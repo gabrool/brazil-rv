@@ -1,0 +1,205 @@
+{
+  "schema": "BRAZIL_RV_V2_ROUND5_DATA_V1",
+  "registered_at_utc": "2026-09-10T14:04:42.486465+00:00",
+  "source_code_commit": "97635435aed191725cb1f32ec8b29981e925f9ca",
+  "source_instruction_file": "C:\\Users\\gabri\\Downloads\\v2_round5_data_round.md",
+  "source_instruction_sha256": "88ad6c7c61591a5c08f264e38d170a35cb72aa2b36f99f833a18dac564a45852",
+  "registration_sha256": "1328f0f5d072654258ada1de369fb3522cdac04f9f8da856cb81060b0d38b8ff",
+  "base_store": {
+    "root": "D:\\quant-data\\b3\\processed\\v2_daily_store_3d67624_20260909T100323Z",
+    "manifest_sha256": "db4f751d47133a6611733739ad9bfc15721452218365e338fec61a6b608bea64"
+  },
+  "round4_roots": {
+    "failed_audit": {
+      "root": "D:\\quant-data\\b3\\processed\\model_runs\\v2_round4_seed_audit_eb5e9ca_20260910",
+      "inventory_sha256": "bf2431e60ab6123b3d91aba93cab408b14eba0fef38124a97afee830f43087e6"
+    },
+    "interrupted_audit": {
+      "root": "D:\\quant-data\\b3\\processed\\model_runs\\v2_round4_seed_audit_714d185_20260910",
+      "inventory_sha256": "b95f98a6995827e8785cea002011075150b8afb65f7b6bdf9998b37afb7b060d"
+    },
+    "screening": {
+      "root": "D:\\quant-data\\b3\\processed\\model_runs\\v2_round4_arms_3d1e95f_20260910T015000Z",
+      "inventory_sha256": "a4c9d098124515594c27acc970b0f3805adc3a36ebbed74e9ddf5be82b284c76"
+    },
+    "seed_audit": {
+      "root": "D:\\quant-data\\b3\\processed\\model_runs\\v2_round4_seed_audit_c77ed66_20260910",
+      "inventory_sha256": "5d66a1d9f4f10bab89c7a32f61f4b9a9eafeb6b4c92c9771175f21ad9f68703d"
+    },
+    "parent": {
+      "root": "D:/quant-data/b3/processed/model_runs/v2_round4_3d1e95f_20260909T220000Z",
+      "inventory_sha256": "c5e836d4945ea85227dfbfcd11b1b79066fe7d34ca6d1f9e9ce7d81252acedd3"
+    },
+    "cpu_replay": {
+      "root": "D:/quant-data/b3/processed/model_runs/v2_round4_cpu_replay_3d1e95f_20260909",
+      "inventory_sha256": "1259dc9544996f626fd6d8bea67ee12afdbef0c1e4d16b493039dded5a719746"
+    }
+  },
+  "acquisition_root": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z",
+  "development_start": "2010-01-04",
+  "development_end": "2024-12-30",
+  "decision_time": "15:45:00",
+  "timezone": "America/Sao_Paulo",
+  "cpu_only": true,
+  "neural_fits_authorized": false,
+  "heldout_performance_access_authorized": false,
+  "max_build_rss_bytes": 8589934592,
+  "families": {
+    "events": {
+      "availability_rule": "publication_timestamp_minute_upper_bound",
+      "planned_features": [
+        "sessions_since_financial_filing",
+        "filing_is_dfp",
+        "sessions_since_material_fact",
+        "material_fact_count_20",
+        "dividend_announcement_age",
+        "offering_or_buyback_flag",
+        "sessions_until_expected_filing"
+      ],
+      "admission": "pending_source_and_joined_causality_proof"
+    },
+    "fundamentals": {
+      "availability_rule": "latest_version_public_at_decision_exact_receipt_else_next_session",
+      "planned_features": [
+        "log_market_cap",
+        "book_to_market",
+        "earnings_yield_ttm",
+        "gross_profitability",
+        "liabilities_to_assets",
+        "accruals_to_assets",
+        "revenue_growth_yoy",
+        "sue",
+        "statement_age_sessions"
+      ],
+      "admission": "pending_source_and_joined_causality_proof"
+    },
+    "lending": {
+      "availability_rule": "reference_next_b3_session_with_verified_open_publication",
+      "planned_features": [
+        "loan_balance_to_volume_20",
+        "loan_balance_change_1",
+        "loan_balance_change_5",
+        "loan_rate",
+        "loan_rate_change_5",
+        "utilization_proxy",
+        "new_loan_volume_surprise"
+      ],
+      "admission": "pending_source_and_joined_causality_proof"
+    },
+    "options": {
+      "availability_rule": "reference_next_b3_session_with_source_publication_proof",
+      "planned_features": [
+        "option_to_stock_volume_20",
+        "put_call_volume_ratio_5",
+        "put_call_oi_log_ratio",
+        "delta_oi_to_volume_1",
+        "uncovered_call_share"
+      ],
+      "admission": "pending_source_and_joined_causality_proof"
+    },
+    "oddlot": {
+      "availability_rule": "unchanged_existing_next_session_contract",
+      "planned_features": [
+        "oddlot_volume_share",
+        "oddlot_volume_share_change_5"
+      ],
+      "admission": "pending_source_and_joined_causality_proof"
+    },
+    "cross_market": {
+      "availability_rule": "per_series_fixing_and_timezone_available_at_or_before_decision",
+      "planned_features": [
+        "exposure_fx",
+        "exposure_rates_br",
+        "exposure_rates_us",
+        "exposure_oil",
+        "exposure_iron",
+        "exposure_vix",
+        "shock_1_and_5_per_verified_series",
+        "exposure_times_shock_1_and_5",
+        "adr_premium_close",
+        "foreign_flow_5",
+        "foreign_flow_5_times_log_volume_mean_20"
+      ],
+      "admission": "pending_source_and_joined_causality_proof"
+    },
+    "sector": {
+      "availability_rule": "historical_public_classification_with_dated_identity",
+      "planned_features": [
+        "name_minus_sector_return_5",
+        "name_minus_sector_return_21",
+        "sector_momentum_12_1"
+      ],
+      "admission": "pending_source_and_joined_causality_proof"
+    },
+    "magnitudes": {
+      "availability_rule": "completed_prior_session_or_causal_hedge_beta",
+      "planned_features": [
+        "return_1_over_vol_20",
+        "daily_vol_20_raw",
+        "log_traded_value_20",
+        "economic_beta_60"
+      ],
+      "admission": "pending_source_and_joined_causality_proof"
+    },
+    "rebalance": {
+      "availability_rule": "verified_preview_publication_before_effective_membership",
+      "planned_features": [
+        "index_pressure",
+        "index_event_age"
+      ],
+      "admission": "pending_source_and_joined_causality_proof"
+    },
+    "microstructure": {
+      "availability_rule": "reference_next_session_verified_archive_schedule",
+      "planned_features": [
+        "avg_trade_size_20",
+        "after_hours_volume_share_5"
+      ],
+      "admission": "pending_source_and_joined_causality_proof"
+    }
+  },
+  "group_b": [
+    "forward_index_previews",
+    "forward_asian_night_minutes",
+    "fund_publication_timing",
+    "ons_ccee_publication_timing",
+    "focus_weekly_timing"
+  ],
+  "gbdt_screen": {
+    "parent": "a_slow",
+    "folds": [
+      "F1",
+      "F2",
+      "F3",
+      "F4",
+      "F5",
+      "F6",
+      "F7",
+      "F8",
+      "F9",
+      "F10",
+      "F11",
+      "F12",
+      "F13",
+      "F14"
+    ],
+    "seeds": [
+      11,
+      29,
+      47,
+      61,
+      79
+    ],
+    "network_selection_weight": 0,
+    "features": "one_admitted_family_at_a_time",
+    "interpretation": "information_readout_only"
+  },
+  "stops": [
+    "rss_above_8gib",
+    "heldout_consumer_row",
+    "protected_base_array_changed",
+    "family_without_availability_proof",
+    "non_ledger_replay_field_changed"
+  ],
+  "raw_archives_immutable": true
+}
