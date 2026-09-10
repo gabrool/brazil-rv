@@ -76,6 +76,13 @@ B3 cash identity govern the join. Original sector codes and separately sourced
 labels must remain distinct. The old identity-dependent admissions will be
 replaced only after the revised bridge and dependent families pass their proofs.
 
+Exact original-versus-annual comparisons now confirm that older annual exports
+can relabel generic shares as ordinary shares. Original descriptions therefore
+govern each version, and genuine modern ticker and preferred-class fields are
+retained. Listing dates are also distinct from entry into a governance segment;
+the latter must not erase an earlier valid listing. These source corrections
+are registered in the [FCA identity amendment](../research/preregistrations/v2_round5_fca_identity_amendment.md).
+
 ## Store and model contract
 
 The registered base is `v2_daily_store_3d67624_20260909T100323Z`, manifestSHA256
@@ -88,6 +95,14 @@ projection. Tests show exact parent forward pass, random initialization and
 parent gradients with invalid sidecars; invalid names contribute no family
 gradient. These are unit tests, not neural research fits. S0 reuse on the eventual
 store requires the recorded exact input-array hashes.
+
+The extension reruns the existing survivor/liquidity composition audits on each
+new family's raw masks and reconstructs the baseline survival flag. Updated
+coverage and audit results live in the extension metadata; copied baseline
+tables remain byte-identical and describe the original store. Nine targeted
+tests cover extension admission, survival/ADV gates, and the existing provider
+invariance and causal-price fixture. Actual full-data audit results remain
+pending the final store build.
 
 ## Continuous book and forward collection
 
