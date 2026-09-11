@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import copy
+from dataclasses import replace
 from pathlib import Path
 
 import numpy as np
@@ -11,7 +12,8 @@ import numpy as np
 from . import research_rounds as rr
 from .artifacts import sha256_file, write_json_atomic
 from .checkpoint_readouts import candidate_readout, paired_readouts, retained
-from .contract import ALLOWED_SEEDS, DEVELOPMENT_FOLDS
+from .contract import ALLOWED_SEEDS, DEVELOPMENT_FOLDS, TRADED_PRIMARY_HORIZONS
+from .evaluate import _primary_daily_metrics, _primary_population_components
 from .data_roots import resolve_external_root
 from .research_checkpoint import _completed, _context_arguments, _finish_cell
 from .research_diagnostics import momentum_diagnostics, pooled_momentum_diagnostics
@@ -70,25 +72,24 @@ def ensemble(
     ablation=None,
 ):
     members, mask, records = [], None, []
+    parent_root = None
+    inventory_files = {}
+    if arm == "S0" and any(seed in ALLOWED_SEEDS for seed in seeds):
+        parent_root = resolve_external_root(design["s0_panels"]["root"])[0]
+        inventory_path = parent_root / "artifact_inventory.json"
+        if sha256_file(inventory_path) != design["s0_panels"]["inventory_sha256"]:
+            raise ValueError("parent score inventory changed")
+        inventory_files = {
+            record["path"]: record for record in rr._read_json(inventory_path)["files"]
+        }
     for seed in seeds:
         run = trajectory(root, arm, seed, fold)
-        if arm == "S0":
-            run = trajectory(Path(design["s0_panels"]["root"]), arm, seed, fold)
+        if arm == "S0" and seed in ALLOWED_SEEDS:
+            run = trajectory(parent_root, arm, seed, fold)
             manifest = rr._read_json(run / "run_manifest.json")
             rr._assert_current_clean_training(manifest, path=run / "run_manifest.json")
             # Every reused byte is bound by the sealed, registered inventory.
-            inventory = rr._read_json(
-                Path(design["s0_panels"]["root"]) / "artifact_inventory.json"
-            )
-            if (
-                sha256_file(
-                    Path(design["s0_panels"]["root"]) / "artifact_inventory.json"
-                )
-                != design["s0_panels"]["inventory_sha256"]
-            ):
-                raise ValueError("parent score inventory changed")
-            relative = run.relative_to(Path(design["s0_panels"]["root"])).as_posix()
-            inventory_files = {record["path"]: record for record in inventory["files"]}
+            relative = run.relative_to(parent_root).as_posix()
             for name in (
                 "run_manifest.json",
                 "scores/score_manifest.json",
@@ -112,7 +113,7 @@ def ensemble(
             expected_feature_schema_sha256=rr._read_json(
                 resolve_external_root(design["s0_store"]["root"])[0] / "manifest.json"
             )["feature_schema_sha256"]
-            if arm == "S0"
+            if arm == "S0" and seed in ALLOWED_SEEDS
             else design["feature_schema_sha256"],
         )
         if mask is not None and not np.array_equal(mask, member_mask):
@@ -248,6 +249,125 @@ def evaluate(root: Path, arms, *, seeds=ALLOWED_SEEDS, group="session1", roster=
         context.store.close()
 
 
+def attribution_reference_matches(metadata: dict, records, seeds, arm: str) -> bool:
+    return (
+        metadata["seeds"] == list(seeds)
+        and metadata["arm"] == arm
+        and [r["run_manifest_sha256"] for r in metadata["trajectories"]]
+        == [r["run_manifest_sha256"] for r in records]
+    )
+
+
+def attribution(root: Path, arms, *, ablation, reference_group, seeds=ALLOWED_SEEDS):
+    """Paired forecast attribution; no refit, new candidate or portfolio gate."""
+    if not ablation or not reference_group:
+        raise ValueError(
+            "attribution requires a family/all and a trained reference group"
+        )
+    design = rr._read_json(root / "frozen_design.json")
+    roster = (
+        rr._read_json(root / "session2_roster.json")
+        if (root / "session2_roster.json").exists()
+        else None
+    )
+    output = root / "attribution" / reference_group / ablation
+    output.mkdir(parents=True, exist_ok=False)
+    context = rr._open_ledger_replay(evaluation_design(design))
+    daily = {a: {} for a in arms}
+    try:
+        for fold in DEVELOPMENT_FOLDS:
+            ix = context.evaluation[fold]
+            for arm in arms:
+                trained_path = root / "aggregates" / reference_group / arm / fold
+                metadata = rr._read_json(trained_path / "score_manifest.json")[
+                    "metadata"
+                ]
+                scores, mask, records = ensemble(
+                    design,
+                    root,
+                    arm,
+                    fold,
+                    seeds,
+                    context.store.dates[ix],
+                    context.store.isins,
+                    roster=roster,
+                    ablation=ablation,
+                )
+                if not attribution_reference_matches(metadata, records, seeds, arm):
+                    raise ValueError(
+                        "attribution reference uses different trained models"
+                    )
+                trained = retained(context, trained_path, fold)
+                np.testing.assert_array_equal(mask, trained.inputs.score_mask)
+                invalid_inputs = replace(trained.inputs, scores=scores, score_mask=mask)
+                components = _primary_population_components(
+                    invalid_inputs, TRADED_PRIMARY_HORIZONS
+                )
+                _, invalid_ic, _ = _primary_daily_metrics(
+                    *components, invalid_inputs.dates, TRADED_PRIMARY_HORIZONS
+                )
+                invalid_result = replace(
+                    trained.result,
+                    daily_primary_ic=invalid_ic,
+                    primary_scores=components[0],
+                    primary_targets=components[1],
+                    primary_outcome_mask=components[2],
+                    primary_score_mask=components[3],
+                )
+                delta, population = rr._paired_primary_daily(
+                    trained.result, invalid_result
+                )
+                daily[arm][fold] = delta
+                write_json_atomic(
+                    output / arm / f"{fold}.json",
+                    {
+                        "arm": arm,
+                        "fold": fold,
+                        "ablation": ablation,
+                        "seeds": list(seeds),
+                        "direction": "trained_minus_forced_invalid",
+                        "source_score_manifests": records,
+                        "trained_aggregate_sha256": sha256_file(
+                            trained_path / "score_manifest.json"
+                        ),
+                        "population": population,
+                        "daily_primary_ic_delta": [
+                            float(v) if np.isfinite(v) else None for v in delta
+                        ],
+                        "promotion_weight": 0,
+                    },
+                )
+                del trained, invalid_inputs, invalid_result
+        summary = {}
+        for arm, values in daily.items():
+            informative = informative_folds(design, arm, roster)
+            summary[arm] = {
+                "all_folds": rr._folded_bootstrap(tuple(values.values())),
+                "informative_folds": informative,
+                "informative": rr._folded_bootstrap(
+                    tuple(values[f] for f in informative)
+                ),
+                "folds": {f: rr._folded_bootstrap((v,)) for f, v in values.items()},
+            }
+        return write_json_atomic(
+            output / "result.json",
+            {
+                "schema": "BRAZIL_RV_ROUND6_ATTRIBUTION_V1",
+                "status": "completed",
+                "ablation": ablation,
+                "reference_group": reference_group,
+                "seeds": list(seeds),
+                "readouts": summary,
+                "promotion_weight": 0,
+                "direction": "trained_minus_forced_invalid",
+                "frozen_design_sha256": sha256_file(root / "frozen_design.json"),
+                **rr.RESEARCH_FLAGS,
+            },
+        )
+    finally:
+        context.store.close()
+
+
 def freeze_roster(root: Path):
     result_path = root / "session1_result.json"
     result = rr._read_json(result_path)
@@ -276,14 +396,26 @@ def freeze_roster(root: Path):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("action", choices=("evaluate", "roster"))
+    parser.add_argument("action", choices=("evaluate", "roster", "attribution"))
     parser.add_argument("--root", required=True, type=Path)
     parser.add_argument("--arms", nargs="+", default=["S0", *SESSION1])
     parser.add_argument("--seeds", type=int, nargs="+", default=list(ALLOWED_SEEDS))
     parser.add_argument("--group", default="session1")
+    parser.add_argument("--ablation")
+    parser.add_argument("--reference-group")
     args = parser.parse_args()
     if args.action == "roster":
         print(freeze_roster(args.root))
+    elif args.action == "attribution":
+        print(
+            attribution(
+                args.root,
+                args.arms,
+                ablation=args.ablation,
+                reference_group=args.reference_group,
+                seeds=tuple(args.seeds),
+            )
+        )
     else:
         roster = (
             rr._read_json(args.root / "session2_roster.json")
