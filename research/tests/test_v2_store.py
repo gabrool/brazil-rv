@@ -286,6 +286,82 @@ def test_external_gate_uses_supported_name_clustered_one_sided_intervals() -> No
         )
 
 
+def test_calendar_coverage_retains_pooled_failure_and_detects_contemporaneous_bias():
+    dates = np.datetime64("2023-01-01") + np.arange(800).astype("timedelta64[D]")
+    observed = np.ones((800, 40), bool)
+    observed[400:, :20] = False
+    adv = np.broadcast_to((1.0 + np.arange(800) % 4)[:, None], observed.shape)
+    valid = np.stack([observed, observed & (np.arange(800)[:, None] >= 400)], axis=2)
+    before = valid.copy()
+    pooled = _external_feature_validity_by_survival_liquidity(
+        dates,
+        observed,
+        observed,
+        adv,
+        "sidecar_lending",
+        valid,
+        observed,
+        enforce=False,
+    )
+    assert (
+        pooled.filter(
+            pl.col("gate_decision") == "fail_survivor_favoring_interval"
+        ).height
+        == 8
+    )
+    matched = _external_feature_validity_by_survival_liquidity(
+        dates,
+        observed,
+        observed,
+        adv,
+        "sidecar_lending",
+        valid,
+        observed,
+        calendar_standardized=True,
+    )
+    assert matched["survivor_minus_delisted_gap"].eq(0).all()
+    assert matched["shared_calendar_sessions"].max() == 400
+    assert matched["one_group_only_calendar_sessions"].max() == 400
+    assert matched.filter(pl.col("prior_adv20_quartile") > 0)[
+        "stratified_gate_passed"
+    ].all()
+    np.testing.assert_array_equal(valid, before)
+    valid[:400, 20:, 1] = True
+    with pytest.raises(ValueError, match="name-bootstrap lower bound"):
+        _external_feature_validity_by_survival_liquidity(
+            dates,
+            observed,
+            observed,
+            adv,
+            "sidecar_lending",
+            valid,
+            observed,
+            calendar_standardized=True,
+        )
+
+
+def test_calendar_coverage_weights_sessions_equally_when_group_sizes_change():
+    dates = np.datetime64("2020-01-01") + np.arange(1600).astype("timedelta64[D]")
+    observed = np.zeros((1600, 40), bool)
+    observed[:400, :22] = True
+    observed[400:800, :2] = True
+    observed[400:, 20:] = True
+    adv = np.broadcast_to((1.0 + np.arange(1600) % 4)[:, None], observed.shape)
+    valid = np.stack([observed, observed & (np.arange(1600)[:, None] >= 400)], axis=2)
+    matched = _external_feature_validity_by_survival_liquidity(
+        dates,
+        observed,
+        observed,
+        adv,
+        "sidecar_lending",
+        valid,
+        observed,
+        calendar_standardized=True,
+    )
+    np.testing.assert_allclose(matched["validity_ratio"], 0.75, atol=1e-12)
+    np.testing.assert_allclose(matched["survivor_minus_delisted_gap"], 0, atol=1e-12)
+
+
 def test_external_gate_reports_but_does_not_gate_thin_strata() -> None:
     dates = np.datetime64("2023-01-01") + np.arange(800).astype("timedelta64[D]")
     observed = np.ones((800, 40), dtype=np.bool_)

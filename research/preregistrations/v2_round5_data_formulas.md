@@ -97,6 +97,23 @@ original registration and replay bindings remain intact.
   Adjacent-filing ratios remain review signals and never supply values, masks or
   availability. The registered feature, chronology and five-seed screen contracts
   remain unchanged.
+- Round-5 coverage acceptance compares survival groups within the same observed
+  decision sessions in each prior-ADV20 quartile. The first attempted store
+  exposed a pooled lower bound of 5.643 percentage points for lending: rates and
+  flow begin later than balances, while low-liquidity delisted names contribute
+  almost no observations in those later years. Retain the original pooled
+  diagnostic, including failed intervals; it is not a calendar-controlled test.
+  For the binding comparison, keep sessions with observed family-present names
+  in both groups, weight each group/session equally, and cluster all contributions
+  by continuation identity. Bootstrap those fixed calendar weights with the
+  existing 1,000 name draws and 95% interval. Retain the 5-percentage-point
+  threshold and original 20-name/2,000-name-day support requirements, now measured
+  on the common calendar. Report one-group-only sessions and unsupported strata;
+  lack of common support is not evidence of equal coverage. Eventual survival and
+  these diagnostic weights must never select, mask, reweight or delay model
+  inputs. Availability/identity proofs, protected hashes and the 8-GiB limit
+  remain hard requirements. This correction is registered under the user's
+  standing authorization before any predictive screen result.
 - A reviewed financial filing can disclose a post-reference share-change approval.
   Register its own approval date with the exact filing identity and source evidence.
   From the filing's ordinary receipt clock, apply the existing capital-event

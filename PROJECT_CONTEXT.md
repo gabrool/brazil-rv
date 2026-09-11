@@ -191,6 +191,15 @@ snapshots or recurring capture are authorized. The existing quarantined snapshot
 remains immutable evidence. The five-minute monitor continues historical Round-5
 work only and must pause after completion, without restoring daily capture.
 
+Round-5 external coverage audits preserve pooled survival/liquidity diagnostics
+and bind acceptance to equal-weight comparisons on the same observed decision
+sessions within each liquidity stratum. Later source launches otherwise confound
+the pooled comparison with eventual survival. Name-cluster bootstrap, the 5-point
+threshold and minimum support remain; one-group-only periods and unsupported
+strata are disclosed. Eventual survival and diagnostic weights never enter model
+values, masks, eligibility or fitting. The original failed lending audit is
+retained in `docs/v2_round5_store_coverage_stop.json`.
+
 Round-5 CVM identity uses each original filing's historical security description
 and exchange listing dates; modern viewer class labels and governance-segment
 entry dates cannot replace those facts. Numeric sector groups use explicit

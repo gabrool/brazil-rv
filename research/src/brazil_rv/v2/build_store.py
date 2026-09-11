@@ -1494,8 +1494,18 @@ def _external_feature_validity_by_survival_liquidity(
     valid: NDArray[np.bool_],
     present: NDArray[np.bool_],
     survival_identities: Sequence[str] | None = None,
+    *,
+    calendar_standardized: bool = False,
+    enforce: bool = True,
 ) -> pl.DataFrame:
-    """Gate survivor-favoring external coverage with name-clustered intervals."""
+    """Audit external coverage; optionally compare the same weighted sessions.
+
+    Calendar standardization restricts the audit to sessions observed in both
+    survival groups within the liquidity stratum. Each group/session receives
+    equal total weight. Name-cluster bootstrap resamples those fixed calendar
+    weights; neither weights nor eventual survival enter any model input.
+    ``enforce=False`` preserves every failed row for the pooled diagnostic.
+    """
 
     membership = np.asarray(active, dtype=np.bool_)
     seen = np.asarray(observed, dtype=np.bool_)
@@ -1532,36 +1542,54 @@ def _external_feature_validity_by_survival_liquidity(
     strata = [(0, eligible)] + [
         (quartile_index + 1, quartile == quartile_index) for quartile_index in range(4)
     ]
+    valid_counts = mask.sum(axis=2, dtype=np.int64)
     for quartile_number, stratum in strata:
-        ratios: dict[str, float] = {}
-        denominators: dict[str, int] = {}
-        numerators_by_identity: dict[str, NDArray[np.int64]] = {}
-        denominators_by_identity: dict[str, NDArray[np.int64]] = {}
+        stratum_eligible = eligible & stratum
+        group_days = {
+            label: stratum_eligible[:, names].sum(axis=1)
+            for label, names in groups.items()
+        }
+        shared_sessions = np.logical_and.reduce(
+            [count > 0 for count in group_days.values()]
+        )
+        calendar_days = stratum_eligible.any(axis=1)
+        if calendar_standardized:
+            stratum_eligible = stratum_eligible & shared_sessions[:, None]
+        ratios = {}
+        denominators = {}
+        numerators_by_identity = {}
+        denominators_by_identity = {}
         supported_names: dict[str, int] = {}
         present_name_days: dict[str, int] = {}
         for label, names in groups.items():
-            selected = eligible & stratum & names[None, :]
+            selected = stratum_eligible & names[None, :]
             per_column_days = selected.sum(axis=0, dtype=np.int64)
-            per_column_valid = (mask & selected[..., None]).sum(
-                axis=(0, 2), dtype=np.int64
-            )
-            clustered: dict[str, list[int]] = {}
+            raw_column_valid = (valid_counts * selected).sum(axis=0)
+            if calendar_standardized:
+                weights = selected / np.maximum(group_days[label], 1)[:, None]
+                per_column_valid = (valid_counts * weights).sum(axis=0)
+                per_column_possible = weights.sum(axis=0) * mask.shape[2]
+            else:
+                per_column_valid = raw_column_valid
+                per_column_possible = per_column_days * mask.shape[2]
+            clustered: dict[str, list[float]] = {}
             for column in np.flatnonzero(names):
                 identity = identities[int(column)]
                 counts = clustered.setdefault(identity, [0, 0])
-                counts[0] += int(per_column_valid[column])
-                counts[1] += int(per_column_days[column]) * mask.shape[2]
+                counts[0] += per_column_valid[column]
+                counts[1] += per_column_possible[column]
             supported = [counts for counts in clustered.values() if counts[1] > 0]
+            count_dtype = np.float64 if calendar_standardized else np.int64
             cluster_numerators = np.asarray(
-                [counts[0] for counts in supported], dtype=np.int64
+                [counts[0] for counts in supported], dtype=count_dtype
             )
             cluster_denominators = np.asarray(
-                [counts[1] for counts in supported], dtype=np.int64
+                [counts[1] for counts in supported], dtype=count_dtype
             )
             present_days = int(per_column_days.sum())
-            denominator = int(cluster_denominators.sum())
-            numerator = int(cluster_numerators.sum())
-            ratio = numerator / denominator if denominator else 0.0
+            denominator = float(cluster_denominators.sum())
+            numerator = float(cluster_numerators.sum())
+            ratio = numerator / denominator if denominator else None
             ratios[label] = ratio
             denominators[label] = denominator
             numerators_by_identity[label] = cluster_numerators
@@ -1586,10 +1614,19 @@ def _external_feature_validity_by_survival_liquidity(
                     "name_count": int(names.sum()),
                     "supported_continuation_name_count": supported_names[label],
                     "family_present_name_days": present_days,
-                    "valid_feature_cells": numerator,
-                    "possible_feature_cells": denominator,
+                    "valid_feature_cells": int(raw_column_valid.sum()),
+                    "possible_feature_cells": present_days * mask.shape[2],
                     "validity_ratio": ratio,
                     "mask_rate": 1.0 - ratio if denominator else None,
+                    "calendar_comparison": (
+                        "same_session_equal_weight"
+                        if calendar_standardized
+                        else "pooled_name_days"
+                    ),
+                    "shared_calendar_sessions": int(shared_sessions.sum()),
+                    "one_group_only_calendar_sessions": int(
+                        (calendar_days & ~shared_sessions).sum()
+                    ),
                     "survivor_minus_delisted_gap": None,
                     "bootstrap_lower_95": None,
                     "bootstrap_upper_95": None,
@@ -1619,6 +1656,7 @@ def _external_feature_validity_by_survival_liquidity(
                 seed_payload = (
                     "v2-external-validity-name-bootstrap|"
                     f"{family}|{quartile_number}|{label}"
+                    + ("|same-session" if calendar_standardized else "")
                 ).encode("utf-8")
                 seed = int.from_bytes(
                     hashlib.sha256(seed_payload).digest()[:8], "little"
@@ -1672,7 +1710,7 @@ def _external_feature_validity_by_survival_liquidity(
                 row["stratum_is_binding"] = binding
                 row["support_threshold_met"] = support_met
                 row["gate_decision"] = decision
-            if binding and float(lower) > 0.05:
+            if enforce and binding and float(lower) > 0.05:
                 raise ValueError(
                     f"external feature validity for {family} has a supported "
                     "survivor-minus-delisted name-bootstrap lower bound above "
@@ -4000,11 +4038,7 @@ def main(arguments: Sequence[str] | None = None) -> None:
         raise FileNotFoundError(args.cotahist_parse_audit)
     _validate_cotahist_parse_audit(args.cotahist_parse_audit, raw_sources)
     full_schedule = load_session_schedule(args.session_schedule)
-    schedule = tuple(
-        row
-        for row in full_schedule
-        if row.trade_date <= args.store_end
-    )
+    schedule = tuple(row for row in full_schedule if row.trade_date <= args.store_end)
     # Calendar metadata preserves the last completed row's original information
     # cutoff. No market data or consumer row for that following session is read.
     following_decision_at = next(

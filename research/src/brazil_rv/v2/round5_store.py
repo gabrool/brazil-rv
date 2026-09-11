@@ -122,7 +122,9 @@ def build(plan_path: Path, output: Path) -> dict:
     isins = store.isins
     active = store.read("active", rows)
     observed = store.read("observed", rows)
-    links = pl.read_parquet(source / original["tables"]["isin_succession_links"]["path"])
+    links = pl.read_parquet(
+        source / original["tables"]["isin_succession_links"]["path"]
+    )
     survival_identities = continuation_identity_axis(isins, links)
     survival = _survival_audit(store, axis)
     if survival and survival["different_cells"]:
@@ -193,9 +195,24 @@ def build(plan_path: Path, output: Path) -> dict:
                         maximum_gap=None,
                     ).to_dicts(),
                     "liquidity_strata": [],
+                    "pooled_liquidity_strata": [],
                     "status": "source_unavailable_no_observable_population",
                 }
                 if np.any(active & observed & present & np.isfinite(prior_adv)):
+                    pooled = _external_feature_validity_by_survival_liquidity(
+                        axis,
+                        active,
+                        observed,
+                        prior_adv,
+                        family,
+                        mask,
+                        present,
+                        survival_identities,
+                        enforce=False,
+                    )
+                    composition["pooled_liquidity_strata"] = pooled.drop(
+                        "coverage_note"
+                    ).to_dicts()
                     strata = _external_feature_validity_by_survival_liquidity(
                         axis,
                         active,
@@ -205,6 +222,7 @@ def build(plan_path: Path, output: Path) -> dict:
                         mask,
                         present,
                         survival_identities,
+                        calendar_standardized=True,
                     )
                     # The base helper carries an old fixed lending note. The
                     # actual counts above describe this extended population.
@@ -212,6 +230,9 @@ def build(plan_path: Path, output: Path) -> dict:
                         "coverage_note"
                     ).to_dicts()
                     composition["status"] = "completed_no_binding_failure"
+                    composition["comparison"] = (
+                        "equal calendar-session weight within common observed survival-group support; fixed-calendar-weight name bootstrap"
+                    )
                 values = staging.create_array(f"{family}_values", raw.shape, np.float32)
                 valid = staging.create_array(f"{family}_valid", mask.shape, np.bool_)
                 transform_feature_panel_into(raw, mask, active, specs, values, valid)
