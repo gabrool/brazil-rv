@@ -75,6 +75,7 @@ def _model_batch(
     device: torch.device,
     *,
     omit_fast_stream: bool,
+    invalid_sidecars: tuple[str, ...] = (),
 ) -> dict[str, torch.Tensor]:
     names = {
         "slow_features",
@@ -119,6 +120,9 @@ def _model_batch(
     missing = required - result.keys()
     if missing:
         raise ValueError(f"scoring batch is missing model inputs: {sorted(missing)}")
+    for family in invalid_sidecars:
+        key = f"sidecar_{family}_valid"
+        result[key] = torch.zeros_like(result[key])
     if omit_fast_stream and "fast_present" in result:
         result["fast_present"] = torch.zeros_like(result["fast_present"])
     any_fast_present = "fast_present" in result and torch.any(
@@ -165,6 +169,7 @@ def score_checkpoint_artifact(
     expected_checkpoint_sha256: str | None = None,
     device: torch.device | None = None,
     record_branch_diagnostics: bool = False,
+    invalid_sidecars: tuple[str, ...] = (),
 ) -> ScoreArtifact:
     """Score one authorized chronological axis into an immutable artifact root.
 
@@ -174,6 +179,8 @@ def score_checkpoint_artifact(
     """
 
     dataset, access = _authorized_dataset(loader)
+    if set(invalid_sidecars) - set(dataset.enabled_sidecars):
+        raise ValueError("inference ablation requires an enabled sidecar family")
     checkpoint = Path(checkpoint).resolve()
     output = Path(output_dir).resolve()
     if output.exists():
@@ -320,6 +327,7 @@ def score_checkpoint_artifact(
                 target_device,
                 omit_fast_stream=dataset.stage == "pretrain"
                 or model_config.disable_fast_stream,
+                invalid_sidecars=invalid_sidecars,
             )
             with torch.autocast(
                 device_type=target_device.type,
@@ -417,6 +425,7 @@ def score_checkpoint_artifact(
                 "horizons": list(HORIZONS),
             },
             "inference": {
+                "forced_invalid_sidecars": list(invalid_sidecars),
                 "device_type": target_device.type,
                 "batch_size": getattr(loader, "batch_size", None),
                 "compiled": model_config.compile_forward,
@@ -434,7 +443,9 @@ def score_checkpoint_artifact(
             from .branch_diagnostics import gate_activations
 
             gate_path = staging / "gate_activations.json"
-            gate_report = gate_activations(model, loader, target_device)
+            gate_report = gate_activations(
+                model, loader, target_device, invalid_sidecars=invalid_sidecars
+            )
             manifest["gate_diagnostics"] = {
                 "path": gate_path.name,
                 "sha256": write_json_atomic(gate_path, gate_report),

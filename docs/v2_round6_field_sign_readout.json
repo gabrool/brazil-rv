@@ -1,0 +1,3212 @@
+{
+  "access": {
+    "official_validation_accessed": false,
+    "purpose": "training",
+    "registration": null,
+    "test_accessed": false
+  },
+  "bounded_formula_check": {
+    "conclusion": "No independently demonstrated formula/alignment/unit error from this bounded review; retain both fields unchanged, including adverse-era results. Prior source receipt/version/TTM/market-cap tests remain the evidence for causality.",
+    "gross_profitability": "TTM gross profit divided by positive assets in consistent BRL units and consolidated/individual basis; banks require financial-intermediation account semantics and insurers are not forced comparable. No inverted sign or present-value denominator found.",
+    "physical_distributions": {
+      "gross_profitability": {
+        "count": 763276,
+        "finite": true,
+        "p01_p50_p99": [
+          -0.04824744892547256,
+          0.1468985247814343,
+          0.6641510957752517
+        ]
+      },
+      "log_market_cap": {
+        "count": 242269,
+        "finite": true,
+        "p01_p50_p99": [
+          16.243568167906115,
+          21.571116371351952,
+          26.272578547935346
+        ]
+      }
+    },
+    "size": "Natural log of issuer capitalization from own-received share counts and prior-session prices of each dated share class. No current-session price, reciprocal, or negation. Positive later-period IC is not proof of an alignment error.",
+    "source_features_sha256": "29a42a5c5231fce2402d17b1a3c19ca70808ba7d2561f3e2e01b11e556fc7012",
+    "source_module_sha256": "ed4a07ff3f9d9259a8230c704a96cb8f64cb3c80714aa50b8f0e06f22db9dcdd"
+  },
+  "code": {
+    "commit": "bf1036321f95988c247033d7b1d9cf823fd4a309",
+    "tracked_worktree_clean": true
+  },
+  "fields": {
+    "accruals_to_assets": {
+      "by_year": {
+        "2010": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 0,
+          "mean_daily_cross_sectional_ic": null,
+          "median_daily_cross_sectional_ic": null,
+          "pooled_name_day_spearman_secondary": null,
+          "positive_daily_ics": 0,
+          "supported_dates": 0,
+          "supported_name_days": 0
+        },
+        "2011": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 0,
+          "mean_daily_cross_sectional_ic": null,
+          "median_daily_cross_sectional_ic": null,
+          "pooled_name_day_spearman_secondary": null,
+          "positive_daily_ics": 0,
+          "supported_dates": 0,
+          "supported_name_days": 0
+        },
+        "2012": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 203,
+          "mean_daily_cross_sectional_ic": -0.041191247644170675,
+          "median_daily_cross_sectional_ic": -0.03716479566143078,
+          "pooled_name_day_spearman_secondary": -0.04352938383817673,
+          "positive_daily_ics": 87,
+          "supported_dates": 203,
+          "supported_name_days": 5816
+        },
+        "2013": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 248,
+          "mean_daily_cross_sectional_ic": -0.018785066865819912,
+          "median_daily_cross_sectional_ic": -0.02531392243103073,
+          "pooled_name_day_spearman_secondary": -0.0214855819940567,
+          "positive_daily_ics": 110,
+          "supported_dates": 248,
+          "supported_name_days": 6749
+        },
+        "2014": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 248,
+          "mean_daily_cross_sectional_ic": -0.0007881027005304332,
+          "median_daily_cross_sectional_ic": 0.004383743772061939,
+          "pooled_name_day_spearman_secondary": 0.001828648615628481,
+          "positive_daily_ics": 126,
+          "supported_dates": 248,
+          "supported_name_days": 8715
+        },
+        "2015": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 246,
+          "mean_daily_cross_sectional_ic": 0.00391365252588482,
+          "median_daily_cross_sectional_ic": -0.01373974181949247,
+          "pooled_name_day_spearman_secondary": 0.007951163686811924,
+          "positive_daily_ics": 117,
+          "supported_dates": 246,
+          "supported_name_days": 8417
+        },
+        "2016": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 233,
+          "mean_daily_cross_sectional_ic": -0.048462063049717376,
+          "median_daily_cross_sectional_ic": -0.048395967815935366,
+          "pooled_name_day_spearman_secondary": -0.04651207476854324,
+          "positive_daily_ics": 88,
+          "supported_dates": 233,
+          "supported_name_days": 7362
+        },
+        "2017": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 246,
+          "mean_daily_cross_sectional_ic": 0.01782584201346548,
+          "median_daily_cross_sectional_ic": 0.026527757038794647,
+          "pooled_name_day_spearman_secondary": 0.016443083062767982,
+          "positive_daily_ics": 139,
+          "supported_dates": 246,
+          "supported_name_days": 7713
+        },
+        "2018": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 245,
+          "mean_daily_cross_sectional_ic": 0.008595832983904959,
+          "median_daily_cross_sectional_ic": 0.008642729475729555,
+          "pooled_name_day_spearman_secondary": 0.014626195654273033,
+          "positive_daily_ics": 133,
+          "supported_dates": 245,
+          "supported_name_days": 19474
+        },
+        "2019": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 248,
+          "mean_daily_cross_sectional_ic": -0.013226059116949596,
+          "median_daily_cross_sectional_ic": -0.004766546313364435,
+          "pooled_name_day_spearman_secondary": -0.013192737475037575,
+          "positive_daily_ics": 116,
+          "supported_dates": 248,
+          "supported_name_days": 26371
+        },
+        "2020": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 249,
+          "mean_daily_cross_sectional_ic": 0.017551114122917343,
+          "median_daily_cross_sectional_ic": 0.017665185507988384,
+          "pooled_name_day_spearman_secondary": 0.017768697813153267,
+          "positive_daily_ics": 138,
+          "supported_dates": 249,
+          "supported_name_days": 30974
+        },
+        "2021": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 247,
+          "mean_daily_cross_sectional_ic": 0.010450594340666773,
+          "median_daily_cross_sectional_ic": 0.012702584319066712,
+          "pooled_name_day_spearman_secondary": 0.011836341582238674,
+          "positive_daily_ics": 138,
+          "supported_dates": 247,
+          "supported_name_days": 38374
+        },
+        "2022": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 250,
+          "mean_daily_cross_sectional_ic": 0.00019824454230780653,
+          "median_daily_cross_sectional_ic": -0.003440960640934279,
+          "pooled_name_day_spearman_secondary": -0.00030258134938776493,
+          "positive_daily_ics": 124,
+          "supported_dates": 250,
+          "supported_name_days": 33467
+        },
+        "2023": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 248,
+          "mean_daily_cross_sectional_ic": -0.019928748669483357,
+          "median_daily_cross_sectional_ic": -0.0298696026694808,
+          "pooled_name_day_spearman_secondary": -0.01975882798433304,
+          "positive_daily_ics": 97,
+          "supported_dates": 248,
+          "supported_name_days": 34556
+        },
+        "2024": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 246,
+          "mean_daily_cross_sectional_ic": 0.006842963979578812,
+          "median_daily_cross_sectional_ic": 0.0033724856111393272,
+          "pooled_name_day_spearman_secondary": 0.006311147473752499,
+          "positive_daily_ics": 131,
+          "supported_dates": 246,
+          "supported_name_days": 32687
+        }
+      },
+      "family": "fundamentals",
+      "pooled": {
+        "constant_rank_dates_with_minimum_support": 0,
+        "defined_daily_ics": 3157,
+        "mean_daily_cross_sectional_ic": -0.005255518883370199,
+        "median_daily_cross_sectional_ic": -0.004222013202341619,
+        "pooled_name_day_spearman_secondary": -0.0003766770241782069,
+        "positive_daily_ics": 1544,
+        "supported_dates": 3157,
+        "supported_name_days": 260675
+      },
+      "registered_expected_sign": "negative"
+    },
+    "book_to_market": {
+      "by_year": {
+        "2010": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 0,
+          "mean_daily_cross_sectional_ic": null,
+          "median_daily_cross_sectional_ic": null,
+          "pooled_name_day_spearman_secondary": null,
+          "positive_daily_ics": 0,
+          "supported_dates": 0,
+          "supported_name_days": 0
+        },
+        "2011": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 1,
+          "mean_daily_cross_sectional_ic": 0.15344115413808584,
+          "median_daily_cross_sectional_ic": 0.15344115413808584,
+          "pooled_name_day_spearman_secondary": 0.1534411609172821,
+          "positive_daily_ics": 1,
+          "supported_dates": 1,
+          "supported_name_days": 20
+        },
+        "2012": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 10,
+          "mean_daily_cross_sectional_ic": -0.03732476609779144,
+          "median_daily_cross_sectional_ic": -0.02099190556770092,
+          "pooled_name_day_spearman_secondary": -0.04599330201745033,
+          "positive_daily_ics": 4,
+          "supported_dates": 10,
+          "supported_name_days": 206
+        },
+        "2013": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 0,
+          "mean_daily_cross_sectional_ic": null,
+          "median_daily_cross_sectional_ic": null,
+          "pooled_name_day_spearman_secondary": null,
+          "positive_daily_ics": 0,
+          "supported_dates": 0,
+          "supported_name_days": 0
+        },
+        "2014": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 68,
+          "mean_daily_cross_sectional_ic": -0.045455804805171335,
+          "median_daily_cross_sectional_ic": -0.0694423986267314,
+          "pooled_name_day_spearman_secondary": -0.0397927388548851,
+          "positive_daily_ics": 31,
+          "supported_dates": 68,
+          "supported_name_days": 1527
+        },
+        "2015": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 51,
+          "mean_daily_cross_sectional_ic": -0.08603669477273457,
+          "median_daily_cross_sectional_ic": -0.06105878854022752,
+          "pooled_name_day_spearman_secondary": -0.10223960876464844,
+          "positive_daily_ics": 18,
+          "supported_dates": 51,
+          "supported_name_days": 1073
+        },
+        "2016": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 17,
+          "mean_daily_cross_sectional_ic": -0.04893036397944339,
+          "median_daily_cross_sectional_ic": -0.013538925365125222,
+          "pooled_name_day_spearman_secondary": -0.02824104204773903,
+          "positive_daily_ics": 8,
+          "supported_dates": 17,
+          "supported_name_days": 351
+        },
+        "2017": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 5,
+          "mean_daily_cross_sectional_ic": 0.022857142857142843,
+          "median_daily_cross_sectional_ic": 0.18796992481203006,
+          "pooled_name_day_spearman_secondary": 0.05013972893357277,
+          "positive_daily_ics": 3,
+          "supported_dates": 5,
+          "supported_name_days": 100
+        },
+        "2018": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 212,
+          "mean_daily_cross_sectional_ic": 0.06641909860642771,
+          "median_daily_cross_sectional_ic": 0.06278650509037798,
+          "pooled_name_day_spearman_secondary": 0.0601789616048336,
+          "positive_daily_ics": 137,
+          "supported_dates": 212,
+          "supported_name_days": 8529
+        },
+        "2019": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 248,
+          "mean_daily_cross_sectional_ic": -0.014864252609592505,
+          "median_daily_cross_sectional_ic": -0.013747153747153747,
+          "pooled_name_day_spearman_secondary": -0.007906263694167137,
+          "positive_daily_ics": 120,
+          "supported_dates": 248,
+          "supported_name_days": 12406
+        },
+        "2020": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 249,
+          "mean_daily_cross_sectional_ic": -0.004994581894081578,
+          "median_daily_cross_sectional_ic": -0.007290329765480282,
+          "pooled_name_day_spearman_secondary": 0.003768909489735961,
+          "positive_daily_ics": 116,
+          "supported_dates": 249,
+          "supported_name_days": 18074
+        },
+        "2021": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 247,
+          "mean_daily_cross_sectional_ic": 0.03281197110392503,
+          "median_daily_cross_sectional_ic": 0.033127757701055395,
+          "pooled_name_day_spearman_secondary": 0.040385901927948,
+          "positive_daily_ics": 147,
+          "supported_dates": 247,
+          "supported_name_days": 21793
+        },
+        "2022": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 250,
+          "mean_daily_cross_sectional_ic": 0.022055736567397708,
+          "median_daily_cross_sectional_ic": 0.03246797161447952,
+          "pooled_name_day_spearman_secondary": 0.021766239777207375,
+          "positive_daily_ics": 150,
+          "supported_dates": 250,
+          "supported_name_days": 18900
+        },
+        "2023": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 248,
+          "mean_daily_cross_sectional_ic": 0.01805885256531961,
+          "median_daily_cross_sectional_ic": 0.014074650515209534,
+          "pooled_name_day_spearman_secondary": 0.02290899120271206,
+          "positive_daily_ics": 133,
+          "supported_dates": 248,
+          "supported_name_days": 18887
+        },
+        "2024": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 246,
+          "mean_daily_cross_sectional_ic": -0.008708923977970871,
+          "median_daily_cross_sectional_ic": -0.013850550908599407,
+          "pooled_name_day_spearman_secondary": -0.0027215778827667236,
+          "positive_daily_ics": 109,
+          "supported_dates": 246,
+          "supported_name_days": 16664
+        }
+      },
+      "family": "fundamentals",
+      "pooled": {
+        "constant_rank_dates_with_minimum_support": 0,
+        "defined_daily_ics": 1852,
+        "mean_daily_cross_sectional_ic": 0.009011528816160363,
+        "median_daily_cross_sectional_ic": 0.0110287363049827,
+        "pooled_name_day_spearman_secondary": 0.016707591712474823,
+        "positive_daily_ics": 977,
+        "supported_dates": 1852,
+        "supported_name_days": 118530
+      },
+      "registered_expected_sign": "positive_value_prior"
+    },
+    "dividend_announcement_age": {
+      "by_year": {
+        "2010": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 62,
+          "mean_daily_cross_sectional_ic": -0.009214645194661388,
+          "median_daily_cross_sectional_ic": 0.026923744338876277,
+          "pooled_name_day_spearman_secondary": 0.018991973251104355,
+          "positive_daily_ics": 34,
+          "supported_dates": 199,
+          "supported_name_days": 2948
+        },
+        "2011": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 236,
+          "mean_daily_cross_sectional_ic": -0.011445333167252696,
+          "median_daily_cross_sectional_ic": 0.0047951340999798225,
+          "pooled_name_day_spearman_secondary": 0.002946206834167242,
+          "positive_daily_ics": 120,
+          "supported_dates": 249,
+          "supported_name_days": 5702
+        },
+        "2012": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 245,
+          "mean_daily_cross_sectional_ic": 0.03283422792614248,
+          "median_daily_cross_sectional_ic": 0.029299018632383884,
+          "pooled_name_day_spearman_secondary": 0.018961451947689056,
+          "positive_daily_ics": 134,
+          "supported_dates": 246,
+          "supported_name_days": 6232
+        },
+        "2013": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 248,
+          "mean_daily_cross_sectional_ic": 0.01947489205363662,
+          "median_daily_cross_sectional_ic": 0.023156562324842464,
+          "pooled_name_day_spearman_secondary": 0.015197530388832092,
+          "positive_daily_ics": 135,
+          "supported_dates": 248,
+          "supported_name_days": 6599
+        },
+        "2014": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 248,
+          "mean_daily_cross_sectional_ic": -0.008302479538523434,
+          "median_daily_cross_sectional_ic": -0.01684547585521022,
+          "pooled_name_day_spearman_secondary": -0.018430450931191444,
+          "positive_daily_ics": 114,
+          "supported_dates": 248,
+          "supported_name_days": 8628
+        },
+        "2015": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 246,
+          "mean_daily_cross_sectional_ic": -0.019316017788618533,
+          "median_daily_cross_sectional_ic": -0.034804290552718005,
+          "pooled_name_day_spearman_secondary": -0.019001811742782593,
+          "positive_daily_ics": 107,
+          "supported_dates": 246,
+          "supported_name_days": 8545
+        },
+        "2016": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 233,
+          "mean_daily_cross_sectional_ic": -0.006442657690212293,
+          "median_daily_cross_sectional_ic": -0.007430257328053801,
+          "pooled_name_day_spearman_secondary": -0.0045187515206635,
+          "positive_daily_ics": 110,
+          "supported_dates": 233,
+          "supported_name_days": 7918
+        },
+        "2017": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 246,
+          "mean_daily_cross_sectional_ic": -0.03910185543590827,
+          "median_daily_cross_sectional_ic": -0.027370050519216434,
+          "pooled_name_day_spearman_secondary": -0.031826820224523544,
+          "positive_daily_ics": 108,
+          "supported_dates": 246,
+          "supported_name_days": 8145
+        },
+        "2018": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 245,
+          "mean_daily_cross_sectional_ic": -0.010170122018444451,
+          "median_daily_cross_sectional_ic": -0.008983019549816115,
+          "pooled_name_day_spearman_secondary": -0.008179783821105957,
+          "positive_daily_ics": 115,
+          "supported_dates": 245,
+          "supported_name_days": 20187
+        },
+        "2019": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 248,
+          "mean_daily_cross_sectional_ic": 0.0001227607807217565,
+          "median_daily_cross_sectional_ic": 0.0004662767421265428,
+          "pooled_name_day_spearman_secondary": 0.0020050527527928352,
+          "positive_daily_ics": 125,
+          "supported_dates": 248,
+          "supported_name_days": 28372
+        },
+        "2020": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 249,
+          "mean_daily_cross_sectional_ic": -0.017535337661984722,
+          "median_daily_cross_sectional_ic": -0.020227824521739195,
+          "pooled_name_day_spearman_secondary": -0.018043633550405502,
+          "positive_daily_ics": 105,
+          "supported_dates": 249,
+          "supported_name_days": 33770
+        },
+        "2021": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 247,
+          "mean_daily_cross_sectional_ic": -0.011413617195600493,
+          "median_daily_cross_sectional_ic": -0.013904315744320404,
+          "pooled_name_day_spearman_secondary": -0.0117853544652462,
+          "positive_daily_ics": 106,
+          "supported_dates": 247,
+          "supported_name_days": 39716
+        },
+        "2022": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 250,
+          "mean_daily_cross_sectional_ic": -0.013646939990081763,
+          "median_daily_cross_sectional_ic": -0.024088805092900095,
+          "pooled_name_day_spearman_secondary": -0.008586980402469635,
+          "positive_daily_ics": 105,
+          "supported_dates": 250,
+          "supported_name_days": 33656
+        },
+        "2023": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 248,
+          "mean_daily_cross_sectional_ic": -0.010533854107974822,
+          "median_daily_cross_sectional_ic": -0.007085347917806091,
+          "pooled_name_day_spearman_secondary": -0.012368066236376762,
+          "positive_daily_ics": 116,
+          "supported_dates": 248,
+          "supported_name_days": 35769
+        },
+        "2024": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 246,
+          "mean_daily_cross_sectional_ic": -0.016336204035239683,
+          "median_daily_cross_sectional_ic": -0.024628391186695638,
+          "pooled_name_day_spearman_secondary": -0.01694381795823574,
+          "positive_daily_ics": 103,
+          "supported_dates": 246,
+          "supported_name_days": 34107
+        }
+      },
+      "family": "events",
+      "pooled": {
+        "constant_rank_dates_with_minimum_support": 0,
+        "defined_daily_ics": 3497,
+        "mean_daily_cross_sectional_ic": -0.008012219986833083,
+        "median_daily_cross_sectional_ic": -0.01195538669201905,
+        "pooled_name_day_spearman_secondary": -0.010443204082548618,
+        "positive_daily_ics": 1637,
+        "supported_dates": 3648,
+        "supported_name_days": 280294
+      },
+      "registered_expected_sign": "small_no_fixed_sign"
+    },
+    "earnings_yield_ttm": {
+      "by_year": {
+        "2010": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 0,
+          "mean_daily_cross_sectional_ic": null,
+          "median_daily_cross_sectional_ic": null,
+          "pooled_name_day_spearman_secondary": null,
+          "positive_daily_ics": 0,
+          "supported_dates": 0,
+          "supported_name_days": 0
+        },
+        "2011": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 0,
+          "mean_daily_cross_sectional_ic": null,
+          "median_daily_cross_sectional_ic": null,
+          "pooled_name_day_spearman_secondary": null,
+          "positive_daily_ics": 0,
+          "supported_dates": 0,
+          "supported_name_days": 0
+        },
+        "2012": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 3,
+          "mean_daily_cross_sectional_ic": 0.11508086560356438,
+          "median_daily_cross_sectional_ic": 0.15344115413808584,
+          "pooled_name_day_spearman_secondary": 0.09535932540893555,
+          "positive_daily_ics": 2,
+          "supported_dates": 3,
+          "supported_name_days": 60
+        },
+        "2013": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 0,
+          "mean_daily_cross_sectional_ic": null,
+          "median_daily_cross_sectional_ic": null,
+          "pooled_name_day_spearman_secondary": null,
+          "positive_daily_ics": 0,
+          "supported_dates": 0,
+          "supported_name_days": 0
+        },
+        "2014": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 67,
+          "mean_daily_cross_sectional_ic": 0.04413614971103523,
+          "median_daily_cross_sectional_ic": 0.08655938182924872,
+          "pooled_name_day_spearman_secondary": 0.04346415027976036,
+          "positive_daily_ics": 41,
+          "supported_dates": 67,
+          "supported_name_days": 1493
+        },
+        "2015": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 40,
+          "mean_daily_cross_sectional_ic": 0.08836036504833496,
+          "median_daily_cross_sectional_ic": 0.05381429272894947,
+          "pooled_name_day_spearman_secondary": 0.07937955856323242,
+          "positive_daily_ics": 25,
+          "supported_dates": 40,
+          "supported_name_days": 848
+        },
+        "2016": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 17,
+          "mean_daily_cross_sectional_ic": 0.07150109978197791,
+          "median_daily_cross_sectional_ic": -0.0030075187969924814,
+          "pooled_name_day_spearman_secondary": 0.05994834378361702,
+          "positive_daily_ics": 8,
+          "supported_dates": 17,
+          "supported_name_days": 351
+        },
+        "2017": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 9,
+          "mean_daily_cross_sectional_ic": 0.18325692951905864,
+          "median_daily_cross_sectional_ic": 0.17272727272727273,
+          "pooled_name_day_spearman_secondary": 0.1820690780878067,
+          "positive_daily_ics": 8,
+          "supported_dates": 9,
+          "supported_name_days": 184
+        },
+        "2018": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 214,
+          "mean_daily_cross_sectional_ic": 0.0056573691231918705,
+          "median_daily_cross_sectional_ic": -0.008994746911767396,
+          "pooled_name_day_spearman_secondary": 0.0031828307546675205,
+          "positive_daily_ics": 101,
+          "supported_dates": 215,
+          "supported_name_days": 8447
+        },
+        "2019": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 248,
+          "mean_daily_cross_sectional_ic": -0.01625242628372234,
+          "median_daily_cross_sectional_ic": -0.006295498169079934,
+          "pooled_name_day_spearman_secondary": -0.012973340228199959,
+          "positive_daily_ics": 120,
+          "supported_dates": 248,
+          "supported_name_days": 12236
+        },
+        "2020": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 249,
+          "mean_daily_cross_sectional_ic": 0.0002842986402276004,
+          "median_daily_cross_sectional_ic": -0.004739119486578205,
+          "pooled_name_day_spearman_secondary": 0.0016735155368223786,
+          "positive_daily_ics": 121,
+          "supported_dates": 249,
+          "supported_name_days": 17848
+        },
+        "2021": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 247,
+          "mean_daily_cross_sectional_ic": 0.06321113642154029,
+          "median_daily_cross_sectional_ic": 0.04805234452695035,
+          "pooled_name_day_spearman_secondary": 0.06890746206045151,
+          "positive_daily_ics": 157,
+          "supported_dates": 247,
+          "supported_name_days": 20618
+        },
+        "2022": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 250,
+          "mean_daily_cross_sectional_ic": 0.03036041587353197,
+          "median_daily_cross_sectional_ic": 0.04112408886953933,
+          "pooled_name_day_spearman_secondary": 0.035602420568466187,
+          "positive_daily_ics": 155,
+          "supported_dates": 250,
+          "supported_name_days": 18380
+        },
+        "2023": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 248,
+          "mean_daily_cross_sectional_ic": 0.019631335514495495,
+          "median_daily_cross_sectional_ic": 0.029601944792219715,
+          "pooled_name_day_spearman_secondary": 0.019411588087677956,
+          "positive_daily_ics": 148,
+          "supported_dates": 248,
+          "supported_name_days": 18865
+        },
+        "2024": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 246,
+          "mean_daily_cross_sectional_ic": 0.019331154390335652,
+          "median_daily_cross_sectional_ic": 0.022663216914372997,
+          "pooled_name_day_spearman_secondary": 0.017388643696904182,
+          "positive_daily_ics": 142,
+          "supported_dates": 246,
+          "supported_name_days": 16573
+        }
+      },
+      "family": "fundamentals",
+      "pooled": {
+        "constant_rank_dates_with_minimum_support": 0,
+        "defined_daily_ics": 1838,
+        "mean_daily_cross_sectional_ic": 0.02164296288296306,
+        "median_daily_cross_sectional_ic": 0.023024034826624837,
+        "pooled_name_day_spearman_secondary": 0.024255838245153427,
+        "positive_daily_ics": 1028,
+        "supported_dates": 1839,
+        "supported_name_days": 115903
+      },
+      "registered_expected_sign": "positive"
+    },
+    "filing_is_dfp": {
+      "by_year": {
+        "2010": {
+          "constant_rank_dates_with_minimum_support": 116,
+          "defined_daily_ics": 30,
+          "mean_daily_cross_sectional_ic": -0.031239298189065855,
+          "median_daily_cross_sectional_ic": -0.0318703307880376,
+          "pooled_name_day_spearman_secondary": -0.012278635054826736,
+          "positive_daily_ics": 13,
+          "supported_dates": 201,
+          "supported_name_days": 5171
+        },
+        "2011": {
+          "constant_rank_dates_with_minimum_support": 197,
+          "defined_daily_ics": 52,
+          "mean_daily_cross_sectional_ic": 0.04960252189363469,
+          "median_daily_cross_sectional_ic": 0.01904706745199388,
+          "pooled_name_day_spearman_secondary": -0.022799085825681686,
+          "positive_daily_ics": 28,
+          "supported_dates": 249,
+          "supported_name_days": 7752
+        },
+        "2012": {
+          "constant_rank_dates_with_minimum_support": 146,
+          "defined_daily_ics": 100,
+          "mean_daily_cross_sectional_ic": -0.002622155029808716,
+          "median_daily_cross_sectional_ic": 0.03439466832255872,
+          "pooled_name_day_spearman_secondary": 0.056178148835897446,
+          "positive_daily_ics": 56,
+          "supported_dates": 246,
+          "supported_name_days": 7770
+        },
+        "2013": {
+          "constant_rank_dates_with_minimum_support": 101,
+          "defined_daily_ics": 147,
+          "mean_daily_cross_sectional_ic": -0.017777998741399133,
+          "median_daily_cross_sectional_ic": -0.02796450759873114,
+          "pooled_name_day_spearman_secondary": 0.009681127965450287,
+          "positive_daily_ics": 61,
+          "supported_dates": 248,
+          "supported_name_days": 7334
+        },
+        "2014": {
+          "constant_rank_dates_with_minimum_support": 138,
+          "defined_daily_ics": 110,
+          "mean_daily_cross_sectional_ic": -0.008419232675586884,
+          "median_daily_cross_sectional_ic": -0.00612406929292355,
+          "pooled_name_day_spearman_secondary": -0.04826873168349266,
+          "positive_daily_ics": 51,
+          "supported_dates": 248,
+          "supported_name_days": 9269
+        },
+        "2015": {
+          "constant_rank_dates_with_minimum_support": 141,
+          "defined_daily_ics": 105,
+          "mean_daily_cross_sectional_ic": 0.030956036669112917,
+          "median_daily_cross_sectional_ic": 0.04067819981796424,
+          "pooled_name_day_spearman_secondary": 0.019182251766324043,
+          "positive_daily_ics": 59,
+          "supported_dates": 246,
+          "supported_name_days": 9118
+        },
+        "2016": {
+          "constant_rank_dates_with_minimum_support": 135,
+          "defined_daily_ics": 98,
+          "mean_daily_cross_sectional_ic": 0.015350010051408252,
+          "median_daily_cross_sectional_ic": 0.03545243594660365,
+          "pooled_name_day_spearman_secondary": 0.00550111336633563,
+          "positive_daily_ics": 57,
+          "supported_dates": 233,
+          "supported_name_days": 8030
+        },
+        "2017": {
+          "constant_rank_dates_with_minimum_support": 137,
+          "defined_daily_ics": 109,
+          "mean_daily_cross_sectional_ic": 0.026117805400178887,
+          "median_daily_cross_sectional_ic": 0.05197191965064278,
+          "pooled_name_day_spearman_secondary": 0.038007549941539764,
+          "positive_daily_ics": 66,
+          "supported_dates": 246,
+          "supported_name_days": 8356
+        },
+        "2018": {
+          "constant_rank_dates_with_minimum_support": 119,
+          "defined_daily_ics": 126,
+          "mean_daily_cross_sectional_ic": 0.028917604945014046,
+          "median_daily_cross_sectional_ic": 0.03164830420383932,
+          "pooled_name_day_spearman_secondary": 0.009737267158925533,
+          "positive_daily_ics": 78,
+          "supported_dates": 245,
+          "supported_name_days": 21596
+        },
+        "2019": {
+          "constant_rank_dates_with_minimum_support": 20,
+          "defined_daily_ics": 228,
+          "mean_daily_cross_sectional_ic": -0.006483938483010481,
+          "median_daily_cross_sectional_ic": -0.0033530311987025746,
+          "pooled_name_day_spearman_secondary": -0.009420784190297127,
+          "positive_daily_ics": 111,
+          "supported_dates": 248,
+          "supported_name_days": 29685
+        },
+        "2020": {
+          "constant_rank_dates_with_minimum_support": 38,
+          "defined_daily_ics": 211,
+          "mean_daily_cross_sectional_ic": 0.009015431839395098,
+          "median_daily_cross_sectional_ic": 0.00222181081386505,
+          "pooled_name_day_spearman_secondary": 0.009362698532640934,
+          "positive_daily_ics": 110,
+          "supported_dates": 249,
+          "supported_name_days": 35975
+        },
+        "2021": {
+          "constant_rank_dates_with_minimum_support": 32,
+          "defined_daily_ics": 215,
+          "mean_daily_cross_sectional_ic": 0.0011972856294513467,
+          "median_daily_cross_sectional_ic": 0.008149857300643732,
+          "pooled_name_day_spearman_secondary": 0.006654461845755577,
+          "positive_daily_ics": 114,
+          "supported_dates": 247,
+          "supported_name_days": 45239
+        },
+        "2022": {
+          "constant_rank_dates_with_minimum_support": 15,
+          "defined_daily_ics": 235,
+          "mean_daily_cross_sectional_ic": -0.006008193098037475,
+          "median_daily_cross_sectional_ic": -0.008688456847210218,
+          "pooled_name_day_spearman_secondary": 0.004258750006556511,
+          "positive_daily_ics": 113,
+          "supported_dates": 250,
+          "supported_name_days": 38075
+        },
+        "2023": {
+          "constant_rank_dates_with_minimum_support": 2,
+          "defined_daily_ics": 246,
+          "mean_daily_cross_sectional_ic": 0.0002273650251314998,
+          "median_daily_cross_sectional_ic": -0.0027367670838840796,
+          "pooled_name_day_spearman_secondary": 0.003875818569213152,
+          "positive_daily_ics": 121,
+          "supported_dates": 248,
+          "supported_name_days": 38887
+        },
+        "2024": {
+          "constant_rank_dates_with_minimum_support": 83,
+          "defined_daily_ics": 163,
+          "mean_daily_cross_sectional_ic": -0.008158821348818722,
+          "median_daily_cross_sectional_ic": -0.011797306621609426,
+          "pooled_name_day_spearman_secondary": 0.0019422752084210515,
+          "positive_daily_ics": 70,
+          "supported_dates": 246,
+          "supported_name_days": 36172
+        }
+      },
+      "family": "events",
+      "pooled": {
+        "constant_rank_dates_with_minimum_support": 1420,
+        "defined_daily_ics": 2175,
+        "mean_daily_cross_sectional_ic": 0.0032556561931522602,
+        "median_daily_cross_sectional_ic": 0.0036023284330536534,
+        "pooled_name_day_spearman_secondary": 0.00436574500054121,
+        "positive_daily_ics": 1108,
+        "supported_dates": 3650,
+        "supported_name_days": 308429
+      },
+      "registered_expected_sign": "event_type_no_fixed_sign"
+    },
+    "fundamental_consolidated_flag": {
+      "by_year": {
+        "2010": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 0,
+          "mean_daily_cross_sectional_ic": null,
+          "median_daily_cross_sectional_ic": null,
+          "pooled_name_day_spearman_secondary": null,
+          "positive_daily_ics": 0,
+          "supported_dates": 0,
+          "supported_name_days": 0
+        },
+        "2011": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 202,
+          "mean_daily_cross_sectional_ic": -0.024632110235808136,
+          "median_daily_cross_sectional_ic": -0.03321055820775357,
+          "pooled_name_day_spearman_secondary": -0.029041552916169167,
+          "positive_daily_ics": 83,
+          "supported_dates": 229,
+          "supported_name_days": 6262
+        },
+        "2012": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 246,
+          "mean_daily_cross_sectional_ic": 0.004388580971476692,
+          "median_daily_cross_sectional_ic": 0.0066688405690273,
+          "pooled_name_day_spearman_secondary": -0.0008056734804995358,
+          "positive_daily_ics": 123,
+          "supported_dates": 246,
+          "supported_name_days": 7770
+        },
+        "2013": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 248,
+          "mean_daily_cross_sectional_ic": 0.018422348422188647,
+          "median_daily_cross_sectional_ic": 0.045175395145262566,
+          "pooled_name_day_spearman_secondary": 0.018572699278593063,
+          "positive_daily_ics": 136,
+          "supported_dates": 248,
+          "supported_name_days": 7334
+        },
+        "2014": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 248,
+          "mean_daily_cross_sectional_ic": -0.043708770984710967,
+          "median_daily_cross_sectional_ic": -0.04008687884575417,
+          "pooled_name_day_spearman_secondary": -0.04495282098650932,
+          "positive_daily_ics": 107,
+          "supported_dates": 248,
+          "supported_name_days": 9269
+        },
+        "2015": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 246,
+          "mean_daily_cross_sectional_ic": -0.02701050714838108,
+          "median_daily_cross_sectional_ic": -0.03430177021119979,
+          "pooled_name_day_spearman_secondary": -0.027092305943369865,
+          "positive_daily_ics": 100,
+          "supported_dates": 246,
+          "supported_name_days": 9118
+        },
+        "2016": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 233,
+          "mean_daily_cross_sectional_ic": -0.02057769431258537,
+          "median_daily_cross_sectional_ic": -0.008871818844986666,
+          "pooled_name_day_spearman_secondary": -0.018198112025856972,
+          "positive_daily_ics": 111,
+          "supported_dates": 233,
+          "supported_name_days": 8030
+        },
+        "2017": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 246,
+          "mean_daily_cross_sectional_ic": 0.023565190689481246,
+          "median_daily_cross_sectional_ic": 0.02661545653496,
+          "pooled_name_day_spearman_secondary": 0.02229180745780468,
+          "positive_daily_ics": 138,
+          "supported_dates": 246,
+          "supported_name_days": 8356
+        },
+        "2018": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 245,
+          "mean_daily_cross_sectional_ic": -0.03333155945719345,
+          "median_daily_cross_sectional_ic": -0.042754613660367834,
+          "pooled_name_day_spearman_secondary": -0.0320645347237587,
+          "positive_daily_ics": 98,
+          "supported_dates": 245,
+          "supported_name_days": 21596
+        },
+        "2019": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 248,
+          "mean_daily_cross_sectional_ic": 0.003704558543736906,
+          "median_daily_cross_sectional_ic": -0.000991839207373355,
+          "pooled_name_day_spearman_secondary": 0.005717428866773844,
+          "positive_daily_ics": 124,
+          "supported_dates": 248,
+          "supported_name_days": 29685
+        },
+        "2020": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 249,
+          "mean_daily_cross_sectional_ic": -0.0019411651037290294,
+          "median_daily_cross_sectional_ic": 0.005020236745389049,
+          "pooled_name_day_spearman_secondary": -0.002306269248947501,
+          "positive_daily_ics": 128,
+          "supported_dates": 249,
+          "supported_name_days": 35975
+        },
+        "2021": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 247,
+          "mean_daily_cross_sectional_ic": -0.010219923819550236,
+          "median_daily_cross_sectional_ic": 0.0011553950111169108,
+          "pooled_name_day_spearman_secondary": -0.006914751138538122,
+          "positive_daily_ics": 125,
+          "supported_dates": 247,
+          "supported_name_days": 45223
+        },
+        "2022": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 250,
+          "mean_daily_cross_sectional_ic": 0.012575456696512447,
+          "median_daily_cross_sectional_ic": 0.01947208366609169,
+          "pooled_name_day_spearman_secondary": 0.011943350546061993,
+          "positive_daily_ics": 148,
+          "supported_dates": 250,
+          "supported_name_days": 38058
+        },
+        "2023": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 248,
+          "mean_daily_cross_sectional_ic": -0.0022792406439508823,
+          "median_daily_cross_sectional_ic": -0.00327107934612859,
+          "pooled_name_day_spearman_secondary": -0.000940551224630326,
+          "positive_daily_ics": 120,
+          "supported_dates": 248,
+          "supported_name_days": 38864
+        },
+        "2024": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 246,
+          "mean_daily_cross_sectional_ic": 0.004269543331550421,
+          "median_daily_cross_sectional_ic": -0.0022169384621051804,
+          "pooled_name_day_spearman_secondary": 0.005970419850200415,
+          "positive_daily_ics": 120,
+          "supported_dates": 246,
+          "supported_name_days": 36012
+        }
+      },
+      "family": "fundamentals",
+      "pooled": {
+        "constant_rank_dates_with_minimum_support": 0,
+        "defined_daily_ics": 3402,
+        "mean_daily_cross_sectional_ic": -0.0065948064245475125,
+        "median_daily_cross_sectional_ic": -0.002069146559684553,
+        "pooled_name_day_spearman_secondary": -0.00450852932408452,
+        "positive_daily_ics": 1661,
+        "supported_dates": 3429,
+        "supported_name_days": 301552
+      },
+      "registered_expected_sign": "structural_no_fixed_sign"
+    },
+    "fundamental_financial_flag": {
+      "by_year": {
+        "2010": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 0,
+          "mean_daily_cross_sectional_ic": null,
+          "median_daily_cross_sectional_ic": null,
+          "pooled_name_day_spearman_secondary": null,
+          "positive_daily_ics": 0,
+          "supported_dates": 0,
+          "supported_name_days": 0
+        },
+        "2011": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 202,
+          "mean_daily_cross_sectional_ic": -0.05023875020174796,
+          "median_daily_cross_sectional_ic": -0.07923806798393156,
+          "pooled_name_day_spearman_secondary": -0.03819260373711586,
+          "positive_daily_ics": 76,
+          "supported_dates": 229,
+          "supported_name_days": 6262
+        },
+        "2012": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 246,
+          "mean_daily_cross_sectional_ic": 0.001304465706103988,
+          "median_daily_cross_sectional_ic": 0.0,
+          "pooled_name_day_spearman_secondary": -0.0006908928626216948,
+          "positive_daily_ics": 117,
+          "supported_dates": 246,
+          "supported_name_days": 7770
+        },
+        "2013": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 248,
+          "mean_daily_cross_sectional_ic": 0.056777562231936946,
+          "median_daily_cross_sectional_ic": 0.06767928302011014,
+          "pooled_name_day_spearman_secondary": 0.0581999346613884,
+          "positive_daily_ics": 145,
+          "supported_dates": 248,
+          "supported_name_days": 7334
+        },
+        "2014": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 248,
+          "mean_daily_cross_sectional_ic": 0.011543719373945296,
+          "median_daily_cross_sectional_ic": 0.0,
+          "pooled_name_day_spearman_secondary": 0.006751964800059795,
+          "positive_daily_ics": 122,
+          "supported_dates": 248,
+          "supported_name_days": 9269
+        },
+        "2015": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 246,
+          "mean_daily_cross_sectional_ic": 0.001550606456869451,
+          "median_daily_cross_sectional_ic": 0.0,
+          "pooled_name_day_spearman_secondary": -0.0007115798071026802,
+          "positive_daily_ics": 122,
+          "supported_dates": 246,
+          "supported_name_days": 9118
+        },
+        "2016": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 233,
+          "mean_daily_cross_sectional_ic": -0.044686898409230465,
+          "median_daily_cross_sectional_ic": -0.03822353935782192,
+          "pooled_name_day_spearman_secondary": -0.04476741701364517,
+          "positive_daily_ics": 93,
+          "supported_dates": 233,
+          "supported_name_days": 8030
+        },
+        "2017": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 246,
+          "mean_daily_cross_sectional_ic": 0.007618097067775541,
+          "median_daily_cross_sectional_ic": 0.0,
+          "pooled_name_day_spearman_secondary": 0.006194354500621557,
+          "positive_daily_ics": 122,
+          "supported_dates": 246,
+          "supported_name_days": 8356
+        },
+        "2018": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 245,
+          "mean_daily_cross_sectional_ic": 0.003120921494978926,
+          "median_daily_cross_sectional_ic": 0.002168653607332685,
+          "pooled_name_day_spearman_secondary": -0.006661457475274801,
+          "positive_daily_ics": 124,
+          "supported_dates": 245,
+          "supported_name_days": 21596
+        },
+        "2019": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 248,
+          "mean_daily_cross_sectional_ic": -0.01490986311202034,
+          "median_daily_cross_sectional_ic": -0.005999590790916434,
+          "pooled_name_day_spearman_secondary": -0.015333267860114574,
+          "positive_daily_ics": 116,
+          "supported_dates": 248,
+          "supported_name_days": 29685
+        },
+        "2020": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 249,
+          "mean_daily_cross_sectional_ic": -0.008331266469570824,
+          "median_daily_cross_sectional_ic": -0.013558447038911707,
+          "pooled_name_day_spearman_secondary": -0.006825880613178015,
+          "positive_daily_ics": 115,
+          "supported_dates": 249,
+          "supported_name_days": 35975
+        },
+        "2021": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 247,
+          "mean_daily_cross_sectional_ic": -0.02256345715564512,
+          "median_daily_cross_sectional_ic": -0.026964553707387155,
+          "pooled_name_day_spearman_secondary": -0.021833274513483047,
+          "positive_daily_ics": 102,
+          "supported_dates": 247,
+          "supported_name_days": 45223
+        },
+        "2022": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 250,
+          "mean_daily_cross_sectional_ic": 0.015248706231050006,
+          "median_daily_cross_sectional_ic": 0.020992671761724382,
+          "pooled_name_day_spearman_secondary": 0.012997226789593697,
+          "positive_daily_ics": 144,
+          "supported_dates": 250,
+          "supported_name_days": 38058
+        },
+        "2023": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 248,
+          "mean_daily_cross_sectional_ic": 0.010701923701371598,
+          "median_daily_cross_sectional_ic": 0.014228460344395559,
+          "pooled_name_day_spearman_secondary": 0.012012066319584846,
+          "positive_daily_ics": 139,
+          "supported_dates": 248,
+          "supported_name_days": 38864
+        },
+        "2024": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 246,
+          "mean_daily_cross_sectional_ic": 0.013109090469774636,
+          "median_daily_cross_sectional_ic": 0.008328782076157344,
+          "pooled_name_day_spearman_secondary": 0.012223129160702229,
+          "positive_daily_ics": 128,
+          "supported_dates": 246,
+          "supported_name_days": 36012
+        }
+      },
+      "family": "fundamentals",
+      "pooled": {
+        "constant_rank_dates_with_minimum_support": 0,
+        "defined_daily_ics": 3402,
+        "mean_daily_cross_sectional_ic": -0.000567250753583837,
+        "median_daily_cross_sectional_ic": 0.0,
+        "pooled_name_day_spearman_secondary": -0.002194380620494485,
+        "positive_daily_ics": 1665,
+        "supported_dates": 3429,
+        "supported_name_days": 301552
+      },
+      "registered_expected_sign": "structural_no_fixed_sign"
+    },
+    "gross_profitability": {
+      "by_year": {
+        "2010": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 0,
+          "mean_daily_cross_sectional_ic": null,
+          "median_daily_cross_sectional_ic": null,
+          "pooled_name_day_spearman_secondary": null,
+          "positive_daily_ics": 0,
+          "supported_dates": 0,
+          "supported_name_days": 0
+        },
+        "2011": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 37,
+          "mean_daily_cross_sectional_ic": 0.12492018321671657,
+          "median_daily_cross_sectional_ic": 0.15500380610681896,
+          "pooled_name_day_spearman_secondary": 0.14354835450649261,
+          "positive_daily_ics": 27,
+          "supported_dates": 37,
+          "supported_name_days": 1040
+        },
+        "2012": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 203,
+          "mean_daily_cross_sectional_ic": 0.05201394688018438,
+          "median_daily_cross_sectional_ic": 0.08048179879984944,
+          "pooled_name_day_spearman_secondary": 0.04537701979279518,
+          "positive_daily_ics": 125,
+          "supported_dates": 203,
+          "supported_name_days": 5838
+        },
+        "2013": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 248,
+          "mean_daily_cross_sectional_ic": -0.008245776286445027,
+          "median_daily_cross_sectional_ic": -0.011074179333924374,
+          "pooled_name_day_spearman_secondary": -0.008304926566779613,
+          "positive_daily_ics": 120,
+          "supported_dates": 248,
+          "supported_name_days": 6749
+        },
+        "2014": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 248,
+          "mean_daily_cross_sectional_ic": 0.017250993856531307,
+          "median_daily_cross_sectional_ic": 0.017175052555019353,
+          "pooled_name_day_spearman_secondary": 0.02193903550505638,
+          "positive_daily_ics": 133,
+          "supported_dates": 248,
+          "supported_name_days": 8707
+        },
+        "2015": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 246,
+          "mean_daily_cross_sectional_ic": 0.06631919240350566,
+          "median_daily_cross_sectional_ic": 0.0835805973279472,
+          "pooled_name_day_spearman_secondary": 0.06963595002889633,
+          "positive_daily_ics": 155,
+          "supported_dates": 246,
+          "supported_name_days": 8465
+        },
+        "2016": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 233,
+          "mean_daily_cross_sectional_ic": -0.036302984638907944,
+          "median_daily_cross_sectional_ic": -0.031051517447853054,
+          "pooled_name_day_spearman_secondary": -0.03498860076069832,
+          "positive_daily_ics": 104,
+          "supported_dates": 233,
+          "supported_name_days": 7410
+        },
+        "2017": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 246,
+          "mean_daily_cross_sectional_ic": 0.0007752699118191291,
+          "median_daily_cross_sectional_ic": 0.017279768059096205,
+          "pooled_name_day_spearman_secondary": 0.0002829103614203632,
+          "positive_daily_ics": 129,
+          "supported_dates": 246,
+          "supported_name_days": 7713
+        },
+        "2018": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 245,
+          "mean_daily_cross_sectional_ic": -0.06045936063825067,
+          "median_daily_cross_sectional_ic": -0.06120067768315539,
+          "pooled_name_day_spearman_secondary": -0.0589020699262619,
+          "positive_daily_ics": 87,
+          "supported_dates": 245,
+          "supported_name_days": 20371
+        },
+        "2019": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 248,
+          "mean_daily_cross_sectional_ic": -0.017902999694505147,
+          "median_daily_cross_sectional_ic": -0.01353229448386813,
+          "pooled_name_day_spearman_secondary": -0.018894264474511147,
+          "positive_daily_ics": 118,
+          "supported_dates": 248,
+          "supported_name_days": 28099
+        },
+        "2020": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 249,
+          "mean_daily_cross_sectional_ic": -0.022140234885608717,
+          "median_daily_cross_sectional_ic": -0.020314359585368476,
+          "pooled_name_day_spearman_secondary": -0.023517174646258354,
+          "positive_daily_ics": 107,
+          "supported_dates": 249,
+          "supported_name_days": 33330
+        },
+        "2021": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 247,
+          "mean_daily_cross_sectional_ic": 0.003660966578784246,
+          "median_daily_cross_sectional_ic": -0.01006201351131409,
+          "pooled_name_day_spearman_secondary": 0.00369152775965631,
+          "positive_daily_ics": 117,
+          "supported_dates": 247,
+          "supported_name_days": 40955
+        },
+        "2022": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 250,
+          "mean_daily_cross_sectional_ic": 0.0037646743754015614,
+          "median_daily_cross_sectional_ic": 0.00346379518966342,
+          "pooled_name_day_spearman_secondary": 0.00226902449503541,
+          "positive_daily_ics": 127,
+          "supported_dates": 250,
+          "supported_name_days": 34737
+        },
+        "2023": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 248,
+          "mean_daily_cross_sectional_ic": -0.007867059759745134,
+          "median_daily_cross_sectional_ic": -0.005532588380321422,
+          "pooled_name_day_spearman_secondary": -0.009710149839520454,
+          "positive_daily_ics": 118,
+          "supported_dates": 248,
+          "supported_name_days": 36389
+        },
+        "2024": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 246,
+          "mean_daily_cross_sectional_ic": 0.013670984880735183,
+          "median_daily_cross_sectional_ic": 0.012261771315242923,
+          "pooled_name_day_spearman_secondary": 0.014177384786307812,
+          "positive_daily_ics": 131,
+          "supported_dates": 246,
+          "supported_name_days": 34058
+        }
+      },
+      "family": "fundamentals",
+      "pooled": {
+        "constant_rank_dates_with_minimum_support": 0,
+        "defined_daily_ics": 3194,
+        "mean_daily_cross_sectional_ic": 0.0012375915133721314,
+        "median_daily_cross_sectional_ic": 0.000273728879244699,
+        "pooled_name_day_spearman_secondary": -0.0045767892152071,
+        "positive_daily_ics": 1598,
+        "supported_dates": 3194,
+        "supported_name_days": 273861
+      },
+      "registered_expected_sign": "positive"
+    },
+    "liabilities_to_assets": {
+      "by_year": {
+        "2010": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 0,
+          "mean_daily_cross_sectional_ic": null,
+          "median_daily_cross_sectional_ic": null,
+          "pooled_name_day_spearman_secondary": null,
+          "positive_daily_ics": 0,
+          "supported_dates": 0,
+          "supported_name_days": 0
+        },
+        "2011": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 202,
+          "mean_daily_cross_sectional_ic": 0.01716178306526939,
+          "median_daily_cross_sectional_ic": 0.007187630815148021,
+          "pooled_name_day_spearman_secondary": 0.020002422854304314,
+          "positive_daily_ics": 104,
+          "supported_dates": 202,
+          "supported_name_days": 6041
+        },
+        "2012": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 246,
+          "mean_daily_cross_sectional_ic": -0.0190246169586618,
+          "median_daily_cross_sectional_ic": -0.016415588589558834,
+          "pooled_name_day_spearman_secondary": -0.01810910925269127,
+          "positive_daily_ics": 117,
+          "supported_dates": 246,
+          "supported_name_days": 7770
+        },
+        "2013": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 248,
+          "mean_daily_cross_sectional_ic": 0.027854594015624533,
+          "median_daily_cross_sectional_ic": 0.013843940786412363,
+          "pooled_name_day_spearman_secondary": 0.024182012304663658,
+          "positive_daily_ics": 133,
+          "supported_dates": 248,
+          "supported_name_days": 7334
+        },
+        "2014": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 248,
+          "mean_daily_cross_sectional_ic": 0.010138015341603931,
+          "median_daily_cross_sectional_ic": 0.03742795670345202,
+          "pooled_name_day_spearman_secondary": 0.012614774517714977,
+          "positive_daily_ics": 134,
+          "supported_dates": 248,
+          "supported_name_days": 9269
+        },
+        "2015": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 246,
+          "mean_daily_cross_sectional_ic": 0.026498473431725962,
+          "median_daily_cross_sectional_ic": 0.02199741031398052,
+          "pooled_name_day_spearman_secondary": 0.022744502872228622,
+          "positive_daily_ics": 133,
+          "supported_dates": 246,
+          "supported_name_days": 9118
+        },
+        "2016": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 233,
+          "mean_daily_cross_sectional_ic": -0.02935991222755095,
+          "median_daily_cross_sectional_ic": -0.058551618448077845,
+          "pooled_name_day_spearman_secondary": -0.02871285192668438,
+          "positive_daily_ics": 100,
+          "supported_dates": 233,
+          "supported_name_days": 8030
+        },
+        "2017": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 246,
+          "mean_daily_cross_sectional_ic": -0.08871377530698997,
+          "median_daily_cross_sectional_ic": -0.09321516001255888,
+          "pooled_name_day_spearman_secondary": -0.09021490812301636,
+          "positive_daily_ics": 72,
+          "supported_dates": 246,
+          "supported_name_days": 8356
+        },
+        "2018": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 245,
+          "mean_daily_cross_sectional_ic": 0.01098646166205536,
+          "median_daily_cross_sectional_ic": 0.005639981200219616,
+          "pooled_name_day_spearman_secondary": 0.00553244911134243,
+          "positive_daily_ics": 126,
+          "supported_dates": 245,
+          "supported_name_days": 21596
+        },
+        "2019": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 248,
+          "mean_daily_cross_sectional_ic": -0.00198602808100449,
+          "median_daily_cross_sectional_ic": -0.0005474877003745653,
+          "pooled_name_day_spearman_secondary": -0.0019583702087402344,
+          "positive_daily_ics": 123,
+          "supported_dates": 248,
+          "supported_name_days": 29685
+        },
+        "2020": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 249,
+          "mean_daily_cross_sectional_ic": -0.009628537227783451,
+          "median_daily_cross_sectional_ic": -0.0023522107890053064,
+          "pooled_name_day_spearman_secondary": -0.009519551880657673,
+          "positive_daily_ics": 122,
+          "supported_dates": 249,
+          "supported_name_days": 35975
+        },
+        "2021": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 247,
+          "mean_daily_cross_sectional_ic": 0.006493229044218318,
+          "median_daily_cross_sectional_ic": 0.0070596132690766795,
+          "pooled_name_day_spearman_secondary": 0.006046127527952194,
+          "positive_daily_ics": 127,
+          "supported_dates": 247,
+          "supported_name_days": 45223
+        },
+        "2022": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 250,
+          "mean_daily_cross_sectional_ic": -0.03290576544682289,
+          "median_daily_cross_sectional_ic": -0.029063325461580282,
+          "pooled_name_day_spearman_secondary": -0.03452284634113312,
+          "positive_daily_ics": 101,
+          "supported_dates": 250,
+          "supported_name_days": 38058
+        },
+        "2023": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 248,
+          "mean_daily_cross_sectional_ic": -0.0004042518116248876,
+          "median_daily_cross_sectional_ic": -0.0053770782598101564,
+          "pooled_name_day_spearman_secondary": -0.0005078827380202711,
+          "positive_daily_ics": 119,
+          "supported_dates": 248,
+          "supported_name_days": 38864
+        },
+        "2024": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 246,
+          "mean_daily_cross_sectional_ic": -0.033943056729839466,
+          "median_daily_cross_sectional_ic": -0.027402534348003365,
+          "pooled_name_day_spearman_secondary": -0.03502969443798065,
+          "positive_daily_ics": 82,
+          "supported_dates": 246,
+          "supported_name_days": 36012
+        }
+      },
+      "family": "fundamentals",
+      "pooled": {
+        "constant_rank_dates_with_minimum_support": 0,
+        "defined_daily_ics": 3402,
+        "mean_daily_cross_sectional_ic": -0.008585611434920325,
+        "median_daily_cross_sectional_ic": -0.010591059182691171,
+        "pooled_name_day_spearman_secondary": -0.010301092639565468,
+        "positive_daily_ics": 1593,
+        "supported_dates": 3402,
+        "supported_name_days": 301331
+      },
+      "registered_expected_sign": "negative"
+    },
+    "log_market_cap": {
+      "by_year": {
+        "2010": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 0,
+          "mean_daily_cross_sectional_ic": null,
+          "median_daily_cross_sectional_ic": null,
+          "pooled_name_day_spearman_secondary": null,
+          "positive_daily_ics": 0,
+          "supported_dates": 0,
+          "supported_name_days": 0
+        },
+        "2011": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 1,
+          "mean_daily_cross_sectional_ic": -0.14742385397580798,
+          "median_daily_cross_sectional_ic": -0.14742385397580798,
+          "pooled_name_day_spearman_secondary": -0.1474238634109497,
+          "positive_daily_ics": 0,
+          "supported_dates": 1,
+          "supported_name_days": 20
+        },
+        "2012": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 11,
+          "mean_daily_cross_sectional_ic": -0.019593274296721874,
+          "median_daily_cross_sectional_ic": -0.0428710642942023,
+          "pooled_name_day_spearman_secondary": -0.02467021718621254,
+          "positive_daily_ics": 5,
+          "supported_dates": 11,
+          "supported_name_days": 227
+        },
+        "2013": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 0,
+          "mean_daily_cross_sectional_ic": null,
+          "median_daily_cross_sectional_ic": null,
+          "pooled_name_day_spearman_secondary": null,
+          "positive_daily_ics": 0,
+          "supported_dates": 0,
+          "supported_name_days": 0
+        },
+        "2014": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 68,
+          "mean_daily_cross_sectional_ic": 0.046308802577977336,
+          "median_daily_cross_sectional_ic": 0.049221530091904206,
+          "pooled_name_day_spearman_secondary": 0.044258005917072296,
+          "positive_daily_ics": 39,
+          "supported_dates": 68,
+          "supported_name_days": 1542
+        },
+        "2015": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 51,
+          "mean_daily_cross_sectional_ic": 0.07116257076016799,
+          "median_daily_cross_sectional_ic": 0.12471582340131579,
+          "pooled_name_day_spearman_secondary": 0.08717361092567444,
+          "positive_daily_ics": 31,
+          "supported_dates": 51,
+          "supported_name_days": 1073
+        },
+        "2016": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 18,
+          "mean_daily_cross_sectional_ic": 0.034174142515199485,
+          "median_daily_cross_sectional_ic": 0.04546092481056664,
+          "pooled_name_day_spearman_secondary": 0.02999250777065754,
+          "positive_daily_ics": 13,
+          "supported_dates": 18,
+          "supported_name_days": 376
+        },
+        "2017": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 9,
+          "mean_daily_cross_sectional_ic": -0.1459093173809441,
+          "median_daily_cross_sectional_ic": -0.24805194805194805,
+          "pooled_name_day_spearman_secondary": -0.1548495590686798,
+          "positive_daily_ics": 2,
+          "supported_dates": 9,
+          "supported_name_days": 184
+        },
+        "2018": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 215,
+          "mean_daily_cross_sectional_ic": -0.021554298770086123,
+          "median_daily_cross_sectional_ic": -0.00507399577167019,
+          "pooled_name_day_spearman_secondary": -0.00835935678333044,
+          "positive_daily_ics": 106,
+          "supported_dates": 215,
+          "supported_name_days": 8731
+        },
+        "2019": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 248,
+          "mean_daily_cross_sectional_ic": 0.021258604303193967,
+          "median_daily_cross_sectional_ic": 0.01654417359917914,
+          "pooled_name_day_spearman_secondary": 0.016412818804383278,
+          "positive_daily_ics": 138,
+          "supported_dates": 248,
+          "supported_name_days": 12514
+        },
+        "2020": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 249,
+          "mean_daily_cross_sectional_ic": 0.02072119280460216,
+          "median_daily_cross_sectional_ic": 0.025172527113577987,
+          "pooled_name_day_spearman_secondary": 0.016484268009662628,
+          "positive_daily_ics": 138,
+          "supported_dates": 249,
+          "supported_name_days": 18438
+        },
+        "2021": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 247,
+          "mean_daily_cross_sectional_ic": 0.011963943853273876,
+          "median_daily_cross_sectional_ic": 0.01809389315176377,
+          "pooled_name_day_spearman_secondary": 0.010641105473041534,
+          "positive_daily_ics": 136,
+          "supported_dates": 247,
+          "supported_name_days": 21993
+        },
+        "2022": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 250,
+          "mean_daily_cross_sectional_ic": 0.023822990382190695,
+          "median_daily_cross_sectional_ic": 0.027327244613085066,
+          "pooled_name_day_spearman_secondary": 0.01854897104203701,
+          "positive_daily_ics": 146,
+          "supported_dates": 250,
+          "supported_name_days": 19238
+        },
+        "2023": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 248,
+          "mean_daily_cross_sectional_ic": 0.0053927859508491995,
+          "median_daily_cross_sectional_ic": 0.0032471491279674755,
+          "pooled_name_day_spearman_secondary": 0.002826867625117302,
+          "positive_daily_ics": 129,
+          "supported_dates": 248,
+          "supported_name_days": 19130
+        },
+        "2024": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 246,
+          "mean_daily_cross_sectional_ic": 0.005234256874399093,
+          "median_daily_cross_sectional_ic": 0.01107317341765695,
+          "pooled_name_day_spearman_secondary": 0.003982890397310257,
+          "positive_daily_ics": 136,
+          "supported_dates": 246,
+          "supported_name_days": 16861
+        }
+      },
+      "family": "fundamentals",
+      "pooled": {
+        "constant_rank_dates_with_minimum_support": 0,
+        "defined_daily_ics": 1861,
+        "mean_daily_cross_sectional_ic": 0.012386193979508329,
+        "median_daily_cross_sectional_ic": 0.017555220303962275,
+        "pooled_name_day_spearman_secondary": 0.010802588425576687,
+        "positive_daily_ics": 1019,
+        "supported_dates": 1861,
+        "supported_name_days": 120327
+      },
+      "registered_expected_sign": "negative_to_flat"
+    },
+    "material_fact_count_20": {
+      "by_year": {
+        "2010": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 146,
+          "mean_daily_cross_sectional_ic": 0.014230397976427285,
+          "median_daily_cross_sectional_ic": 0.019839903112903484,
+          "pooled_name_day_spearman_secondary": 0.024103445932269096,
+          "positive_daily_ics": 77,
+          "supported_dates": 146,
+          "supported_name_days": 4679
+        },
+        "2011": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 249,
+          "mean_daily_cross_sectional_ic": -0.034200629201837474,
+          "median_daily_cross_sectional_ic": -0.02847627792534151,
+          "pooled_name_day_spearman_secondary": -0.03011845424771309,
+          "positive_daily_ics": 106,
+          "supported_dates": 249,
+          "supported_name_days": 7752
+        },
+        "2012": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 246,
+          "mean_daily_cross_sectional_ic": -0.01695336085691473,
+          "median_daily_cross_sectional_ic": -0.023576236927744132,
+          "pooled_name_day_spearman_secondary": -0.007653008680790663,
+          "positive_daily_ics": 110,
+          "supported_dates": 246,
+          "supported_name_days": 7770
+        },
+        "2013": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 248,
+          "mean_daily_cross_sectional_ic": 0.00786242553186335,
+          "median_daily_cross_sectional_ic": 0.004681891113644884,
+          "pooled_name_day_spearman_secondary": -0.0011900480603799224,
+          "positive_daily_ics": 125,
+          "supported_dates": 248,
+          "supported_name_days": 7334
+        },
+        "2014": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 248,
+          "mean_daily_cross_sectional_ic": -0.05472836488815866,
+          "median_daily_cross_sectional_ic": -0.06546440717895081,
+          "pooled_name_day_spearman_secondary": -0.04998263716697693,
+          "positive_daily_ics": 87,
+          "supported_dates": 248,
+          "supported_name_days": 9269
+        },
+        "2015": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 246,
+          "mean_daily_cross_sectional_ic": -0.036653882400044545,
+          "median_daily_cross_sectional_ic": -0.05402531645195803,
+          "pooled_name_day_spearman_secondary": -0.039056167006492615,
+          "positive_daily_ics": 98,
+          "supported_dates": 246,
+          "supported_name_days": 9118
+        },
+        "2016": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 233,
+          "mean_daily_cross_sectional_ic": 0.022515377936782082,
+          "median_daily_cross_sectional_ic": 0.03699356632130931,
+          "pooled_name_day_spearman_secondary": 0.009347104467451572,
+          "positive_daily_ics": 133,
+          "supported_dates": 233,
+          "supported_name_days": 8030
+        },
+        "2017": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 246,
+          "mean_daily_cross_sectional_ic": -0.04388514637006847,
+          "median_daily_cross_sectional_ic": -0.04443619302988583,
+          "pooled_name_day_spearman_secondary": -0.028687909245491028,
+          "positive_daily_ics": 100,
+          "supported_dates": 246,
+          "supported_name_days": 8356
+        },
+        "2018": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 245,
+          "mean_daily_cross_sectional_ic": 0.024039867490074286,
+          "median_daily_cross_sectional_ic": 0.021736995524639764,
+          "pooled_name_day_spearman_secondary": 0.012336562387645245,
+          "positive_daily_ics": 143,
+          "supported_dates": 245,
+          "supported_name_days": 21596
+        },
+        "2019": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 248,
+          "mean_daily_cross_sectional_ic": 0.007665010931362765,
+          "median_daily_cross_sectional_ic": 0.010053955866173685,
+          "pooled_name_day_spearman_secondary": 0.006732326466590166,
+          "positive_daily_ics": 138,
+          "supported_dates": 248,
+          "supported_name_days": 29685
+        },
+        "2020": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 249,
+          "mean_daily_cross_sectional_ic": -0.004913183605942264,
+          "median_daily_cross_sectional_ic": -4.167327226819065e-05,
+          "pooled_name_day_spearman_secondary": -0.0030897408723831177,
+          "positive_daily_ics": 124,
+          "supported_dates": 249,
+          "supported_name_days": 35975
+        },
+        "2021": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 247,
+          "mean_daily_cross_sectional_ic": 0.011299423176453298,
+          "median_daily_cross_sectional_ic": 0.009415791647030663,
+          "pooled_name_day_spearman_secondary": 0.014249197207391262,
+          "positive_daily_ics": 138,
+          "supported_dates": 247,
+          "supported_name_days": 45239
+        },
+        "2022": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 250,
+          "mean_daily_cross_sectional_ic": 0.027575983044125216,
+          "median_daily_cross_sectional_ic": 0.022712761533274832,
+          "pooled_name_day_spearman_secondary": 0.0311264805495739,
+          "positive_daily_ics": 159,
+          "supported_dates": 250,
+          "supported_name_days": 38075
+        },
+        "2023": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 248,
+          "mean_daily_cross_sectional_ic": 0.014459116551758255,
+          "median_daily_cross_sectional_ic": 0.015092213920623324,
+          "pooled_name_day_spearman_secondary": 0.014700223691761494,
+          "positive_daily_ics": 139,
+          "supported_dates": 248,
+          "supported_name_days": 38887
+        },
+        "2024": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 246,
+          "mean_daily_cross_sectional_ic": -0.002524331951565849,
+          "median_daily_cross_sectional_ic": -0.0010091055718760085,
+          "pooled_name_day_spearman_secondary": 0.003778895828872919,
+          "positive_daily_ics": 120,
+          "supported_dates": 246,
+          "supported_name_days": 36172
+        }
+      },
+      "family": "events",
+      "pooled": {
+        "constant_rank_dates_with_minimum_support": 0,
+        "defined_daily_ics": 3595,
+        "mean_daily_cross_sectional_ic": -0.004890397846316085,
+        "median_daily_cross_sectional_ic": 0.0,
+        "pooled_name_day_spearman_secondary": 0.006180180236697197,
+        "positive_daily_ics": 1797,
+        "supported_dates": 3595,
+        "supported_name_days": 307937
+      },
+      "registered_expected_sign": "event_intensity_no_fixed_sign"
+    },
+    "offering_or_buyback_flag": {
+      "by_year": {
+        "2010": {
+          "constant_rank_dates_with_minimum_support": 102,
+          "defined_daily_ics": 44,
+          "mean_daily_cross_sectional_ic": 0.02383872909788036,
+          "median_daily_cross_sectional_ic": 0.04998526583053252,
+          "pooled_name_day_spearman_secondary": 0.009610578417778015,
+          "positive_daily_ics": 28,
+          "supported_dates": 201,
+          "supported_name_days": 5171
+        },
+        "2011": {
+          "constant_rank_dates_with_minimum_support": 152,
+          "defined_daily_ics": 97,
+          "mean_daily_cross_sectional_ic": 0.052252546605216194,
+          "median_daily_cross_sectional_ic": 0.06052275326688024,
+          "pooled_name_day_spearman_secondary": 0.030398868024349213,
+          "positive_daily_ics": 56,
+          "supported_dates": 249,
+          "supported_name_days": 7752
+        },
+        "2012": {
+          "constant_rank_dates_with_minimum_support": 149,
+          "defined_daily_ics": 97,
+          "mean_daily_cross_sectional_ic": -0.014526152400132579,
+          "median_daily_cross_sectional_ic": -0.013333333333333334,
+          "pooled_name_day_spearman_secondary": -0.009534371085464954,
+          "positive_daily_ics": 46,
+          "supported_dates": 246,
+          "supported_name_days": 7770
+        },
+        "2013": {
+          "constant_rank_dates_with_minimum_support": 155,
+          "defined_daily_ics": 93,
+          "mean_daily_cross_sectional_ic": 0.023495643206486144,
+          "median_daily_cross_sectional_ic": 0.029029074405127316,
+          "pooled_name_day_spearman_secondary": 0.02469331957399845,
+          "positive_daily_ics": 50,
+          "supported_dates": 248,
+          "supported_name_days": 7334
+        },
+        "2014": {
+          "constant_rank_dates_with_minimum_support": 153,
+          "defined_daily_ics": 95,
+          "mean_daily_cross_sectional_ic": -0.024598854265127004,
+          "median_daily_cross_sectional_ic": -0.029178517217202934,
+          "pooled_name_day_spearman_secondary": -0.024724015966057777,
+          "positive_daily_ics": 44,
+          "supported_dates": 248,
+          "supported_name_days": 9269
+        },
+        "2015": {
+          "constant_rank_dates_with_minimum_support": 88,
+          "defined_daily_ics": 158,
+          "mean_daily_cross_sectional_ic": 0.014472330667636124,
+          "median_daily_cross_sectional_ic": 0.0019329912957275763,
+          "pooled_name_day_spearman_secondary": 0.013430583290755749,
+          "positive_daily_ics": 79,
+          "supported_dates": 246,
+          "supported_name_days": 9118
+        },
+        "2016": {
+          "constant_rank_dates_with_minimum_support": 170,
+          "defined_daily_ics": 63,
+          "mean_daily_cross_sectional_ic": -0.02608671577367406,
+          "median_daily_cross_sectional_ic": -0.04435909422493333,
+          "pooled_name_day_spearman_secondary": -0.009664838202297688,
+          "positive_daily_ics": 26,
+          "supported_dates": 233,
+          "supported_name_days": 8030
+        },
+        "2017": {
+          "constant_rank_dates_with_minimum_support": 130,
+          "defined_daily_ics": 116,
+          "mean_daily_cross_sectional_ic": 0.030936036876863682,
+          "median_daily_cross_sectional_ic": 0.04218606881954856,
+          "pooled_name_day_spearman_secondary": 0.0088680824264884,
+          "positive_daily_ics": 66,
+          "supported_dates": 246,
+          "supported_name_days": 8356
+        },
+        "2018": {
+          "constant_rank_dates_with_minimum_support": 48,
+          "defined_daily_ics": 197,
+          "mean_daily_cross_sectional_ic": 0.024979198012937232,
+          "median_daily_cross_sectional_ic": 0.022938272475153097,
+          "pooled_name_day_spearman_secondary": 0.020126095041632652,
+          "positive_daily_ics": 115,
+          "supported_dates": 245,
+          "supported_name_days": 21596
+        },
+        "2019": {
+          "constant_rank_dates_with_minimum_support": 18,
+          "defined_daily_ics": 230,
+          "mean_daily_cross_sectional_ic": -0.005470493167567406,
+          "median_daily_cross_sectional_ic": -0.011737115595269593,
+          "pooled_name_day_spearman_secondary": -0.01091900747269392,
+          "positive_daily_ics": 106,
+          "supported_dates": 248,
+          "supported_name_days": 29685
+        },
+        "2020": {
+          "constant_rank_dates_with_minimum_support": 18,
+          "defined_daily_ics": 231,
+          "mean_daily_cross_sectional_ic": -0.0020611037551196408,
+          "median_daily_cross_sectional_ic": -0.0026846838811608003,
+          "pooled_name_day_spearman_secondary": -0.0019524504896253347,
+          "positive_daily_ics": 113,
+          "supported_dates": 249,
+          "supported_name_days": 35975
+        },
+        "2021": {
+          "constant_rank_dates_with_minimum_support": 5,
+          "defined_daily_ics": 242,
+          "mean_daily_cross_sectional_ic": -0.002784518533989029,
+          "median_daily_cross_sectional_ic": 0.0024563741673951575,
+          "pooled_name_day_spearman_secondary": -0.003356187604367733,
+          "positive_daily_ics": 123,
+          "supported_dates": 247,
+          "supported_name_days": 45239
+        },
+        "2022": {
+          "constant_rank_dates_with_minimum_support": 26,
+          "defined_daily_ics": 224,
+          "mean_daily_cross_sectional_ic": 0.02137456580922095,
+          "median_daily_cross_sectional_ic": 0.021927360044567926,
+          "pooled_name_day_spearman_secondary": 0.01736408844590187,
+          "positive_daily_ics": 141,
+          "supported_dates": 250,
+          "supported_name_days": 38075
+        },
+        "2023": {
+          "constant_rank_dates_with_minimum_support": 5,
+          "defined_daily_ics": 243,
+          "mean_daily_cross_sectional_ic": -0.007047082542927903,
+          "median_daily_cross_sectional_ic": -0.010213991597252099,
+          "pooled_name_day_spearman_secondary": -0.002021434949710965,
+          "positive_daily_ics": 117,
+          "supported_dates": 248,
+          "supported_name_days": 38887
+        },
+        "2024": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 246,
+          "mean_daily_cross_sectional_ic": -0.014470705179846083,
+          "median_daily_cross_sectional_ic": -0.011984743586555597,
+          "pooled_name_day_spearman_secondary": -0.015502700582146645,
+          "positive_daily_ics": 102,
+          "supported_dates": 246,
+          "supported_name_days": 36172
+        }
+      },
+      "family": "events",
+      "pooled": {
+        "constant_rank_dates_with_minimum_support": 1219,
+        "defined_daily_ics": 2376,
+        "mean_daily_cross_sectional_ic": 0.004552483900302713,
+        "median_daily_cross_sectional_ic": 0.003246789977118105,
+        "pooled_name_day_spearman_secondary": -0.00023131821944843978,
+        "positive_daily_ics": 1212,
+        "supported_dates": 3650,
+        "supported_name_days": 308429
+      },
+      "registered_expected_sign": "mixed_event_types_no_fixed_sign"
+    },
+    "revenue_growth_yoy": {
+      "by_year": {
+        "2010": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 0,
+          "mean_daily_cross_sectional_ic": null,
+          "median_daily_cross_sectional_ic": null,
+          "pooled_name_day_spearman_secondary": null,
+          "positive_daily_ics": 0,
+          "supported_dates": 0,
+          "supported_name_days": 0
+        },
+        "2011": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 0,
+          "mean_daily_cross_sectional_ic": null,
+          "median_daily_cross_sectional_ic": null,
+          "pooled_name_day_spearman_secondary": null,
+          "positive_daily_ics": 0,
+          "supported_dates": 0,
+          "supported_name_days": 0
+        },
+        "2012": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 31,
+          "mean_daily_cross_sectional_ic": 0.03319891768245294,
+          "median_daily_cross_sectional_ic": 0.014961832758549414,
+          "pooled_name_day_spearman_secondary": 0.020507540553808212,
+          "positive_daily_ics": 17,
+          "supported_dates": 31,
+          "supported_name_days": 814
+        },
+        "2013": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 195,
+          "mean_daily_cross_sectional_ic": 0.025739762571525823,
+          "median_daily_cross_sectional_ic": 0.0287434995713748,
+          "pooled_name_day_spearman_secondary": 0.01649719849228859,
+          "positive_daily_ics": 104,
+          "supported_dates": 195,
+          "supported_name_days": 4869
+        },
+        "2014": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 248,
+          "mean_daily_cross_sectional_ic": 0.03374754871987616,
+          "median_daily_cross_sectional_ic": 0.021515852145459705,
+          "pooled_name_day_spearman_secondary": 0.037843868136405945,
+          "positive_daily_ics": 132,
+          "supported_dates": 248,
+          "supported_name_days": 8049
+        },
+        "2015": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 246,
+          "mean_daily_cross_sectional_ic": 0.03943349290985622,
+          "median_daily_cross_sectional_ic": 0.02479714918409265,
+          "pooled_name_day_spearman_secondary": 0.03566505014896393,
+          "positive_daily_ics": 138,
+          "supported_dates": 246,
+          "supported_name_days": 8038
+        },
+        "2016": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 233,
+          "mean_daily_cross_sectional_ic": -0.029237207206265443,
+          "median_daily_cross_sectional_ic": -0.029441420239661953,
+          "pooled_name_day_spearman_secondary": -0.030467769131064415,
+          "positive_daily_ics": 107,
+          "supported_dates": 233,
+          "supported_name_days": 6982
+        },
+        "2017": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 246,
+          "mean_daily_cross_sectional_ic": 0.0351170755884679,
+          "median_daily_cross_sectional_ic": 0.025072180362351523,
+          "pooled_name_day_spearman_secondary": 0.034202128648757935,
+          "positive_daily_ics": 141,
+          "supported_dates": 246,
+          "supported_name_days": 7300
+        },
+        "2018": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 245,
+          "mean_daily_cross_sectional_ic": 0.020114019205451816,
+          "median_daily_cross_sectional_ic": 0.010757427873350439,
+          "pooled_name_day_spearman_secondary": 0.01432920340448618,
+          "positive_daily_ics": 133,
+          "supported_dates": 245,
+          "supported_name_days": 18442
+        },
+        "2019": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 248,
+          "mean_daily_cross_sectional_ic": -0.0010713074181454322,
+          "median_daily_cross_sectional_ic": -0.0027604242338147974,
+          "pooled_name_day_spearman_secondary": -0.00112222193274647,
+          "positive_daily_ics": 118,
+          "supported_dates": 248,
+          "supported_name_days": 25175
+        },
+        "2020": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 249,
+          "mean_daily_cross_sectional_ic": 0.0026670962074829647,
+          "median_daily_cross_sectional_ic": -0.0015885542802027276,
+          "pooled_name_day_spearman_secondary": 0.0030392229091376066,
+          "positive_daily_ics": 123,
+          "supported_dates": 249,
+          "supported_name_days": 29988
+        },
+        "2021": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 247,
+          "mean_daily_cross_sectional_ic": 0.021384905656686486,
+          "median_daily_cross_sectional_ic": 0.024671004498340008,
+          "pooled_name_day_spearman_secondary": 0.01873016729950905,
+          "positive_daily_ics": 140,
+          "supported_dates": 247,
+          "supported_name_days": 33220
+        },
+        "2022": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 250,
+          "mean_daily_cross_sectional_ic": -0.005008263327319047,
+          "median_daily_cross_sectional_ic": 0.002601861282637525,
+          "pooled_name_day_spearman_secondary": -0.0038986934814602137,
+          "positive_daily_ics": 126,
+          "supported_dates": 250,
+          "supported_name_days": 30140
+        },
+        "2023": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 248,
+          "mean_daily_cross_sectional_ic": 0.007801278443815527,
+          "median_daily_cross_sectional_ic": 0.016577256867624304,
+          "pooled_name_day_spearman_secondary": 0.008113913238048553,
+          "positive_daily_ics": 138,
+          "supported_dates": 248,
+          "supported_name_days": 32857
+        },
+        "2024": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 246,
+          "mean_daily_cross_sectional_ic": -0.00705053074584364,
+          "median_daily_cross_sectional_ic": -0.005992384657301682,
+          "pooled_name_day_spearman_secondary": -0.009322848170995712,
+          "positive_daily_ics": 120,
+          "supported_dates": 246,
+          "supported_name_days": 32083
+        }
+      },
+      "family": "fundamentals",
+      "pooled": {
+        "constant_rank_dates_with_minimum_support": 0,
+        "defined_daily_ics": 2932,
+        "mean_daily_cross_sectional_ic": 0.012108333076712191,
+        "median_daily_cross_sectional_ic": 0.009574207721355376,
+        "pooled_name_day_spearman_secondary": 0.0065119266510009766,
+        "positive_daily_ics": 1537,
+        "supported_dates": 2932,
+        "supported_name_days": 237957
+      },
+      "registered_expected_sign": "positive_weak_prior"
+    },
+    "sessions_since_financial_filing": {
+      "by_year": {
+        "2010": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 146,
+          "mean_daily_cross_sectional_ic": 0.021938552709058624,
+          "median_daily_cross_sectional_ic": 0.01342517363142209,
+          "pooled_name_day_spearman_secondary": -0.031068243086338043,
+          "positive_daily_ics": 75,
+          "supported_dates": 201,
+          "supported_name_days": 5171
+        },
+        "2011": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 249,
+          "mean_daily_cross_sectional_ic": 0.030271170531064876,
+          "median_daily_cross_sectional_ic": 0.04125073564223591,
+          "pooled_name_day_spearman_secondary": 0.01645844615995884,
+          "positive_daily_ics": 143,
+          "supported_dates": 249,
+          "supported_name_days": 7752
+        },
+        "2012": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 246,
+          "mean_daily_cross_sectional_ic": 0.006162451710415945,
+          "median_daily_cross_sectional_ic": 0.01563628161782738,
+          "pooled_name_day_spearman_secondary": -0.024812672287225723,
+          "positive_daily_ics": 130,
+          "supported_dates": 246,
+          "supported_name_days": 7770
+        },
+        "2013": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 248,
+          "mean_daily_cross_sectional_ic": -0.02802902989589028,
+          "median_daily_cross_sectional_ic": -0.039291913380628075,
+          "pooled_name_day_spearman_secondary": -0.015570242889225483,
+          "positive_daily_ics": 103,
+          "supported_dates": 248,
+          "supported_name_days": 7334
+        },
+        "2014": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 248,
+          "mean_daily_cross_sectional_ic": 0.014096741430290995,
+          "median_daily_cross_sectional_ic": 0.007957024248439548,
+          "pooled_name_day_spearman_secondary": 0.019846783950924873,
+          "positive_daily_ics": 129,
+          "supported_dates": 248,
+          "supported_name_days": 9269
+        },
+        "2015": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 246,
+          "mean_daily_cross_sectional_ic": 0.013862411099387652,
+          "median_daily_cross_sectional_ic": 0.021263186743575524,
+          "pooled_name_day_spearman_secondary": 0.00827234610915184,
+          "positive_daily_ics": 132,
+          "supported_dates": 246,
+          "supported_name_days": 9118
+        },
+        "2016": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 233,
+          "mean_daily_cross_sectional_ic": -0.013726380735769013,
+          "median_daily_cross_sectional_ic": -0.022384188376780235,
+          "pooled_name_day_spearman_secondary": -0.007321224082261324,
+          "positive_daily_ics": 104,
+          "supported_dates": 233,
+          "supported_name_days": 8030
+        },
+        "2017": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 246,
+          "mean_daily_cross_sectional_ic": 0.025080052488731755,
+          "median_daily_cross_sectional_ic": 0.02005262283852218,
+          "pooled_name_day_spearman_secondary": -0.0074829296208918095,
+          "positive_daily_ics": 130,
+          "supported_dates": 246,
+          "supported_name_days": 8356
+        },
+        "2018": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 245,
+          "mean_daily_cross_sectional_ic": -0.025278922781274075,
+          "median_daily_cross_sectional_ic": -0.020032763636572252,
+          "pooled_name_day_spearman_secondary": -0.01135963760316372,
+          "positive_daily_ics": 102,
+          "supported_dates": 245,
+          "supported_name_days": 21596
+        },
+        "2019": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 248,
+          "mean_daily_cross_sectional_ic": 0.0001178923913714588,
+          "median_daily_cross_sectional_ic": 0.004014834236267226,
+          "pooled_name_day_spearman_secondary": -0.0019958566408604383,
+          "positive_daily_ics": 126,
+          "supported_dates": 248,
+          "supported_name_days": 29685
+        },
+        "2020": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 249,
+          "mean_daily_cross_sectional_ic": 0.004631328891220356,
+          "median_daily_cross_sectional_ic": 0.0002569827314963757,
+          "pooled_name_day_spearman_secondary": 0.004747005179524422,
+          "positive_daily_ics": 125,
+          "supported_dates": 249,
+          "supported_name_days": 35975
+        },
+        "2021": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 247,
+          "mean_daily_cross_sectional_ic": 0.017536327194096705,
+          "median_daily_cross_sectional_ic": 0.012018511758694922,
+          "pooled_name_day_spearman_secondary": 0.006863492541015148,
+          "positive_daily_ics": 138,
+          "supported_dates": 247,
+          "supported_name_days": 45239
+        },
+        "2022": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 250,
+          "mean_daily_cross_sectional_ic": 0.007603250036379587,
+          "median_daily_cross_sectional_ic": 0.009520349937994391,
+          "pooled_name_day_spearman_secondary": -0.0003465427435003221,
+          "positive_daily_ics": 132,
+          "supported_dates": 250,
+          "supported_name_days": 38075
+        },
+        "2023": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 248,
+          "mean_daily_cross_sectional_ic": -0.002811962996550957,
+          "median_daily_cross_sectional_ic": -0.001370028064205049,
+          "pooled_name_day_spearman_secondary": -0.010253487154841423,
+          "positive_daily_ics": 121,
+          "supported_dates": 248,
+          "supported_name_days": 38887
+        },
+        "2024": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 246,
+          "mean_daily_cross_sectional_ic": 0.011807291463640778,
+          "median_daily_cross_sectional_ic": 0.01642439308238217,
+          "pooled_name_day_spearman_secondary": -0.0016254099318757653,
+          "positive_daily_ics": 142,
+          "supported_dates": 246,
+          "supported_name_days": 36172
+        }
+      },
+      "family": "events",
+      "pooled": {
+        "constant_rank_dates_with_minimum_support": 0,
+        "defined_daily_ics": 3595,
+        "mean_daily_cross_sectional_ic": 0.005177056856412858,
+        "median_daily_cross_sectional_ic": 0.0038356750495330935,
+        "pooled_name_day_spearman_secondary": -0.0014856585767120123,
+        "positive_daily_ics": 1832,
+        "supported_dates": 3650,
+        "supported_name_days": 308429
+      },
+      "registered_expected_sign": "small_no_fixed_sign"
+    },
+    "sessions_since_material_fact": {
+      "by_year": {
+        "2010": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 146,
+          "mean_daily_cross_sectional_ic": -0.0491470746919688,
+          "median_daily_cross_sectional_ic": -0.04554146603405986,
+          "pooled_name_day_spearman_secondary": -0.03153671324253082,
+          "positive_daily_ics": 60,
+          "supported_dates": 201,
+          "supported_name_days": 4446
+        },
+        "2011": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 249,
+          "mean_daily_cross_sectional_ic": 0.03297710177064064,
+          "median_daily_cross_sectional_ic": 0.049562353282673464,
+          "pooled_name_day_spearman_secondary": 0.02929757349193096,
+          "positive_daily_ics": 145,
+          "supported_dates": 249,
+          "supported_name_days": 7542
+        },
+        "2012": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 246,
+          "mean_daily_cross_sectional_ic": 0.02656645964932242,
+          "median_daily_cross_sectional_ic": 0.012709032943487068,
+          "pooled_name_day_spearman_secondary": 0.028021609410643578,
+          "positive_daily_ics": 131,
+          "supported_dates": 246,
+          "supported_name_days": 7770
+        },
+        "2013": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 248,
+          "mean_daily_cross_sectional_ic": -0.0013007456458263326,
+          "median_daily_cross_sectional_ic": -0.0006482723597196018,
+          "pooled_name_day_spearman_secondary": -0.00143345701508224,
+          "positive_daily_ics": 124,
+          "supported_dates": 248,
+          "supported_name_days": 7334
+        },
+        "2014": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 248,
+          "mean_daily_cross_sectional_ic": 0.046749124630274495,
+          "median_daily_cross_sectional_ic": 0.05459913740333455,
+          "pooled_name_day_spearman_secondary": 0.044166285544633865,
+          "positive_daily_ics": 156,
+          "supported_dates": 248,
+          "supported_name_days": 9269
+        },
+        "2015": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 246,
+          "mean_daily_cross_sectional_ic": 0.0421784483562934,
+          "median_daily_cross_sectional_ic": 0.04472268734267515,
+          "pooled_name_day_spearman_secondary": 0.042895495891571045,
+          "positive_daily_ics": 149,
+          "supported_dates": 246,
+          "supported_name_days": 9118
+        },
+        "2016": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 233,
+          "mean_daily_cross_sectional_ic": -0.035592881390907424,
+          "median_daily_cross_sectional_ic": -0.03777337574236739,
+          "pooled_name_day_spearman_secondary": -0.03838890790939331,
+          "positive_daily_ics": 96,
+          "supported_dates": 233,
+          "supported_name_days": 8030
+        },
+        "2017": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 246,
+          "mean_daily_cross_sectional_ic": 0.03775571487349453,
+          "median_daily_cross_sectional_ic": 0.027888277556091648,
+          "pooled_name_day_spearman_secondary": 0.03461842238903046,
+          "positive_daily_ics": 137,
+          "supported_dates": 246,
+          "supported_name_days": 8356
+        },
+        "2018": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 245,
+          "mean_daily_cross_sectional_ic": -0.025335418261670874,
+          "median_daily_cross_sectional_ic": -0.021035457297799168,
+          "pooled_name_day_spearman_secondary": -0.01564381644129753,
+          "positive_daily_ics": 103,
+          "supported_dates": 245,
+          "supported_name_days": 21595
+        },
+        "2019": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 248,
+          "mean_daily_cross_sectional_ic": -0.012299066001645164,
+          "median_daily_cross_sectional_ic": -0.028200089948804928,
+          "pooled_name_day_spearman_secondary": -0.011768709868192673,
+          "positive_daily_ics": 99,
+          "supported_dates": 248,
+          "supported_name_days": 29683
+        },
+        "2020": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 249,
+          "mean_daily_cross_sectional_ic": 0.017316032650098876,
+          "median_daily_cross_sectional_ic": 0.024831366084180156,
+          "pooled_name_day_spearman_secondary": 0.013425643555819988,
+          "positive_daily_ics": 146,
+          "supported_dates": 249,
+          "supported_name_days": 35871
+        },
+        "2021": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 247,
+          "mean_daily_cross_sectional_ic": -0.015018849344149035,
+          "median_daily_cross_sectional_ic": -0.010548709056428537,
+          "pooled_name_day_spearman_secondary": -0.019131548702716827,
+          "positive_daily_ics": 106,
+          "supported_dates": 247,
+          "supported_name_days": 44873
+        },
+        "2022": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 250,
+          "mean_daily_cross_sectional_ic": -0.020952494262942583,
+          "median_daily_cross_sectional_ic": -0.025584680664808908,
+          "pooled_name_day_spearman_secondary": -0.02713906578719616,
+          "positive_daily_ics": 83,
+          "supported_dates": 250,
+          "supported_name_days": 37992
+        },
+        "2023": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 248,
+          "mean_daily_cross_sectional_ic": 0.0022484519716176286,
+          "median_daily_cross_sectional_ic": -4.292465391396875e-05,
+          "pooled_name_day_spearman_secondary": 0.0008473393972963095,
+          "positive_daily_ics": 124,
+          "supported_dates": 248,
+          "supported_name_days": 38887
+        },
+        "2024": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 246,
+          "mean_daily_cross_sectional_ic": 0.008172219906613754,
+          "median_daily_cross_sectional_ic": 0.012183218578646206,
+          "pooled_name_day_spearman_secondary": 0.008194253779947758,
+          "positive_daily_ics": 133,
+          "supported_dates": 246,
+          "supported_name_days": 36172
+        }
+      },
+      "family": "events",
+      "pooled": {
+        "constant_rank_dates_with_minimum_support": 0,
+        "defined_daily_ics": 3595,
+        "mean_daily_cross_sectional_ic": 0.0052538482358247245,
+        "median_daily_cross_sectional_ic": -0.00020193887417953017,
+        "pooled_name_day_spearman_secondary": -0.0021293971221894026,
+        "positive_daily_ics": 1792,
+        "supported_dates": 3650,
+        "supported_name_days": 306938
+      },
+      "registered_expected_sign": "small_no_fixed_sign"
+    },
+    "sessions_until_expected_filing": {
+      "by_year": {
+        "2010": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 0,
+          "mean_daily_cross_sectional_ic": null,
+          "median_daily_cross_sectional_ic": null,
+          "pooled_name_day_spearman_secondary": null,
+          "positive_daily_ics": 0,
+          "supported_dates": 0,
+          "supported_name_days": 0
+        },
+        "2011": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 34,
+          "mean_daily_cross_sectional_ic": 0.03454176742078112,
+          "median_daily_cross_sectional_ic": 0.00963044099631248,
+          "pooled_name_day_spearman_secondary": 0.01680021919310093,
+          "positive_daily_ics": 18,
+          "supported_dates": 45,
+          "supported_name_days": 1031
+        },
+        "2012": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 246,
+          "mean_daily_cross_sectional_ic": -0.007594741714972336,
+          "median_daily_cross_sectional_ic": -0.012621893627183106,
+          "pooled_name_day_spearman_secondary": -0.009543872438371181,
+          "positive_daily_ics": 117,
+          "supported_dates": 246,
+          "supported_name_days": 7770
+        },
+        "2013": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 248,
+          "mean_daily_cross_sectional_ic": 0.02094225424611285,
+          "median_daily_cross_sectional_ic": 0.015430944349869559,
+          "pooled_name_day_spearman_secondary": 0.016613546758890152,
+          "positive_daily_ics": 133,
+          "supported_dates": 248,
+          "supported_name_days": 7334
+        },
+        "2014": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 248,
+          "mean_daily_cross_sectional_ic": 0.02655665268130564,
+          "median_daily_cross_sectional_ic": 0.009835815845199936,
+          "pooled_name_day_spearman_secondary": 0.020680932328104973,
+          "positive_daily_ics": 135,
+          "supported_dates": 248,
+          "supported_name_days": 9269
+        },
+        "2015": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 246,
+          "mean_daily_cross_sectional_ic": -0.011105137070685134,
+          "median_daily_cross_sectional_ic": -0.01548963875017361,
+          "pooled_name_day_spearman_secondary": -0.008441189303994179,
+          "positive_daily_ics": 117,
+          "supported_dates": 246,
+          "supported_name_days": 9118
+        },
+        "2016": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 233,
+          "mean_daily_cross_sectional_ic": 0.02037783572713109,
+          "median_daily_cross_sectional_ic": 0.030072977185969147,
+          "pooled_name_day_spearman_secondary": 0.010489186272025108,
+          "positive_daily_ics": 135,
+          "supported_dates": 233,
+          "supported_name_days": 8030
+        },
+        "2017": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 246,
+          "mean_daily_cross_sectional_ic": -0.014420378605593647,
+          "median_daily_cross_sectional_ic": -0.021633537323485327,
+          "pooled_name_day_spearman_secondary": 0.0014714462449774146,
+          "positive_daily_ics": 111,
+          "supported_dates": 246,
+          "supported_name_days": 8271
+        },
+        "2018": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 245,
+          "mean_daily_cross_sectional_ic": 0.023522265204898894,
+          "median_daily_cross_sectional_ic": 0.01989714849404393,
+          "pooled_name_day_spearman_secondary": 0.011909347027540207,
+          "positive_daily_ics": 146,
+          "supported_dates": 245,
+          "supported_name_days": 21518
+        },
+        "2019": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 248,
+          "mean_daily_cross_sectional_ic": 0.016312720632569375,
+          "median_daily_cross_sectional_ic": 0.017397875359573885,
+          "pooled_name_day_spearman_secondary": 0.011588092893362045,
+          "positive_daily_ics": 137,
+          "supported_dates": 248,
+          "supported_name_days": 29598
+        },
+        "2020": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 249,
+          "mean_daily_cross_sectional_ic": 0.006501138812320785,
+          "median_daily_cross_sectional_ic": 0.021902192519878887,
+          "pooled_name_day_spearman_secondary": -0.00194383948110044,
+          "positive_daily_ics": 136,
+          "supported_dates": 249,
+          "supported_name_days": 35849
+        },
+        "2021": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 247,
+          "mean_daily_cross_sectional_ic": -0.014415475710487279,
+          "median_daily_cross_sectional_ic": -0.02000001206023918,
+          "pooled_name_day_spearman_secondary": -0.021953441202640533,
+          "positive_daily_ics": 103,
+          "supported_dates": 247,
+          "supported_name_days": 44789
+        },
+        "2022": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 250,
+          "mean_daily_cross_sectional_ic": 0.006904432696093206,
+          "median_daily_cross_sectional_ic": 0.00808609912819936,
+          "pooled_name_day_spearman_secondary": 0.00047916019684635103,
+          "positive_daily_ics": 135,
+          "supported_dates": 250,
+          "supported_name_days": 37988
+        },
+        "2023": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 248,
+          "mean_daily_cross_sectional_ic": -0.003965723498260329,
+          "median_daily_cross_sectional_ic": -0.005626443612362711,
+          "pooled_name_day_spearman_secondary": -0.0012540773022919893,
+          "positive_daily_ics": 118,
+          "supported_dates": 248,
+          "supported_name_days": 38887
+        },
+        "2024": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 246,
+          "mean_daily_cross_sectional_ic": 0.004625037340707182,
+          "median_daily_cross_sectional_ic": 0.00271266392798457,
+          "pooled_name_day_spearman_secondary": 0.0032866757828742266,
+          "positive_daily_ics": 124,
+          "supported_dates": 246,
+          "supported_name_days": 36172
+        }
+      },
+      "family": "events",
+      "pooled": {
+        "constant_rank_dates_with_minimum_support": 0,
+        "defined_daily_ics": 3234,
+        "mean_daily_cross_sectional_ic": 0.005968348826408094,
+        "median_daily_cross_sectional_ic": 0.004739814424876849,
+        "pooled_name_day_spearman_secondary": -0.0002239417372038588,
+        "positive_daily_ics": 1665,
+        "supported_dates": 3245,
+        "supported_name_days": 295624
+      },
+      "registered_expected_sign": "small_no_fixed_sign"
+    },
+    "statement_age_sessions": {
+      "by_year": {
+        "2010": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 0,
+          "mean_daily_cross_sectional_ic": null,
+          "median_daily_cross_sectional_ic": null,
+          "pooled_name_day_spearman_secondary": null,
+          "positive_daily_ics": 0,
+          "supported_dates": 0,
+          "supported_name_days": 0
+        },
+        "2011": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 202,
+          "mean_daily_cross_sectional_ic": 0.0356012454950824,
+          "median_daily_cross_sectional_ic": 0.036906642852388635,
+          "pooled_name_day_spearman_secondary": 0.030000193044543266,
+          "positive_daily_ics": 117,
+          "supported_dates": 229,
+          "supported_name_days": 6262
+        },
+        "2012": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 246,
+          "mean_daily_cross_sectional_ic": 0.006162451710415945,
+          "median_daily_cross_sectional_ic": 0.01563628161782738,
+          "pooled_name_day_spearman_secondary": -0.024812672287225723,
+          "positive_daily_ics": 130,
+          "supported_dates": 246,
+          "supported_name_days": 7770
+        },
+        "2013": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 248,
+          "mean_daily_cross_sectional_ic": -0.02802902989589028,
+          "median_daily_cross_sectional_ic": -0.039291913380628075,
+          "pooled_name_day_spearman_secondary": -0.015570242889225483,
+          "positive_daily_ics": 103,
+          "supported_dates": 248,
+          "supported_name_days": 7334
+        },
+        "2014": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 248,
+          "mean_daily_cross_sectional_ic": 0.012118897466118037,
+          "median_daily_cross_sectional_ic": 0.006050411262799377,
+          "pooled_name_day_spearman_secondary": 0.010102466680109501,
+          "positive_daily_ics": 129,
+          "supported_dates": 248,
+          "supported_name_days": 9269
+        },
+        "2015": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 246,
+          "mean_daily_cross_sectional_ic": 0.013862411099387652,
+          "median_daily_cross_sectional_ic": 0.021263186743575524,
+          "pooled_name_day_spearman_secondary": 0.00827234610915184,
+          "positive_daily_ics": 132,
+          "supported_dates": 246,
+          "supported_name_days": 9118
+        },
+        "2016": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 233,
+          "mean_daily_cross_sectional_ic": -0.013726380735769013,
+          "median_daily_cross_sectional_ic": -0.022384188376780235,
+          "pooled_name_day_spearman_secondary": -0.007321224082261324,
+          "positive_daily_ics": 104,
+          "supported_dates": 233,
+          "supported_name_days": 8030
+        },
+        "2017": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 246,
+          "mean_daily_cross_sectional_ic": 0.025080052488731755,
+          "median_daily_cross_sectional_ic": 0.02005262283852218,
+          "pooled_name_day_spearman_secondary": -0.0074829296208918095,
+          "positive_daily_ics": 130,
+          "supported_dates": 246,
+          "supported_name_days": 8356
+        },
+        "2018": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 245,
+          "mean_daily_cross_sectional_ic": -0.026311459343832267,
+          "median_daily_cross_sectional_ic": -0.020032763636572252,
+          "pooled_name_day_spearman_secondary": -0.012628143653273582,
+          "positive_daily_ics": 102,
+          "supported_dates": 245,
+          "supported_name_days": 21596
+        },
+        "2019": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 248,
+          "mean_daily_cross_sectional_ic": 0.0001178923913714588,
+          "median_daily_cross_sectional_ic": 0.004014834236267226,
+          "pooled_name_day_spearman_secondary": -0.0019958566408604383,
+          "positive_daily_ics": 126,
+          "supported_dates": 248,
+          "supported_name_days": 29685
+        },
+        "2020": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 249,
+          "mean_daily_cross_sectional_ic": 0.004573954479050674,
+          "median_daily_cross_sectional_ic": 0.0013974663554395786,
+          "pooled_name_day_spearman_secondary": 0.00509801646694541,
+          "positive_daily_ics": 127,
+          "supported_dates": 249,
+          "supported_name_days": 35975
+        },
+        "2021": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 247,
+          "mean_daily_cross_sectional_ic": 0.017536327194096705,
+          "median_daily_cross_sectional_ic": 0.012018511758694922,
+          "pooled_name_day_spearman_secondary": 0.006863492541015148,
+          "positive_daily_ics": 138,
+          "supported_dates": 247,
+          "supported_name_days": 45239
+        },
+        "2022": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 250,
+          "mean_daily_cross_sectional_ic": 0.00757612290343449,
+          "median_daily_cross_sectional_ic": 0.009520349937994391,
+          "pooled_name_day_spearman_secondary": -0.00035258533898741007,
+          "positive_daily_ics": 132,
+          "supported_dates": 250,
+          "supported_name_days": 38075
+        },
+        "2023": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 248,
+          "mean_daily_cross_sectional_ic": -0.002811962996550957,
+          "median_daily_cross_sectional_ic": -0.001370028064205049,
+          "pooled_name_day_spearman_secondary": -0.010253487154841423,
+          "positive_daily_ics": 121,
+          "supported_dates": 248,
+          "supported_name_days": 38887
+        },
+        "2024": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 246,
+          "mean_daily_cross_sectional_ic": 0.011807291463640778,
+          "median_daily_cross_sectional_ic": 0.01642439308238217,
+          "pooled_name_day_spearman_secondary": -0.0016254099318757653,
+          "positive_daily_ics": 142,
+          "supported_dates": 246,
+          "supported_name_days": 36172
+        }
+      },
+      "family": "fundamentals",
+      "pooled": {
+        "constant_rank_dates_with_minimum_support": 0,
+        "defined_daily_ics": 3402,
+        "mean_daily_cross_sectional_ic": 0.004202785437461783,
+        "median_daily_cross_sectional_ic": 0.003370938295695564,
+        "pooled_name_day_spearman_secondary": -0.001349214930087328,
+        "positive_daily_ics": 1733,
+        "supported_dates": 3429,
+        "supported_name_days": 301768
+      },
+      "registered_expected_sign": "small_no_fixed_sign"
+    },
+    "sue": {
+      "by_year": {
+        "2010": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 0,
+          "mean_daily_cross_sectional_ic": null,
+          "median_daily_cross_sectional_ic": null,
+          "pooled_name_day_spearman_secondary": null,
+          "positive_daily_ics": 0,
+          "supported_dates": 0,
+          "supported_name_days": 0
+        },
+        "2011": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 0,
+          "mean_daily_cross_sectional_ic": null,
+          "median_daily_cross_sectional_ic": null,
+          "pooled_name_day_spearman_secondary": null,
+          "positive_daily_ics": 0,
+          "supported_dates": 0,
+          "supported_name_days": 0
+        },
+        "2012": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 0,
+          "mean_daily_cross_sectional_ic": null,
+          "median_daily_cross_sectional_ic": null,
+          "pooled_name_day_spearman_secondary": null,
+          "positive_daily_ics": 0,
+          "supported_dates": 0,
+          "supported_name_days": 0
+        },
+        "2013": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 0,
+          "mean_daily_cross_sectional_ic": null,
+          "median_daily_cross_sectional_ic": null,
+          "pooled_name_day_spearman_secondary": null,
+          "positive_daily_ics": 0,
+          "supported_dates": 0,
+          "supported_name_days": 0
+        },
+        "2014": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 163,
+          "mean_daily_cross_sectional_ic": 0.051272254033136976,
+          "median_daily_cross_sectional_ic": 0.036686619722313824,
+          "pooled_name_day_spearman_secondary": 0.05003143101930618,
+          "positive_daily_ics": 93,
+          "supported_dates": 163,
+          "supported_name_days": 5983
+        },
+        "2015": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 246,
+          "mean_daily_cross_sectional_ic": 0.016569133216431952,
+          "median_daily_cross_sectional_ic": 0.0020090041734555555,
+          "pooled_name_day_spearman_secondary": 0.019726306200027466,
+          "positive_daily_ics": 124,
+          "supported_dates": 246,
+          "supported_name_days": 8545
+        },
+        "2016": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 233,
+          "mean_daily_cross_sectional_ic": -0.021769044646679347,
+          "median_daily_cross_sectional_ic": -0.02236480330887922,
+          "pooled_name_day_spearman_secondary": -0.025358280166983604,
+          "positive_daily_ics": 109,
+          "supported_dates": 233,
+          "supported_name_days": 7405
+        },
+        "2017": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 246,
+          "mean_daily_cross_sectional_ic": 0.036589337214307405,
+          "median_daily_cross_sectional_ic": 0.02454994116846686,
+          "pooled_name_day_spearman_secondary": 0.03505341336131096,
+          "positive_daily_ics": 142,
+          "supported_dates": 246,
+          "supported_name_days": 7796
+        },
+        "2018": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 245,
+          "mean_daily_cross_sectional_ic": 0.0603186759656136,
+          "median_daily_cross_sectional_ic": 0.056671894088840324,
+          "pooled_name_day_spearman_secondary": 0.05046404153108597,
+          "positive_daily_ics": 158,
+          "supported_dates": 245,
+          "supported_name_days": 19696
+        },
+        "2019": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 248,
+          "mean_daily_cross_sectional_ic": 0.005285702524725838,
+          "median_daily_cross_sectional_ic": -0.0009746018582258945,
+          "pooled_name_day_spearman_secondary": 0.004901705775409937,
+          "positive_daily_ics": 122,
+          "supported_dates": 248,
+          "supported_name_days": 26562
+        },
+        "2020": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 249,
+          "mean_daily_cross_sectional_ic": 0.005945925163960898,
+          "median_daily_cross_sectional_ic": 0.014129832182742844,
+          "pooled_name_day_spearman_secondary": 0.00540641276165843,
+          "positive_daily_ics": 134,
+          "supported_dates": 249,
+          "supported_name_days": 31618
+        },
+        "2021": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 247,
+          "mean_daily_cross_sectional_ic": 0.03771189579729237,
+          "median_daily_cross_sectional_ic": 0.04509776596612729,
+          "pooled_name_day_spearman_secondary": 0.03730239346623421,
+          "positive_daily_ics": 157,
+          "supported_dates": 247,
+          "supported_name_days": 35960
+        },
+        "2022": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 250,
+          "mean_daily_cross_sectional_ic": 0.011681497542852522,
+          "median_daily_cross_sectional_ic": 0.010668329796234863,
+          "pooled_name_day_spearman_secondary": 0.011175226420164108,
+          "positive_daily_ics": 136,
+          "supported_dates": 250,
+          "supported_name_days": 27778
+        },
+        "2023": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 248,
+          "mean_daily_cross_sectional_ic": 0.04039944229488503,
+          "median_daily_cross_sectional_ic": 0.047207314891466685,
+          "pooled_name_day_spearman_secondary": 0.03777819871902466,
+          "positive_daily_ics": 166,
+          "supported_dates": 248,
+          "supported_name_days": 31180
+        },
+        "2024": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 246,
+          "mean_daily_cross_sectional_ic": 0.005355309618386883,
+          "median_daily_cross_sectional_ic": -0.001331890821239352,
+          "pooled_name_day_spearman_secondary": 0.004558966960757971,
+          "positive_daily_ics": 119,
+          "supported_dates": 246,
+          "supported_name_days": 32120
+        }
+      },
+      "family": "fundamentals",
+      "pooled": {
+        "constant_rank_dates_with_minimum_support": 0,
+        "defined_daily_ics": 2621,
+        "mean_daily_cross_sectional_ic": 0.02193945800729475,
+        "median_daily_cross_sectional_ic": 0.02072459758208731,
+        "pooled_name_day_spearman_secondary": 0.02055707573890686,
+        "positive_daily_ics": 1460,
+        "supported_dates": 2621,
+        "supported_name_days": 234643
+      },
+      "registered_expected_sign": "positive"
+    },
+    "valuation_available_flag": {
+      "by_year": {
+        "2010": {
+          "constant_rank_dates_with_minimum_support": 146,
+          "defined_daily_ics": 0,
+          "mean_daily_cross_sectional_ic": null,
+          "median_daily_cross_sectional_ic": null,
+          "pooled_name_day_spearman_secondary": null,
+          "positive_daily_ics": 0,
+          "supported_dates": 201,
+          "supported_name_days": 5171
+        },
+        "2011": {
+          "constant_rank_dates_with_minimum_support": 20,
+          "defined_daily_ics": 229,
+          "mean_daily_cross_sectional_ic": 0.020301313179608954,
+          "median_daily_cross_sectional_ic": 0.021437323142813606,
+          "pooled_name_day_spearman_secondary": 0.017507895827293396,
+          "positive_daily_ics": 123,
+          "supported_dates": 249,
+          "supported_name_days": 7752
+        },
+        "2012": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 246,
+          "mean_daily_cross_sectional_ic": 0.019781673698305958,
+          "median_daily_cross_sectional_ic": 0.014874825042283144,
+          "pooled_name_day_spearman_secondary": 0.014454205520451069,
+          "positive_daily_ics": 131,
+          "supported_dates": 246,
+          "supported_name_days": 7770
+        },
+        "2013": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 248,
+          "mean_daily_cross_sectional_ic": 0.015194103162433834,
+          "median_daily_cross_sectional_ic": 0.031062969983227252,
+          "pooled_name_day_spearman_secondary": 0.014042203314602375,
+          "positive_daily_ics": 137,
+          "supported_dates": 248,
+          "supported_name_days": 7334
+        },
+        "2014": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 248,
+          "mean_daily_cross_sectional_ic": 0.020683865315533442,
+          "median_daily_cross_sectional_ic": 0.01924256158756786,
+          "pooled_name_day_spearman_secondary": 0.011413742788136005,
+          "positive_daily_ics": 135,
+          "supported_dates": 248,
+          "supported_name_days": 9269
+        },
+        "2015": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 246,
+          "mean_daily_cross_sectional_ic": 0.014941445274131097,
+          "median_daily_cross_sectional_ic": 0.03892220427751525,
+          "pooled_name_day_spearman_secondary": 0.010592632927000523,
+          "positive_daily_ics": 136,
+          "supported_dates": 246,
+          "supported_name_days": 9118
+        },
+        "2016": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 233,
+          "mean_daily_cross_sectional_ic": -0.00812134358088723,
+          "median_daily_cross_sectional_ic": -0.015422625610268945,
+          "pooled_name_day_spearman_secondary": -0.009314805269241333,
+          "positive_daily_ics": 110,
+          "supported_dates": 233,
+          "supported_name_days": 8030
+        },
+        "2017": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 246,
+          "mean_daily_cross_sectional_ic": -0.057522989116160154,
+          "median_daily_cross_sectional_ic": -0.05890453745132018,
+          "pooled_name_day_spearman_secondary": -0.05271514877676964,
+          "positive_daily_ics": 98,
+          "supported_dates": 246,
+          "supported_name_days": 8356
+        },
+        "2018": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 245,
+          "mean_daily_cross_sectional_ic": -0.00739728285085877,
+          "median_daily_cross_sectional_ic": -0.011796876316710975,
+          "pooled_name_day_spearman_secondary": -0.004892852157354355,
+          "positive_daily_ics": 115,
+          "supported_dates": 245,
+          "supported_name_days": 21596
+        },
+        "2019": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 248,
+          "mean_daily_cross_sectional_ic": 0.033668128019770496,
+          "median_daily_cross_sectional_ic": 0.030370697127950874,
+          "pooled_name_day_spearman_secondary": 0.03390531614422798,
+          "positive_daily_ics": 150,
+          "supported_dates": 248,
+          "supported_name_days": 29685
+        },
+        "2020": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 249,
+          "mean_daily_cross_sectional_ic": -0.024366477125336943,
+          "median_daily_cross_sectional_ic": -0.023818892544999866,
+          "pooled_name_day_spearman_secondary": -0.02427539974451065,
+          "positive_daily_ics": 96,
+          "supported_dates": 249,
+          "supported_name_days": 35975
+        },
+        "2021": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 247,
+          "mean_daily_cross_sectional_ic": -0.01852247127590629,
+          "median_daily_cross_sectional_ic": -0.011645397276225043,
+          "pooled_name_day_spearman_secondary": -0.018781110644340515,
+          "positive_daily_ics": 101,
+          "supported_dates": 247,
+          "supported_name_days": 45239
+        },
+        "2022": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 250,
+          "mean_daily_cross_sectional_ic": 0.008212271196330473,
+          "median_daily_cross_sectional_ic": 0.0015894225046875442,
+          "pooled_name_day_spearman_secondary": 0.008859129622578621,
+          "positive_daily_ics": 127,
+          "supported_dates": 250,
+          "supported_name_days": 38075
+        },
+        "2023": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 248,
+          "mean_daily_cross_sectional_ic": 0.0036975236950978754,
+          "median_daily_cross_sectional_ic": 0.008119631487358316,
+          "pooled_name_day_spearman_secondary": 0.004190036095678806,
+          "positive_daily_ics": 134,
+          "supported_dates": 248,
+          "supported_name_days": 38887
+        },
+        "2024": {
+          "constant_rank_dates_with_minimum_support": 0,
+          "defined_daily_ics": 246,
+          "mean_daily_cross_sectional_ic": 0.010534355960059819,
+          "median_daily_cross_sectional_ic": 0.015297527666734412,
+          "pooled_name_day_spearman_secondary": 0.011043868958950043,
+          "positive_daily_ics": 146,
+          "supported_dates": 246,
+          "supported_name_days": 36172
+        }
+      },
+      "family": "fundamentals",
+      "pooled": {
+        "constant_rank_dates_with_minimum_support": 166,
+        "defined_daily_ics": 3429,
+        "mean_daily_cross_sectional_ic": 0.0021878854691426857,
+        "median_daily_cross_sectional_ic": 0.0037066817729263023,
+        "pooled_name_day_spearman_secondary": -0.00017535520601086318,
+        "positive_daily_ics": 1739,
+        "supported_dates": 3650,
+        "supported_name_days": 308429
+      },
+      "registered_expected_sign": "coverage_no_fixed_sign"
+    }
+  },
+  "full_daily_readout": {
+    "path": "D:\\quant-data\\b3\\interim\\round6_20260911T111805Z\\field_sign_readout.json",
+    "sha256": "591fb966ba4ca6be127712e922703878913c6d26ed08b8d529fba7b2e2f61a7f"
+  },
+  "horizon": 5,
+  "interpretation": "Expected signs are diagnostic priors, not gates; contrary signs never justify a sign flip or source change without independent evidence.",
+  "minimum_names_per_daily_ic": 20,
+  "peak_rss_bytes": 2835173376,
+  "registration_sha256": "7f2e94272ff6dbf674d595453ec07b91cef7c382af49361a23ab2ad9baed0bcd",
+  "schema": "BRAZIL_RV_ROUND6_FIELD_SIGN_READOUT_V1",
+  "selection_weight": 0,
+  "store": {
+    "manifest_sha256": "44a19df181f4896d12e510d1f49cc815762a057c0a74ca7bad879ea02a86cf7b",
+    "root": "D:/quant-data/b3/processed/v2_round5_store_9020bde_20260911T023227Z"
+  },
+  "target": "target_primary_neutral",
+  "wall_seconds": 29.360000000000582
+}

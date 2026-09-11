@@ -210,6 +210,15 @@ def extend_cross_market(plan_path: Path, output: Path) -> dict:
         )
         return_valid[:-1] &= parent_valid[1:, :, return_field]
         return_valid[-1] = False
+        from .cross_market_returns import comparison_return_mask
+
+        # The frozen parent deliberately contains inferred cash/unit terms.
+        # Do not mistake these estimates for exact observed returns when
+        # constructing the newly admitted ADR gap and oil exposure.
+        inferred_actions = store.read("action_has_action", rows)
+        excluded_action_returns = int((return_valid & inferred_actions).sum())
+        return_valid = comparison_return_mask(return_valid, inferred_actions)
+        del inferred_actions
         del wealth, wealth_valid, parent_valid
         levels = pl.read_parquet(paths["market_levels"])
         us = pl.read_parquet(paths["us_returns"])
@@ -421,6 +430,8 @@ def extend_cross_market(plan_path: Path, output: Path) -> dict:
                 "fixture_report": bind(paths["causality_tests"]),
                 "actual_us_fx_identity_future_mutation_cutoff": str(cutoff),
                 "prefix_exact": True,
+                "new_return_fields_action_policy": "Exclude inferred-action end dates from ADR gap and oil-exposure return pairs only; following ordinary one-day returns remain usable. Parent and preexisting cross-market fields are unchanged.",
+                "excluded_inferred_action_return_cells": excluded_action_returns,
                 "untouched_fields_exact": protected[2:],
                 "timing_conventions": "Brent next B3 decision; BDI date-only next decision; US exact previous-session closes and known PTAX.",
             },

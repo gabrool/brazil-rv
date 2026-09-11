@@ -2370,6 +2370,7 @@ def _train_parser() -> argparse.ArgumentParser:
     parser.add_argument("--store", type=Path, required=True)
     parser.add_argument("--output-dir", type=Path, required=True)
     parser.add_argument("--score-output-dir", type=Path)
+    parser.add_argument("--score-sidecar-ablations", action="store_true")
     parser.add_argument("--stage", choices=("P", "F", "J"), required=True)
     parser.add_argument("--fold", default="F1")
     parser.add_argument("--seed", type=int, required=True)
@@ -2582,6 +2583,22 @@ def main(argv: Sequence[str] | None = None) -> int:
             device=device,
             record_branch_diagnostics=arguments.record_branch_diagnostics,
         )
+        if arguments.score_sidecar_ablations:
+            ablations = [(family, (family,)) for family in sidecars]
+            if len(sidecars) > 1:
+                ablations.append(("all", sidecars))
+            for name, invalid in ablations:
+                score_checkpoint_artifact(
+                    checkpoint=result.raw_patience_checkpoint,
+                    model_config=model_config,
+                    loader=score_loader,
+                    output_dir=arguments.score_output_dir.parent / "ablations" / name,
+                    expected_checkpoint_sha256=sha256_file(
+                        result.raw_patience_checkpoint
+                    ),
+                    device=device,
+                    invalid_sidecars=invalid,
+                )
     return 0
 
 

@@ -10,6 +10,18 @@ import polars as pl
 from .round5_market import SAO_PAULO
 
 
+def comparison_return_mask(
+    valid: np.ndarray, inferred_action: np.ndarray
+) -> np.ndarray:
+    """An inferred adjustment is not an observed cross-market holding return.
+
+    Exclude only the return ending on the annotated action day. The next
+    ordinary one-day return is usable: the cumulative wealth scale cancels.
+    These retrospective end-of-day annotations are used at the next decision.
+    """
+    return valid & ~inferred_action
+
+
 def admit_brent(levels: pl.DataFrame, sessions: list[date]) -> pl.DataFrame:
     """Day-t assessed Brent is known at the next B3 decision, never same-day."""
     clocks = {}

@@ -4,7 +4,22 @@ import numpy as np
 import polars as pl
 import pytest
 
-from brazil_rv.v2.cross_market_returns import admit_brent, relative_return_panel
+from brazil_rv.v2.cross_market_returns import (
+    admit_brent,
+    comparison_return_mask,
+    relative_return_panel,
+)
+
+
+def test_inferred_crash_adjustment_cannot_become_an_adr_gap():
+    args = list(inputs())
+    actions = np.zeros_like(args[7])
+    actions[1, 0] = True
+    args[6][1, 0] = 0.46  # Artificial wealth return after an inferred unit change.
+    args[7] = comparison_return_mask(args[7], actions)
+    result = relative_return_panel(*args)
+    assert not result[1][2, 0]
+    assert result[1][3, 0]  # No additional lag or permanent history exclusion.
 
 
 def inputs():

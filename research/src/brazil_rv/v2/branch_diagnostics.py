@@ -33,6 +33,8 @@ def gate_activations(
     model: DailyMultiHorizonModel,
     loader: Iterable[Mapping[str, object]],
     device: torch.device,
+    *,
+    invalid_sidecars: tuple[str, ...] = (),
 ) -> dict[str, object]:
     """Summarize sigmoid gates on active evaluation rows of the selected checkpoint.
 
@@ -88,7 +90,10 @@ def gate_activations(
         with torch.random.fork_rng(), torch.inference_mode():
             for cpu_batch in loader:
                 batch = _model_batch(
-                    cpu_batch, device, omit_fast_stream=model.config.disable_fast_stream
+                    cpu_batch,
+                    device,
+                    omit_fast_stream=model.config.disable_fast_stream,
+                    invalid_sidecars=invalid_sidecars,
                 )
                 active = batch["active_mask"].bool()
                 present = batch.get("fast_present", torch.zeros_like(active)).bool()

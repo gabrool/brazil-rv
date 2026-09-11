@@ -201,6 +201,47 @@ def test_magnitude_scoring_restores_training_bounds_without_refitting(
     assert manifest["scoring_input"]["features"]["magnitude_clip"] == frozen
 
 
+def test_family_ablation_masks_trained_projection_without_changing_population(tmp_path):
+    dataset, config, checkpoint, _ = _scoring_fixture(tmp_path, include_magnitudes=True)
+    payload = torch.load(checkpoint, map_location="cpu", weights_only=True)
+    projection = payload["model_state_dict"]["sidecar_projections.magnitudes"]
+    torch.manual_seed(73)
+    projection.copy_(torch.randn_like(projection) * 0.2)
+    torch.save(payload, checkpoint)
+
+    def score(name, invalid=()):
+        artifact = score_checkpoint_artifact(
+            checkpoint=checkpoint,
+            model_config=config,
+            loader=DataLoader(dataset, batch_size=2, collate_fn=_omit_absent_fast),
+            output_dir=tmp_path / name,
+            device=torch.device("cpu"),
+            invalid_sidecars=invalid,
+        )
+        return (
+            artifact,
+            np.load(artifact.scores_path),
+            np.load(artifact.score_mask_path),
+        )
+
+    original_hash = sha256_file(checkpoint)
+    regular, predictions, population = score("regular")
+    ablated, without_family, ablated_population = score("ablated", ("magnitudes",))
+    assert sha256_file(checkpoint) == original_hash
+    assert np.array_equal(population, ablated_population)
+    assert not np.array_equal(predictions, without_family)
+    projection.zero_()
+    torch.save(payload, checkpoint)
+    _, zero_projection, _ = score("zero_projection")
+    assert np.array_equal(without_family, zero_projection)
+    normal = json.loads(regular.manifest_path.read_text(encoding="utf8"))
+    masked = json.loads(ablated.manifest_path.read_text(encoding="utf8"))
+    assert normal["scoring_input_sha256"] == masked["scoring_input_sha256"]
+    assert masked["inference"]["forced_invalid_sidecars"] == ["magnitudes"]
+    with pytest.raises(ValueError, match="enabled sidecar"):
+        score("bad_family", ("lending",))
+
+
 def test_magnitude_handoff_allows_stage_fit_bounds_but_keeps_feature_identity(tmp_path):
     _, config, checkpoint, _ = _scoring_fixture(tmp_path, include_magnitudes=True)
     payload = torch.load(checkpoint, map_location="cpu", weights_only=True)
