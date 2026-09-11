@@ -1,0 +1,4695 @@
+{
+  "status": "store_not_accepted",
+  "runtime": {
+    "StartedUtc": "2026-09-11T02:14:26.4838667Z",
+    "FinishedUtc": "2026-09-11T02:14:51.7516498Z",
+    "WallSeconds": 25.2739446,
+    "ExitCode": 1,
+    "Store": "D:/quant-data/b3/processed/v2_round5_store_0aea7a8_20260911T021426Z"
+  },
+  "failed_gate": "sidecar_lending prior-ADV20 quartile1: survivor-minus-delisted bootstrap lower bound 0.056433 exceeds 0.05",
+  "evidence": {
+    "bindings": [
+      {
+        "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\lending_coverage_stop_diagnostic.py",
+        "sha256": "55ad6f16530b22f06720be9286ad62896b13a247158c2f8f36eae9d23bc1150a"
+      },
+      {
+        "path": "C:\\quant\\brazil-rv-round5-cvm-0aea7a8\\research\\src\\brazil_rv\\v2\\build_store.py",
+        "sha256": "f2bb91521eeb735c6d7d19521753d3d1ae9498993a6bba7a74d70d8b79c6679e"
+      },
+      {
+        "path": "D:\\quant-data\\b3\\processed\\v2_daily_store_3d67624_20260909T100323Z\\manifest.json",
+        "sha256": "db4f751d47133a6611733739ad9bfc15721452218365e338fec61a6b608bea64"
+      },
+      {
+        "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\fca_dependencies_0aea7a8\\lending\\features.parquet",
+        "sha256": "0d3ee9e4bdb431e759b393f496c287bbb977dd05a8a111b5b7ead5ab2d344dcf"
+      },
+      {
+        "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\final_store_plan_0aea7a8.json",
+        "sha256": "c3c1c2fe3279378668839f907f1c92fb99c831ecacf9e42ea136c403229dca65"
+      }
+    ],
+    "lowest_adv_quartile_coverage_by_year": [
+      {
+        "group": "delisted_within_panel",
+        "loan_balance_change_1": 0.9140350877192982,
+        "loan_balance_change_5": 0.8456140350877193,
+        "loan_balance_to_volume_20": 1.0,
+        "loan_rate": 0.0,
+        "loan_rate_change_5": 0.0,
+        "names": 15,
+        "new_loan_volume_surprise": 0.0,
+        "present_name_days": 570,
+        "utilization_proxy": 0.10526315789473684,
+        "year": 2019
+      },
+      {
+        "group": "survives_to_final_year",
+        "loan_balance_change_1": 0.9143302180685359,
+        "loan_balance_change_5": 0.838006230529595,
+        "loan_balance_to_volume_20": 1.0,
+        "loan_rate": 0.0,
+        "loan_rate_change_5": 0.0,
+        "names": 49,
+        "new_loan_volume_surprise": 0.0,
+        "present_name_days": 1926,
+        "utilization_proxy": 0.14589823468328142,
+        "year": 2019
+      },
+      {
+        "group": "delisted_within_panel",
+        "loan_balance_change_1": 0.9515685195376995,
+        "loan_balance_change_5": 0.9521188772702256,
+        "loan_balance_to_volume_20": 1.0,
+        "loan_rate": 0.0,
+        "loan_rate_change_5": 0.0,
+        "names": 19,
+        "new_loan_volume_surprise": 0.0,
+        "present_name_days": 1817,
+        "utilization_proxy": 0.09521188772702256,
+        "year": 2020
+      },
+      {
+        "group": "survives_to_final_year",
+        "loan_balance_change_1": 0.9394130640580625,
+        "loan_balance_change_5": 0.94367308299148,
+        "loan_balance_to_volume_20": 0.9988955506468917,
+        "loan_rate": 0.0,
+        "loan_rate_change_5": 0.0,
+        "names": 73,
+        "new_loan_volume_surprise": 0.0,
+        "present_name_days": 6338,
+        "utilization_proxy": 0.15462290943515306,
+        "year": 2020
+      },
+      {
+        "group": "delisted_within_panel",
+        "loan_balance_change_1": 0.9587198515769945,
+        "loan_balance_change_5": 0.9443413729128015,
+        "loan_balance_to_volume_20": 1.0,
+        "loan_rate": 0.0,
+        "loan_rate_change_5": 0.0,
+        "names": 25,
+        "new_loan_volume_surprise": 0.0,
+        "present_name_days": 2156,
+        "utilization_proxy": 0.11085343228200371,
+        "year": 2021
+      },
+      {
+        "group": "survives_to_final_year",
+        "loan_balance_change_1": 0.9553725196555597,
+        "loan_balance_change_5": 0.9451890677648821,
+        "loan_balance_to_volume_20": 1.0,
+        "loan_rate": 0.0,
+        "loan_rate_change_5": 0.0,
+        "names": 126,
+        "new_loan_volume_surprise": 0.0,
+        "present_name_days": 13355,
+        "utilization_proxy": 0.17072257581430175,
+        "year": 2021
+      },
+      {
+        "group": "delisted_within_panel",
+        "loan_balance_change_1": 0.969047619047619,
+        "loan_balance_change_5": 0.9547619047619048,
+        "loan_balance_to_volume_20": 1.0,
+        "loan_rate": 0.0,
+        "loan_rate_change_5": 0.0,
+        "names": 18,
+        "new_loan_volume_surprise": 0.0,
+        "present_name_days": 840,
+        "utilization_proxy": 0.02023809523809524,
+        "year": 2022
+      },
+      {
+        "group": "survives_to_final_year",
+        "loan_balance_change_1": 0.9835904168034132,
+        "loan_balance_change_5": 0.9761514057542938,
+        "loan_balance_to_volume_20": 1.0,
+        "loan_rate": 0.0,
+        "loan_rate_change_5": 0.0,
+        "names": 117,
+        "new_loan_volume_surprise": 0.0,
+        "present_name_days": 9141,
+        "utilization_proxy": 0.07723443824526857,
+        "year": 2022
+      },
+      {
+        "group": "delisted_within_panel",
+        "loan_balance_change_1": 0.9666666666666667,
+        "loan_balance_change_5": 0.9,
+        "loan_balance_to_volume_20": 1.0,
+        "loan_rate": 0.0,
+        "loan_rate_change_5": 0.0,
+        "names": 2,
+        "new_loan_volume_surprise": 0.0,
+        "present_name_days": 30,
+        "utilization_proxy": 0.0,
+        "year": 2023
+      },
+      {
+        "group": "survives_to_final_year",
+        "loan_balance_change_1": 0.9607655502392345,
+        "loan_balance_change_5": 0.8797448165869218,
+        "loan_balance_to_volume_20": 1.0,
+        "loan_rate": 0.6988835725677831,
+        "loan_rate_change_5": 0.6220095693779905,
+        "names": 52,
+        "new_loan_volume_surprise": 0.5307814992025518,
+        "present_name_days": 3135,
+        "utilization_proxy": 0.07910685805422647,
+        "year": 2023
+      },
+      {
+        "group": "survives_to_final_year",
+        "loan_balance_change_1": 0.9957413249211357,
+        "loan_balance_change_5": 0.9958990536277602,
+        "loan_balance_to_volume_20": 1.0,
+        "loan_rate": 0.8025236593059937,
+        "loan_rate_change_5": 0.701577287066246,
+        "names": 49,
+        "new_loan_volume_surprise": 0.6481072555205047,
+        "present_name_days": 6340,
+        "utilization_proxy": 0.11750788643533124,
+        "year": 2024
+      }
+    ],
+    "per_feature": {
+      "loan_balance_change_1": {
+        "passed": true,
+        "rows": [
+          {
+            "bootstrap_cluster_unit": "continuation_name",
+            "bootstrap_lower_95": 0.01643397009205279,
+            "bootstrap_replications": 1000,
+            "bootstrap_upper_95": 0.022421994865048,
+            "coverage_note": "Delisted mid-liquidity names have thin lending records: 5,212 present name-days across 526 names; lending value will be coverage-limited for exactly that segment.",
+            "family": "sidecar_lending",
+            "family_present_name_days": 19364,
+            "gap_direction": "survivor_above_delisted",
+            "gate_decision": "diagnostic_unstratified",
+            "group": "delisted_within_panel",
+            "mask_rate": 0.05174550712662673,
+            "name_count": 491,
+            "possible_feature_cells": 19364,
+            "prior_adv20_lower_brl": null,
+            "prior_adv20_quartile": 0,
+            "prior_adv20_upper_brl": null,
+            "stratified_gate_passed": null,
+            "stratum_is_binding": false,
+            "support_threshold_met": true,
+            "supported_continuation_name_count": 59,
+            "survivor_minus_delisted_gap": 0.019465506146402745,
+            "valid_feature_cells": 18362,
+            "validity_ratio": 0.9482544928733733
+          },
+          {
+            "bootstrap_cluster_unit": "continuation_name",
+            "bootstrap_lower_95": 0.01643397009205279,
+            "bootstrap_replications": 1000,
+            "bootstrap_upper_95": 0.022421994865048,
+            "coverage_note": "Delisted mid-liquidity names have thin lending records: 5,212 present name-days across 526 names; lending value will be coverage-limited for exactly that segment.",
+            "family": "sidecar_lending",
+            "family_present_name_days": 163228,
+            "gap_direction": "survivor_above_delisted",
+            "gate_decision": "diagnostic_unstratified",
+            "group": "survives_to_final_year",
+            "mask_rate": 0.03228000098022399,
+            "name_count": 442,
+            "possible_feature_cells": 163228,
+            "prior_adv20_lower_brl": null,
+            "prior_adv20_quartile": 0,
+            "prior_adv20_upper_brl": null,
+            "stratified_gate_passed": null,
+            "stratum_is_binding": false,
+            "support_threshold_met": true,
+            "supported_continuation_name_count": 249,
+            "survivor_minus_delisted_gap": 0.019465506146402745,
+            "valid_feature_cells": 157959,
+            "validity_ratio": 0.967719999019776
+          },
+          {
+            "bootstrap_cluster_unit": "continuation_name",
+            "bootstrap_lower_95": 0.006189933284938265,
+            "bootstrap_replications": 1000,
+            "bootstrap_upper_95": 0.01622425758124371,
+            "coverage_note": "Delisted mid-liquidity names have thin lending records: 5,212 present name-days across 526 names; lending value will be coverage-limited for exactly that segment.",
+            "family": "sidecar_lending",
+            "family_present_name_days": 5413,
+            "gap_direction": "survivor_above_delisted",
+            "gate_decision": "pass",
+            "group": "delisted_within_panel",
+            "mask_rate": 0.046739331239608384,
+            "name_count": 491,
+            "possible_feature_cells": 5413,
+            "prior_adv20_lower_brl": null,
+            "prior_adv20_quartile": 1,
+            "prior_adv20_upper_brl": 17107061.0,
+            "stratified_gate_passed": true,
+            "stratum_is_binding": true,
+            "support_threshold_met": true,
+            "supported_continuation_name_count": 35,
+            "survivor_minus_delisted_gap": 0.010825326020271975,
+            "valid_feature_cells": 5160,
+            "validity_ratio": 0.9532606687603916
+          },
+          {
+            "bootstrap_cluster_unit": "continuation_name",
+            "bootstrap_lower_95": 0.006189933284938265,
+            "bootstrap_replications": 1000,
+            "bootstrap_upper_95": 0.01622425758124371,
+            "coverage_note": "Delisted mid-liquidity names have thin lending records: 5,212 present name-days across 526 names; lending value will be coverage-limited for exactly that segment.",
+            "family": "sidecar_lending",
+            "family_present_name_days": 40235,
+            "gap_direction": "survivor_above_delisted",
+            "gate_decision": "pass",
+            "group": "survives_to_final_year",
+            "mask_rate": 0.03591400521933641,
+            "name_count": 442,
+            "possible_feature_cells": 40235,
+            "prior_adv20_lower_brl": null,
+            "prior_adv20_quartile": 1,
+            "prior_adv20_upper_brl": 17107061.0,
+            "stratified_gate_passed": true,
+            "stratum_is_binding": true,
+            "support_threshold_met": true,
+            "supported_continuation_name_count": 166,
+            "survivor_minus_delisted_gap": 0.010825326020271975,
+            "valid_feature_cells": 38790,
+            "validity_ratio": 0.9640859947806636
+          },
+          {
+            "bootstrap_cluster_unit": "continuation_name",
+            "bootstrap_lower_95": 0.015190004756411824,
+            "bootstrap_replications": 1000,
+            "bootstrap_upper_95": 0.032073825511415584,
+            "coverage_note": "Delisted mid-liquidity names have thin lending records: 5,212 present name-days across 526 names; lending value will be coverage-limited for exactly that segment.",
+            "family": "sidecar_lending",
+            "family_present_name_days": 5281,
+            "gap_direction": "survivor_above_delisted",
+            "gate_decision": "pass",
+            "group": "delisted_within_panel",
+            "mask_rate": 0.0539670516947548,
+            "name_count": 491,
+            "possible_feature_cells": 5281,
+            "prior_adv20_lower_brl": 17107061.0,
+            "prior_adv20_quartile": 2,
+            "prior_adv20_upper_brl": 47774406.0,
+            "stratified_gate_passed": true,
+            "stratum_is_binding": true,
+            "support_threshold_met": true,
+            "supported_continuation_name_count": 32,
+            "survivor_minus_delisted_gap": 0.0231497999792446,
+            "valid_feature_cells": 4996,
+            "validity_ratio": 0.9460329483052452
+          },
+          {
+            "bootstrap_cluster_unit": "continuation_name",
+            "bootstrap_lower_95": 0.015190004756411824,
+            "bootstrap_replications": 1000,
+            "bootstrap_upper_95": 0.032073825511415584,
+            "coverage_note": "Delisted mid-liquidity names have thin lending records: 5,212 present name-days across 526 names; lending value will be coverage-limited for exactly that segment.",
+            "family": "sidecar_lending",
+            "family_present_name_days": 40367,
+            "gap_direction": "survivor_above_delisted",
+            "gate_decision": "pass",
+            "group": "survives_to_final_year",
+            "mask_rate": 0.030817251715510197,
+            "name_count": 442,
+            "possible_feature_cells": 40367,
+            "prior_adv20_lower_brl": 17107061.0,
+            "prior_adv20_quartile": 2,
+            "prior_adv20_upper_brl": 47774406.0,
+            "stratified_gate_passed": true,
+            "stratum_is_binding": true,
+            "support_threshold_met": true,
+            "supported_continuation_name_count": 142,
+            "survivor_minus_delisted_gap": 0.0231497999792446,
+            "valid_feature_cells": 39123,
+            "validity_ratio": 0.9691827482844898
+          },
+          {
+            "bootstrap_cluster_unit": "continuation_name",
+            "bootstrap_lower_95": 0.01799106828507955,
+            "bootstrap_replications": 1000,
+            "bootstrap_upper_95": 0.029523319282707808,
+            "coverage_note": "Delisted mid-liquidity names have thin lending records: 5,212 present name-days across 526 names; lending value will be coverage-limited for exactly that segment.",
+            "family": "sidecar_lending",
+            "family_present_name_days": 4627,
+            "gap_direction": "survivor_above_delisted",
+            "gate_decision": "pass",
+            "group": "delisted_within_panel",
+            "mask_rate": 0.054679057704776324,
+            "name_count": 491,
+            "possible_feature_cells": 4627,
+            "prior_adv20_lower_brl": 47774406.0,
+            "prior_adv20_quartile": 3,
+            "prior_adv20_upper_brl": 132880936.0,
+            "stratified_gate_passed": true,
+            "stratum_is_binding": true,
+            "support_threshold_met": true,
+            "supported_continuation_name_count": 28,
+            "survivor_minus_delisted_gap": 0.02384119417146413,
+            "valid_feature_cells": 4374,
+            "validity_ratio": 0.9453209422952237
+          },
+          {
+            "bootstrap_cluster_unit": "continuation_name",
+            "bootstrap_lower_95": 0.01799106828507955,
+            "bootstrap_replications": 1000,
+            "bootstrap_upper_95": 0.029523319282707808,
+            "coverage_note": "Delisted mid-liquidity names have thin lending records: 5,212 present name-days across 526 names; lending value will be coverage-limited for exactly that segment.",
+            "family": "sidecar_lending",
+            "family_present_name_days": 41021,
+            "gap_direction": "survivor_above_delisted",
+            "gate_decision": "pass",
+            "group": "survives_to_final_year",
+            "mask_rate": 0.030837863533312193,
+            "name_count": 442,
+            "possible_feature_cells": 41021,
+            "prior_adv20_lower_brl": 47774406.0,
+            "prior_adv20_quartile": 3,
+            "prior_adv20_upper_brl": 132880936.0,
+            "stratified_gate_passed": true,
+            "stratum_is_binding": true,
+            "support_threshold_met": true,
+            "supported_continuation_name_count": 128,
+            "survivor_minus_delisted_gap": 0.02384119417146413,
+            "valid_feature_cells": 39756,
+            "validity_ratio": 0.9691621364666878
+          },
+          {
+            "bootstrap_cluster_unit": "continuation_name",
+            "bootstrap_lower_95": 0.01170030785185167,
+            "bootstrap_replications": 1000,
+            "bootstrap_upper_95": 0.029812999397744757,
+            "coverage_note": "Delisted mid-liquidity names have thin lending records: 5,212 present name-days across 526 names; lending value will be coverage-limited for exactly that segment.",
+            "family": "sidecar_lending",
+            "family_present_name_days": 4043,
+            "gap_direction": "survivor_above_delisted",
+            "gate_decision": "reported_not_gated_insufficient_support",
+            "group": "delisted_within_panel",
+            "mask_rate": 0.052188968587682405,
+            "name_count": 491,
+            "possible_feature_cells": 4043,
+            "prior_adv20_lower_brl": 132880936.0,
+            "prior_adv20_quartile": 4,
+            "prior_adv20_upper_brl": null,
+            "stratified_gate_passed": null,
+            "stratum_is_binding": false,
+            "support_threshold_met": false,
+            "supported_continuation_name_count": 18,
+            "survivor_minus_delisted_gap": 0.020582190556195812,
+            "valid_feature_cells": 3832,
+            "validity_ratio": 0.9478110314123176
+          },
+          {
+            "bootstrap_cluster_unit": "continuation_name",
+            "bootstrap_lower_95": 0.01170030785185167,
+            "bootstrap_replications": 1000,
+            "bootstrap_upper_95": 0.029812999397744757,
+            "coverage_note": "Delisted mid-liquidity names have thin lending records: 5,212 present name-days across 526 names; lending value will be coverage-limited for exactly that segment.",
+            "family": "sidecar_lending",
+            "family_present_name_days": 41605,
+            "gap_direction": "survivor_above_delisted",
+            "gate_decision": "reported_not_gated_insufficient_support",
+            "group": "survives_to_final_year",
+            "mask_rate": 0.03160677803148659,
+            "name_count": 442,
+            "possible_feature_cells": 41605,
+            "prior_adv20_lower_brl": 132880936.0,
+            "prior_adv20_quartile": 4,
+            "prior_adv20_upper_brl": null,
+            "stratified_gate_passed": null,
+            "stratum_is_binding": false,
+            "support_threshold_met": false,
+            "supported_continuation_name_count": 87,
+            "survivor_minus_delisted_gap": 0.020582190556195812,
+            "valid_feature_cells": 40290,
+            "validity_ratio": 0.9683932219685134
+          }
+        ]
+      },
+      "loan_balance_change_5": {
+        "passed": true,
+        "rows": [
+          {
+            "bootstrap_cluster_unit": "continuation_name",
+            "bootstrap_lower_95": 0.01424958698688213,
+            "bootstrap_replications": 1000,
+            "bootstrap_upper_95": 0.021744754079319827,
+            "coverage_note": "Delisted mid-liquidity names have thin lending records: 5,212 present name-days across 526 names; lending value will be coverage-limited for exactly that segment.",
+            "family": "sidecar_lending",
+            "family_present_name_days": 19364,
+            "gap_direction": "survivor_above_delisted",
+            "gate_decision": "diagnostic_unstratified",
+            "group": "delisted_within_panel",
+            "mask_rate": 0.06708324726296222,
+            "name_count": 491,
+            "possible_feature_cells": 19364,
+            "prior_adv20_lower_brl": null,
+            "prior_adv20_quartile": 0,
+            "prior_adv20_upper_brl": null,
+            "stratified_gate_passed": null,
+            "stratum_is_binding": false,
+            "support_threshold_met": true,
+            "supported_continuation_name_count": 59,
+            "survivor_minus_delisted_gap": 0.01807204820397723,
+            "valid_feature_cells": 18065,
+            "validity_ratio": 0.9329167527370378
+          },
+          {
+            "bootstrap_cluster_unit": "continuation_name",
+            "bootstrap_lower_95": 0.01424958698688213,
+            "bootstrap_replications": 1000,
+            "bootstrap_upper_95": 0.021744754079319827,
+            "coverage_note": "Delisted mid-liquidity names have thin lending records: 5,212 present name-days across 526 names; lending value will be coverage-limited for exactly that segment.",
+            "family": "sidecar_lending",
+            "family_present_name_days": 163228,
+            "gap_direction": "survivor_above_delisted",
+            "gate_decision": "diagnostic_unstratified",
+            "group": "survives_to_final_year",
+            "mask_rate": 0.04901119905898499,
+            "name_count": 442,
+            "possible_feature_cells": 163228,
+            "prior_adv20_lower_brl": null,
+            "prior_adv20_quartile": 0,
+            "prior_adv20_upper_brl": null,
+            "stratified_gate_passed": null,
+            "stratum_is_binding": false,
+            "support_threshold_met": true,
+            "supported_continuation_name_count": 249,
+            "survivor_minus_delisted_gap": 0.01807204820397723,
+            "valid_feature_cells": 155228,
+            "validity_ratio": 0.950988800941015
+          },
+          {
+            "bootstrap_cluster_unit": "continuation_name",
+            "bootstrap_lower_95": 0.005447843035658598,
+            "bootstrap_replications": 1000,
+            "bootstrap_upper_95": 0.019067878437312554,
+            "coverage_note": "Delisted mid-liquidity names have thin lending records: 5,212 present name-days across 526 names; lending value will be coverage-limited for exactly that segment.",
+            "family": "sidecar_lending",
+            "family_present_name_days": 5413,
+            "gap_direction": "survivor_above_delisted",
+            "gate_decision": "pass",
+            "group": "delisted_within_panel",
+            "mask_rate": 0.06207278773323477,
+            "name_count": 491,
+            "possible_feature_cells": 5413,
+            "prior_adv20_lower_brl": null,
+            "prior_adv20_quartile": 1,
+            "prior_adv20_upper_brl": 17107061.0,
+            "stratified_gate_passed": true,
+            "stratum_is_binding": true,
+            "support_threshold_met": true,
+            "supported_continuation_name_count": 35,
+            "survivor_minus_delisted_gap": 0.011818034409014522,
+            "valid_feature_cells": 5077,
+            "validity_ratio": 0.9379272122667652
+          },
+          {
+            "bootstrap_cluster_unit": "continuation_name",
+            "bootstrap_lower_95": 0.005447843035658598,
+            "bootstrap_replications": 1000,
+            "bootstrap_upper_95": 0.019067878437312554,
+            "coverage_note": "Delisted mid-liquidity names have thin lending records: 5,212 present name-days across 526 names; lending value will be coverage-limited for exactly that segment.",
+            "family": "sidecar_lending",
+            "family_present_name_days": 40235,
+            "gap_direction": "survivor_above_delisted",
+            "gate_decision": "pass",
+            "group": "survives_to_final_year",
+            "mask_rate": 0.05025475332422025,
+            "name_count": 442,
+            "possible_feature_cells": 40235,
+            "prior_adv20_lower_brl": null,
+            "prior_adv20_quartile": 1,
+            "prior_adv20_upper_brl": 17107061.0,
+            "stratified_gate_passed": true,
+            "stratum_is_binding": true,
+            "support_threshold_met": true,
+            "supported_continuation_name_count": 166,
+            "survivor_minus_delisted_gap": 0.011818034409014522,
+            "valid_feature_cells": 38213,
+            "validity_ratio": 0.9497452466757798
+          },
+          {
+            "bootstrap_cluster_unit": "continuation_name",
+            "bootstrap_lower_95": 0.010277503734692753,
+            "bootstrap_replications": 1000,
+            "bootstrap_upper_95": 0.03139814093451605,
+            "coverage_note": "Delisted mid-liquidity names have thin lending records: 5,212 present name-days across 526 names; lending value will be coverage-limited for exactly that segment.",
+            "family": "sidecar_lending",
+            "family_present_name_days": 5281,
+            "gap_direction": "survivor_above_delisted",
+            "gate_decision": "pass",
+            "group": "delisted_within_panel",
+            "mask_rate": 0.0681689074039008,
+            "name_count": 491,
+            "possible_feature_cells": 5281,
+            "prior_adv20_lower_brl": 17107061.0,
+            "prior_adv20_quartile": 2,
+            "prior_adv20_upper_brl": 47774406.0,
+            "stratified_gate_passed": true,
+            "stratum_is_binding": true,
+            "support_threshold_met": true,
+            "supported_continuation_name_count": 32,
+            "survivor_minus_delisted_gap": 0.019688713185851414,
+            "valid_feature_cells": 4921,
+            "validity_ratio": 0.9318310925960992
+          },
+          {
+            "bootstrap_cluster_unit": "continuation_name",
+            "bootstrap_lower_95": 0.010277503734692753,
+            "bootstrap_replications": 1000,
+            "bootstrap_upper_95": 0.03139814093451605,
+            "coverage_note": "Delisted mid-liquidity names have thin lending records: 5,212 present name-days across 526 names; lending value will be coverage-limited for exactly that segment.",
+            "family": "sidecar_lending",
+            "family_present_name_days": 40367,
+            "gap_direction": "survivor_above_delisted",
+            "gate_decision": "pass",
+            "group": "survives_to_final_year",
+            "mask_rate": 0.04848019421804939,
+            "name_count": 442,
+            "possible_feature_cells": 40367,
+            "prior_adv20_lower_brl": 17107061.0,
+            "prior_adv20_quartile": 2,
+            "prior_adv20_upper_brl": 47774406.0,
+            "stratified_gate_passed": true,
+            "stratum_is_binding": true,
+            "support_threshold_met": true,
+            "supported_continuation_name_count": 142,
+            "survivor_minus_delisted_gap": 0.019688713185851414,
+            "valid_feature_cells": 38410,
+            "validity_ratio": 0.9515198057819506
+          },
+          {
+            "bootstrap_cluster_unit": "continuation_name",
+            "bootstrap_lower_95": 0.014657781816967077,
+            "bootstrap_replications": 1000,
+            "bootstrap_upper_95": 0.03257321963569956,
+            "coverage_note": "Delisted mid-liquidity names have thin lending records: 5,212 present name-days across 526 names; lending value will be coverage-limited for exactly that segment.",
+            "family": "sidecar_lending",
+            "family_present_name_days": 4627,
+            "gap_direction": "survivor_above_delisted",
+            "gate_decision": "pass",
+            "group": "delisted_within_panel",
+            "mask_rate": 0.07067214177652903,
+            "name_count": 491,
+            "possible_feature_cells": 4627,
+            "prior_adv20_lower_brl": 47774406.0,
+            "prior_adv20_quartile": 3,
+            "prior_adv20_upper_brl": 132880936.0,
+            "stratified_gate_passed": true,
+            "stratum_is_binding": true,
+            "support_threshold_met": true,
+            "supported_continuation_name_count": 28,
+            "survivor_minus_delisted_gap": 0.02237980370578474,
+            "valid_feature_cells": 4300,
+            "validity_ratio": 0.929327858223471
+          },
+          {
+            "bootstrap_cluster_unit": "continuation_name",
+            "bootstrap_lower_95": 0.014657781816967077,
+            "bootstrap_replications": 1000,
+            "bootstrap_upper_95": 0.03257321963569956,
+            "coverage_note": "Delisted mid-liquidity names have thin lending records: 5,212 present name-days across 526 names; lending value will be coverage-limited for exactly that segment.",
+            "family": "sidecar_lending",
+            "family_present_name_days": 41021,
+            "gap_direction": "survivor_above_delisted",
+            "gate_decision": "pass",
+            "group": "survives_to_final_year",
+            "mask_rate": 0.04829233807074429,
+            "name_count": 442,
+            "possible_feature_cells": 41021,
+            "prior_adv20_lower_brl": 47774406.0,
+            "prior_adv20_quartile": 3,
+            "prior_adv20_upper_brl": 132880936.0,
+            "stratified_gate_passed": true,
+            "stratum_is_binding": true,
+            "support_threshold_met": true,
+            "supported_continuation_name_count": 128,
+            "survivor_minus_delisted_gap": 0.02237980370578474,
+            "valid_feature_cells": 39040,
+            "validity_ratio": 0.9517076619292557
+          },
+          {
+            "bootstrap_cluster_unit": "continuation_name",
+            "bootstrap_lower_95": 0.00882952896806027,
+            "bootstrap_replications": 1000,
+            "bootstrap_upper_95": 0.030594280781300817,
+            "coverage_note": "Delisted mid-liquidity names have thin lending records: 5,212 present name-days across 526 names; lending value will be coverage-limited for exactly that segment.",
+            "family": "sidecar_lending",
+            "family_present_name_days": 4043,
+            "gap_direction": "survivor_above_delisted",
+            "gate_decision": "reported_not_gated_insufficient_support",
+            "group": "delisted_within_panel",
+            "mask_rate": 0.0682661390056889,
+            "name_count": 491,
+            "possible_feature_cells": 4043,
+            "prior_adv20_lower_brl": 132880936.0,
+            "prior_adv20_quartile": 4,
+            "prior_adv20_upper_brl": null,
+            "stratified_gate_passed": null,
+            "stratum_is_binding": false,
+            "support_threshold_met": false,
+            "supported_continuation_name_count": 18,
+            "survivor_minus_delisted_gap": 0.01923357080475152,
+            "valid_feature_cells": 3767,
+            "validity_ratio": 0.9317338609943111
+          },
+          {
+            "bootstrap_cluster_unit": "continuation_name",
+            "bootstrap_lower_95": 0.00882952896806027,
+            "bootstrap_replications": 1000,
+            "bootstrap_upper_95": 0.030594280781300817,
+            "coverage_note": "Delisted mid-liquidity names have thin lending records: 5,212 present name-days across 526 names; lending value will be coverage-limited for exactly that segment.",
+            "family": "sidecar_lending",
+            "family_present_name_days": 41605,
+            "gap_direction": "survivor_above_delisted",
+            "gate_decision": "reported_not_gated_insufficient_support",
+            "group": "survives_to_final_year",
+            "mask_rate": 0.049032568200937376,
+            "name_count": 442,
+            "possible_feature_cells": 41605,
+            "prior_adv20_lower_brl": 132880936.0,
+            "prior_adv20_quartile": 4,
+            "prior_adv20_upper_brl": null,
+            "stratified_gate_passed": null,
+            "stratum_is_binding": false,
+            "support_threshold_met": false,
+            "supported_continuation_name_count": 87,
+            "survivor_minus_delisted_gap": 0.01923357080475152,
+            "valid_feature_cells": 39565,
+            "validity_ratio": 0.9509674317990626
+          }
+        ]
+      },
+      "loan_balance_to_volume_20": {
+        "passed": true,
+        "rows": [
+          {
+            "bootstrap_cluster_unit": "continuation_name",
+            "bootstrap_lower_95": 3.5292720135533533e-07,
+            "bootstrap_replications": 1000,
+            "bootstrap_upper_95": 0.0005049327777642054,
+            "coverage_note": "Delisted mid-liquidity names have thin lending records: 5,212 present name-days across 526 names; lending value will be coverage-limited for exactly that segment.",
+            "family": "sidecar_lending",
+            "family_present_name_days": 19364,
+            "gap_direction": "survivor_above_delisted",
+            "gate_decision": "diagnostic_unstratified",
+            "group": "delisted_within_panel",
+            "mask_rate": 0.000361495558768854,
+            "name_count": 491,
+            "possible_feature_cells": 19364,
+            "prior_adv20_lower_brl": null,
+            "prior_adv20_quartile": 0,
+            "prior_adv20_upper_brl": null,
+            "stratified_gate_passed": null,
+            "stratum_is_binding": false,
+            "support_threshold_met": true,
+            "supported_continuation_name_count": 59,
+            "survivor_minus_delisted_gap": 0.00023896756112140594,
+            "valid_feature_cells": 19357,
+            "validity_ratio": 0.9996385044412311
+          },
+          {
+            "bootstrap_cluster_unit": "continuation_name",
+            "bootstrap_lower_95": 3.5292720135533533e-07,
+            "bootstrap_replications": 1000,
+            "bootstrap_upper_95": 0.0005049327777642054,
+            "coverage_note": "Delisted mid-liquidity names have thin lending records: 5,212 present name-days across 526 names; lending value will be coverage-limited for exactly that segment.",
+            "family": "sidecar_lending",
+            "family_present_name_days": 163228,
+            "gap_direction": "survivor_above_delisted",
+            "gate_decision": "diagnostic_unstratified",
+            "group": "survives_to_final_year",
+            "mask_rate": 0.00012252799764744804,
+            "name_count": 442,
+            "possible_feature_cells": 163228,
+            "prior_adv20_lower_brl": null,
+            "prior_adv20_quartile": 0,
+            "prior_adv20_upper_brl": null,
+            "stratified_gate_passed": null,
+            "stratum_is_binding": false,
+            "support_threshold_met": true,
+            "supported_continuation_name_count": 249,
+            "survivor_minus_delisted_gap": 0.00023896756112140594,
+            "valid_feature_cells": 163208,
+            "validity_ratio": 0.9998774720023526
+          },
+          {
+            "bootstrap_cluster_unit": "continuation_name",
+            "bootstrap_lower_95": -0.0003076103971375282,
+            "bootstrap_replications": 1000,
+            "bootstrap_upper_95": -5.642230777415103e-05,
+            "coverage_note": "Delisted mid-liquidity names have thin lending records: 5,212 present name-days across 526 names; lending value will be coverage-limited for exactly that segment.",
+            "family": "sidecar_lending",
+            "family_present_name_days": 5413,
+            "gap_direction": "delisted_above_survivor",
+            "gate_decision": "pass",
+            "group": "delisted_within_panel",
+            "mask_rate": 0.0,
+            "name_count": 491,
+            "possible_feature_cells": 5413,
+            "prior_adv20_lower_brl": null,
+            "prior_adv20_quartile": 1,
+            "prior_adv20_upper_brl": 17107061.0,
+            "stratified_gate_passed": true,
+            "stratum_is_binding": true,
+            "support_threshold_met": true,
+            "supported_continuation_name_count": 35,
+            "survivor_minus_delisted_gap": -0.00017397787995521163,
+            "valid_feature_cells": 5413,
+            "validity_ratio": 1.0
+          },
+          {
+            "bootstrap_cluster_unit": "continuation_name",
+            "bootstrap_lower_95": -0.0003076103971375282,
+            "bootstrap_replications": 1000,
+            "bootstrap_upper_95": -5.642230777415103e-05,
+            "coverage_note": "Delisted mid-liquidity names have thin lending records: 5,212 present name-days across 526 names; lending value will be coverage-limited for exactly that segment.",
+            "family": "sidecar_lending",
+            "family_present_name_days": 40235,
+            "gap_direction": "delisted_above_survivor",
+            "gate_decision": "pass",
+            "group": "survives_to_final_year",
+            "mask_rate": 0.00017397787995521163,
+            "name_count": 442,
+            "possible_feature_cells": 40235,
+            "prior_adv20_lower_brl": null,
+            "prior_adv20_quartile": 1,
+            "prior_adv20_upper_brl": 17107061.0,
+            "stratified_gate_passed": true,
+            "stratum_is_binding": true,
+            "support_threshold_met": true,
+            "supported_continuation_name_count": 166,
+            "survivor_minus_delisted_gap": -0.00017397787995521163,
+            "valid_feature_cells": 40228,
+            "validity_ratio": 0.9998260221200448
+          },
+          {
+            "bootstrap_cluster_unit": "continuation_name",
+            "bootstrap_lower_95": -6.857727046341294e-05,
+            "bootstrap_replications": 1000,
+            "bootstrap_upper_95": 0.0011596107205945252,
+            "coverage_note": "Delisted mid-liquidity names have thin lending records: 5,212 present name-days across 526 names; lending value will be coverage-limited for exactly that segment.",
+            "family": "sidecar_lending",
+            "family_present_name_days": 5281,
+            "gap_direction": "survivor_above_delisted",
+            "gate_decision": "pass",
+            "group": "delisted_within_panel",
+            "mask_rate": 0.0005680742283658002,
+            "name_count": 491,
+            "possible_feature_cells": 5281,
+            "prior_adv20_lower_brl": 17107061.0,
+            "prior_adv20_quartile": 2,
+            "prior_adv20_upper_brl": 47774406.0,
+            "stratified_gate_passed": true,
+            "stratum_is_binding": true,
+            "support_threshold_met": true,
+            "supported_continuation_name_count": 32,
+            "survivor_minus_delisted_gap": 0.0004937560972190225,
+            "valid_feature_cells": 5278,
+            "validity_ratio": 0.9994319257716342
+          },
+          {
+            "bootstrap_cluster_unit": "continuation_name",
+            "bootstrap_lower_95": -6.857727046341294e-05,
+            "bootstrap_replications": 1000,
+            "bootstrap_upper_95": 0.0011596107205945252,
+            "coverage_note": "Delisted mid-liquidity names have thin lending records: 5,212 present name-days across 526 names; lending value will be coverage-limited for exactly that segment.",
+            "family": "sidecar_lending",
+            "family_present_name_days": 40367,
+            "gap_direction": "survivor_above_delisted",
+            "gate_decision": "pass",
+            "group": "survives_to_final_year",
+            "mask_rate": 7.431813114677777e-05,
+            "name_count": 442,
+            "possible_feature_cells": 40367,
+            "prior_adv20_lower_brl": 17107061.0,
+            "prior_adv20_quartile": 2,
+            "prior_adv20_upper_brl": 47774406.0,
+            "stratified_gate_passed": true,
+            "stratum_is_binding": true,
+            "support_threshold_met": true,
+            "supported_continuation_name_count": 142,
+            "survivor_minus_delisted_gap": 0.0004937560972190225,
+            "valid_feature_cells": 40364,
+            "validity_ratio": 0.9999256818688532
+          },
+          {
+            "bootstrap_cluster_unit": "continuation_name",
+            "bootstrap_lower_95": -0.00028752493362984015,
+            "bootstrap_replications": 1000,
+            "bootstrap_upper_95": 0.0005224028995863022,
+            "coverage_note": "Delisted mid-liquidity names have thin lending records: 5,212 present name-days across 526 names; lending value will be coverage-limited for exactly that segment.",
+            "family": "sidecar_lending",
+            "family_present_name_days": 4627,
+            "gap_direction": "survivor_above_delisted",
+            "gate_decision": "pass",
+            "group": "delisted_within_panel",
+            "mask_rate": 0.00021612275772642242,
+            "name_count": 491,
+            "possible_feature_cells": 4627,
+            "prior_adv20_lower_brl": 47774406.0,
+            "prior_adv20_quartile": 3,
+            "prior_adv20_upper_brl": 132880936.0,
+            "stratified_gate_passed": true,
+            "stratum_is_binding": true,
+            "support_threshold_met": true,
+            "supported_continuation_name_count": 28,
+            "survivor_minus_delisted_gap": 2.110069585570251e-05,
+            "valid_feature_cells": 4626,
+            "validity_ratio": 0.9997838772422736
+          },
+          {
+            "bootstrap_cluster_unit": "continuation_name",
+            "bootstrap_lower_95": -0.00028752493362984015,
+            "bootstrap_replications": 1000,
+            "bootstrap_upper_95": 0.0005224028995863022,
+            "coverage_note": "Delisted mid-liquidity names have thin lending records: 5,212 present name-days across 526 names; lending value will be coverage-limited for exactly that segment.",
+            "family": "sidecar_lending",
+            "family_present_name_days": 41021,
+            "gap_direction": "survivor_above_delisted",
+            "gate_decision": "pass",
+            "group": "survives_to_final_year",
+            "mask_rate": 0.0001950220618707199,
+            "name_count": 442,
+            "possible_feature_cells": 41021,
+            "prior_adv20_lower_brl": 47774406.0,
+            "prior_adv20_quartile": 3,
+            "prior_adv20_upper_brl": 132880936.0,
+            "stratified_gate_passed": true,
+            "stratum_is_binding": true,
+            "support_threshold_met": true,
+            "supported_continuation_name_count": 128,
+            "survivor_minus_delisted_gap": 2.110069585570251e-05,
+            "valid_feature_cells": 41013,
+            "validity_ratio": 0.9998049779381293
+          },
+          {
+            "bootstrap_cluster_unit": "continuation_name",
+            "bootstrap_lower_95": -2.6733134517858942e-05,
+            "bootstrap_replications": 1000,
+            "bootstrap_upper_95": 0.001662735586193556,
+            "coverage_note": "Delisted mid-liquidity names have thin lending records: 5,212 present name-days across 526 names; lending value will be coverage-limited for exactly that segment.",
+            "family": "sidecar_lending",
+            "family_present_name_days": 4043,
+            "gap_direction": "survivor_above_delisted",
+            "gate_decision": "reported_not_gated_insufficient_support",
+            "group": "delisted_within_panel",
+            "mask_rate": 0.0007420232500617852,
+            "name_count": 491,
+            "possible_feature_cells": 4043,
+            "prior_adv20_lower_brl": 132880936.0,
+            "prior_adv20_quartile": 4,
+            "prior_adv20_upper_brl": null,
+            "stratified_gate_passed": null,
+            "stratum_is_binding": false,
+            "support_threshold_met": false,
+            "supported_continuation_name_count": 18,
+            "survivor_minus_delisted_gap": 0.0006939521047667485,
+            "valid_feature_cells": 4040,
+            "validity_ratio": 0.9992579767499382
+          },
+          {
+            "bootstrap_cluster_unit": "continuation_name",
+            "bootstrap_lower_95": -2.6733134517858942e-05,
+            "bootstrap_replications": 1000,
+            "bootstrap_upper_95": 0.001662735586193556,
+            "coverage_note": "Delisted mid-liquidity names have thin lending records: 5,212 present name-days across 526 names; lending value will be coverage-limited for exactly that segment.",
+            "family": "sidecar_lending",
+            "family_present_name_days": 41605,
+            "gap_direction": "survivor_above_delisted",
+            "gate_decision": "reported_not_gated_insufficient_support",
+            "group": "survives_to_final_year",
+            "mask_rate": 4.8071145295036644e-05,
+            "name_count": 442,
+            "possible_feature_cells": 41605,
+            "prior_adv20_lower_brl": 132880936.0,
+            "prior_adv20_quartile": 4,
+            "prior_adv20_upper_brl": null,
+            "stratified_gate_passed": null,
+            "stratum_is_binding": false,
+            "support_threshold_met": false,
+            "supported_continuation_name_count": 87,
+            "survivor_minus_delisted_gap": 0.0006939521047667485,
+            "valid_feature_cells": 41603,
+            "validity_ratio": 0.999951928854705
+          }
+        ]
+      },
+      "loan_rate": {
+        "error": "external feature validity for sidecar_lending has a supported survivor-minus-delisted name-bootstrap lower bound above 5 percentage points within prior-ADV20 quartile 1: 0.140595",
+        "passed": false,
+        "rows_through_failure": [
+          {
+            "bootstrap_cluster_unit": "continuation_name",
+            "bootstrap_lower_95": 0.21896731523987117,
+            "bootstrap_replications": 1000,
+            "bootstrap_upper_95": 0.24658665603165716,
+            "coverage_note": "Delisted mid-liquidity names have thin lending records: 5,212 present name-days across 526 names; lending value will be coverage-limited for exactly that segment.",
+            "family": "sidecar_lending",
+            "family_present_name_days": 19364,
+            "gap_direction": "survivor_above_delisted",
+            "gate_decision": "diagnostic_unstratified",
+            "group": "delisted_within_panel",
+            "mask_rate": 0.9963334021896303,
+            "name_count": 491,
+            "possible_feature_cells": 19364,
+            "prior_adv20_lower_brl": null,
+            "prior_adv20_quartile": 0,
+            "prior_adv20_upper_brl": null,
+            "stratified_gate_passed": null,
+            "stratum_is_binding": false,
+            "support_threshold_met": true,
+            "supported_continuation_name_count": 59,
+            "survivor_minus_delisted_gap": 0.2336885128324121,
+            "valid_feature_cells": 71,
+            "validity_ratio": 0.0036665978103697584
+          },
+          {
+            "bootstrap_cluster_unit": "continuation_name",
+            "bootstrap_lower_95": 0.21896731523987117,
+            "bootstrap_replications": 1000,
+            "bootstrap_upper_95": 0.24658665603165716,
+            "coverage_note": "Delisted mid-liquidity names have thin lending records: 5,212 present name-days across 526 names; lending value will be coverage-limited for exactly that segment.",
+            "family": "sidecar_lending",
+            "family_present_name_days": 163228,
+            "gap_direction": "survivor_above_delisted",
+            "gate_decision": "diagnostic_unstratified",
+            "group": "survives_to_final_year",
+            "mask_rate": 0.7626448893572182,
+            "name_count": 442,
+            "possible_feature_cells": 163228,
+            "prior_adv20_lower_brl": null,
+            "prior_adv20_quartile": 0,
+            "prior_adv20_upper_brl": null,
+            "stratified_gate_passed": null,
+            "stratum_is_binding": false,
+            "support_threshold_met": true,
+            "supported_continuation_name_count": 249,
+            "survivor_minus_delisted_gap": 0.2336885128324121,
+            "valid_feature_cells": 38743,
+            "validity_ratio": 0.23735511064278186
+          },
+          {
+            "bootstrap_cluster_unit": "continuation_name",
+            "bootstrap_lower_95": 0.14059525458417854,
+            "bootstrap_replications": 1000,
+            "bootstrap_upper_95": 0.2201488654380861,
+            "coverage_note": "Delisted mid-liquidity names have thin lending records: 5,212 present name-days across 526 names; lending value will be coverage-limited for exactly that segment.",
+            "family": "sidecar_lending",
+            "family_present_name_days": 5413,
+            "gap_direction": "survivor_above_delisted",
+            "gate_decision": "fail_survivor_favoring_interval",
+            "group": "delisted_within_panel",
+            "mask_rate": 1.0,
+            "name_count": 491,
+            "possible_feature_cells": 5413,
+            "prior_adv20_lower_brl": null,
+            "prior_adv20_quartile": 1,
+            "prior_adv20_upper_brl": 17107061.0,
+            "stratified_gate_passed": false,
+            "stratum_is_binding": true,
+            "support_threshold_met": true,
+            "supported_continuation_name_count": 35,
+            "survivor_minus_delisted_gap": 0.1809121411706226,
+            "valid_feature_cells": 0,
+            "validity_ratio": 0.0
+          },
+          {
+            "bootstrap_cluster_unit": "continuation_name",
+            "bootstrap_lower_95": 0.14059525458417854,
+            "bootstrap_replications": 1000,
+            "bootstrap_upper_95": 0.2201488654380861,
+            "coverage_note": "Delisted mid-liquidity names have thin lending records: 5,212 present name-days across 526 names; lending value will be coverage-limited for exactly that segment.",
+            "family": "sidecar_lending",
+            "family_present_name_days": 40235,
+            "gap_direction": "survivor_above_delisted",
+            "gate_decision": "fail_survivor_favoring_interval",
+            "group": "survives_to_final_year",
+            "mask_rate": 0.8190878588293774,
+            "name_count": 442,
+            "possible_feature_cells": 40235,
+            "prior_adv20_lower_brl": null,
+            "prior_adv20_quartile": 1,
+            "prior_adv20_upper_brl": 17107061.0,
+            "stratified_gate_passed": false,
+            "stratum_is_binding": true,
+            "support_threshold_met": true,
+            "supported_continuation_name_count": 166,
+            "survivor_minus_delisted_gap": 0.1809121411706226,
+            "valid_feature_cells": 7279,
+            "validity_ratio": 0.1809121411706226
+          }
+        ]
+      },
+      "loan_rate_change_5": {
+        "error": "external feature validity for sidecar_lending has a supported survivor-minus-delisted name-bootstrap lower bound above 5 percentage points within prior-ADV20 quartile 1: 0.123655",
+        "passed": false,
+        "rows_through_failure": [
+          {
+            "bootstrap_cluster_unit": "continuation_name",
+            "bootstrap_lower_95": 0.19451169261894183,
+            "bootstrap_replications": 1000,
+            "bootstrap_upper_95": 0.21835123771048462,
+            "coverage_note": "Delisted mid-liquidity names have thin lending records: 5,212 present name-days across 526 names; lending value will be coverage-limited for exactly that segment.",
+            "family": "sidecar_lending",
+            "family_present_name_days": 19364,
+            "gap_direction": "survivor_above_delisted",
+            "gate_decision": "diagnostic_unstratified",
+            "group": "delisted_within_panel",
+            "mask_rate": 0.9973662466432556,
+            "name_count": 491,
+            "possible_feature_cells": 19364,
+            "prior_adv20_lower_brl": null,
+            "prior_adv20_quartile": 0,
+            "prior_adv20_upper_brl": null,
+            "stratified_gate_passed": null,
+            "stratum_is_binding": false,
+            "support_threshold_met": true,
+            "supported_continuation_name_count": 59,
+            "survivor_minus_delisted_gap": 0.20717093701500547,
+            "valid_feature_cells": 51,
+            "validity_ratio": 0.002633753356744474
+          },
+          {
+            "bootstrap_cluster_unit": "continuation_name",
+            "bootstrap_lower_95": 0.19451169261894183,
+            "bootstrap_replications": 1000,
+            "bootstrap_upper_95": 0.21835123771048462,
+            "coverage_note": "Delisted mid-liquidity names have thin lending records: 5,212 present name-days across 526 names; lending value will be coverage-limited for exactly that segment.",
+            "family": "sidecar_lending",
+            "family_present_name_days": 163228,
+            "gap_direction": "survivor_above_delisted",
+            "gate_decision": "diagnostic_unstratified",
+            "group": "survives_to_final_year",
+            "mask_rate": 0.79019530962825,
+            "name_count": 442,
+            "possible_feature_cells": 163228,
+            "prior_adv20_lower_brl": null,
+            "prior_adv20_quartile": 0,
+            "prior_adv20_upper_brl": null,
+            "stratified_gate_passed": null,
+            "stratum_is_binding": false,
+            "support_threshold_met": true,
+            "supported_continuation_name_count": 249,
+            "survivor_minus_delisted_gap": 0.20717093701500547,
+            "valid_feature_cells": 34246,
+            "validity_ratio": 0.20980469037174995
+          },
+          {
+            "bootstrap_cluster_unit": "continuation_name",
+            "bootstrap_lower_95": 0.12365544765464384,
+            "bootstrap_replications": 1000,
+            "bootstrap_upper_95": 0.1947031639124207,
+            "coverage_note": "Delisted mid-liquidity names have thin lending records: 5,212 present name-days across 526 names; lending value will be coverage-limited for exactly that segment.",
+            "family": "sidecar_lending",
+            "family_present_name_days": 5413,
+            "gap_direction": "survivor_above_delisted",
+            "gate_decision": "fail_survivor_favoring_interval",
+            "group": "delisted_within_panel",
+            "mask_rate": 1.0,
+            "name_count": 491,
+            "possible_feature_cells": 5413,
+            "prior_adv20_lower_brl": null,
+            "prior_adv20_quartile": 1,
+            "prior_adv20_upper_brl": 17107061.0,
+            "stratified_gate_passed": false,
+            "stratum_is_binding": true,
+            "support_threshold_met": true,
+            "supported_continuation_name_count": 35,
+            "survivor_minus_delisted_gap": 0.15901578227911023,
+            "valid_feature_cells": 0,
+            "validity_ratio": 0.0
+          },
+          {
+            "bootstrap_cluster_unit": "continuation_name",
+            "bootstrap_lower_95": 0.12365544765464384,
+            "bootstrap_replications": 1000,
+            "bootstrap_upper_95": 0.1947031639124207,
+            "coverage_note": "Delisted mid-liquidity names have thin lending records: 5,212 present name-days across 526 names; lending value will be coverage-limited for exactly that segment.",
+            "family": "sidecar_lending",
+            "family_present_name_days": 40235,
+            "gap_direction": "survivor_above_delisted",
+            "gate_decision": "fail_survivor_favoring_interval",
+            "group": "survives_to_final_year",
+            "mask_rate": 0.8409842177208897,
+            "name_count": 442,
+            "possible_feature_cells": 40235,
+            "prior_adv20_lower_brl": null,
+            "prior_adv20_quartile": 1,
+            "prior_adv20_upper_brl": 17107061.0,
+            "stratified_gate_passed": false,
+            "stratum_is_binding": true,
+            "support_threshold_met": true,
+            "supported_continuation_name_count": 166,
+            "survivor_minus_delisted_gap": 0.15901578227911023,
+            "valid_feature_cells": 6398,
+            "validity_ratio": 0.15901578227911023
+          }
+        ]
+      },
+      "new_loan_volume_surprise": {
+        "error": "external feature validity for sidecar_lending has a supported survivor-minus-delisted name-bootstrap lower bound above 5 percentage points within prior-ADV20 quartile 1: 0.111741",
+        "passed": false,
+        "rows_through_failure": [
+          {
+            "bootstrap_cluster_unit": "continuation_name",
+            "bootstrap_lower_95": 0.17644113678205126,
+            "bootstrap_replications": 1000,
+            "bootstrap_upper_95": 0.19725101389884328,
+            "coverage_note": "Delisted mid-liquidity names have thin lending records: 5,212 present name-days across 526 names; lending value will be coverage-limited for exactly that segment.",
+            "family": "sidecar_lending",
+            "family_present_name_days": 19364,
+            "gap_direction": "survivor_above_delisted",
+            "gate_decision": "diagnostic_unstratified",
+            "group": "delisted_within_panel",
+            "mask_rate": 0.9987089444329684,
+            "name_count": 491,
+            "possible_feature_cells": 19364,
+            "prior_adv20_lower_brl": null,
+            "prior_adv20_quartile": 0,
+            "prior_adv20_upper_brl": null,
+            "stratified_gate_passed": null,
+            "stratum_is_binding": false,
+            "support_threshold_met": true,
+            "supported_continuation_name_count": 59,
+            "survivor_minus_delisted_gap": 0.18735917601088395,
+            "valid_feature_cells": 25,
+            "validity_ratio": 0.001291055567031605
+          },
+          {
+            "bootstrap_cluster_unit": "continuation_name",
+            "bootstrap_lower_95": 0.17644113678205126,
+            "bootstrap_replications": 1000,
+            "bootstrap_upper_95": 0.19725101389884328,
+            "coverage_note": "Delisted mid-liquidity names have thin lending records: 5,212 present name-days across 526 names; lending value will be coverage-limited for exactly that segment.",
+            "family": "sidecar_lending",
+            "family_present_name_days": 163228,
+            "gap_direction": "survivor_above_delisted",
+            "gate_decision": "diagnostic_unstratified",
+            "group": "survives_to_final_year",
+            "mask_rate": 0.8113497684220845,
+            "name_count": 442,
+            "possible_feature_cells": 163228,
+            "prior_adv20_lower_brl": null,
+            "prior_adv20_quartile": 0,
+            "prior_adv20_upper_brl": null,
+            "stratified_gate_passed": null,
+            "stratum_is_binding": false,
+            "support_threshold_met": true,
+            "supported_continuation_name_count": 249,
+            "survivor_minus_delisted_gap": 0.18735917601088395,
+            "valid_feature_cells": 30793,
+            "validity_ratio": 0.18865023157791555
+          },
+          {
+            "bootstrap_cluster_unit": "continuation_name",
+            "bootstrap_lower_95": 0.11174125546200453,
+            "bootstrap_replications": 1000,
+            "bootstrap_upper_95": 0.17619721145114461,
+            "coverage_note": "Delisted mid-liquidity names have thin lending records: 5,212 present name-days across 526 names; lending value will be coverage-limited for exactly that segment.",
+            "family": "sidecar_lending",
+            "family_present_name_days": 5413,
+            "gap_direction": "survivor_above_delisted",
+            "gate_decision": "fail_survivor_favoring_interval",
+            "group": "delisted_within_panel",
+            "mask_rate": 1.0,
+            "name_count": 491,
+            "possible_feature_cells": 5413,
+            "prior_adv20_lower_brl": null,
+            "prior_adv20_quartile": 1,
+            "prior_adv20_upper_brl": 17107061.0,
+            "stratified_gate_passed": false,
+            "stratum_is_binding": true,
+            "support_threshold_met": true,
+            "supported_continuation_name_count": 35,
+            "survivor_minus_delisted_gap": 0.14348204299739034,
+            "valid_feature_cells": 0,
+            "validity_ratio": 0.0
+          },
+          {
+            "bootstrap_cluster_unit": "continuation_name",
+            "bootstrap_lower_95": 0.11174125546200453,
+            "bootstrap_replications": 1000,
+            "bootstrap_upper_95": 0.17619721145114461,
+            "coverage_note": "Delisted mid-liquidity names have thin lending records: 5,212 present name-days across 526 names; lending value will be coverage-limited for exactly that segment.",
+            "family": "sidecar_lending",
+            "family_present_name_days": 40235,
+            "gap_direction": "survivor_above_delisted",
+            "gate_decision": "fail_survivor_favoring_interval",
+            "group": "survives_to_final_year",
+            "mask_rate": 0.8565179570026097,
+            "name_count": 442,
+            "possible_feature_cells": 40235,
+            "prior_adv20_lower_brl": null,
+            "prior_adv20_quartile": 1,
+            "prior_adv20_upper_brl": 17107061.0,
+            "stratified_gate_passed": false,
+            "stratum_is_binding": true,
+            "support_threshold_met": true,
+            "supported_continuation_name_count": 166,
+            "survivor_minus_delisted_gap": 0.14348204299739034,
+            "valid_feature_cells": 5773,
+            "validity_ratio": 0.14348204299739034
+          }
+        ]
+      },
+      "utilization_proxy": {
+        "passed": true,
+        "rows": [
+          {
+            "bootstrap_cluster_unit": "continuation_name",
+            "bootstrap_lower_95": -0.08838132506496624,
+            "bootstrap_replications": 1000,
+            "bootstrap_upper_95": 0.02890985562986359,
+            "coverage_note": "Delisted mid-liquidity names have thin lending records: 5,212 present name-days across 526 names; lending value will be coverage-limited for exactly that segment.",
+            "family": "sidecar_lending",
+            "family_present_name_days": 19364,
+            "gap_direction": "delisted_above_survivor",
+            "gate_decision": "diagnostic_unstratified",
+            "group": "delisted_within_panel",
+            "mask_rate": 0.8839599256351993,
+            "name_count": 491,
+            "possible_feature_cells": 19364,
+            "prior_adv20_lower_brl": null,
+            "prior_adv20_quartile": 0,
+            "prior_adv20_upper_brl": null,
+            "stratified_gate_passed": null,
+            "stratum_is_binding": false,
+            "support_threshold_met": true,
+            "supported_continuation_name_count": 59,
+            "survivor_minus_delisted_gap": -0.02707249527297817,
+            "valid_feature_cells": 2247,
+            "validity_ratio": 0.11604007436480065
+          },
+          {
+            "bootstrap_cluster_unit": "continuation_name",
+            "bootstrap_lower_95": -0.08838132506496624,
+            "bootstrap_replications": 1000,
+            "bootstrap_upper_95": 0.02890985562986359,
+            "coverage_note": "Delisted mid-liquidity names have thin lending records: 5,212 present name-days across 526 names; lending value will be coverage-limited for exactly that segment.",
+            "family": "sidecar_lending",
+            "family_present_name_days": 163228,
+            "gap_direction": "delisted_above_survivor",
+            "gate_decision": "diagnostic_unstratified",
+            "group": "survives_to_final_year",
+            "mask_rate": 0.9110324209081775,
+            "name_count": 442,
+            "possible_feature_cells": 163228,
+            "prior_adv20_lower_brl": null,
+            "prior_adv20_quartile": 0,
+            "prior_adv20_upper_brl": null,
+            "stratified_gate_passed": null,
+            "stratum_is_binding": false,
+            "support_threshold_met": true,
+            "supported_continuation_name_count": 249,
+            "survivor_minus_delisted_gap": -0.02707249527297817,
+            "valid_feature_cells": 14522,
+            "validity_ratio": 0.08896757909182249
+          },
+          {
+            "bootstrap_cluster_unit": "continuation_name",
+            "bootstrap_lower_95": -0.07818092876939345,
+            "bootstrap_replications": 1000,
+            "bootstrap_upper_95": 0.12814258124556904,
+            "coverage_note": "Delisted mid-liquidity names have thin lending records: 5,212 present name-days across 526 names; lending value will be coverage-limited for exactly that segment.",
+            "family": "sidecar_lending",
+            "family_present_name_days": 5413,
+            "gap_direction": "survivor_above_delisted",
+            "gate_decision": "pass",
+            "group": "delisted_within_panel",
+            "mask_rate": 0.9096619249953815,
+            "name_count": 491,
+            "possible_feature_cells": 5413,
+            "prior_adv20_lower_brl": null,
+            "prior_adv20_quartile": 1,
+            "prior_adv20_upper_brl": 17107061.0,
+            "stratified_gate_passed": true,
+            "stratum_is_binding": true,
+            "support_threshold_met": true,
+            "supported_continuation_name_count": 35,
+            "survivor_minus_delisted_gap": 0.03989679513332109,
+            "valid_feature_cells": 489,
+            "validity_ratio": 0.09033807500461852
+          },
+          {
+            "bootstrap_cluster_unit": "continuation_name",
+            "bootstrap_lower_95": -0.07818092876939345,
+            "bootstrap_replications": 1000,
+            "bootstrap_upper_95": 0.12814258124556904,
+            "coverage_note": "Delisted mid-liquidity names have thin lending records: 5,212 present name-days across 526 names; lending value will be coverage-limited for exactly that segment.",
+            "family": "sidecar_lending",
+            "family_present_name_days": 40235,
+            "gap_direction": "survivor_above_delisted",
+            "gate_decision": "pass",
+            "group": "survives_to_final_year",
+            "mask_rate": 0.8697651298620603,
+            "name_count": 442,
+            "possible_feature_cells": 40235,
+            "prior_adv20_lower_brl": null,
+            "prior_adv20_quartile": 1,
+            "prior_adv20_upper_brl": 17107061.0,
+            "stratified_gate_passed": true,
+            "stratum_is_binding": true,
+            "support_threshold_met": true,
+            "supported_continuation_name_count": 166,
+            "survivor_minus_delisted_gap": 0.03989679513332109,
+            "valid_feature_cells": 5240,
+            "validity_ratio": 0.1302348701379396
+          },
+          {
+            "bootstrap_cluster_unit": "continuation_name",
+            "bootstrap_lower_95": -0.053908137599479926,
+            "bootstrap_replications": 1000,
+            "bootstrap_upper_95": 0.0868041332403833,
+            "coverage_note": "Delisted mid-liquidity names have thin lending records: 5,212 present name-days across 526 names; lending value will be coverage-limited for exactly that segment.",
+            "family": "sidecar_lending",
+            "family_present_name_days": 5281,
+            "gap_direction": "survivor_above_delisted",
+            "gate_decision": "pass",
+            "group": "delisted_within_panel",
+            "mask_rate": 0.9163037303540996,
+            "name_count": 491,
+            "possible_feature_cells": 5281,
+            "prior_adv20_lower_brl": 17107061.0,
+            "prior_adv20_quartile": 2,
+            "prior_adv20_upper_brl": 47774406.0,
+            "stratified_gate_passed": true,
+            "stratum_is_binding": true,
+            "support_threshold_met": true,
+            "supported_continuation_name_count": 32,
+            "survivor_minus_delisted_gap": 0.019358205544230164,
+            "valid_feature_cells": 442,
+            "validity_ratio": 0.08369626964590039
+          },
+          {
+            "bootstrap_cluster_unit": "continuation_name",
+            "bootstrap_lower_95": -0.053908137599479926,
+            "bootstrap_replications": 1000,
+            "bootstrap_upper_95": 0.0868041332403833,
+            "coverage_note": "Delisted mid-liquidity names have thin lending records: 5,212 present name-days across 526 names; lending value will be coverage-limited for exactly that segment.",
+            "family": "sidecar_lending",
+            "family_present_name_days": 40367,
+            "gap_direction": "survivor_above_delisted",
+            "gate_decision": "pass",
+            "group": "survives_to_final_year",
+            "mask_rate": 0.8969455248098694,
+            "name_count": 442,
+            "possible_feature_cells": 40367,
+            "prior_adv20_lower_brl": 17107061.0,
+            "prior_adv20_quartile": 2,
+            "prior_adv20_upper_brl": 47774406.0,
+            "stratified_gate_passed": true,
+            "stratum_is_binding": true,
+            "support_threshold_met": true,
+            "supported_continuation_name_count": 142,
+            "survivor_minus_delisted_gap": 0.019358205544230164,
+            "valid_feature_cells": 4160,
+            "validity_ratio": 0.10305447519013056
+          },
+          {
+            "bootstrap_cluster_unit": "continuation_name",
+            "bootstrap_lower_95": -0.08403736988921752,
+            "bootstrap_replications": 1000,
+            "bootstrap_upper_95": 0.06393071501196718,
+            "coverage_note": "Delisted mid-liquidity names have thin lending records: 5,212 present name-days across 526 names; lending value will be coverage-limited for exactly that segment.",
+            "family": "sidecar_lending",
+            "family_present_name_days": 4627,
+            "gap_direction": "delisted_above_survivor",
+            "gate_decision": "pass",
+            "group": "delisted_within_panel",
+            "mask_rate": 0.920466825156689,
+            "name_count": 491,
+            "possible_feature_cells": 4627,
+            "prior_adv20_lower_brl": 47774406.0,
+            "prior_adv20_quartile": 3,
+            "prior_adv20_upper_brl": 132880936.0,
+            "stratified_gate_passed": true,
+            "stratum_is_binding": true,
+            "support_threshold_met": true,
+            "supported_continuation_name_count": 28,
+            "survivor_minus_delisted_gap": -0.005034747208684839,
+            "valid_feature_cells": 368,
+            "validity_ratio": 0.079533174843311
+          },
+          {
+            "bootstrap_cluster_unit": "continuation_name",
+            "bootstrap_lower_95": -0.08403736988921752,
+            "bootstrap_replications": 1000,
+            "bootstrap_upper_95": 0.06393071501196718,
+            "coverage_note": "Delisted mid-liquidity names have thin lending records: 5,212 present name-days across 526 names; lending value will be coverage-limited for exactly that segment.",
+            "family": "sidecar_lending",
+            "family_present_name_days": 41021,
+            "gap_direction": "delisted_above_survivor",
+            "gate_decision": "pass",
+            "group": "survives_to_final_year",
+            "mask_rate": 0.9255015723653739,
+            "name_count": 442,
+            "possible_feature_cells": 41021,
+            "prior_adv20_lower_brl": 47774406.0,
+            "prior_adv20_quartile": 3,
+            "prior_adv20_upper_brl": 132880936.0,
+            "stratified_gate_passed": true,
+            "stratum_is_binding": true,
+            "support_threshold_met": true,
+            "supported_continuation_name_count": 128,
+            "survivor_minus_delisted_gap": -0.005034747208684839,
+            "valid_feature_cells": 3056,
+            "validity_ratio": 0.07449842763462616
+          },
+          {
+            "bootstrap_cluster_unit": "continuation_name",
+            "bootstrap_lower_95": -0.30965046925941814,
+            "bootstrap_replications": 1000,
+            "bootstrap_upper_95": -0.0481874706676863,
+            "coverage_note": "Delisted mid-liquidity names have thin lending records: 5,212 present name-days across 526 names; lending value will be coverage-limited for exactly that segment.",
+            "family": "sidecar_lending",
+            "family_present_name_days": 4043,
+            "gap_direction": "delisted_above_survivor",
+            "gate_decision": "reported_not_gated_insufficient_support",
+            "group": "delisted_within_panel",
+            "mask_rate": 0.76552065298046,
+            "name_count": 491,
+            "possible_feature_cells": 4043,
+            "prior_adv20_lower_brl": 132880936.0,
+            "prior_adv20_quartile": 4,
+            "prior_adv20_upper_brl": null,
+            "stratified_gate_passed": null,
+            "stratum_is_binding": false,
+            "support_threshold_met": false,
+            "supported_continuation_name_count": 18,
+            "survivor_minus_delisted_gap": -0.18482185392976708,
+            "valid_feature_cells": 948,
+            "validity_ratio": 0.23447934701953996
+          },
+          {
+            "bootstrap_cluster_unit": "continuation_name",
+            "bootstrap_lower_95": -0.30965046925941814,
+            "bootstrap_replications": 1000,
+            "bootstrap_upper_95": -0.0481874706676863,
+            "coverage_note": "Delisted mid-liquidity names have thin lending records: 5,212 present name-days across 526 names; lending value will be coverage-limited for exactly that segment.",
+            "family": "sidecar_lending",
+            "family_present_name_days": 41605,
+            "gap_direction": "delisted_above_survivor",
+            "gate_decision": "reported_not_gated_insufficient_support",
+            "group": "survives_to_final_year",
+            "mask_rate": 0.9503425069102271,
+            "name_count": 442,
+            "possible_feature_cells": 41605,
+            "prior_adv20_lower_brl": 132880936.0,
+            "prior_adv20_quartile": 4,
+            "prior_adv20_upper_brl": null,
+            "stratified_gate_passed": null,
+            "stratum_is_binding": false,
+            "support_threshold_met": false,
+            "supported_continuation_name_count": 87,
+            "survivor_minus_delisted_gap": -0.18482185392976708,
+            "valid_feature_cells": 2066,
+            "validity_ratio": 0.04965749308977287
+          }
+        ]
+      }
+    },
+    "scope": "Existing gate executed unchanged. Python tracing only captures its diagnostic rows when it raises; no production check, value, mask, store or source is altered. Featurewise and yearwise composition explain the aggregate flag and do not constitute a passing store.",
+    "store_accepted": false,
+    "whole_family": {
+      "error": "external feature validity for sidecar_lending has a supported survivor-minus-delisted name-bootstrap lower bound above 5 percentage points within prior-ADV20 quartile 1: 0.056433",
+      "passed": false,
+      "rows_through_failure": [
+        {
+          "bootstrap_cluster_unit": "continuation_name",
+          "bootstrap_lower_95": 0.08128489209071689,
+          "bootstrap_replications": 1000,
+          "bootstrap_upper_95": 0.10066577475552485,
+          "coverage_note": "Delisted mid-liquidity names have thin lending records: 5,212 present name-days across 526 names; lending value will be coverage-limited for exactly that segment.",
+          "family": "sidecar_lending",
+          "family_present_name_days": 19364,
+          "gap_direction": "survivor_above_delisted",
+          "gate_decision": "diagnostic_unstratified",
+          "group": "delisted_within_panel",
+          "mask_rate": 0.5707941098356302,
+          "name_count": 491,
+          "possible_feature_cells": 135548,
+          "prior_adv20_lower_brl": null,
+          "prior_adv20_quartile": 0,
+          "prior_adv20_upper_brl": null,
+          "stratified_gate_passed": null,
+          "stratum_is_binding": false,
+          "support_threshold_met": true,
+          "supported_continuation_name_count": 59,
+          "survivor_minus_delisted_gap": 0.09127466464240352,
+          "valid_feature_cells": 58178,
+          "validity_ratio": 0.42920589016436983
+        },
+        {
+          "bootstrap_cluster_unit": "continuation_name",
+          "bootstrap_lower_95": 0.08128489209071689,
+          "bootstrap_replications": 1000,
+          "bootstrap_upper_95": 0.10066577475552485,
+          "coverage_note": "Delisted mid-liquidity names have thin lending records: 5,212 present name-days across 526 names; lending value will be coverage-limited for exactly that segment.",
+          "family": "sidecar_lending",
+          "family_present_name_days": 163228,
+          "gap_direction": "survivor_above_delisted",
+          "gate_decision": "diagnostic_unstratified",
+          "group": "survives_to_final_year",
+          "mask_rate": 0.47951944519322665,
+          "name_count": 442,
+          "possible_feature_cells": 1142596,
+          "prior_adv20_lower_brl": null,
+          "prior_adv20_quartile": 0,
+          "prior_adv20_upper_brl": null,
+          "stratified_gate_passed": null,
+          "stratum_is_binding": false,
+          "support_threshold_met": true,
+          "supported_continuation_name_count": 249,
+          "survivor_minus_delisted_gap": 0.09127466464240352,
+          "valid_feature_cells": 594699,
+          "validity_ratio": 0.5204805548067734
+        },
+        {
+          "bootstrap_cluster_unit": "continuation_name",
+          "bootstrap_lower_95": 0.056433122066784046,
+          "bootstrap_replications": 1000,
+          "bootstrap_upper_95": 0.09831018752374328,
+          "coverage_note": "Delisted mid-liquidity names have thin lending records: 5,212 present name-days across 526 names; lending value will be coverage-limited for exactly that segment.",
+          "family": "sidecar_lending",
+          "family_present_name_days": 5413,
+          "gap_direction": "survivor_above_delisted",
+          "gate_decision": "fail_survivor_favoring_interval",
+          "group": "delisted_within_panel",
+          "mask_rate": 0.5740677205668893,
+          "name_count": 491,
+          "possible_feature_cells": 37891,
+          "prior_adv20_lower_brl": null,
+          "prior_adv20_quartile": 1,
+          "prior_adv20_upper_brl": 17107061.0,
+          "stratified_gate_passed": false,
+          "stratum_is_binding": true,
+          "support_threshold_met": true,
+          "supported_continuation_name_count": 35,
+          "survivor_minus_delisted_gap": 0.07796802058996799,
+          "valid_feature_cells": 16139,
+          "validity_ratio": 0.42593227943311074
+        },
+        {
+          "bootstrap_cluster_unit": "continuation_name",
+          "bootstrap_lower_95": 0.056433122066784046,
+          "bootstrap_replications": 1000,
+          "bootstrap_upper_95": 0.09831018752374328,
+          "coverage_note": "Delisted mid-liquidity names have thin lending records: 5,212 present name-days across 526 names; lending value will be coverage-limited for exactly that segment.",
+          "family": "sidecar_lending",
+          "family_present_name_days": 40235,
+          "gap_direction": "survivor_above_delisted",
+          "gate_decision": "fail_survivor_favoring_interval",
+          "group": "survives_to_final_year",
+          "mask_rate": 0.49609969997692127,
+          "name_count": 442,
+          "possible_feature_cells": 281645,
+          "prior_adv20_lower_brl": null,
+          "prior_adv20_quartile": 1,
+          "prior_adv20_upper_brl": 17107061.0,
+          "stratified_gate_passed": false,
+          "stratum_is_binding": true,
+          "support_threshold_met": true,
+          "supported_continuation_name_count": 166,
+          "survivor_minus_delisted_gap": 0.07796802058996799,
+          "valid_feature_cells": 141921,
+          "validity_ratio": 0.5039003000230787
+        }
+      ]
+    }
+  },
+  "interpretation": "The pooled statistic mixes calendar eras. Loan rates, five-session rate change and new-loan flow are unavailable for both groups in 2019-2022. In the lowest ADV quartile, delisted names contribute only30 present days across2 names in2023 and none in2024, while survivor rate coverage rises in2023-24. Balance fields and utilization pass their featurewise checks. This documents temporal composition confounding; it does not certify absence of missing-data bias or authorize an unreviewed gate bypass.",
+  "next_action": "Review the pooled coverage gate against source-era/calendar-matched coverage, retain the original failure and unsupported strata, and register any correction before a fresh store build. No masking or filtering based on eventual survival, no new source search, no predictive or held-out evaluation.",
+  "dependency_acceptance": {
+    "manifest": {
+      "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\fca_dependencies_0aea7a8\\manifest.json",
+      "sha256": "32b4ecf463d2ffd8de61ad6f0965ebe4e5d2463c3bde6658cb770e75372affbf"
+    },
+    "derived_peak_rss_gib": 3.999767303466797,
+    "parity_and_coverage": {
+      "magnitudes": {
+        "all_payloads_exact": true,
+        "retained_original_admission": true
+      },
+      "sector": {
+        "key_coverage": {
+          "before_rows": 228356,
+          "after_rows": 206994,
+          "added_keys": 17048,
+          "removed_keys": 38410,
+          "all_new_rows_have_accepted_dated_sector": true
+        },
+        "changes": [
+          {
+            "feature": "name_minus_sector_return_5",
+            "by_year": [
+              {
+                "year": 2010,
+                "old_valid": 301,
+                "new_valid": 452,
+                "newly_supported": 151,
+                "lost_support": 0,
+                "changed_value_or_age": 280,
+                "first_changed_date": "2010-06-01"
+              },
+              {
+                "year": 2011,
+                "old_valid": 875,
+                "new_valid": 762,
+                "newly_supported": 0,
+                "lost_support": 113,
+                "changed_value_or_age": 434,
+                "first_changed_date": "2011-06-01"
+              },
+              {
+                "year": 2012,
+                "old_valid": 440,
+                "new_valid": 1271,
+                "newly_supported": 1119,
+                "lost_support": 288,
+                "changed_value_or_age": 1452,
+                "first_changed_date": "2012-02-16"
+              },
+              {
+                "year": 2013,
+                "old_valid": 900,
+                "new_valid": 1549,
+                "newly_supported": 744,
+                "lost_support": 95,
+                "changed_value_or_age": 1124,
+                "first_changed_date": "2013-01-02"
+              },
+              {
+                "year": 2014,
+                "old_valid": 1145,
+                "new_valid": 1924,
+                "newly_supported": 779,
+                "lost_support": 0,
+                "changed_value_or_age": 847,
+                "first_changed_date": "2014-01-02"
+              },
+              {
+                "year": 2015,
+                "old_valid": 1267,
+                "new_valid": 1897,
+                "newly_supported": 630,
+                "lost_support": 0,
+                "changed_value_or_age": 630,
+                "first_changed_date": "2015-01-02"
+              },
+              {
+                "year": 2016,
+                "old_valid": 1022,
+                "new_valid": 1769,
+                "newly_supported": 747,
+                "lost_support": 0,
+                "changed_value_or_age": 747,
+                "first_changed_date": "2016-01-04"
+              },
+              {
+                "year": 2017,
+                "old_valid": 1111,
+                "new_valid": 1905,
+                "newly_supported": 794,
+                "lost_support": 0,
+                "changed_value_or_age": 938,
+                "first_changed_date": "2017-01-02"
+              },
+              {
+                "year": 2018,
+                "old_valid": 9545,
+                "new_valid": 13299,
+                "newly_supported": 4931,
+                "lost_support": 1177,
+                "changed_value_or_age": 10739,
+                "first_changed_date": "2018-01-03"
+              },
+              {
+                "year": 2019,
+                "old_valid": 22276,
+                "new_valid": 21433,
+                "newly_supported": 2381,
+                "lost_support": 3224,
+                "changed_value_or_age": 17011,
+                "first_changed_date": "2019-01-02"
+              },
+              {
+                "year": 2020,
+                "old_valid": 31168,
+                "new_valid": 27844,
+                "newly_supported": 689,
+                "lost_support": 4013,
+                "changed_value_or_age": 19108,
+                "first_changed_date": "2020-01-02"
+              },
+              {
+                "year": 2021,
+                "old_valid": 41127,
+                "new_valid": 38238,
+                "newly_supported": 1165,
+                "lost_support": 4054,
+                "changed_value_or_age": 26868,
+                "first_changed_date": "2021-01-04"
+              },
+              {
+                "year": 2022,
+                "old_valid": 41370,
+                "new_valid": 31797,
+                "newly_supported": 1150,
+                "lost_support": 10723,
+                "changed_value_or_age": 32983,
+                "first_changed_date": "2022-01-03"
+              },
+              {
+                "year": 2023,
+                "old_valid": 38779,
+                "new_valid": 32296,
+                "newly_supported": 794,
+                "lost_support": 7277,
+                "changed_value_or_age": 29164,
+                "first_changed_date": "2023-01-02"
+              },
+              {
+                "year": 2024,
+                "old_valid": 37030,
+                "new_valid": 30558,
+                "newly_supported": 974,
+                "lost_support": 7446,
+                "changed_value_or_age": 27764,
+                "first_changed_date": "2024-01-02"
+              }
+            ]
+          },
+          {
+            "feature": "name_minus_sector_return_21",
+            "by_year": [
+              {
+                "year": 2010,
+                "old_valid": 301,
+                "new_valid": 452,
+                "newly_supported": 151,
+                "lost_support": 0,
+                "changed_value_or_age": 280,
+                "first_changed_date": "2010-06-01"
+              },
+              {
+                "year": 2011,
+                "old_valid": 875,
+                "new_valid": 762,
+                "newly_supported": 0,
+                "lost_support": 113,
+                "changed_value_or_age": 434,
+                "first_changed_date": "2011-06-01"
+              },
+              {
+                "year": 2012,
+                "old_valid": 440,
+                "new_valid": 1271,
+                "newly_supported": 1119,
+                "lost_support": 288,
+                "changed_value_or_age": 1452,
+                "first_changed_date": "2012-02-16"
+              },
+              {
+                "year": 2013,
+                "old_valid": 900,
+                "new_valid": 1549,
+                "newly_supported": 744,
+                "lost_support": 95,
+                "changed_value_or_age": 1124,
+                "first_changed_date": "2013-01-02"
+              },
+              {
+                "year": 2014,
+                "old_valid": 1145,
+                "new_valid": 1924,
+                "newly_supported": 779,
+                "lost_support": 0,
+                "changed_value_or_age": 847,
+                "first_changed_date": "2014-01-02"
+              },
+              {
+                "year": 2015,
+                "old_valid": 1267,
+                "new_valid": 1897,
+                "newly_supported": 630,
+                "lost_support": 0,
+                "changed_value_or_age": 630,
+                "first_changed_date": "2015-01-02"
+              },
+              {
+                "year": 2016,
+                "old_valid": 1022,
+                "new_valid": 1769,
+                "newly_supported": 747,
+                "lost_support": 0,
+                "changed_value_or_age": 747,
+                "first_changed_date": "2016-01-04"
+              },
+              {
+                "year": 2017,
+                "old_valid": 1111,
+                "new_valid": 1905,
+                "newly_supported": 794,
+                "lost_support": 0,
+                "changed_value_or_age": 938,
+                "first_changed_date": "2017-01-02"
+              },
+              {
+                "year": 2018,
+                "old_valid": 9545,
+                "new_valid": 13299,
+                "newly_supported": 4931,
+                "lost_support": 1177,
+                "changed_value_or_age": 10739,
+                "first_changed_date": "2018-01-03"
+              },
+              {
+                "year": 2019,
+                "old_valid": 22276,
+                "new_valid": 21433,
+                "newly_supported": 2381,
+                "lost_support": 3224,
+                "changed_value_or_age": 17011,
+                "first_changed_date": "2019-01-02"
+              },
+              {
+                "year": 2020,
+                "old_valid": 31158,
+                "new_valid": 27834,
+                "newly_supported": 689,
+                "lost_support": 4013,
+                "changed_value_or_age": 19098,
+                "first_changed_date": "2020-01-02"
+              },
+              {
+                "year": 2021,
+                "old_valid": 41112,
+                "new_valid": 38223,
+                "newly_supported": 1165,
+                "lost_support": 4054,
+                "changed_value_or_age": 26860,
+                "first_changed_date": "2021-01-04"
+              },
+              {
+                "year": 2022,
+                "old_valid": 41329,
+                "new_valid": 31764,
+                "newly_supported": 1150,
+                "lost_support": 10715,
+                "changed_value_or_age": 32970,
+                "first_changed_date": "2022-01-03"
+              },
+              {
+                "year": 2023,
+                "old_valid": 38750,
+                "new_valid": 32275,
+                "newly_supported": 794,
+                "lost_support": 7269,
+                "changed_value_or_age": 29164,
+                "first_changed_date": "2023-01-02"
+              },
+              {
+                "year": 2024,
+                "old_valid": 37023,
+                "new_valid": 30551,
+                "newly_supported": 974,
+                "lost_support": 7446,
+                "changed_value_or_age": 27757,
+                "first_changed_date": "2024-01-02"
+              }
+            ]
+          },
+          {
+            "feature": "sector_momentum_12_1",
+            "by_year": [
+              {
+                "year": 2010,
+                "old_valid": 0,
+                "new_valid": 0,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 151,
+                "first_changed_date": "2010-06-01"
+              },
+              {
+                "year": 2011,
+                "old_valid": 762,
+                "new_valid": 649,
+                "newly_supported": 0,
+                "lost_support": 113,
+                "changed_value_or_age": 434,
+                "first_changed_date": "2011-06-01"
+              },
+              {
+                "year": 2012,
+                "old_valid": 314,
+                "new_valid": 779,
+                "newly_supported": 690,
+                "lost_support": 225,
+                "changed_value_or_age": 1407,
+                "first_changed_date": "2012-02-16"
+              },
+              {
+                "year": 2013,
+                "old_valid": 869,
+                "new_valid": 1518,
+                "newly_supported": 744,
+                "lost_support": 95,
+                "changed_value_or_age": 1124,
+                "first_changed_date": "2013-01-02"
+              },
+              {
+                "year": 2014,
+                "old_valid": 1061,
+                "new_valid": 1840,
+                "newly_supported": 779,
+                "lost_support": 0,
+                "changed_value_or_age": 841,
+                "first_changed_date": "2014-01-02"
+              },
+              {
+                "year": 2015,
+                "old_valid": 1267,
+                "new_valid": 1897,
+                "newly_supported": 630,
+                "lost_support": 0,
+                "changed_value_or_age": 630,
+                "first_changed_date": "2015-01-02"
+              },
+              {
+                "year": 2016,
+                "old_valid": 1022,
+                "new_valid": 1769,
+                "newly_supported": 747,
+                "lost_support": 0,
+                "changed_value_or_age": 747,
+                "first_changed_date": "2016-01-04"
+              },
+              {
+                "year": 2017,
+                "old_valid": 1111,
+                "new_valid": 1905,
+                "newly_supported": 794,
+                "lost_support": 0,
+                "changed_value_or_age": 938,
+                "first_changed_date": "2017-01-02"
+              },
+              {
+                "year": 2018,
+                "old_valid": 8698,
+                "new_valid": 11315,
+                "newly_supported": 3916,
+                "lost_support": 1299,
+                "changed_value_or_age": 10613,
+                "first_changed_date": "2018-01-03"
+              },
+              {
+                "year": 2019,
+                "old_valid": 21377,
+                "new_valid": 20613,
+                "newly_supported": 2381,
+                "lost_support": 3145,
+                "changed_value_or_age": 16665,
+                "first_changed_date": "2019-01-02"
+              },
+              {
+                "year": 2020,
+                "old_valid": 28968,
+                "new_valid": 25608,
+                "newly_supported": 334,
+                "lost_support": 3694,
+                "changed_value_or_age": 18071,
+                "first_changed_date": "2020-01-02"
+              },
+              {
+                "year": 2021,
+                "old_valid": 34050,
+                "new_valid": 30306,
+                "newly_supported": 74,
+                "lost_support": 3818,
+                "changed_value_or_age": 22282,
+                "first_changed_date": "2021-01-04"
+              },
+              {
+                "year": 2022,
+                "old_valid": 37557,
+                "new_valid": 28342,
+                "newly_supported": 502,
+                "lost_support": 9717,
+                "changed_value_or_age": 30993,
+                "first_changed_date": "2022-01-03"
+              },
+              {
+                "year": 2023,
+                "old_valid": 38118,
+                "new_valid": 31475,
+                "newly_supported": 794,
+                "lost_support": 7437,
+                "changed_value_or_age": 28755,
+                "first_changed_date": "2023-01-02"
+              },
+              {
+                "year": 2024,
+                "old_valid": 36509,
+                "new_valid": 29935,
+                "newly_supported": 974,
+                "lost_support": 7548,
+                "changed_value_or_age": 27470,
+                "first_changed_date": "2024-01-02"
+              }
+            ]
+          }
+        ]
+      },
+      "cross_market": {
+        "common_shocks_unavailable_external_fields_and_OLS_support_exact": true,
+        "changes": [
+          {
+            "feature": "exposure_fx",
+            "by_year": [
+              {
+                "year": 2010,
+                "old_valid": 20363,
+                "new_valid": 20363,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 0,
+                "first_changed_date": null
+              },
+              {
+                "year": 2011,
+                "old_valid": 29783,
+                "new_valid": 29783,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 434,
+                "first_changed_date": "2011-06-01"
+              },
+              {
+                "year": 2012,
+                "old_valid": 30696,
+                "new_valid": 30696,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 420,
+                "first_changed_date": "2012-06-12"
+              },
+              {
+                "year": 2013,
+                "old_valid": 33790,
+                "new_valid": 33790,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 544,
+                "first_changed_date": "2013-03-12"
+              },
+              {
+                "year": 2014,
+                "old_valid": 31737,
+                "new_valid": 31737,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 85,
+                "first_changed_date": "2014-04-28"
+              },
+              {
+                "year": 2015,
+                "old_valid": 28000,
+                "new_valid": 28000,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 0,
+                "first_changed_date": null
+              },
+              {
+                "year": 2016,
+                "old_valid": 27373,
+                "new_valid": 27373,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 0,
+                "first_changed_date": null
+              },
+              {
+                "year": 2017,
+                "old_valid": 28612,
+                "new_valid": 28612,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 0,
+                "first_changed_date": null
+              },
+              {
+                "year": 2018,
+                "old_valid": 32643,
+                "new_valid": 32643,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 8437,
+                "first_changed_date": "2018-01-05"
+              },
+              {
+                "year": 2019,
+                "old_valid": 35198,
+                "new_valid": 35198,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 15119,
+                "first_changed_date": "2019-01-02"
+              },
+              {
+                "year": 2020,
+                "old_valid": 41692,
+                "new_valid": 41692,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 16838,
+                "first_changed_date": "2020-01-02"
+              },
+              {
+                "year": 2021,
+                "old_valid": 49424,
+                "new_valid": 49424,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 24147,
+                "first_changed_date": "2021-01-04"
+              },
+              {
+                "year": 2022,
+                "old_valid": 52207,
+                "new_valid": 52207,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 29648,
+                "first_changed_date": "2022-01-03"
+              },
+              {
+                "year": 2023,
+                "old_valid": 46851,
+                "new_valid": 46851,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 26041,
+                "first_changed_date": "2023-01-02"
+              },
+              {
+                "year": 2024,
+                "old_valid": 44988,
+                "new_valid": 44988,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 26061,
+                "first_changed_date": "2024-01-02"
+              }
+            ]
+          },
+          {
+            "feature": "exposure_rates_br",
+            "by_year": [
+              {
+                "year": 2010,
+                "old_valid": 20363,
+                "new_valid": 20363,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 0,
+                "first_changed_date": null
+              },
+              {
+                "year": 2011,
+                "old_valid": 29783,
+                "new_valid": 29783,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 434,
+                "first_changed_date": "2011-06-01"
+              },
+              {
+                "year": 2012,
+                "old_valid": 30696,
+                "new_valid": 30696,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 420,
+                "first_changed_date": "2012-06-12"
+              },
+              {
+                "year": 2013,
+                "old_valid": 33790,
+                "new_valid": 33790,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 544,
+                "first_changed_date": "2013-03-12"
+              },
+              {
+                "year": 2014,
+                "old_valid": 31737,
+                "new_valid": 31737,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 85,
+                "first_changed_date": "2014-04-28"
+              },
+              {
+                "year": 2015,
+                "old_valid": 27973,
+                "new_valid": 27973,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 0,
+                "first_changed_date": null
+              },
+              {
+                "year": 2016,
+                "old_valid": 27373,
+                "new_valid": 27373,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 0,
+                "first_changed_date": null
+              },
+              {
+                "year": 2017,
+                "old_valid": 28612,
+                "new_valid": 28612,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 0,
+                "first_changed_date": null
+              },
+              {
+                "year": 2018,
+                "old_valid": 32643,
+                "new_valid": 32643,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 8437,
+                "first_changed_date": "2018-01-05"
+              },
+              {
+                "year": 2019,
+                "old_valid": 35198,
+                "new_valid": 35198,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 15119,
+                "first_changed_date": "2019-01-02"
+              },
+              {
+                "year": 2020,
+                "old_valid": 41692,
+                "new_valid": 41692,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 16838,
+                "first_changed_date": "2020-01-02"
+              },
+              {
+                "year": 2021,
+                "old_valid": 49424,
+                "new_valid": 49424,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 24147,
+                "first_changed_date": "2021-01-04"
+              },
+              {
+                "year": 2022,
+                "old_valid": 52207,
+                "new_valid": 52207,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 29648,
+                "first_changed_date": "2022-01-03"
+              },
+              {
+                "year": 2023,
+                "old_valid": 46851,
+                "new_valid": 46851,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 26041,
+                "first_changed_date": "2023-01-02"
+              },
+              {
+                "year": 2024,
+                "old_valid": 44988,
+                "new_valid": 44988,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 26061,
+                "first_changed_date": "2024-01-02"
+              }
+            ]
+          },
+          {
+            "feature": "exposure_rates_us",
+            "by_year": [
+              {
+                "year": 2010,
+                "old_valid": 20184,
+                "new_valid": 20184,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 0,
+                "first_changed_date": null
+              },
+              {
+                "year": 2011,
+                "old_valid": 29730,
+                "new_valid": 29730,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 434,
+                "first_changed_date": "2011-06-01"
+              },
+              {
+                "year": 2012,
+                "old_valid": 30627,
+                "new_valid": 30627,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 416,
+                "first_changed_date": "2012-06-13"
+              },
+              {
+                "year": 2013,
+                "old_valid": 33744,
+                "new_valid": 33744,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 530,
+                "first_changed_date": "2013-03-14"
+              },
+              {
+                "year": 2014,
+                "old_valid": 31720,
+                "new_valid": 31720,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 85,
+                "first_changed_date": "2014-04-28"
+              },
+              {
+                "year": 2015,
+                "old_valid": 27979,
+                "new_valid": 27979,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 0,
+                "first_changed_date": null
+              },
+              {
+                "year": 2016,
+                "old_valid": 27356,
+                "new_valid": 27356,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 0,
+                "first_changed_date": null
+              },
+              {
+                "year": 2017,
+                "old_valid": 28556,
+                "new_valid": 28556,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 0,
+                "first_changed_date": null
+              },
+              {
+                "year": 2018,
+                "old_valid": 32606,
+                "new_valid": 32606,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 8424,
+                "first_changed_date": "2018-01-05"
+              },
+              {
+                "year": 2019,
+                "old_valid": 35137,
+                "new_valid": 35137,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 15092,
+                "first_changed_date": "2019-01-02"
+              },
+              {
+                "year": 2020,
+                "old_valid": 41572,
+                "new_valid": 41572,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 16785,
+                "first_changed_date": "2020-01-02"
+              },
+              {
+                "year": 2021,
+                "old_valid": 49303,
+                "new_valid": 49303,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 24067,
+                "first_changed_date": "2021-01-04"
+              },
+              {
+                "year": 2022,
+                "old_valid": 52131,
+                "new_valid": 52131,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 29611,
+                "first_changed_date": "2022-01-03"
+              },
+              {
+                "year": 2023,
+                "old_valid": 46750,
+                "new_valid": 46750,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 25942,
+                "first_changed_date": "2023-01-02"
+              },
+              {
+                "year": 2024,
+                "old_valid": 44956,
+                "new_valid": 44956,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 26025,
+                "first_changed_date": "2024-01-02"
+              }
+            ]
+          },
+          {
+            "feature": "exposure_oil",
+            "by_year": [
+              {
+                "year": 2010,
+                "old_valid": 0,
+                "new_valid": 0,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 0,
+                "first_changed_date": null
+              },
+              {
+                "year": 2011,
+                "old_valid": 0,
+                "new_valid": 0,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 0,
+                "first_changed_date": null
+              },
+              {
+                "year": 2012,
+                "old_valid": 0,
+                "new_valid": 0,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 0,
+                "first_changed_date": null
+              },
+              {
+                "year": 2013,
+                "old_valid": 0,
+                "new_valid": 0,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 0,
+                "first_changed_date": null
+              },
+              {
+                "year": 2014,
+                "old_valid": 0,
+                "new_valid": 0,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 0,
+                "first_changed_date": null
+              },
+              {
+                "year": 2015,
+                "old_valid": 0,
+                "new_valid": 0,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 0,
+                "first_changed_date": null
+              },
+              {
+                "year": 2016,
+                "old_valid": 0,
+                "new_valid": 0,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 0,
+                "first_changed_date": null
+              },
+              {
+                "year": 2017,
+                "old_valid": 0,
+                "new_valid": 0,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 0,
+                "first_changed_date": null
+              },
+              {
+                "year": 2018,
+                "old_valid": 0,
+                "new_valid": 0,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 0,
+                "first_changed_date": null
+              },
+              {
+                "year": 2019,
+                "old_valid": 0,
+                "new_valid": 0,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 0,
+                "first_changed_date": null
+              },
+              {
+                "year": 2020,
+                "old_valid": 0,
+                "new_valid": 0,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 0,
+                "first_changed_date": null
+              },
+              {
+                "year": 2021,
+                "old_valid": 0,
+                "new_valid": 0,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 0,
+                "first_changed_date": null
+              },
+              {
+                "year": 2022,
+                "old_valid": 0,
+                "new_valid": 0,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 0,
+                "first_changed_date": null
+              },
+              {
+                "year": 2023,
+                "old_valid": 0,
+                "new_valid": 0,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 0,
+                "first_changed_date": null
+              },
+              {
+                "year": 2024,
+                "old_valid": 0,
+                "new_valid": 0,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 0,
+                "first_changed_date": null
+              }
+            ]
+          },
+          {
+            "feature": "exposure_iron",
+            "by_year": [
+              {
+                "year": 2010,
+                "old_valid": 0,
+                "new_valid": 0,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 0,
+                "first_changed_date": null
+              },
+              {
+                "year": 2011,
+                "old_valid": 0,
+                "new_valid": 0,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 0,
+                "first_changed_date": null
+              },
+              {
+                "year": 2012,
+                "old_valid": 0,
+                "new_valid": 0,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 0,
+                "first_changed_date": null
+              },
+              {
+                "year": 2013,
+                "old_valid": 0,
+                "new_valid": 0,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 0,
+                "first_changed_date": null
+              },
+              {
+                "year": 2014,
+                "old_valid": 0,
+                "new_valid": 0,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 0,
+                "first_changed_date": null
+              },
+              {
+                "year": 2015,
+                "old_valid": 0,
+                "new_valid": 0,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 0,
+                "first_changed_date": null
+              },
+              {
+                "year": 2016,
+                "old_valid": 0,
+                "new_valid": 0,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 0,
+                "first_changed_date": null
+              },
+              {
+                "year": 2017,
+                "old_valid": 0,
+                "new_valid": 0,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 0,
+                "first_changed_date": null
+              },
+              {
+                "year": 2018,
+                "old_valid": 13198,
+                "new_valid": 13198,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 4646,
+                "first_changed_date": "2018-08-06"
+              },
+              {
+                "year": 2019,
+                "old_valid": 35102,
+                "new_valid": 35102,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 15078,
+                "first_changed_date": "2019-01-02"
+              },
+              {
+                "year": 2020,
+                "old_valid": 19058,
+                "new_valid": 19058,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 7239,
+                "first_changed_date": "2020-01-02"
+              },
+              {
+                "year": 2021,
+                "old_valid": 49127,
+                "new_valid": 49127,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 23873,
+                "first_changed_date": "2021-01-04"
+              },
+              {
+                "year": 2022,
+                "old_valid": 52049,
+                "new_valid": 52049,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 29533,
+                "first_changed_date": "2022-01-03"
+              },
+              {
+                "year": 2023,
+                "old_valid": 46742,
+                "new_valid": 46742,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 25930,
+                "first_changed_date": "2023-01-02"
+              },
+              {
+                "year": 2024,
+                "old_valid": 44904,
+                "new_valid": 44904,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 26009,
+                "first_changed_date": "2024-01-02"
+              }
+            ]
+          },
+          {
+            "feature": "exposure_vix",
+            "by_year": [
+              {
+                "year": 2010,
+                "old_valid": 20201,
+                "new_valid": 20201,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 0,
+                "first_changed_date": null
+              },
+              {
+                "year": 2011,
+                "old_valid": 29744,
+                "new_valid": 29744,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 434,
+                "first_changed_date": "2011-06-01"
+              },
+              {
+                "year": 2012,
+                "old_valid": 30636,
+                "new_valid": 30636,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 416,
+                "first_changed_date": "2012-06-13"
+              },
+              {
+                "year": 2013,
+                "old_valid": 33750,
+                "new_valid": 33750,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 530,
+                "first_changed_date": "2013-03-14"
+              },
+              {
+                "year": 2014,
+                "old_valid": 31721,
+                "new_valid": 31721,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 85,
+                "first_changed_date": "2014-04-28"
+              },
+              {
+                "year": 2015,
+                "old_valid": 27993,
+                "new_valid": 27993,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 0,
+                "first_changed_date": null
+              },
+              {
+                "year": 2016,
+                "old_valid": 27359,
+                "new_valid": 27359,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 0,
+                "first_changed_date": null
+              },
+              {
+                "year": 2017,
+                "old_valid": 28570,
+                "new_valid": 28570,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 0,
+                "first_changed_date": null
+              },
+              {
+                "year": 2018,
+                "old_valid": 32609,
+                "new_valid": 32609,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 8424,
+                "first_changed_date": "2018-01-05"
+              },
+              {
+                "year": 2019,
+                "old_valid": 35150,
+                "new_valid": 35150,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 15099,
+                "first_changed_date": "2019-01-02"
+              },
+              {
+                "year": 2020,
+                "old_valid": 41593,
+                "new_valid": 41593,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 16790,
+                "first_changed_date": "2020-01-02"
+              },
+              {
+                "year": 2021,
+                "old_valid": 49321,
+                "new_valid": 49321,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 24078,
+                "first_changed_date": "2021-01-04"
+              },
+              {
+                "year": 2022,
+                "old_valid": 52167,
+                "new_valid": 52167,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 29627,
+                "first_changed_date": "2022-01-03"
+              },
+              {
+                "year": 2023,
+                "old_valid": 46828,
+                "new_valid": 46828,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 26029,
+                "first_changed_date": "2023-01-02"
+              },
+              {
+                "year": 2024,
+                "old_valid": 44988,
+                "new_valid": 44988,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 26061,
+                "first_changed_date": "2024-01-02"
+              }
+            ]
+          },
+          {
+            "feature": "exposure_fx_times_shock_1",
+            "by_year": [
+              {
+                "year": 2010,
+                "old_valid": 20363,
+                "new_valid": 20363,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 0,
+                "first_changed_date": null
+              },
+              {
+                "year": 2011,
+                "old_valid": 29783,
+                "new_valid": 29783,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 434,
+                "first_changed_date": "2011-06-01"
+              },
+              {
+                "year": 2012,
+                "old_valid": 30696,
+                "new_valid": 30696,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 416,
+                "first_changed_date": "2012-06-12"
+              },
+              {
+                "year": 2013,
+                "old_valid": 33790,
+                "new_valid": 33790,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 544,
+                "first_changed_date": "2013-03-12"
+              },
+              {
+                "year": 2014,
+                "old_valid": 31737,
+                "new_valid": 31737,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 85,
+                "first_changed_date": "2014-04-28"
+              },
+              {
+                "year": 2015,
+                "old_valid": 28000,
+                "new_valid": 28000,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 0,
+                "first_changed_date": null
+              },
+              {
+                "year": 2016,
+                "old_valid": 27373,
+                "new_valid": 27373,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 0,
+                "first_changed_date": null
+              },
+              {
+                "year": 2017,
+                "old_valid": 28612,
+                "new_valid": 28612,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 0,
+                "first_changed_date": null
+              },
+              {
+                "year": 2018,
+                "old_valid": 32643,
+                "new_valid": 32643,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 8437,
+                "first_changed_date": "2018-01-05"
+              },
+              {
+                "year": 2019,
+                "old_valid": 35198,
+                "new_valid": 35198,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 15119,
+                "first_changed_date": "2019-01-02"
+              },
+              {
+                "year": 2020,
+                "old_valid": 41692,
+                "new_valid": 41692,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 16838,
+                "first_changed_date": "2020-01-02"
+              },
+              {
+                "year": 2021,
+                "old_valid": 49424,
+                "new_valid": 49424,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 24147,
+                "first_changed_date": "2021-01-04"
+              },
+              {
+                "year": 2022,
+                "old_valid": 52207,
+                "new_valid": 52207,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 29648,
+                "first_changed_date": "2022-01-03"
+              },
+              {
+                "year": 2023,
+                "old_valid": 46851,
+                "new_valid": 46851,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 25953,
+                "first_changed_date": "2023-01-02"
+              },
+              {
+                "year": 2024,
+                "old_valid": 44988,
+                "new_valid": 44988,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 26061,
+                "first_changed_date": "2024-01-02"
+              }
+            ]
+          },
+          {
+            "feature": "exposure_fx_times_shock_5",
+            "by_year": [
+              {
+                "year": 2010,
+                "old_valid": 20363,
+                "new_valid": 20363,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 0,
+                "first_changed_date": null
+              },
+              {
+                "year": 2011,
+                "old_valid": 29783,
+                "new_valid": 29783,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 434,
+                "first_changed_date": "2011-06-01"
+              },
+              {
+                "year": 2012,
+                "old_valid": 30696,
+                "new_valid": 30696,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 420,
+                "first_changed_date": "2012-06-12"
+              },
+              {
+                "year": 2013,
+                "old_valid": 33790,
+                "new_valid": 33790,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 544,
+                "first_changed_date": "2013-03-12"
+              },
+              {
+                "year": 2014,
+                "old_valid": 31737,
+                "new_valid": 31737,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 85,
+                "first_changed_date": "2014-04-28"
+              },
+              {
+                "year": 2015,
+                "old_valid": 28000,
+                "new_valid": 28000,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 0,
+                "first_changed_date": null
+              },
+              {
+                "year": 2016,
+                "old_valid": 27373,
+                "new_valid": 27373,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 0,
+                "first_changed_date": null
+              },
+              {
+                "year": 2017,
+                "old_valid": 28612,
+                "new_valid": 28612,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 0,
+                "first_changed_date": null
+              },
+              {
+                "year": 2018,
+                "old_valid": 32643,
+                "new_valid": 32643,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 8437,
+                "first_changed_date": "2018-01-05"
+              },
+              {
+                "year": 2019,
+                "old_valid": 35198,
+                "new_valid": 35198,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 15119,
+                "first_changed_date": "2019-01-02"
+              },
+              {
+                "year": 2020,
+                "old_valid": 41692,
+                "new_valid": 41692,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 16838,
+                "first_changed_date": "2020-01-02"
+              },
+              {
+                "year": 2021,
+                "old_valid": 49424,
+                "new_valid": 49424,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 24147,
+                "first_changed_date": "2021-01-04"
+              },
+              {
+                "year": 2022,
+                "old_valid": 52207,
+                "new_valid": 52207,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 29648,
+                "first_changed_date": "2022-01-03"
+              },
+              {
+                "year": 2023,
+                "old_valid": 46851,
+                "new_valid": 46851,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 26041,
+                "first_changed_date": "2023-01-02"
+              },
+              {
+                "year": 2024,
+                "old_valid": 44988,
+                "new_valid": 44988,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 26061,
+                "first_changed_date": "2024-01-02"
+              }
+            ]
+          },
+          {
+            "feature": "exposure_rates_br_times_shock_1",
+            "by_year": [
+              {
+                "year": 2010,
+                "old_valid": 20363,
+                "new_valid": 20363,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 0,
+                "first_changed_date": null
+              },
+              {
+                "year": 2011,
+                "old_valid": 29783,
+                "new_valid": 29783,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 426,
+                "first_changed_date": "2011-06-01"
+              },
+              {
+                "year": 2012,
+                "old_valid": 30696,
+                "new_valid": 30696,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 400,
+                "first_changed_date": "2012-06-12"
+              },
+              {
+                "year": 2013,
+                "old_valid": 33790,
+                "new_valid": 33790,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 532,
+                "first_changed_date": "2013-03-12"
+              },
+              {
+                "year": 2014,
+                "old_valid": 31617,
+                "new_valid": 31617,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 85,
+                "first_changed_date": "2014-04-28"
+              },
+              {
+                "year": 2015,
+                "old_valid": 27862,
+                "new_valid": 27862,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 0,
+                "first_changed_date": null
+              },
+              {
+                "year": 2016,
+                "old_valid": 27373,
+                "new_valid": 27373,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 0,
+                "first_changed_date": null
+              },
+              {
+                "year": 2017,
+                "old_valid": 28612,
+                "new_valid": 28612,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 0,
+                "first_changed_date": null
+              },
+              {
+                "year": 2018,
+                "old_valid": 32643,
+                "new_valid": 32643,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 8437,
+                "first_changed_date": "2018-01-05"
+              },
+              {
+                "year": 2019,
+                "old_valid": 35198,
+                "new_valid": 35198,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 14955,
+                "first_changed_date": "2019-01-02"
+              },
+              {
+                "year": 2020,
+                "old_valid": 41692,
+                "new_valid": 41692,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 16712,
+                "first_changed_date": "2020-01-02"
+              },
+              {
+                "year": 2021,
+                "old_valid": 49424,
+                "new_valid": 49424,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 24088,
+                "first_changed_date": "2021-01-04"
+              },
+              {
+                "year": 2022,
+                "old_valid": 52207,
+                "new_valid": 52207,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 29090,
+                "first_changed_date": "2022-01-03"
+              },
+              {
+                "year": 2023,
+                "old_valid": 46851,
+                "new_valid": 46851,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 26041,
+                "first_changed_date": "2023-01-02"
+              },
+              {
+                "year": 2024,
+                "old_valid": 44988,
+                "new_valid": 44988,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 26061,
+                "first_changed_date": "2024-01-02"
+              }
+            ]
+          },
+          {
+            "feature": "exposure_rates_br_times_shock_5",
+            "by_year": [
+              {
+                "year": 2010,
+                "old_valid": 20363,
+                "new_valid": 20363,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 0,
+                "first_changed_date": null
+              },
+              {
+                "year": 2011,
+                "old_valid": 29783,
+                "new_valid": 29783,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 434,
+                "first_changed_date": "2011-06-01"
+              },
+              {
+                "year": 2012,
+                "old_valid": 30696,
+                "new_valid": 30696,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 412,
+                "first_changed_date": "2012-06-12"
+              },
+              {
+                "year": 2013,
+                "old_valid": 33790,
+                "new_valid": 33790,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 540,
+                "first_changed_date": "2013-03-12"
+              },
+              {
+                "year": 2014,
+                "old_valid": 31737,
+                "new_valid": 31737,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 85,
+                "first_changed_date": "2014-04-28"
+              },
+              {
+                "year": 2015,
+                "old_valid": 27746,
+                "new_valid": 27746,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 0,
+                "first_changed_date": null
+              },
+              {
+                "year": 2016,
+                "old_valid": 27373,
+                "new_valid": 27373,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 0,
+                "first_changed_date": null
+              },
+              {
+                "year": 2017,
+                "old_valid": 28612,
+                "new_valid": 28612,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 0,
+                "first_changed_date": null
+              },
+              {
+                "year": 2018,
+                "old_valid": 32643,
+                "new_valid": 32643,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 8408,
+                "first_changed_date": "2018-01-05"
+              },
+              {
+                "year": 2019,
+                "old_valid": 35198,
+                "new_valid": 35198,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 14873,
+                "first_changed_date": "2019-01-02"
+              },
+              {
+                "year": 2020,
+                "old_valid": 41692,
+                "new_valid": 41692,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 16838,
+                "first_changed_date": "2020-01-02"
+              },
+              {
+                "year": 2021,
+                "old_valid": 49424,
+                "new_valid": 49424,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 24088,
+                "first_changed_date": "2021-01-04"
+              },
+              {
+                "year": 2022,
+                "old_valid": 52207,
+                "new_valid": 52207,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 29648,
+                "first_changed_date": "2022-01-03"
+              },
+              {
+                "year": 2023,
+                "old_valid": 46851,
+                "new_valid": 46851,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 26041,
+                "first_changed_date": "2023-01-02"
+              },
+              {
+                "year": 2024,
+                "old_valid": 44988,
+                "new_valid": 44988,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 26061,
+                "first_changed_date": "2024-01-02"
+              }
+            ]
+          },
+          {
+            "feature": "exposure_rates_us_times_shock_1",
+            "by_year": [
+              {
+                "year": 2010,
+                "old_valid": 20184,
+                "new_valid": 20184,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 0,
+                "first_changed_date": null
+              },
+              {
+                "year": 2011,
+                "old_valid": 29730,
+                "new_valid": 29730,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 422,
+                "first_changed_date": "2011-06-01"
+              },
+              {
+                "year": 2012,
+                "old_valid": 30627,
+                "new_valid": 30627,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 392,
+                "first_changed_date": "2012-06-13"
+              },
+              {
+                "year": 2013,
+                "old_valid": 33744,
+                "new_valid": 33744,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 498,
+                "first_changed_date": "2013-03-14"
+              },
+              {
+                "year": 2014,
+                "old_valid": 31720,
+                "new_valid": 31720,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 85,
+                "first_changed_date": "2014-04-28"
+              },
+              {
+                "year": 2015,
+                "old_valid": 27979,
+                "new_valid": 27979,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 0,
+                "first_changed_date": null
+              },
+              {
+                "year": 2016,
+                "old_valid": 27356,
+                "new_valid": 27356,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 0,
+                "first_changed_date": null
+              },
+              {
+                "year": 2017,
+                "old_valid": 28556,
+                "new_valid": 28556,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 0,
+                "first_changed_date": null
+              },
+              {
+                "year": 2018,
+                "old_valid": 32606,
+                "new_valid": 32606,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 7162,
+                "first_changed_date": "2018-01-05"
+              },
+              {
+                "year": 2019,
+                "old_valid": 35137,
+                "new_valid": 35137,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 13562,
+                "first_changed_date": "2019-01-02"
+              },
+              {
+                "year": 2020,
+                "old_valid": 41572,
+                "new_valid": 41572,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 14827,
+                "first_changed_date": "2020-01-02"
+              },
+              {
+                "year": 2021,
+                "old_valid": 49303,
+                "new_valid": 49303,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 22077,
+                "first_changed_date": "2021-01-06"
+              },
+              {
+                "year": 2022,
+                "old_valid": 52131,
+                "new_valid": 52131,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 28680,
+                "first_changed_date": "2022-01-03"
+              },
+              {
+                "year": 2023,
+                "old_valid": 46750,
+                "new_valid": 46750,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 25163,
+                "first_changed_date": "2023-01-02"
+              },
+              {
+                "year": 2024,
+                "old_valid": 44956,
+                "new_valid": 44956,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 24699,
+                "first_changed_date": "2024-01-02"
+              }
+            ]
+          },
+          {
+            "feature": "exposure_rates_us_times_shock_5",
+            "by_year": [
+              {
+                "year": 2010,
+                "old_valid": 20184,
+                "new_valid": 20184,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 0,
+                "first_changed_date": null
+              },
+              {
+                "year": 2011,
+                "old_valid": 29730,
+                "new_valid": 29730,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 414,
+                "first_changed_date": "2011-06-01"
+              },
+              {
+                "year": 2012,
+                "old_valid": 30627,
+                "new_valid": 30627,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 400,
+                "first_changed_date": "2012-06-13"
+              },
+              {
+                "year": 2013,
+                "old_valid": 33744,
+                "new_valid": 33744,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 510,
+                "first_changed_date": "2013-03-14"
+              },
+              {
+                "year": 2014,
+                "old_valid": 31720,
+                "new_valid": 31720,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 80,
+                "first_changed_date": "2014-04-28"
+              },
+              {
+                "year": 2015,
+                "old_valid": 27979,
+                "new_valid": 27979,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 0,
+                "first_changed_date": null
+              },
+              {
+                "year": 2016,
+                "old_valid": 27356,
+                "new_valid": 27356,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 0,
+                "first_changed_date": null
+              },
+              {
+                "year": 2017,
+                "old_valid": 28556,
+                "new_valid": 28556,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 0,
+                "first_changed_date": null
+              },
+              {
+                "year": 2018,
+                "old_valid": 32606,
+                "new_valid": 32606,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 7937,
+                "first_changed_date": "2018-01-05"
+              },
+              {
+                "year": 2019,
+                "old_valid": 35137,
+                "new_valid": 35137,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 14517,
+                "first_changed_date": "2019-01-02"
+              },
+              {
+                "year": 2020,
+                "old_valid": 41572,
+                "new_valid": 41572,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 15115,
+                "first_changed_date": "2020-01-02"
+              },
+              {
+                "year": 2021,
+                "old_valid": 49303,
+                "new_valid": 49303,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 23318,
+                "first_changed_date": "2021-01-04"
+              },
+              {
+                "year": 2022,
+                "old_valid": 52131,
+                "new_valid": 52131,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 29030,
+                "first_changed_date": "2022-01-03"
+              },
+              {
+                "year": 2023,
+                "old_valid": 46750,
+                "new_valid": 46750,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 25611,
+                "first_changed_date": "2023-01-02"
+              },
+              {
+                "year": 2024,
+                "old_valid": 44956,
+                "new_valid": 44956,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 25041,
+                "first_changed_date": "2024-01-02"
+              }
+            ]
+          },
+          {
+            "feature": "exposure_oil_times_shock_1",
+            "by_year": [
+              {
+                "year": 2010,
+                "old_valid": 0,
+                "new_valid": 0,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 0,
+                "first_changed_date": null
+              },
+              {
+                "year": 2011,
+                "old_valid": 0,
+                "new_valid": 0,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 0,
+                "first_changed_date": null
+              },
+              {
+                "year": 2012,
+                "old_valid": 0,
+                "new_valid": 0,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 0,
+                "first_changed_date": null
+              },
+              {
+                "year": 2013,
+                "old_valid": 0,
+                "new_valid": 0,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 0,
+                "first_changed_date": null
+              },
+              {
+                "year": 2014,
+                "old_valid": 0,
+                "new_valid": 0,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 0,
+                "first_changed_date": null
+              },
+              {
+                "year": 2015,
+                "old_valid": 0,
+                "new_valid": 0,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 0,
+                "first_changed_date": null
+              },
+              {
+                "year": 2016,
+                "old_valid": 0,
+                "new_valid": 0,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 0,
+                "first_changed_date": null
+              },
+              {
+                "year": 2017,
+                "old_valid": 0,
+                "new_valid": 0,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 0,
+                "first_changed_date": null
+              },
+              {
+                "year": 2018,
+                "old_valid": 0,
+                "new_valid": 0,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 0,
+                "first_changed_date": null
+              },
+              {
+                "year": 2019,
+                "old_valid": 0,
+                "new_valid": 0,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 0,
+                "first_changed_date": null
+              },
+              {
+                "year": 2020,
+                "old_valid": 0,
+                "new_valid": 0,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 0,
+                "first_changed_date": null
+              },
+              {
+                "year": 2021,
+                "old_valid": 0,
+                "new_valid": 0,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 0,
+                "first_changed_date": null
+              },
+              {
+                "year": 2022,
+                "old_valid": 0,
+                "new_valid": 0,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 0,
+                "first_changed_date": null
+              },
+              {
+                "year": 2023,
+                "old_valid": 0,
+                "new_valid": 0,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 0,
+                "first_changed_date": null
+              },
+              {
+                "year": 2024,
+                "old_valid": 0,
+                "new_valid": 0,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 0,
+                "first_changed_date": null
+              }
+            ]
+          },
+          {
+            "feature": "exposure_oil_times_shock_5",
+            "by_year": [
+              {
+                "year": 2010,
+                "old_valid": 0,
+                "new_valid": 0,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 0,
+                "first_changed_date": null
+              },
+              {
+                "year": 2011,
+                "old_valid": 0,
+                "new_valid": 0,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 0,
+                "first_changed_date": null
+              },
+              {
+                "year": 2012,
+                "old_valid": 0,
+                "new_valid": 0,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 0,
+                "first_changed_date": null
+              },
+              {
+                "year": 2013,
+                "old_valid": 0,
+                "new_valid": 0,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 0,
+                "first_changed_date": null
+              },
+              {
+                "year": 2014,
+                "old_valid": 0,
+                "new_valid": 0,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 0,
+                "first_changed_date": null
+              },
+              {
+                "year": 2015,
+                "old_valid": 0,
+                "new_valid": 0,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 0,
+                "first_changed_date": null
+              },
+              {
+                "year": 2016,
+                "old_valid": 0,
+                "new_valid": 0,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 0,
+                "first_changed_date": null
+              },
+              {
+                "year": 2017,
+                "old_valid": 0,
+                "new_valid": 0,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 0,
+                "first_changed_date": null
+              },
+              {
+                "year": 2018,
+                "old_valid": 0,
+                "new_valid": 0,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 0,
+                "first_changed_date": null
+              },
+              {
+                "year": 2019,
+                "old_valid": 0,
+                "new_valid": 0,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 0,
+                "first_changed_date": null
+              },
+              {
+                "year": 2020,
+                "old_valid": 0,
+                "new_valid": 0,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 0,
+                "first_changed_date": null
+              },
+              {
+                "year": 2021,
+                "old_valid": 0,
+                "new_valid": 0,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 0,
+                "first_changed_date": null
+              },
+              {
+                "year": 2022,
+                "old_valid": 0,
+                "new_valid": 0,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 0,
+                "first_changed_date": null
+              },
+              {
+                "year": 2023,
+                "old_valid": 0,
+                "new_valid": 0,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 0,
+                "first_changed_date": null
+              },
+              {
+                "year": 2024,
+                "old_valid": 0,
+                "new_valid": 0,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 0,
+                "first_changed_date": null
+              }
+            ]
+          },
+          {
+            "feature": "exposure_iron_times_shock_1",
+            "by_year": [
+              {
+                "year": 2010,
+                "old_valid": 0,
+                "new_valid": 0,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 0,
+                "first_changed_date": null
+              },
+              {
+                "year": 2011,
+                "old_valid": 0,
+                "new_valid": 0,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 0,
+                "first_changed_date": null
+              },
+              {
+                "year": 2012,
+                "old_valid": 0,
+                "new_valid": 0,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 0,
+                "first_changed_date": null
+              },
+              {
+                "year": 2013,
+                "old_valid": 0,
+                "new_valid": 0,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 0,
+                "first_changed_date": null
+              },
+              {
+                "year": 2014,
+                "old_valid": 0,
+                "new_valid": 0,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 0,
+                "first_changed_date": null
+              },
+              {
+                "year": 2015,
+                "old_valid": 0,
+                "new_valid": 0,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 0,
+                "first_changed_date": null
+              },
+              {
+                "year": 2016,
+                "old_valid": 0,
+                "new_valid": 0,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 0,
+                "first_changed_date": null
+              },
+              {
+                "year": 2017,
+                "old_valid": 0,
+                "new_valid": 0,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 0,
+                "first_changed_date": null
+              },
+              {
+                "year": 2018,
+                "old_valid": 13198,
+                "new_valid": 13198,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 4544,
+                "first_changed_date": "2018-08-06"
+              },
+              {
+                "year": 2019,
+                "old_valid": 35102,
+                "new_valid": 35102,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 14705,
+                "first_changed_date": "2019-01-02"
+              },
+              {
+                "year": 2020,
+                "old_valid": 19058,
+                "new_valid": 19058,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 7239,
+                "first_changed_date": "2020-01-02"
+              },
+              {
+                "year": 2021,
+                "old_valid": 49127,
+                "new_valid": 49127,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 23406,
+                "first_changed_date": "2021-01-04"
+              },
+              {
+                "year": 2022,
+                "old_valid": 52049,
+                "new_valid": 52049,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 29444,
+                "first_changed_date": "2022-01-03"
+              },
+              {
+                "year": 2023,
+                "old_valid": 46742,
+                "new_valid": 46742,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 25385,
+                "first_changed_date": "2023-01-02"
+              },
+              {
+                "year": 2024,
+                "old_valid": 44904,
+                "new_valid": 44904,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 25836,
+                "first_changed_date": "2024-01-02"
+              }
+            ]
+          },
+          {
+            "feature": "exposure_iron_times_shock_5",
+            "by_year": [
+              {
+                "year": 2010,
+                "old_valid": 0,
+                "new_valid": 0,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 0,
+                "first_changed_date": null
+              },
+              {
+                "year": 2011,
+                "old_valid": 0,
+                "new_valid": 0,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 0,
+                "first_changed_date": null
+              },
+              {
+                "year": 2012,
+                "old_valid": 0,
+                "new_valid": 0,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 0,
+                "first_changed_date": null
+              },
+              {
+                "year": 2013,
+                "old_valid": 0,
+                "new_valid": 0,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 0,
+                "first_changed_date": null
+              },
+              {
+                "year": 2014,
+                "old_valid": 0,
+                "new_valid": 0,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 0,
+                "first_changed_date": null
+              },
+              {
+                "year": 2015,
+                "old_valid": 0,
+                "new_valid": 0,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 0,
+                "first_changed_date": null
+              },
+              {
+                "year": 2016,
+                "old_valid": 0,
+                "new_valid": 0,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 0,
+                "first_changed_date": null
+              },
+              {
+                "year": 2017,
+                "old_valid": 0,
+                "new_valid": 0,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 0,
+                "first_changed_date": null
+              },
+              {
+                "year": 2018,
+                "old_valid": 13198,
+                "new_valid": 13198,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 4646,
+                "first_changed_date": "2018-08-06"
+              },
+              {
+                "year": 2019,
+                "old_valid": 33518,
+                "new_valid": 33518,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 14464,
+                "first_changed_date": "2019-01-02"
+              },
+              {
+                "year": 2020,
+                "old_valid": 11330,
+                "new_valid": 11330,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 4504,
+                "first_changed_date": "2020-01-07"
+              },
+              {
+                "year": 2021,
+                "old_valid": 49127,
+                "new_valid": 49127,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 23873,
+                "first_changed_date": "2021-01-04"
+              },
+              {
+                "year": 2022,
+                "old_valid": 51212,
+                "new_valid": 51212,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 29062,
+                "first_changed_date": "2022-01-03"
+              },
+              {
+                "year": 2023,
+                "old_valid": 46742,
+                "new_valid": 46742,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 25930,
+                "first_changed_date": "2023-01-02"
+              },
+              {
+                "year": 2024,
+                "old_valid": 43331,
+                "new_valid": 43331,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 24937,
+                "first_changed_date": "2024-01-02"
+              }
+            ]
+          },
+          {
+            "feature": "exposure_vix_times_shock_1",
+            "by_year": [
+              {
+                "year": 2010,
+                "old_valid": 20201,
+                "new_valid": 20201,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 0,
+                "first_changed_date": null
+              },
+              {
+                "year": 2011,
+                "old_valid": 29744,
+                "new_valid": 29744,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 430,
+                "first_changed_date": "2011-06-01"
+              },
+              {
+                "year": 2012,
+                "old_valid": 30636,
+                "new_valid": 30636,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 416,
+                "first_changed_date": "2012-06-13"
+              },
+              {
+                "year": 2013,
+                "old_valid": 33750,
+                "new_valid": 33750,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 522,
+                "first_changed_date": "2013-03-14"
+              },
+              {
+                "year": 2014,
+                "old_valid": 31721,
+                "new_valid": 31721,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 85,
+                "first_changed_date": "2014-04-28"
+              },
+              {
+                "year": 2015,
+                "old_valid": 27993,
+                "new_valid": 27993,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 0,
+                "first_changed_date": null
+              },
+              {
+                "year": 2016,
+                "old_valid": 27359,
+                "new_valid": 27359,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 0,
+                "first_changed_date": null
+              },
+              {
+                "year": 2017,
+                "old_valid": 28570,
+                "new_valid": 28570,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 0,
+                "first_changed_date": null
+              },
+              {
+                "year": 2018,
+                "old_valid": 32609,
+                "new_valid": 32609,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 8373,
+                "first_changed_date": "2018-01-05"
+              },
+              {
+                "year": 2019,
+                "old_valid": 35150,
+                "new_valid": 35150,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 15099,
+                "first_changed_date": "2019-01-02"
+              },
+              {
+                "year": 2020,
+                "old_valid": 41593,
+                "new_valid": 41593,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 16790,
+                "first_changed_date": "2020-01-02"
+              },
+              {
+                "year": 2021,
+                "old_valid": 49321,
+                "new_valid": 49321,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 23913,
+                "first_changed_date": "2021-01-04"
+              },
+              {
+                "year": 2022,
+                "old_valid": 52167,
+                "new_valid": 52167,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 29534,
+                "first_changed_date": "2022-01-03"
+              },
+              {
+                "year": 2023,
+                "old_valid": 46828,
+                "new_valid": 46828,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 25846,
+                "first_changed_date": "2023-01-02"
+              },
+              {
+                "year": 2024,
+                "old_valid": 44988,
+                "new_valid": 44988,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 25885,
+                "first_changed_date": "2024-01-02"
+              }
+            ]
+          },
+          {
+            "feature": "exposure_vix_times_shock_5",
+            "by_year": [
+              {
+                "year": 2010,
+                "old_valid": 20201,
+                "new_valid": 20201,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 0,
+                "first_changed_date": null
+              },
+              {
+                "year": 2011,
+                "old_valid": 29744,
+                "new_valid": 29744,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 434,
+                "first_changed_date": "2011-06-01"
+              },
+              {
+                "year": 2012,
+                "old_valid": 30636,
+                "new_valid": 30636,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 416,
+                "first_changed_date": "2012-06-13"
+              },
+              {
+                "year": 2013,
+                "old_valid": 33750,
+                "new_valid": 33750,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 530,
+                "first_changed_date": "2013-03-14"
+              },
+              {
+                "year": 2014,
+                "old_valid": 31721,
+                "new_valid": 31721,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 85,
+                "first_changed_date": "2014-04-28"
+              },
+              {
+                "year": 2015,
+                "old_valid": 27993,
+                "new_valid": 27993,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 0,
+                "first_changed_date": null
+              },
+              {
+                "year": 2016,
+                "old_valid": 27359,
+                "new_valid": 27359,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 0,
+                "first_changed_date": null
+              },
+              {
+                "year": 2017,
+                "old_valid": 28570,
+                "new_valid": 28570,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 0,
+                "first_changed_date": null
+              },
+              {
+                "year": 2018,
+                "old_valid": 32609,
+                "new_valid": 32609,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 8354,
+                "first_changed_date": "2018-01-05"
+              },
+              {
+                "year": 2019,
+                "old_valid": 35150,
+                "new_valid": 35150,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 15099,
+                "first_changed_date": "2019-01-02"
+              },
+              {
+                "year": 2020,
+                "old_valid": 41593,
+                "new_valid": 41593,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 16790,
+                "first_changed_date": "2020-01-02"
+              },
+              {
+                "year": 2021,
+                "old_valid": 49321,
+                "new_valid": 49321,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 23983,
+                "first_changed_date": "2021-01-04"
+              },
+              {
+                "year": 2022,
+                "old_valid": 52167,
+                "new_valid": 52167,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 29627,
+                "first_changed_date": "2022-01-03"
+              },
+              {
+                "year": 2023,
+                "old_valid": 46828,
+                "new_valid": 46828,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 25952,
+                "first_changed_date": "2023-01-02"
+              },
+              {
+                "year": 2024,
+                "old_valid": 44988,
+                "new_valid": 44988,
+                "newly_supported": 0,
+                "lost_support": 0,
+                "changed_value_or_age": 26061,
+                "first_changed_date": "2024-01-02"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    "lending_parity": {
+      "row_count": 242232,
+      "all_keys_dtypes_and_other_six_features_and_ages_exact": true,
+      "utilization": {
+        "observed_unit_boundary": 109767,
+        "identity_or_class_unavailable": 68597,
+        "known_capital_boundary": 32712,
+        "dated_float_unavailable": 4703,
+        "source_balance_rows": 242232,
+        "valid_rows": 26453
+      },
+      "changes": [
+        {
+          "feature": "utilization_proxy",
+          "by_year": [
+            {
+              "year": 2019,
+              "old_valid": 1696,
+              "new_valid": 1854,
+              "newly_supported": 269,
+              "lost_support": 111,
+              "changed_value_or_age": 380,
+              "first_changed_date": "2019-10-02"
+            },
+            {
+              "year": 2020,
+              "old_valid": 7283,
+              "new_valid": 6926,
+              "newly_supported": 332,
+              "lost_support": 689,
+              "changed_value_or_age": 1021,
+              "first_changed_date": "2020-01-02"
+            },
+            {
+              "year": 2021,
+              "old_valid": 9956,
+              "new_valid": 9239,
+              "newly_supported": 256,
+              "lost_support": 973,
+              "changed_value_or_age": 1229,
+              "first_changed_date": "2021-02-09"
+            },
+            {
+              "year": 2022,
+              "old_valid": 4679,
+              "new_valid": 3869,
+              "newly_supported": 41,
+              "lost_support": 851,
+              "changed_value_or_age": 892,
+              "first_changed_date": "2022-01-05"
+            },
+            {
+              "year": 2023,
+              "old_valid": 1868,
+              "new_valid": 1712,
+              "newly_supported": 0,
+              "lost_support": 156,
+              "changed_value_or_age": 156,
+              "first_changed_date": "2023-01-20"
+            },
+            {
+              "year": 2024,
+              "old_valid": 3784,
+              "new_valid": 2853,
+              "newly_supported": 23,
+              "lost_support": 954,
+              "changed_value_or_age": 977,
+              "first_changed_date": "2024-01-10"
+            }
+          ]
+        }
+      ]
+    },
+    "sector_checker_correction": {
+      "before_rows": 228356,
+      "after_rows": 206994,
+      "added_keys": 17048,
+      "removed_keys": 38410,
+      "all_new_rows_have_accepted_dated_sector": true,
+      "bounded_fixtures_passed": true,
+      "unknown_or_future_group_rejected": true,
+      "protected_family_key_mutation_rejected": true,
+      "reason": "Sector source support changes with accepted dated classification and peer support. Magnitude and common-shock keys/values remain exact requirements.",
+      "driver": {
+        "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\rebuild_fca_dependencies.py",
+        "sha256": "da09a3e54771982d6509e7daf75e476535ebde7d7249995cd6860b30d74128cb"
+      },
+      "test_producer": {
+        "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\check_sector_admission_correction.py",
+        "sha256": "fee7c9c630c8d3fb0d84ee88b7fe1cb192c6d07b7ebc2b1f056421394a1fc3a4"
+      },
+      "original_driver": {
+        "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\fca_dependencies_0aea7a8\\derived_producer.py",
+        "sha256": "189f12069d4fbebe19c0e3450be7d8bbd2429b85edcb29a2bfae8146d8387ea6"
+      }
+    }
+  }
+}

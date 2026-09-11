@@ -2,7 +2,7 @@
 
 Status: historical acquisition and the corrected-class source preflight are complete.
 Its twelve capital gaps and one account gap now have verified own-filing sources;
-source-review decisions are complete; final family and identity admission remain open. **The final store and
+source-review decisions are complete. The final CVM family and dated identity have passed acceptance. **The final store and
 GBDT screens are not yet complete. The continuous-book replay is complete.** This document
 will be replaced with the completed acceptance tables and readouts before the
 round is closed. CPU only; no paid instance or neural fit has run this round.
@@ -24,13 +24,38 @@ dividing rounded figures and no external price is used.
 Copasa's specific current capital-and-treasury composition is retained after
 correcting the2022Q1 common unit. The narrative/weighted-EPS discrepancy remains
 explicit: alternative gross/net readings differ by about0.283%. These are source
-review decisions, not exact legal-count certifications. The final transformed
-feature readout will quantify this remaining input uncertainty, without further
-predictive fits. See [the completed focused review](v2_round5_capital_priority_review.json).
+review decisions, not exact legal-count certifications. The actual transformed-input sensitivity is complete: the 2021Q3 alternative
+changes 30 feature cells across the three valuation fields (15 Copasa cells and
+15 rank effects on other names), with maximum absolute rank-Gauss difference
+0.05416. The 2022Q1 alternative changes no transformed cell in its one selected
+session. Masks and ages are identical. No predictive fit was needed. See [the completed focused review](v2_round5_capital_priority_review.json).
 The own-filing capital-approval barrier also prevents Moura Dubeux's December
 share count from being paired with post-consolidation prices; the seven affected
-actual decision dates are verified. Eighty-three targeted tests pass. Final
-family/store acceptance and measured screen runtimes remain pending.
+actual decision dates are verified. Eighty-three targeted tests pass. The final
+CVM build took 348 seconds with measured peak RSS 4.782 GiB. All 880,858 dated
+identity rows reproduce the completed preflight after key sorting. Events and
+fundamentals passed their source and transformed-availability proofs; the final
+identity covers 581 ISINs. The dependent sector/exposure/lending build is
+complete, with peak RSS 4.000 GiB. Magnitudes, common shocks, own-regression
+support and all six non-utilization lending fields remain exact. Sector coverage
+changes with the accepted historical classifications and is reported explicitly.
+Final store acceptance and measured screen runtimes remain pending. See
+[final CVM acceptance and source sensitivity](v2_round5_cvm_final_acceptance.json).
+
+The first extended-store attempt stopped after 25 seconds on the existing lending
+coverage audit: the lowest-liquidity quartile has a survivor-minus-delisted
+bootstrap lower bound of 5.643 percentage points, above its 5-point threshold.
+No final store is accepted and no screen fit has started. A bounded diagnostic
+isolates the flag to rates and new-loan flow, whose source histories start much
+later than balances. These fields are missing for both groups through 2022;
+the lowest-quartile delisted group contributes only 30 present days in 2023 and
+none in 2024. The pooled comparison mixes different source eras. This requires
+review of calendar-matched coverage, with the original flag preserved; it does
+not justify altering data by eventual survival. See
+[the stop, per-field evidence and completed dependency proof](v2_round5_store_coverage_stop.json).
+
+The source-review checkpoints below preserve earlier evidence; their pending
+counts and holds are superseded by the accepted state above.
 
 The preflight checked 22,349 financial documents against 821,266 dated identity
 rows and 398 registrations. Its source gaps were specific: twelve capital pages

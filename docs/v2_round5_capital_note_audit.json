@@ -3521,5 +3521,172 @@
       }
     ],
     "scope": "Complete first ZIP member recovered from preserved truncated response; no partial PDF is treated as complete and no bytes are synthesized."
+  },
+  "final_family_acceptance": {
+    "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\acceptance_0aea7a8\\final_source_preflight_equality.json",
+    "sha256": "95b214f3f8c8e2869d08394653d141448fdcb0f68837fda454baa96912d80910"
+  },
+  "copasa_input_sensitivity": {
+    "bindings": [
+      {
+        "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\copasa_input_sensitivity.py",
+        "sha256": "604fc4a5e55af5a849990e5ac09be2e0d6b6863a915662a75c3ee50bba72c211"
+      },
+      {
+        "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\family_0aea7a8\\manifest.json",
+        "sha256": "cc4edd200d61045ee3f637b61967beee8c672bf66ef5cd77fa429ceff14ff8f4"
+      },
+      {
+        "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\family_0aea7a8\\fundamentals.parquet",
+        "sha256": "29a42a5c5231fce2402d17b1a3c19ca70808ba7d2561f3e2e01b11e556fc7012"
+      },
+      {
+        "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\family_0aea7a8\\identity.parquet",
+        "sha256": "83355f68ae5c8ac95f6ed34156c2119fea9512c5cba65b8a0e001ebe97d3776f"
+      },
+      {
+        "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\family_0aea7a8\\capital_change_observations.json",
+        "sha256": "172f8842cd7a0446afe45f7a4060ffaeabcb4055990bdc27a48d445c1744c2ee"
+      },
+      {
+        "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_source_dispositions.json",
+        "sha256": "d352f55be6419237d855159fd11c56922f1d0f854f8e065f16970e9da0e98375"
+      },
+      {
+        "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\source_preflight_59ba9ab_20260911T000951Z\\financial_source_support.json",
+        "sha256": "adee5093f924810298abfc8ec3cb5c02e1f8bc0e9b426a55b7e5266bced7d6ba"
+      },
+      {
+        "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\review_last_four_20260911.json",
+        "sha256": "b7ef16a98d8fe9ea9322559d70984df360bd37779bfb7f2b5034d46cc6ddc3ba"
+      },
+      {
+        "path": "D:\\quant-data\\b3\\processed\\v2_daily_store_3d67624_20260909T100323Z\\manifest.json",
+        "sha256": "db4f751d47133a6611733739ad9bfc15721452218365e338fec61a6b608bea64"
+      }
+    ],
+    "code_commit": "0aea7a8",
+    "consumer_end": "2024-12-30",
+    "method": "Reconstruct only Copasa production capital selection from completed source preflight plus final dispositions; final own-price/barrier helper must reproduce every selected final-family log market cap. Perturb only each exact document selected date/ISIN window, using a single positive ordinary class. Transform the full contemporaneous cross-section through the actual float32 alignment, active membership and FeatureSpec rank-Gauss transform. Rank effects on other names are reported too.",
+    "predictive_fits": 0,
+    "results": [
+      {
+        "alternative_market_cap_relative_change": -0.002826011851859711,
+        "alternative_net_shares": 378109430.0,
+        "alternative_valuation_ratio_relative_change": 0.0028340208283088586,
+        "canonical_net_shares": 379181000.0,
+        "features": [
+          {
+            "changed_copasa_cells": 5,
+            "changed_model_cells": 10,
+            "changed_other_name_cells": 5,
+            "changed_sessions": 5,
+            "copasa_model_max_absolute_change": 0.04026255011558533,
+            "covered_model_cells": 9416,
+            "feature": "log_market_cap",
+            "model_max_absolute_change": 0.04026255011558533,
+            "model_mean_absolute_change_over_covered_cells": 3.5756758734351024e-05,
+            "raw_max_absolute_change": 0.00283050537109375
+          },
+          {
+            "changed_copasa_cells": 6,
+            "changed_model_cells": 12,
+            "changed_other_name_cells": 6,
+            "changed_sessions": 6,
+            "copasa_model_max_absolute_change": 0.05415928363800049,
+            "covered_model_cells": 9263,
+            "feature": "book_to_market",
+            "model_max_absolute_change": 0.05415928363800049,
+            "model_mean_absolute_change_over_covered_cells": 6.1140424804762e-05,
+            "raw_max_absolute_change": 0.004324555397033691
+          },
+          {
+            "changed_copasa_cells": 4,
+            "changed_model_cells": 8,
+            "changed_other_name_cells": 4,
+            "changed_sessions": 4,
+            "copasa_model_max_absolute_change": 0.043795883655548096,
+            "covered_model_cells": 8532,
+            "feature": "earnings_yield_ttm",
+            "model_max_absolute_change": 0.043795883655548096,
+            "model_mean_absolute_change_over_covered_cells": 3.331858533783816e-05,
+            "raw_max_absolute_change": 0.00017466768622398376
+          }
+        ],
+        "first_decision": "2021-11-04",
+        "id": "109371",
+        "last_decision": "2022-03-29",
+        "model_masks_and_ages_exact": true,
+        "selected_isins": [
+          "BRCSMGACNOR5"
+        ],
+        "selected_name_days": 99,
+        "valued_name_days": 95
+      },
+      {
+        "alternative_market_cap_relative_change": 0.0028342006092088035,
+        "alternative_net_shares": 379181430.0,
+        "alternative_valuation_ratio_relative_change": -0.0028261906180374607,
+        "canonical_net_shares": 378109791.0,
+        "features": [
+          {
+            "changed_copasa_cells": 0,
+            "changed_model_cells": 0,
+            "changed_other_name_cells": 0,
+            "changed_sessions": 0,
+            "copasa_model_max_absolute_change": 0.0,
+            "covered_model_cells": 62,
+            "feature": "log_market_cap",
+            "model_max_absolute_change": 0.0,
+            "model_mean_absolute_change_over_covered_cells": 0.0,
+            "raw_max_absolute_change": 0.00283050537109375
+          },
+          {
+            "changed_copasa_cells": 0,
+            "changed_model_cells": 0,
+            "changed_other_name_cells": 0,
+            "changed_sessions": 0,
+            "copasa_model_max_absolute_change": 0.0,
+            "covered_model_cells": 58,
+            "feature": "book_to_market",
+            "model_max_absolute_change": 0.0,
+            "model_mean_absolute_change_over_covered_cells": 0.0,
+            "raw_max_absolute_change": 0.0
+          },
+          {
+            "changed_copasa_cells": 0,
+            "changed_model_cells": 0,
+            "changed_other_name_cells": 0,
+            "changed_sessions": 0,
+            "copasa_model_max_absolute_change": 0.0,
+            "covered_model_cells": 61,
+            "feature": "earnings_yield_ttm",
+            "model_max_absolute_change": 0.0,
+            "model_mean_absolute_change_over_covered_cells": 0.0,
+            "raw_max_absolute_change": 0.00027649104595184326
+          }
+        ],
+        "first_decision": "2022-05-03",
+        "id": "114129",
+        "last_decision": "2022-05-03",
+        "model_masks_and_ages_exact": true,
+        "selected_isins": [
+          "BRCSMGACNOR5"
+        ],
+        "selected_name_days": 1,
+        "valued_name_days": 1
+      }
+    ],
+    "scope": "Actual final-family input sensitivity for two disclosed Copasa gross/net alternatives. Current specific composition tables remain canonical. Neither interpretation is asserted to be an independently verified legal count. No data, mask, model, outcome, source decision or held-out consumer changes.",
+    "selected_windows": [
+      {
+        "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\copasa_input_sensitivity_0aea7a8\\109371_selected_name_days.parquet",
+        "sha256": "3e0cf135750e93f66b027e2a0c6a8829f9a6c7cd30e1e53210a6f73e8d8849ed"
+      },
+      {
+        "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\copasa_input_sensitivity_0aea7a8\\114129_selected_name_days.parquet",
+        "sha256": "562fc11ce3d2bf357502759593e4b7d33a8cdf344e2fefc91a36eb94737730ab"
+      }
+    ]
   }
 }

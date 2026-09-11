@@ -1,0 +1,2049 @@
+{
+  "status": "CVM family accepted; dependent families and final store still pending",
+  "code_commit": "0aea7a8",
+  "family_manifest": {
+    "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\family_0aea7a8\\manifest.json",
+    "sha256": "cc4edd200d61045ee3f637b61967beee8c672bf66ef5cd77fa429ceff14ff8f4"
+  },
+  "identity_proof": {
+    "admissions": {
+      "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\acceptance_0aea7a8\\admissions.json",
+      "sha256": "f1ed5e730dd7e37448f42b7f77d078d9d695c44d815a2ca2082c4ae0590c9f31"
+    },
+    "family_manifest": {
+      "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\family_0aea7a8\\manifest.json",
+      "sha256": "cc4edd200d61045ee3f637b61967beee8c672bf66ef5cd77fa429ceff14ff8f4"
+    },
+    "final_identity": {
+      "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\family_0aea7a8\\identity.parquet",
+      "sha256": "83355f68ae5c8ac95f6ed34156c2119fea9512c5cba65b8a0e001ebe97d3776f"
+    },
+    "identity_rows": 880858,
+    "identity_rows_exact": true,
+    "prior_identity": {
+      "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\source_preflight_59ba9ab_20260911T000951Z\\identity.parquet",
+      "sha256": "8499b2ef0322b9ff87a82e9765e370f941cb48e4664b47b4d24b780d9d852e25"
+    },
+    "producer": {
+      "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\accept_final_cvm_state.py",
+      "sha256": "2d45afc1646be3efe448d90c0b787567e079491455ad56db4058a8f6bf9c8087"
+    },
+    "runtime": {
+      "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm_family_0aea7a8_runtime.json",
+      "sha256": "90a2c67b6e975be5d4640b8193fc8e0bbfb8ac31c87bd214469e6a69fdb5f353"
+    },
+    "runtime_exit_code_limitation": "PowerShell Start-Process returned a null ExitCode after completion and the launcher treated it as failure. The CVM writer produced its final manifest and all bound files; independent acceptance then exited 0. Original launcher/runtime evidence is preserved; no build rerun or invented exit code.",
+    "scope": "Final manifest files verified and final dated identity equals the completed source preflight after sorting by its unique date/ISIN keys. Byte ordering is not claimed equal."
+  },
+  "admissions": {
+    "families": [
+      {
+        "availability_proof": {
+          "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\acceptance_0aea7a8\\events_availability_proof.json",
+          "sha256": "fb8c06f5bb628dee07815e6bd46088bbc148ffc712be4a24d97d1d267d990c9a"
+        },
+        "data": {
+          "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\family_0aea7a8\\events.parquet",
+          "sha256": "0770aa05b2313bb69918c60c668226378be2dae5b38e22226ecfb6402d867105"
+        },
+        "family": "events",
+        "feature_names": [
+          "sessions_since_financial_filing",
+          "filing_is_dfp",
+          "sessions_since_material_fact",
+          "material_fact_count_20",
+          "dividend_announcement_age",
+          "offering_or_buyback_flag",
+          "sessions_until_expected_filing"
+        ],
+        "source_manifest": {
+          "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\family_0aea7a8\\manifest.json",
+          "sha256": "cc4edd200d61045ee3f637b61967beee8c672bf66ef5cd77fa429ceff14ff8f4"
+        },
+        "status": "admitted"
+      },
+      {
+        "availability_proof": {
+          "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\acceptance_0aea7a8\\fundamentals_availability_proof.json",
+          "sha256": "4ecde11b50fd98d75fc2896ccf5176dd7fdc318e146237d3e895d376156c87b1"
+        },
+        "data": {
+          "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\family_0aea7a8\\fundamentals.parquet",
+          "sha256": "29a42a5c5231fce2402d17b1a3c19ca70808ba7d2561f3e2e01b11e556fc7012"
+        },
+        "family": "fundamentals",
+        "feature_names": [
+          "log_market_cap",
+          "book_to_market",
+          "earnings_yield_ttm",
+          "gross_profitability",
+          "liabilities_to_assets",
+          "accruals_to_assets",
+          "revenue_growth_yoy",
+          "sue",
+          "statement_age_sessions",
+          "fundamental_financial_flag",
+          "fundamental_consolidated_flag",
+          "valuation_available_flag"
+        ],
+        "source_manifest": {
+          "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\family_0aea7a8\\manifest.json",
+          "sha256": "cc4edd200d61045ee3f637b61967beee8c672bf66ef5cd77fa429ceff14ff8f4"
+        },
+        "status": "admitted"
+      }
+    ],
+    "identity_equal_to_9120d7d": false
+  },
+  "availability_proofs": {
+    "events": {
+      "alignment_code_sha256": "608676349656d6f3d93c4ebffc580d4e9410105f4e878b8f23aba607f2323c9a",
+      "calendar_followup_test_commit": "4553fa5",
+      "calendar_method": "Dedicated committed future-calendar mutation test preserves all pre-announcement values and changes the first Nov6 decision; source age follows the oldest actual contributing first receipt.",
+      "causality_passed": true,
+      "data_path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\family_0aea7a8\\events.parquet",
+      "data_sha256": "0770aa05b2313bb69918c60c668226378be2dae5b38e22226ecfb6402d867105",
+      "family": "events",
+      "feature_schema_sha256": "a4b62f92562d45a0ef6d35feca77861b9705f276908221408ef5d568ee0596fe",
+      "feature_spec_source_sha256": "b80291332f526c254ffbe208257e0654ff8b1b785ff10d42ffcecf0a6b498ef1",
+      "first_available_decision_passed": true,
+      "fixture_source_sha256": "3e6a7d30e19c5765a100133563a0e10807d96bc420becd17075e9b663f081dc6",
+      "identity_diff_audit": {
+        "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\acceptance_0aea7a8\\identity_diff_audit.json",
+        "sha256": "3f043804a3930e59f353d643cdd4a079dd6f162c892d54a326aaa9d284725e6d"
+      },
+      "identity_fixture_source_sha256": "f34b5e092f5dc430735d2ce5d5dd44a6324ed12858571487b35cfe5d5eef2692",
+      "method": "Committed24issuer fixtures mutate future filing values, capital, missing equity, unpriced PN and material facts; exact dated ISIN join, canonical align_family and actual FeatureSpec transforms preserve all earlier raw/transformed values/masks/ages. First eligible15:44same-decision,15:45next-decision anddate-onlynext-session changes are verified. TTM retains oldest contribution age. Separate48security/24issuer prior-close mutation and header-only original-lag regression pass.",
+      "proof_driver_sha256": "ad70655d228c922940ed35468336921c42cef5085151a958ba12e572f4174f0d",
+      "schema": "ROUND5_CVM_JOINED_AVAILABILITY_PROOF_V1",
+      "source_code_commit": "0aea7a8",
+      "source_manifest_sha256": "cc4edd200d61045ee3f637b61967beee8c672bf66ef5cd77fa429ceff14ff8f4",
+      "source_program_sha256": "ed4a07ff3f9d9259a8230c704a96cb8f64cb3c80714aa50b8f0e06f22db9dcdd",
+      "transformed_proof": {
+        "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\acceptance_0aea7a8\\fixtures\\receipt_transforms\\receipt_transform_evidence.json",
+        "sha256": "f6518ae44ae778db3593035c0d82205151d66bf760c1d185a4ec0a64aea2aa0b"
+      }
+    },
+    "fundamentals": {
+      "alignment_code_sha256": "608676349656d6f3d93c4ebffc580d4e9410105f4e878b8f23aba607f2323c9a",
+      "calendar_followup_test_commit": "4553fa5",
+      "calendar_method": "Dedicated committed future-calendar mutation test preserves all pre-announcement values and changes the first Nov6 decision; source age follows the oldest actual contributing first receipt.",
+      "causality_passed": true,
+      "data_path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\family_0aea7a8\\fundamentals.parquet",
+      "data_sha256": "29a42a5c5231fce2402d17b1a3c19ca70808ba7d2561f3e2e01b11e556fc7012",
+      "family": "fundamentals",
+      "feature_schema_sha256": "d76c70d241485ae8b2a313e5ec6e4e0026ee327b6de98941305afb51d5db2202",
+      "feature_spec_source_sha256": "b80291332f526c254ffbe208257e0654ff8b1b785ff10d42ffcecf0a6b498ef1",
+      "first_available_decision_passed": true,
+      "fixture_source_sha256": "3e6a7d30e19c5765a100133563a0e10807d96bc420becd17075e9b663f081dc6",
+      "identity_diff_audit": {
+        "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\acceptance_0aea7a8\\identity_diff_audit.json",
+        "sha256": "3f043804a3930e59f353d643cdd4a079dd6f162c892d54a326aaa9d284725e6d"
+      },
+      "identity_fixture_source_sha256": "f34b5e092f5dc430735d2ce5d5dd44a6324ed12858571487b35cfe5d5eef2692",
+      "method": "Committed24issuer fixtures mutate future filing values, capital, missing equity, unpriced PN and material facts; exact dated ISIN join, canonical align_family and actual FeatureSpec transforms preserve all earlier raw/transformed values/masks/ages. First eligible15:44same-decision,15:45next-decision anddate-onlynext-session changes are verified. TTM retains oldest contribution age. Separate48security/24issuer prior-close mutation and header-only original-lag regression pass.",
+      "proof_driver_sha256": "ad70655d228c922940ed35468336921c42cef5085151a958ba12e572f4174f0d",
+      "schema": "ROUND5_CVM_JOINED_AVAILABILITY_PROOF_V1",
+      "source_code_commit": "0aea7a8",
+      "source_manifest_sha256": "cc4edd200d61045ee3f637b61967beee8c672bf66ef5cd77fa429ceff14ff8f4",
+      "source_program_sha256": "ed4a07ff3f9d9259a8230c704a96cb8f64cb3c80714aa50b8f0e06f22db9dcdd",
+      "transformed_proof": {
+        "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\acceptance_0aea7a8\\fixtures\\receipt_transforms\\receipt_transform_evidence.json",
+        "sha256": "f6518ae44ae778db3593035c0d82205151d66bf760c1d185a4ec0a64aea2aa0b"
+      }
+    }
+  },
+  "source_state": {
+    "through": "2024-12-30",
+    "base_store_manifest_sha256": "db4f751d47133a6611733739ad9bfc15721452218365e338fec61a6b608bea64",
+    "availability_rule": "exact RAD minute upper bound (+1min), first15:45at-or-after; date-only nextsession",
+    "version_rule": "only own version account contents; missing original versions remain unavailable until recovered or replaced at actual later receipt",
+    "identity_rule": "own-receipt FCA cash ticker or unique exact historical legal spelling, prior COTAHIST ISIN and class, bounded existing security; original generic shares require exact-name observed ON/PN, never units or modern HTML class backfill; legal CNPJ root plus CVM registration",
+    "sector_rule": "explicit numeric FCA code at own receipt; annual labels resolve at each decision using only already-received unambiguous exact-ID code/label evidence; sector_known_date and sector_mapping_id bind availability and source; future evidence never changes earlier groups; display labels remain own-receipt accounting annotations",
+    "identity_rows": 880858,
+    "identity_isins": 581,
+    "receipt_audit": {
+      "exact_receipt_documents": 21767,
+      "date_only_receipt_documents": 16,
+      "unrecovered_account_documents": 0,
+      "first_version_documents": 17613,
+      "later_version_documents": 4170,
+      "feature_version_composition": [
+        {
+          "year": 2011,
+          "feature": "book_to_market",
+          "first_version_only": 3651,
+          "includes_later_version": 1538
+        },
+        {
+          "year": 2011,
+          "feature": "earnings_yield_ttm",
+          "first_version_only": 592,
+          "includes_later_version": 618
+        },
+        {
+          "year": 2011,
+          "feature": "gross_profitability",
+          "first_version_only": 2335,
+          "includes_later_version": 1886
+        },
+        {
+          "year": 2011,
+          "feature": "liabilities_to_assets",
+          "first_version_only": 15313,
+          "includes_later_version": 4128
+        },
+        {
+          "year": 2011,
+          "feature": "log_market_cap",
+          "first_version_only": 3753,
+          "includes_later_version": 1538
+        },
+        {
+          "year": 2011,
+          "feature": "statement_age_sessions",
+          "first_version_only": 15169,
+          "includes_later_version": 4272
+        },
+        {
+          "year": 2012,
+          "feature": "accruals_to_assets",
+          "first_version_only": 7675,
+          "includes_later_version": 8629
+        },
+        {
+          "year": 2012,
+          "feature": "book_to_market",
+          "first_version_only": 5224,
+          "includes_later_version": 789
+        },
+        {
+          "year": 2012,
+          "feature": "earnings_yield_ttm",
+          "first_version_only": 3028,
+          "includes_later_version": 1908
+        },
+        {
+          "year": 2012,
+          "feature": "gross_profitability",
+          "first_version_only": 9293,
+          "includes_later_version": 7144
+        },
+        {
+          "year": 2012,
+          "feature": "liabilities_to_assets",
+          "first_version_only": 19255,
+          "includes_later_version": 2814
+        },
+        {
+          "year": 2012,
+          "feature": "log_market_cap",
+          "first_version_only": 5233,
+          "includes_later_version": 809
+        },
+        {
+          "year": 2012,
+          "feature": "revenue_growth_yoy",
+          "first_version_only": 939,
+          "includes_later_version": 2492
+        },
+        {
+          "year": 2012,
+          "feature": "statement_age_sessions",
+          "first_version_only": 18843,
+          "includes_later_version": 3226
+        },
+        {
+          "year": 2013,
+          "feature": "accruals_to_assets",
+          "first_version_only": 11379,
+          "includes_later_version": 7398
+        },
+        {
+          "year": 2013,
+          "feature": "book_to_market",
+          "first_version_only": 4728,
+          "includes_later_version": 420
+        },
+        {
+          "year": 2013,
+          "feature": "earnings_yield_ttm",
+          "first_version_only": 3093,
+          "includes_later_version": 1968
+        },
+        {
+          "year": 2013,
+          "feature": "gross_profitability",
+          "first_version_only": 11709,
+          "includes_later_version": 6940
+        },
+        {
+          "year": 2013,
+          "feature": "liabilities_to_assets",
+          "first_version_only": 18062,
+          "includes_later_version": 1815
+        },
+        {
+          "year": 2013,
+          "feature": "log_market_cap",
+          "first_version_only": 4728,
+          "includes_later_version": 420
+        },
+        {
+          "year": 2013,
+          "feature": "revenue_growth_yoy",
+          "first_version_only": 5866,
+          "includes_later_version": 6258
+        },
+        {
+          "year": 2013,
+          "feature": "statement_age_sessions",
+          "first_version_only": 17720,
+          "includes_later_version": 2157
+        },
+        {
+          "year": 2014,
+          "feature": "accruals_to_assets",
+          "first_version_only": 14321,
+          "includes_later_version": 10486
+        },
+        {
+          "year": 2014,
+          "feature": "book_to_market",
+          "first_version_only": 6807,
+          "includes_later_version": 817
+        },
+        {
+          "year": 2014,
+          "feature": "earnings_yield_ttm",
+          "first_version_only": 4989,
+          "includes_later_version": 2712
+        },
+        {
+          "year": 2014,
+          "feature": "gross_profitability",
+          "first_version_only": 14890,
+          "includes_later_version": 9778
+        },
+        {
+          "year": 2014,
+          "feature": "liabilities_to_assets",
+          "first_version_only": 23213,
+          "includes_later_version": 2830
+        },
+        {
+          "year": 2014,
+          "feature": "log_market_cap",
+          "first_version_only": 6945,
+          "includes_later_version": 817
+        },
+        {
+          "year": 2014,
+          "feature": "revenue_growth_yoy",
+          "first_version_only": 9543,
+          "includes_later_version": 11036
+        },
+        {
+          "year": 2014,
+          "feature": "statement_age_sessions",
+          "first_version_only": 23130,
+          "includes_later_version": 2913
+        },
+        {
+          "year": 2014,
+          "feature": "sue",
+          "first_version_only": 2971,
+          "includes_later_version": 13127
+        },
+        {
+          "year": 2015,
+          "feature": "accruals_to_assets",
+          "first_version_only": 15682,
+          "includes_later_version": 12051
+        },
+        {
+          "year": 2015,
+          "feature": "book_to_market",
+          "first_version_only": 6515,
+          "includes_later_version": 799
+        },
+        {
+          "year": 2015,
+          "feature": "earnings_yield_ttm",
+          "first_version_only": 4716,
+          "includes_later_version": 2608
+        },
+        {
+          "year": 2015,
+          "feature": "gross_profitability",
+          "first_version_only": 16958,
+          "includes_later_version": 10823
+        },
+        {
+          "year": 2015,
+          "feature": "liabilities_to_assets",
+          "first_version_only": 26102,
+          "includes_later_version": 3089
+        },
+        {
+          "year": 2015,
+          "feature": "log_market_cap",
+          "first_version_only": 6576,
+          "includes_later_version": 813
+        },
+        {
+          "year": 2015,
+          "feature": "revenue_growth_yoy",
+          "first_version_only": 9728,
+          "includes_later_version": 14668
+        },
+        {
+          "year": 2015,
+          "feature": "statement_age_sessions",
+          "first_version_only": 25864,
+          "includes_later_version": 3327
+        },
+        {
+          "year": 2015,
+          "feature": "sue",
+          "first_version_only": 4135,
+          "includes_later_version": 21692
+        },
+        {
+          "year": 2016,
+          "feature": "accruals_to_assets",
+          "first_version_only": 18193,
+          "includes_later_version": 8713
+        },
+        {
+          "year": 2016,
+          "feature": "book_to_market",
+          "first_version_only": 7387,
+          "includes_later_version": 686
+        },
+        {
+          "year": 2016,
+          "feature": "earnings_yield_ttm",
+          "first_version_only": 5728,
+          "includes_later_version": 2453
+        },
+        {
+          "year": 2016,
+          "feature": "gross_profitability",
+          "first_version_only": 19247,
+          "includes_later_version": 7956
+        },
+        {
+          "year": 2016,
+          "feature": "liabilities_to_assets",
+          "first_version_only": 25555,
+          "includes_later_version": 3066
+        },
+        {
+          "year": 2016,
+          "feature": "log_market_cap",
+          "first_version_only": 7591,
+          "includes_later_version": 707
+        },
+        {
+          "year": 2016,
+          "feature": "revenue_growth_yoy",
+          "first_version_only": 11890,
+          "includes_later_version": 11747
+        },
+        {
+          "year": 2016,
+          "feature": "statement_age_sessions",
+          "first_version_only": 25378,
+          "includes_later_version": 3243
+        },
+        {
+          "year": 2016,
+          "feature": "sue",
+          "first_version_only": 3814,
+          "includes_later_version": 21209
+        },
+        {
+          "year": 2017,
+          "feature": "accruals_to_assets",
+          "first_version_only": 17508,
+          "includes_later_version": 8622
+        },
+        {
+          "year": 2017,
+          "feature": "book_to_market",
+          "first_version_only": 7009,
+          "includes_later_version": 748
+        },
+        {
+          "year": 2017,
+          "feature": "earnings_yield_ttm",
+          "first_version_only": 5429,
+          "includes_later_version": 2346
+        },
+        {
+          "year": 2017,
+          "feature": "gross_profitability",
+          "first_version_only": 17958,
+          "includes_later_version": 8438
+        },
+        {
+          "year": 2017,
+          "feature": "liabilities_to_assets",
+          "first_version_only": 24093,
+          "includes_later_version": 3789
+        },
+        {
+          "year": 2017,
+          "feature": "log_market_cap",
+          "first_version_only": 7075,
+          "includes_later_version": 752
+        },
+        {
+          "year": 2017,
+          "feature": "revenue_growth_yoy",
+          "first_version_only": 13251,
+          "includes_later_version": 9820
+        },
+        {
+          "year": 2017,
+          "feature": "statement_age_sessions",
+          "first_version_only": 23679,
+          "includes_later_version": 4203
+        },
+        {
+          "year": 2017,
+          "feature": "sue",
+          "first_version_only": 4201,
+          "includes_later_version": 20217
+        },
+        {
+          "year": 2018,
+          "feature": "accruals_to_assets",
+          "first_version_only": 37559,
+          "includes_later_version": 23641
+        },
+        {
+          "year": 2018,
+          "feature": "book_to_market",
+          "first_version_only": 15850,
+          "includes_later_version": 2556
+        },
+        {
+          "year": 2018,
+          "feature": "earnings_yield_ttm",
+          "first_version_only": 10741,
+          "includes_later_version": 7320
+        },
+        {
+          "year": 2018,
+          "feature": "gross_profitability",
+          "first_version_only": 41589,
+          "includes_later_version": 24591
+        },
+        {
+          "year": 2018,
+          "feature": "liabilities_to_assets",
+          "first_version_only": 62486,
+          "includes_later_version": 9591
+        },
+        {
+          "year": 2018,
+          "feature": "log_market_cap",
+          "first_version_only": 16103,
+          "includes_later_version": 2558
+        },
+        {
+          "year": 2018,
+          "feature": "revenue_growth_yoy",
+          "first_version_only": 27879,
+          "includes_later_version": 27836
+        },
+        {
+          "year": 2018,
+          "feature": "statement_age_sessions",
+          "first_version_only": 62073,
+          "includes_later_version": 10004
+        },
+        {
+          "year": 2018,
+          "feature": "sue",
+          "first_version_only": 13594,
+          "includes_later_version": 51950
+        },
+        {
+          "year": 2019,
+          "feature": "accruals_to_assets",
+          "first_version_only": 47593,
+          "includes_later_version": 28867
+        },
+        {
+          "year": 2019,
+          "feature": "book_to_market",
+          "first_version_only": 19436,
+          "includes_later_version": 3129
+        },
+        {
+          "year": 2019,
+          "feature": "earnings_yield_ttm",
+          "first_version_only": 13751,
+          "includes_later_version": 8755
+        },
+        {
+          "year": 2019,
+          "feature": "gross_profitability",
+          "first_version_only": 52110,
+          "includes_later_version": 31126
+        },
+        {
+          "year": 2019,
+          "feature": "liabilities_to_assets",
+          "first_version_only": 77526,
+          "includes_later_version": 12440
+        },
+        {
+          "year": 2019,
+          "feature": "log_market_cap",
+          "first_version_only": 19805,
+          "includes_later_version": 3166
+        },
+        {
+          "year": 2019,
+          "feature": "revenue_growth_yoy",
+          "first_version_only": 34453,
+          "includes_later_version": 35755
+        },
+        {
+          "year": 2019,
+          "feature": "statement_age_sessions",
+          "first_version_only": 76744,
+          "includes_later_version": 13222
+        },
+        {
+          "year": 2019,
+          "feature": "sue",
+          "first_version_only": 16794,
+          "includes_later_version": 65113
+        },
+        {
+          "year": 2020,
+          "feature": "accruals_to_assets",
+          "first_version_only": 51350,
+          "includes_later_version": 29224
+        },
+        {
+          "year": 2020,
+          "feature": "book_to_market",
+          "first_version_only": 24599,
+          "includes_later_version": 3386
+        },
+        {
+          "year": 2020,
+          "feature": "earnings_yield_ttm",
+          "first_version_only": 18509,
+          "includes_later_version": 8906
+        },
+        {
+          "year": 2020,
+          "feature": "gross_profitability",
+          "first_version_only": 57243,
+          "includes_later_version": 30643
+        },
+        {
+          "year": 2020,
+          "feature": "liabilities_to_assets",
+          "first_version_only": 84308,
+          "includes_later_version": 12372
+        },
+        {
+          "year": 2020,
+          "feature": "log_market_cap",
+          "first_version_only": 25110,
+          "includes_later_version": 3450
+        },
+        {
+          "year": 2020,
+          "feature": "revenue_growth_yoy",
+          "first_version_only": 38229,
+          "includes_later_version": 36258
+        },
+        {
+          "year": 2020,
+          "feature": "statement_age_sessions",
+          "first_version_only": 83667,
+          "includes_later_version": 13013
+        },
+        {
+          "year": 2020,
+          "feature": "sue",
+          "first_version_only": 18200,
+          "includes_later_version": 68651
+        },
+        {
+          "year": 2021,
+          "feature": "accruals_to_assets",
+          "first_version_only": 57072,
+          "includes_later_version": 31938
+        },
+        {
+          "year": 2021,
+          "feature": "book_to_market",
+          "first_version_only": 28403,
+          "includes_later_version": 4451
+        },
+        {
+          "year": 2021,
+          "feature": "earnings_yield_ttm",
+          "first_version_only": 19998,
+          "includes_later_version": 10824
+        },
+        {
+          "year": 2021,
+          "feature": "gross_profitability",
+          "first_version_only": 61851,
+          "includes_later_version": 34408
+        },
+        {
+          "year": 2021,
+          "feature": "liabilities_to_assets",
+          "first_version_only": 93461,
+          "includes_later_version": 13500
+        },
+        {
+          "year": 2021,
+          "feature": "log_market_cap",
+          "first_version_only": 28610,
+          "includes_later_version": 4509
+        },
+        {
+          "year": 2021,
+          "feature": "revenue_growth_yoy",
+          "first_version_only": 40706,
+          "includes_later_version": 37107
+        },
+        {
+          "year": 2021,
+          "feature": "statement_age_sessions",
+          "first_version_only": 92167,
+          "includes_later_version": 14810
+        },
+        {
+          "year": 2021,
+          "feature": "sue",
+          "first_version_only": 20470,
+          "includes_later_version": 70161
+        },
+        {
+          "year": 2022,
+          "feature": "accruals_to_assets",
+          "first_version_only": 56582,
+          "includes_later_version": 29429
+        },
+        {
+          "year": 2022,
+          "feature": "book_to_market",
+          "first_version_only": 26222,
+          "includes_later_version": 3743
+        },
+        {
+          "year": 2022,
+          "feature": "earnings_yield_ttm",
+          "first_version_only": 19192,
+          "includes_later_version": 10021
+        },
+        {
+          "year": 2022,
+          "feature": "gross_profitability",
+          "first_version_only": 60951,
+          "includes_later_version": 29617
+        },
+        {
+          "year": 2022,
+          "feature": "liabilities_to_assets",
+          "first_version_only": 87527,
+          "includes_later_version": 12709
+        },
+        {
+          "year": 2022,
+          "feature": "log_market_cap",
+          "first_version_only": 26542,
+          "includes_later_version": 3804
+        },
+        {
+          "year": 2022,
+          "feature": "revenue_growth_yoy",
+          "first_version_only": 39971,
+          "includes_later_version": 36284
+        },
+        {
+          "year": 2022,
+          "feature": "statement_age_sessions",
+          "first_version_only": 86702,
+          "includes_later_version": 13551
+        },
+        {
+          "year": 2022,
+          "feature": "sue",
+          "first_version_only": 19420,
+          "includes_later_version": 61542
+        },
+        {
+          "year": 2023,
+          "feature": "accruals_to_assets",
+          "first_version_only": 60716,
+          "includes_later_version": 30006
+        },
+        {
+          "year": 2023,
+          "feature": "book_to_market",
+          "first_version_only": 27540,
+          "includes_later_version": 2990
+        },
+        {
+          "year": 2023,
+          "feature": "earnings_yield_ttm",
+          "first_version_only": 19553,
+          "includes_later_version": 10782
+        },
+        {
+          "year": 2023,
+          "feature": "gross_profitability",
+          "first_version_only": 65832,
+          "includes_later_version": 29898
+        },
+        {
+          "year": 2023,
+          "feature": "liabilities_to_assets",
+          "first_version_only": 93747,
+          "includes_later_version": 9928
+        },
+        {
+          "year": 2023,
+          "feature": "log_market_cap",
+          "first_version_only": 27874,
+          "includes_later_version": 3032
+        },
+        {
+          "year": 2023,
+          "feature": "revenue_growth_yoy",
+          "first_version_only": 44533,
+          "includes_later_version": 38396
+        },
+        {
+          "year": 2023,
+          "feature": "statement_age_sessions",
+          "first_version_only": 92781,
+          "includes_later_version": 11046
+        },
+        {
+          "year": 2023,
+          "feature": "sue",
+          "first_version_only": 20479,
+          "includes_later_version": 66141
+        },
+        {
+          "year": 2024,
+          "feature": "accruals_to_assets",
+          "first_version_only": 64686,
+          "includes_later_version": 26119
+        },
+        {
+          "year": 2024,
+          "feature": "book_to_market",
+          "first_version_only": 26805,
+          "includes_later_version": 2739
+        },
+        {
+          "year": 2024,
+          "feature": "earnings_yield_ttm",
+          "first_version_only": 20511,
+          "includes_later_version": 8943
+        },
+        {
+          "year": 2024,
+          "feature": "gross_profitability",
+          "first_version_only": 73167,
+          "includes_later_version": 24895
+        },
+        {
+          "year": 2024,
+          "feature": "liabilities_to_assets",
+          "first_version_only": 96512,
+          "includes_later_version": 9371
+        },
+        {
+          "year": 2024,
+          "feature": "log_market_cap",
+          "first_version_only": 27210,
+          "includes_later_version": 2739
+        },
+        {
+          "year": 2024,
+          "feature": "revenue_growth_yoy",
+          "first_version_only": 44974,
+          "includes_later_version": 39543
+        },
+        {
+          "year": 2024,
+          "feature": "statement_age_sessions",
+          "first_version_only": 95925,
+          "includes_later_version": 10575
+        },
+        {
+          "year": 2024,
+          "feature": "sue",
+          "first_version_only": 22330,
+          "includes_later_version": 70897
+        }
+      ],
+      "feature_version_rule": "First-version-only means all contributing financial accounts and share counts are version1; any later-version contribution classifies the composite as includes_later_version. Cadastre versions are separate identity/sector provenance.",
+      "valuation_coverage_by_class_count": [
+        {
+          "year": 2010,
+          "class_scope": "unavailable_or_zero_capital",
+          "mapped_name_days": 15666,
+          "issuer_counts": {
+            "mapped": 73,
+            "log_market_cap": 0,
+            "book_to_market": 0,
+            "earnings_yield_ttm": 0
+          }
+        },
+        {
+          "year": 2011,
+          "class_scope": "multiple_classes",
+          "mapped_name_days": 11975,
+          "log_market_cap": 1652,
+          "book_to_market": 1652,
+          "earnings_yield_ttm": 406,
+          "issuer_counts": {
+            "mapped": 36,
+            "log_market_cap": 21,
+            "book_to_market": 21,
+            "earnings_yield_ttm": 16
+          }
+        },
+        {
+          "year": 2011,
+          "class_scope": "single_class",
+          "mapped_name_days": 7466,
+          "log_market_cap": 3639,
+          "book_to_market": 3537,
+          "earnings_yield_ttm": 804,
+          "issuer_counts": {
+            "mapped": 41,
+            "log_market_cap": 39,
+            "book_to_market": 39,
+            "earnings_yield_ttm": 33
+          }
+        },
+        {
+          "year": 2011,
+          "class_scope": "unavailable_or_zero_capital",
+          "mapped_name_days": 6125,
+          "issuer_counts": {
+            "mapped": 75,
+            "log_market_cap": 0,
+            "book_to_market": 0,
+            "earnings_yield_ttm": 0
+          }
+        },
+        {
+          "year": 2012,
+          "class_scope": "multiple_classes",
+          "mapped_name_days": 12724,
+          "log_market_cap": 1610,
+          "book_to_market": 1590,
+          "earnings_yield_ttm": 1466,
+          "issuer_counts": {
+            "mapped": 36,
+            "log_market_cap": 20,
+            "book_to_market": 20,
+            "earnings_yield_ttm": 19
+          }
+        },
+        {
+          "year": 2012,
+          "class_scope": "single_class",
+          "mapped_name_days": 9345,
+          "log_market_cap": 4432,
+          "book_to_market": 4423,
+          "earnings_yield_ttm": 3470,
+          "issuer_counts": {
+            "mapped": 44,
+            "log_market_cap": 40,
+            "book_to_market": 40,
+            "earnings_yield_ttm": 38
+          }
+        },
+        {
+          "year": 2012,
+          "class_scope": "unavailable_or_zero_capital",
+          "mapped_name_days": 738,
+          "issuer_counts": {
+            "mapped": 2,
+            "log_market_cap": 0,
+            "book_to_market": 0,
+            "earnings_yield_ttm": 0
+          }
+        },
+        {
+          "year": 2013,
+          "class_scope": "multiple_classes",
+          "mapped_name_days": 9945,
+          "log_market_cap": 1324,
+          "book_to_market": 1324,
+          "earnings_yield_ttm": 1324,
+          "issuer_counts": {
+            "mapped": 31,
+            "log_market_cap": 13,
+            "book_to_market": 13,
+            "earnings_yield_ttm": 13
+          }
+        },
+        {
+          "year": 2013,
+          "class_scope": "single_class",
+          "mapped_name_days": 9932,
+          "log_market_cap": 3824,
+          "book_to_market": 3824,
+          "earnings_yield_ttm": 3737,
+          "issuer_counts": {
+            "mapped": 43,
+            "log_market_cap": 39,
+            "book_to_market": 39,
+            "earnings_yield_ttm": 38
+          }
+        },
+        {
+          "year": 2013,
+          "class_scope": "unavailable_or_zero_capital",
+          "mapped_name_days": 744,
+          "issuer_counts": {
+            "mapped": 2,
+            "log_market_cap": 0,
+            "book_to_market": 0,
+            "earnings_yield_ttm": 0
+          }
+        },
+        {
+          "year": 2014,
+          "class_scope": "multiple_classes",
+          "mapped_name_days": 12547,
+          "log_market_cap": 2214,
+          "book_to_market": 2186,
+          "earnings_yield_ttm": 2214,
+          "issuer_counts": {
+            "mapped": 33,
+            "log_market_cap": 16,
+            "book_to_market": 16,
+            "earnings_yield_ttm": 16
+          }
+        },
+        {
+          "year": 2014,
+          "class_scope": "single_class",
+          "mapped_name_days": 13496,
+          "log_market_cap": 5548,
+          "book_to_market": 5438,
+          "earnings_yield_ttm": 5487,
+          "issuer_counts": {
+            "mapped": 52,
+            "log_market_cap": 43,
+            "book_to_market": 43,
+            "earnings_yield_ttm": 43
+          }
+        },
+        {
+          "year": 2014,
+          "class_scope": "unavailable_or_zero_capital",
+          "mapped_name_days": 744,
+          "issuer_counts": {
+            "mapped": 2,
+            "log_market_cap": 0,
+            "book_to_market": 0,
+            "earnings_yield_ttm": 0
+          }
+        },
+        {
+          "year": 2015,
+          "class_scope": "multiple_classes",
+          "mapped_name_days": 14957,
+          "log_market_cap": 2256,
+          "book_to_market": 2216,
+          "earnings_yield_ttm": 2254,
+          "issuer_counts": {
+            "mapped": 35,
+            "log_market_cap": 16,
+            "book_to_market": 16,
+            "earnings_yield_ttm": 16
+          }
+        },
+        {
+          "year": 2015,
+          "class_scope": "single_class",
+          "mapped_name_days": 14234,
+          "log_market_cap": 5133,
+          "book_to_market": 5098,
+          "earnings_yield_ttm": 5070,
+          "issuer_counts": {
+            "mapped": 51,
+            "log_market_cap": 41,
+            "book_to_market": 41,
+            "earnings_yield_ttm": 41
+          }
+        },
+        {
+          "year": 2015,
+          "class_scope": "unavailable_or_zero_capital",
+          "mapped_name_days": 738,
+          "issuer_counts": {
+            "mapped": 2,
+            "log_market_cap": 0,
+            "book_to_market": 0,
+            "earnings_yield_ttm": 0
+          }
+        },
+        {
+          "year": 2016,
+          "class_scope": "multiple_classes",
+          "mapped_name_days": 14559,
+          "log_market_cap": 2704,
+          "book_to_market": 2610,
+          "earnings_yield_ttm": 2704,
+          "issuer_counts": {
+            "mapped": 35,
+            "log_market_cap": 16,
+            "book_to_market": 16,
+            "earnings_yield_ttm": 16
+          }
+        },
+        {
+          "year": 2016,
+          "class_scope": "single_class",
+          "mapped_name_days": 14062,
+          "log_market_cap": 5594,
+          "book_to_market": 5463,
+          "earnings_yield_ttm": 5477,
+          "issuer_counts": {
+            "mapped": 49,
+            "log_market_cap": 38,
+            "book_to_market": 38,
+            "earnings_yield_ttm": 38
+          }
+        },
+        {
+          "year": 2016,
+          "class_scope": "unavailable_or_zero_capital",
+          "mapped_name_days": 747,
+          "issuer_counts": {
+            "mapped": 2,
+            "log_market_cap": 0,
+            "book_to_market": 0,
+            "earnings_yield_ttm": 0
+          }
+        },
+        {
+          "year": 2017,
+          "class_scope": "multiple_classes",
+          "mapped_name_days": 14303,
+          "log_market_cap": 2490,
+          "book_to_market": 2490,
+          "earnings_yield_ttm": 2490,
+          "issuer_counts": {
+            "mapped": 33,
+            "log_market_cap": 13,
+            "book_to_market": 13,
+            "earnings_yield_ttm": 13
+          }
+        },
+        {
+          "year": 2017,
+          "class_scope": "single_class",
+          "mapped_name_days": 13579,
+          "log_market_cap": 5337,
+          "book_to_market": 5267,
+          "earnings_yield_ttm": 5285,
+          "issuer_counts": {
+            "mapped": 47,
+            "log_market_cap": 38,
+            "book_to_market": 38,
+            "earnings_yield_ttm": 38
+          }
+        },
+        {
+          "year": 2017,
+          "class_scope": "unavailable_or_zero_capital",
+          "mapped_name_days": 738,
+          "issuer_counts": {
+            "mapped": 2,
+            "log_market_cap": 0,
+            "book_to_market": 0,
+            "earnings_yield_ttm": 0
+          }
+        },
+        {
+          "year": 2018,
+          "class_scope": "multiple_classes",
+          "mapped_name_days": 40694,
+          "log_market_cap": 2380,
+          "book_to_market": 2380,
+          "earnings_yield_ttm": 2380,
+          "issuer_counts": {
+            "mapped": 114,
+            "log_market_cap": 32,
+            "book_to_market": 32,
+            "earnings_yield_ttm": 32
+          }
+        },
+        {
+          "year": 2018,
+          "class_scope": "single_class",
+          "mapped_name_days": 31383,
+          "log_market_cap": 16281,
+          "book_to_market": 16026,
+          "earnings_yield_ttm": 15681,
+          "issuer_counts": {
+            "mapped": 152,
+            "log_market_cap": 136,
+            "book_to_market": 135,
+            "earnings_yield_ttm": 135
+          }
+        },
+        {
+          "year": 2018,
+          "class_scope": "unavailable_or_zero_capital",
+          "mapped_name_days": 735,
+          "issuer_counts": {
+            "mapped": 2,
+            "log_market_cap": 0,
+            "book_to_market": 0,
+            "earnings_yield_ttm": 0
+          }
+        },
+        {
+          "year": 2019,
+          "class_scope": "multiple_classes",
+          "mapped_name_days": 50497,
+          "log_market_cap": 3112,
+          "book_to_market": 3082,
+          "earnings_yield_ttm": 3112,
+          "issuer_counts": {
+            "mapped": 121,
+            "log_market_cap": 36,
+            "book_to_market": 36,
+            "earnings_yield_ttm": 36
+          }
+        },
+        {
+          "year": 2019,
+          "class_scope": "single_class",
+          "mapped_name_days": 39469,
+          "log_market_cap": 19859,
+          "book_to_market": 19483,
+          "earnings_yield_ttm": 19394,
+          "issuer_counts": {
+            "mapped": 176,
+            "log_market_cap": 152,
+            "book_to_market": 151,
+            "earnings_yield_ttm": 150
+          }
+        },
+        {
+          "year": 2019,
+          "class_scope": "unavailable_or_zero_capital",
+          "mapped_name_days": 744,
+          "issuer_counts": {
+            "mapped": 2,
+            "log_market_cap": 0,
+            "book_to_market": 0,
+            "earnings_yield_ttm": 0
+          }
+        },
+        {
+          "year": 2020,
+          "class_scope": "multiple_classes",
+          "mapped_name_days": 53226,
+          "log_market_cap": 5667,
+          "book_to_market": 5667,
+          "earnings_yield_ttm": 5667,
+          "issuer_counts": {
+            "mapped": 126,
+            "log_market_cap": 42,
+            "book_to_market": 42,
+            "earnings_yield_ttm": 42
+          }
+        },
+        {
+          "year": 2020,
+          "class_scope": "single_class",
+          "mapped_name_days": 43454,
+          "log_market_cap": 22893,
+          "book_to_market": 22318,
+          "earnings_yield_ttm": 21748,
+          "issuer_counts": {
+            "mapped": 196,
+            "log_market_cap": 164,
+            "book_to_market": 164,
+            "earnings_yield_ttm": 150
+          }
+        },
+        {
+          "year": 2020,
+          "class_scope": "unavailable_or_zero_capital",
+          "mapped_name_days": 747,
+          "issuer_counts": {
+            "mapped": 2,
+            "log_market_cap": 0,
+            "book_to_market": 0,
+            "earnings_yield_ttm": 0
+          }
+        },
+        {
+          "year": 2021,
+          "class_scope": "multiple_classes",
+          "mapped_name_days": 54775,
+          "log_market_cap": 6392,
+          "book_to_market": 6334,
+          "earnings_yield_ttm": 6384,
+          "issuer_counts": {
+            "mapped": 134,
+            "log_market_cap": 41,
+            "book_to_market": 41,
+            "earnings_yield_ttm": 40
+          }
+        },
+        {
+          "year": 2021,
+          "class_scope": "single_class",
+          "mapped_name_days": 52202,
+          "log_market_cap": 26727,
+          "book_to_market": 26520,
+          "earnings_yield_ttm": 24438,
+          "issuer_counts": {
+            "mapped": 235,
+            "log_market_cap": 202,
+            "book_to_market": 202,
+            "earnings_yield_ttm": 191
+          }
+        },
+        {
+          "year": 2021,
+          "class_scope": "unavailable_or_zero_capital",
+          "mapped_name_days": 741,
+          "issuer_counts": {
+            "mapped": 2,
+            "log_market_cap": 0,
+            "book_to_market": 0,
+            "earnings_yield_ttm": 0
+          }
+        },
+        {
+          "year": 2022,
+          "class_scope": "multiple_classes",
+          "mapped_name_days": 48776,
+          "log_market_cap": 4742,
+          "book_to_market": 4739,
+          "earnings_yield_ttm": 4627,
+          "issuer_counts": {
+            "mapped": 128,
+            "log_market_cap": 40,
+            "book_to_market": 40,
+            "earnings_yield_ttm": 38
+          }
+        },
+        {
+          "year": 2022,
+          "class_scope": "single_class",
+          "mapped_name_days": 51477,
+          "log_market_cap": 25604,
+          "book_to_market": 25226,
+          "earnings_yield_ttm": 24586,
+          "issuer_counts": {
+            "mapped": 253,
+            "log_market_cap": 212,
+            "book_to_market": 210,
+            "earnings_yield_ttm": 210
+          }
+        },
+        {
+          "year": 2022,
+          "class_scope": "unavailable_or_zero_capital",
+          "mapped_name_days": 750,
+          "issuer_counts": {
+            "mapped": 2,
+            "log_market_cap": 0,
+            "book_to_market": 0,
+            "earnings_yield_ttm": 0
+          }
+        },
+        {
+          "year": 2023,
+          "class_scope": "multiple_classes",
+          "mapped_name_days": 49008,
+          "log_market_cap": 3946,
+          "book_to_market": 3942,
+          "earnings_yield_ttm": 3770,
+          "issuer_counts": {
+            "mapped": 124,
+            "log_market_cap": 36,
+            "book_to_market": 36,
+            "earnings_yield_ttm": 35
+          }
+        },
+        {
+          "year": 2023,
+          "class_scope": "single_class",
+          "mapped_name_days": 54819,
+          "log_market_cap": 26960,
+          "book_to_market": 26588,
+          "earnings_yield_ttm": 26565,
+          "issuer_counts": {
+            "mapped": 252,
+            "log_market_cap": 211,
+            "book_to_market": 209,
+            "earnings_yield_ttm": 210
+          }
+        },
+        {
+          "year": 2023,
+          "class_scope": "unavailable_or_zero_capital",
+          "mapped_name_days": 744,
+          "issuer_counts": {
+            "mapped": 2,
+            "log_market_cap": 0,
+            "book_to_market": 0,
+            "earnings_yield_ttm": 0
+          }
+        },
+        {
+          "year": 2024,
+          "class_scope": "multiple_classes",
+          "mapped_name_days": 51684,
+          "log_market_cap": 4396,
+          "book_to_market": 4228,
+          "earnings_yield_ttm": 4194,
+          "issuer_counts": {
+            "mapped": 129,
+            "log_market_cap": 39,
+            "book_to_market": 38,
+            "earnings_yield_ttm": 35
+          }
+        },
+        {
+          "year": 2024,
+          "class_scope": "single_class",
+          "mapped_name_days": 54816,
+          "log_market_cap": 25553,
+          "book_to_market": 25316,
+          "earnings_yield_ttm": 25260,
+          "issuer_counts": {
+            "mapped": 249,
+            "log_market_cap": 204,
+            "book_to_market": 204,
+            "earnings_yield_ttm": 204
+          }
+        },
+        {
+          "year": 2024,
+          "class_scope": "unavailable_or_zero_capital",
+          "mapped_name_days": 753,
+          "issuer_counts": {
+            "mapped": 2,
+            "log_market_cap": 0,
+            "book_to_market": 0,
+            "earnings_yield_ttm": 0
+          }
+        }
+      ],
+      "valuation_status": "all_reported_classes_own_version_shares_separate_prior_observed_closes_no_intervening_known_capital_or_unit_boundary"
+    },
+    "original_recovery": {
+      "attached": 4191,
+      "invalid": []
+    },
+    "coverage": {
+      "events": [
+        {
+          "year": 2010,
+          "covered_isins": 107,
+          "mapped_name_days": 15666,
+          "sessions_since_financial_filing": 15665,
+          "filing_is_dfp": 15665,
+          "sessions_since_material_fact": 11125,
+          "material_fact_count_20": 15666,
+          "dividend_announcement_age": 7206,
+          "offering_or_buyback_flag": 15666,
+          "sessions_until_expected_filing": 0
+        },
+        {
+          "year": 2011,
+          "covered_isins": 115,
+          "mapped_name_days": 25566,
+          "sessions_since_financial_filing": 25566,
+          "filing_is_dfp": 25566,
+          "sessions_since_material_fact": 21633,
+          "material_fact_count_20": 25566,
+          "dividend_announcement_age": 15325,
+          "offering_or_buyback_flag": 25566,
+          "sessions_until_expected_filing": 3248
+        },
+        {
+          "year": 2012,
+          "covered_isins": 118,
+          "mapped_name_days": 22807,
+          "sessions_since_financial_filing": 22807,
+          "filing_is_dfp": 22807,
+          "sessions_since_material_fact": 21076,
+          "material_fact_count_20": 22807,
+          "dividend_announcement_age": 16291,
+          "offering_or_buyback_flag": 22807,
+          "sessions_until_expected_filing": 21679
+        },
+        {
+          "year": 2013,
+          "covered_isins": 106,
+          "mapped_name_days": 20621,
+          "sessions_since_financial_filing": 20621,
+          "filing_is_dfp": 20621,
+          "sessions_since_material_fact": 19547,
+          "material_fact_count_20": 20621,
+          "dividend_announcement_age": 16228,
+          "offering_or_buyback_flag": 20621,
+          "sessions_until_expected_filing": 19629
+        },
+        {
+          "year": 2014,
+          "covered_isins": 123,
+          "mapped_name_days": 26787,
+          "sessions_since_financial_filing": 26787,
+          "filing_is_dfp": 26787,
+          "sessions_since_material_fact": 25473,
+          "material_fact_count_20": 26787,
+          "dividend_announcement_age": 21166,
+          "offering_or_buyback_flag": 26787,
+          "sessions_until_expected_filing": 25795
+        },
+        {
+          "year": 2015,
+          "covered_isins": 126,
+          "mapped_name_days": 29929,
+          "sessions_since_financial_filing": 29929,
+          "filing_is_dfp": 29929,
+          "sessions_since_material_fact": 28703,
+          "material_fact_count_20": 29929,
+          "dividend_announcement_age": 22840,
+          "offering_or_buyback_flag": 29929,
+          "sessions_until_expected_filing": 28945
+        },
+        {
+          "year": 2016,
+          "covered_isins": 127,
+          "mapped_name_days": 29368,
+          "sessions_since_financial_filing": 29368,
+          "filing_is_dfp": 29368,
+          "sessions_since_material_fact": 28870,
+          "material_fact_count_20": 29368,
+          "dividend_announcement_age": 23147,
+          "offering_or_buyback_flag": 29368,
+          "sessions_until_expected_filing": 28372
+        },
+        {
+          "year": 2017,
+          "covered_isins": 120,
+          "mapped_name_days": 28620,
+          "sessions_since_financial_filing": 28620,
+          "filing_is_dfp": 28620,
+          "sessions_since_material_fact": 28108,
+          "material_fact_count_20": 28620,
+          "dividend_announcement_age": 23503,
+          "offering_or_buyback_flag": 28620,
+          "sessions_until_expected_filing": 27492
+        },
+        {
+          "year": 2018,
+          "covered_isins": 372,
+          "mapped_name_days": 72812,
+          "sessions_since_financial_filing": 72812,
+          "filing_is_dfp": 72812,
+          "sessions_since_material_fact": 70005,
+          "material_fact_count_20": 72812,
+          "dividend_announcement_age": 61574,
+          "offering_or_buyback_flag": 72812,
+          "sessions_until_expected_filing": 71568
+        },
+        {
+          "year": 2019,
+          "covered_isins": 410,
+          "mapped_name_days": 90710,
+          "sessions_since_financial_filing": 90710,
+          "filing_is_dfp": 90710,
+          "sessions_since_material_fact": 89599,
+          "material_fact_count_20": 90710,
+          "dividend_announcement_age": 78184,
+          "offering_or_buyback_flag": 90710,
+          "sessions_until_expected_filing": 89508
+        },
+        {
+          "year": 2020,
+          "covered_isins": 435,
+          "mapped_name_days": 97427,
+          "sessions_since_financial_filing": 97427,
+          "filing_is_dfp": 97427,
+          "sessions_since_material_fact": 95829,
+          "material_fact_count_20": 97427,
+          "dividend_announcement_age": 83882,
+          "offering_or_buyback_flag": 97427,
+          "sessions_until_expected_filing": 95922
+        },
+        {
+          "year": 2021,
+          "covered_isins": 490,
+          "mapped_name_days": 107718,
+          "sessions_since_financial_filing": 107718,
+          "filing_is_dfp": 107718,
+          "sessions_since_material_fact": 105680,
+          "material_fact_count_20": 107718,
+          "dividend_announcement_age": 89274,
+          "offering_or_buyback_flag": 107718,
+          "sessions_until_expected_filing": 105700
+        },
+        {
+          "year": 2022,
+          "covered_isins": 503,
+          "mapped_name_days": 101003,
+          "sessions_since_financial_filing": 101003,
+          "filing_is_dfp": 101003,
+          "sessions_since_material_fact": 100420,
+          "material_fact_count_20": 101003,
+          "dividend_announcement_age": 84430,
+          "offering_or_buyback_flag": 101003,
+          "sessions_until_expected_filing": 99811
+        },
+        {
+          "year": 2023,
+          "covered_isins": 495,
+          "mapped_name_days": 104571,
+          "sessions_since_financial_filing": 104571,
+          "filing_is_dfp": 104571,
+          "sessions_since_material_fact": 104075,
+          "material_fact_count_20": 104571,
+          "dividend_announcement_age": 88504,
+          "offering_or_buyback_flag": 104571,
+          "sessions_until_expected_filing": 103579
+        },
+        {
+          "year": 2024,
+          "covered_isins": 493,
+          "mapped_name_days": 107253,
+          "sessions_since_financial_filing": 107253,
+          "filing_is_dfp": 107253,
+          "sessions_since_material_fact": 106751,
+          "material_fact_count_20": 107253,
+          "dividend_announcement_age": 92546,
+          "offering_or_buyback_flag": 107253,
+          "sessions_until_expected_filing": 106249
+        }
+      ],
+      "fundamentals": [
+        {
+          "year": 2010,
+          "covered_isins": 107,
+          "mapped_name_days": 15666,
+          "log_market_cap": 0,
+          "book_to_market": 0,
+          "earnings_yield_ttm": 0,
+          "gross_profitability": 0,
+          "liabilities_to_assets": 0,
+          "accruals_to_assets": 0,
+          "revenue_growth_yoy": 0,
+          "sue": 0,
+          "statement_age_sessions": 0
+        },
+        {
+          "year": 2011,
+          "covered_isins": 115,
+          "mapped_name_days": 25566,
+          "log_market_cap": 5291,
+          "book_to_market": 5189,
+          "earnings_yield_ttm": 1210,
+          "gross_profitability": 4221,
+          "liabilities_to_assets": 19441,
+          "accruals_to_assets": 0,
+          "revenue_growth_yoy": 0,
+          "sue": 0,
+          "statement_age_sessions": 19441
+        },
+        {
+          "year": 2012,
+          "covered_isins": 118,
+          "mapped_name_days": 22807,
+          "log_market_cap": 6042,
+          "book_to_market": 6013,
+          "earnings_yield_ttm": 4936,
+          "gross_profitability": 16437,
+          "liabilities_to_assets": 22069,
+          "accruals_to_assets": 16304,
+          "revenue_growth_yoy": 3431,
+          "sue": 0,
+          "statement_age_sessions": 22069
+        },
+        {
+          "year": 2013,
+          "covered_isins": 106,
+          "mapped_name_days": 20621,
+          "log_market_cap": 5148,
+          "book_to_market": 5148,
+          "earnings_yield_ttm": 5061,
+          "gross_profitability": 18649,
+          "liabilities_to_assets": 19877,
+          "accruals_to_assets": 18777,
+          "revenue_growth_yoy": 12124,
+          "sue": 0,
+          "statement_age_sessions": 19877
+        },
+        {
+          "year": 2014,
+          "covered_isins": 123,
+          "mapped_name_days": 26787,
+          "log_market_cap": 7762,
+          "book_to_market": 7624,
+          "earnings_yield_ttm": 7701,
+          "gross_profitability": 24668,
+          "liabilities_to_assets": 26043,
+          "accruals_to_assets": 24807,
+          "revenue_growth_yoy": 20579,
+          "sue": 16098,
+          "statement_age_sessions": 26043
+        },
+        {
+          "year": 2015,
+          "covered_isins": 126,
+          "mapped_name_days": 29929,
+          "log_market_cap": 7389,
+          "book_to_market": 7314,
+          "earnings_yield_ttm": 7324,
+          "gross_profitability": 27781,
+          "liabilities_to_assets": 29191,
+          "accruals_to_assets": 27733,
+          "revenue_growth_yoy": 24396,
+          "sue": 25827,
+          "statement_age_sessions": 29191
+        },
+        {
+          "year": 2016,
+          "covered_isins": 127,
+          "mapped_name_days": 29368,
+          "log_market_cap": 8298,
+          "book_to_market": 8073,
+          "earnings_yield_ttm": 8181,
+          "gross_profitability": 27203,
+          "liabilities_to_assets": 28621,
+          "accruals_to_assets": 26906,
+          "revenue_growth_yoy": 23637,
+          "sue": 25023,
+          "statement_age_sessions": 28621
+        },
+        {
+          "year": 2017,
+          "covered_isins": 120,
+          "mapped_name_days": 28620,
+          "log_market_cap": 7827,
+          "book_to_market": 7757,
+          "earnings_yield_ttm": 7775,
+          "gross_profitability": 26396,
+          "liabilities_to_assets": 27882,
+          "accruals_to_assets": 26130,
+          "revenue_growth_yoy": 23071,
+          "sue": 24418,
+          "statement_age_sessions": 27882
+        },
+        {
+          "year": 2018,
+          "covered_isins": 372,
+          "mapped_name_days": 72812,
+          "log_market_cap": 18661,
+          "book_to_market": 18406,
+          "earnings_yield_ttm": 18061,
+          "gross_profitability": 66180,
+          "liabilities_to_assets": 72077,
+          "accruals_to_assets": 61200,
+          "revenue_growth_yoy": 55715,
+          "sue": 65544,
+          "statement_age_sessions": 72077
+        },
+        {
+          "year": 2019,
+          "covered_isins": 410,
+          "mapped_name_days": 90710,
+          "log_market_cap": 22971,
+          "book_to_market": 22565,
+          "earnings_yield_ttm": 22506,
+          "gross_profitability": 83236,
+          "liabilities_to_assets": 89966,
+          "accruals_to_assets": 76460,
+          "revenue_growth_yoy": 70208,
+          "sue": 81907,
+          "statement_age_sessions": 89966
+        },
+        {
+          "year": 2020,
+          "covered_isins": 435,
+          "mapped_name_days": 97427,
+          "log_market_cap": 28560,
+          "book_to_market": 27985,
+          "earnings_yield_ttm": 27415,
+          "gross_profitability": 87886,
+          "liabilities_to_assets": 96680,
+          "accruals_to_assets": 80574,
+          "revenue_growth_yoy": 74487,
+          "sue": 86851,
+          "statement_age_sessions": 96680
+        },
+        {
+          "year": 2021,
+          "covered_isins": 490,
+          "mapped_name_days": 107718,
+          "log_market_cap": 33119,
+          "book_to_market": 32854,
+          "earnings_yield_ttm": 30822,
+          "gross_profitability": 96259,
+          "liabilities_to_assets": 106961,
+          "accruals_to_assets": 89010,
+          "revenue_growth_yoy": 77813,
+          "sue": 90631,
+          "statement_age_sessions": 106977
+        },
+        {
+          "year": 2022,
+          "covered_isins": 503,
+          "mapped_name_days": 101003,
+          "log_market_cap": 30346,
+          "book_to_market": 29965,
+          "earnings_yield_ttm": 29213,
+          "gross_profitability": 90568,
+          "liabilities_to_assets": 100236,
+          "accruals_to_assets": 86011,
+          "revenue_growth_yoy": 76255,
+          "sue": 80962,
+          "statement_age_sessions": 100253
+        },
+        {
+          "year": 2023,
+          "covered_isins": 495,
+          "mapped_name_days": 104571,
+          "log_market_cap": 30906,
+          "book_to_market": 30530,
+          "earnings_yield_ttm": 30335,
+          "gross_profitability": 95730,
+          "liabilities_to_assets": 103675,
+          "accruals_to_assets": 90722,
+          "revenue_growth_yoy": 82929,
+          "sue": 86620,
+          "statement_age_sessions": 103827
+        },
+        {
+          "year": 2024,
+          "covered_isins": 493,
+          "mapped_name_days": 107253,
+          "log_market_cap": 29949,
+          "book_to_market": 29544,
+          "earnings_yield_ttm": 29454,
+          "gross_profitability": 98062,
+          "liabilities_to_assets": 105883,
+          "accruals_to_assets": 90805,
+          "revenue_growth_yoy": 84517,
+          "sue": 93227,
+          "statement_age_sessions": 106500
+        }
+      ]
+    },
+    "limitations": [
+      "EarlyFCA2010–2017 omits ticker symbols; only unique exact historical legal spellings with contemporaneous class/existing-security evidence are admitted.",
+      "Original FCA versions are recovered at their own receipt; any still-missing original remains unavailable until an actually received supported version. Unresolved annual sector-code translations remain missing rather than mixing labels and codes.",
+      "Valuation uses only own-version XML/HTML counts with independent quantity scale, or document-specific audited note reconciliation. Annual capital CSV omits quantity scale and is not a model count source. Negative/unknown treasury is never subtracted or zero-filled; audited unusable counts remain missing. Every positive issued class requires an unambiguous prior observed price; DISMES/known capital boundaries remain enforced. Independently verified action completeness is not established.",
+      "Accounting source recipes retain masked bank/insurance incomparable fields."
+    ]
+  },
+  "measured_build": {
+    "code_commit": "0aea7a8",
+    "clean_worktree": "C:/quant/brazil-rv-round5-cvm-0aea7a8",
+    "output": "D:/quant-data/b3/interim/round5_data_20260910T140442Z/cvm/family_0aea7a8",
+    "started_utc": "2026-09-11T01:56:14.4743529Z",
+    "finished_utc": "2026-09-11T02:02:02.4954180Z",
+    "wall_seconds": 348.0042822,
+    "exit_code": null,
+    "peak_worker_working_set_bytes": 5134893056,
+    "peak_worker_working_set_gib": 4.7822418212890625,
+    "worker_peak_bytes": {
+      "26544": 5134893056,
+      "17164": 5398528
+    },
+    "measurement": "Windows lifetime PeakWorkingSet64, actual Python workers and launcher observed separately every500ms; largest worker reported"
+  },
+  "copasa_input_sensitivity": {
+    "bindings": [
+      {
+        "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\copasa_input_sensitivity.py",
+        "sha256": "604fc4a5e55af5a849990e5ac09be2e0d6b6863a915662a75c3ee50bba72c211"
+      },
+      {
+        "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\family_0aea7a8\\manifest.json",
+        "sha256": "cc4edd200d61045ee3f637b61967beee8c672bf66ef5cd77fa429ceff14ff8f4"
+      },
+      {
+        "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\family_0aea7a8\\fundamentals.parquet",
+        "sha256": "29a42a5c5231fce2402d17b1a3c19ca70808ba7d2561f3e2e01b11e556fc7012"
+      },
+      {
+        "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\family_0aea7a8\\identity.parquet",
+        "sha256": "83355f68ae5c8ac95f6ed34156c2119fea9512c5cba65b8a0e001ebe97d3776f"
+      },
+      {
+        "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\family_0aea7a8\\capital_change_observations.json",
+        "sha256": "172f8842cd7a0446afe45f7a4060ffaeabcb4055990bdc27a48d445c1744c2ee"
+      },
+      {
+        "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_source_dispositions.json",
+        "sha256": "d352f55be6419237d855159fd11c56922f1d0f854f8e065f16970e9da0e98375"
+      },
+      {
+        "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\source_preflight_59ba9ab_20260911T000951Z\\financial_source_support.json",
+        "sha256": "adee5093f924810298abfc8ec3cb5c02e1f8bc0e9b426a55b7e5266bced7d6ba"
+      },
+      {
+        "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\review_last_four_20260911.json",
+        "sha256": "b7ef16a98d8fe9ea9322559d70984df360bd37779bfb7f2b5034d46cc6ddc3ba"
+      },
+      {
+        "path": "D:\\quant-data\\b3\\processed\\v2_daily_store_3d67624_20260909T100323Z\\manifest.json",
+        "sha256": "db4f751d47133a6611733739ad9bfc15721452218365e338fec61a6b608bea64"
+      }
+    ],
+    "code_commit": "0aea7a8",
+    "consumer_end": "2024-12-30",
+    "method": "Reconstruct only Copasa production capital selection from completed source preflight plus final dispositions; final own-price/barrier helper must reproduce every selected final-family log market cap. Perturb only each exact document selected date/ISIN window, using a single positive ordinary class. Transform the full contemporaneous cross-section through the actual float32 alignment, active membership and FeatureSpec rank-Gauss transform. Rank effects on other names are reported too.",
+    "predictive_fits": 0,
+    "results": [
+      {
+        "alternative_market_cap_relative_change": -0.002826011851859711,
+        "alternative_net_shares": 378109430.0,
+        "alternative_valuation_ratio_relative_change": 0.0028340208283088586,
+        "canonical_net_shares": 379181000.0,
+        "features": [
+          {
+            "changed_copasa_cells": 5,
+            "changed_model_cells": 10,
+            "changed_other_name_cells": 5,
+            "changed_sessions": 5,
+            "copasa_model_max_absolute_change": 0.04026255011558533,
+            "covered_model_cells": 9416,
+            "feature": "log_market_cap",
+            "model_max_absolute_change": 0.04026255011558533,
+            "model_mean_absolute_change_over_covered_cells": 3.5756758734351024e-05,
+            "raw_max_absolute_change": 0.00283050537109375
+          },
+          {
+            "changed_copasa_cells": 6,
+            "changed_model_cells": 12,
+            "changed_other_name_cells": 6,
+            "changed_sessions": 6,
+            "copasa_model_max_absolute_change": 0.05415928363800049,
+            "covered_model_cells": 9263,
+            "feature": "book_to_market",
+            "model_max_absolute_change": 0.05415928363800049,
+            "model_mean_absolute_change_over_covered_cells": 6.1140424804762e-05,
+            "raw_max_absolute_change": 0.004324555397033691
+          },
+          {
+            "changed_copasa_cells": 4,
+            "changed_model_cells": 8,
+            "changed_other_name_cells": 4,
+            "changed_sessions": 4,
+            "copasa_model_max_absolute_change": 0.043795883655548096,
+            "covered_model_cells": 8532,
+            "feature": "earnings_yield_ttm",
+            "model_max_absolute_change": 0.043795883655548096,
+            "model_mean_absolute_change_over_covered_cells": 3.331858533783816e-05,
+            "raw_max_absolute_change": 0.00017466768622398376
+          }
+        ],
+        "first_decision": "2021-11-04",
+        "id": "109371",
+        "last_decision": "2022-03-29",
+        "model_masks_and_ages_exact": true,
+        "selected_isins": [
+          "BRCSMGACNOR5"
+        ],
+        "selected_name_days": 99,
+        "valued_name_days": 95
+      },
+      {
+        "alternative_market_cap_relative_change": 0.0028342006092088035,
+        "alternative_net_shares": 379181430.0,
+        "alternative_valuation_ratio_relative_change": -0.0028261906180374607,
+        "canonical_net_shares": 378109791.0,
+        "features": [
+          {
+            "changed_copasa_cells": 0,
+            "changed_model_cells": 0,
+            "changed_other_name_cells": 0,
+            "changed_sessions": 0,
+            "copasa_model_max_absolute_change": 0.0,
+            "covered_model_cells": 62,
+            "feature": "log_market_cap",
+            "model_max_absolute_change": 0.0,
+            "model_mean_absolute_change_over_covered_cells": 0.0,
+            "raw_max_absolute_change": 0.00283050537109375
+          },
+          {
+            "changed_copasa_cells": 0,
+            "changed_model_cells": 0,
+            "changed_other_name_cells": 0,
+            "changed_sessions": 0,
+            "copasa_model_max_absolute_change": 0.0,
+            "covered_model_cells": 58,
+            "feature": "book_to_market",
+            "model_max_absolute_change": 0.0,
+            "model_mean_absolute_change_over_covered_cells": 0.0,
+            "raw_max_absolute_change": 0.0
+          },
+          {
+            "changed_copasa_cells": 0,
+            "changed_model_cells": 0,
+            "changed_other_name_cells": 0,
+            "changed_sessions": 0,
+            "copasa_model_max_absolute_change": 0.0,
+            "covered_model_cells": 61,
+            "feature": "earnings_yield_ttm",
+            "model_max_absolute_change": 0.0,
+            "model_mean_absolute_change_over_covered_cells": 0.0,
+            "raw_max_absolute_change": 0.00027649104595184326
+          }
+        ],
+        "first_decision": "2022-05-03",
+        "id": "114129",
+        "last_decision": "2022-05-03",
+        "model_masks_and_ages_exact": true,
+        "selected_isins": [
+          "BRCSMGACNOR5"
+        ],
+        "selected_name_days": 1,
+        "valued_name_days": 1
+      }
+    ],
+    "scope": "Actual final-family input sensitivity for two disclosed Copasa gross/net alternatives. Current specific composition tables remain canonical. Neither interpretation is asserted to be an independently verified legal count. No data, mask, model, outcome, source decision or held-out consumer changes.",
+    "selected_windows": [
+      {
+        "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\copasa_input_sensitivity_0aea7a8\\109371_selected_name_days.parquet",
+        "sha256": "3e0cf135750e93f66b027e2a0c6a8829f9a6c7cd30e1e53210a6f73e8d8849ed"
+      },
+      {
+        "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\copasa_input_sensitivity_0aea7a8\\114129_selected_name_days.parquet",
+        "sha256": "562fc11ce3d2bf357502759593e4b7d33a8cdf344e2fefc91a36eb94737730ab"
+      }
+    ]
+  },
+  "final_store_accepted": false,
+  "screen_fits_started": false
+}
