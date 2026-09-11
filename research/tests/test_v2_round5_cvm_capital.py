@@ -139,6 +139,7 @@ def disposition_fixture(tmp_path, disposition="reconciled"):
         "evidence": [{"path": str(evidence), "sha256": capital.sha256(evidence)}],
         "paid_in_shares": {"ON": 90_954_000, "PN": 0},
         "treasury_shares": {"ON": 5207, "PN": 0},
+        "capital_change_approval_dates": ["2024-01-02"],
     }
     path = tmp_path / "dispositions.json"
     path.write_text(json.dumps({"documents": [record]}), encoding="utf8")
@@ -226,6 +227,7 @@ def test_builder_applies_own_note_audit_even_to_parseable_capital(
         pass
 
     def inspect_documents(documents, *_):
+        assert documents[0]["capital_change_approval_dates"] == ["2024-01-02"]
         assert documents[0]["shares"] == (
             {"ON": 90_948_793, "PN": 0} if disposition == "reconciled" else None
         )

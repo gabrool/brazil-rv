@@ -97,6 +97,12 @@ original registration and replay bindings remain intact.
   Adjacent-filing ratios remain review signals and never supply values, masks or
   availability. The registered feature, chronology and five-seed screen contracts
   remain unchanged.
+- A reviewed financial filing can disclose a post-reference share-change approval.
+  Register its own approval date with the exact filing identity and source evidence.
+  From the filing's ordinary receipt clock, apply the existing capital-event
+  uncertainty barrier to older counts, including older fallback snapshots. The
+  approval date is not an asserted effective date, and retrospective EPS counts
+  do not replace reference-date capital. Unrelated accounting remains available.
 
 Exact ordered field descriptions and transforms are in `feature_spec.py` and are
 hashed into the new store. Joined fixtures bind first admissible decisions to the

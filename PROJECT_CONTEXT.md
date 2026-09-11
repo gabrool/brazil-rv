@@ -221,6 +221,10 @@ audits but never determine corrected quantities, masks or availability.
 Published rounding precision is sufficient. Parser non-matches and diagnostic
 warnings whose triggers disappear after accepted corrections are not independent
 admission failures; known own-source contradictions remain explicit review holds.
+Audited capital-change approvals disclosed in a financial filing also invalidate
+older share-count snapshots from that filing's original receipt, using the same
+uncertainty barrier as FRE approvals. Approval dates do not establish exact
+effective dates or supply split adjustments. Accounting fields remain independent.
 For original financial ZIPs, a blank or zero public-envelope CNPJ can be resolved
 from that same submitted `Documento.xml` only when its CNPJ, CVM registration and
 reference match the historical header. Public document ID/version remain exact;

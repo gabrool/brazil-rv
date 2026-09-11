@@ -1,12 +1,12 @@
 {
-  "status": "146 own-source dispositions accepted: 139 reconciled and 7 unavailable. Material source review and final family admission remain pending.",
+  "status": "154 own-source dispositions accepted:147 reconciled and7 unavailable. The focused50-case review has8 corrections,38 retained originals and4 unresolved cases. Final family/store admission remains pending.",
   "capital_dispositions": {
     "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_source_dispositions.json",
-    "sha256": "2bbec726a9bfcbf96c80ce00250f0828bc87f1d0f1b3df2d817ef9a4a3101457"
+    "sha256": "133f96d5d279f943732c045da31b061969b80cbf15ee5417981aa9cd44babfd0"
   },
   "counts": {
     "audited_unavailable": 7,
-    "reconciled": 139
+    "reconciled": 147
   },
   "accepted_batch": {
     "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\accepted_batch_20260910T192900Z\\acceptance.json",
@@ -3164,5 +3164,132 @@
     "original_scale_signal_removed_count": 52,
     "scope": "Diagnostic review priorities only. No source value, receipt, consumer mask or disposition changes. Ratios cannot choose corrected counts or establish historical availability. A removed warning is not an own-filing reconciliation. Known own-source issues remain open.",
     "criteria": "The original roughly 1000-fold warning is removed when every original edge is now within a factor of 2 using already approved own-source corrections. A persistent larger side above 250 is review priority, not an error or exclusion rule. Correct values are never inferred from an adjacent filing."
+  },
+  "priority_review_closure": {
+    "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\priority_review_closure_20260911.json",
+    "sha256": "ea168d8f37c2e1d7c9431b731683964c8c30f12f96c7dfaac764e892c9684796"
+  },
+  "latest_priority_acceptances": [
+    {
+      "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\accepted_priority_seven_20260911\\acceptance.json",
+      "sha256": "60008c845b5561a97f919d61c5f03c15f82e1ac7641213656754ee6e6d438660"
+    },
+    {
+      "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\accepted_moura_event_20260911\\acceptance.json",
+      "sha256": "ca3ae0be4a849eb7e132eab3b7f722529cc0fd4cb088733dd1defba8722d8bd7"
+    }
+  ],
+  "own_filing_capital_event_tests": {
+    "passed": 83,
+    "report": {
+      "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\own_note_capital_event_tests_20260911.xml",
+      "sha256": "943ac1134422cee7b3c5043c68c07fe4ce5246fdce8bfc7cec78c3039b005f05"
+    }
+  },
+  "moura_own_event_actual_check": {
+    "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\accepted_moura_event_20260911\\actual_valuation_barrier.json",
+    "sha256": "c95b0cdd419d9607bd62f3bdf4e698a97145832d3ed2048ab03bfdad2cd47199",
+    "result": {
+      "scope": "Actual seven previously valued decision dates, same store/identity and corrected own-reference count. Isolates the newly registered own-filing approval barrier; not a full-family replay.",
+      "program_sha256": "ed4a07ff3f9d9259a8230c704a96cb8f64cb3c80714aa50b8f0e06f22db9dcdd",
+      "store_manifest_sha256": "db4f751d47133a6611733739ad9bfc15721452218365e338fec61a6b608bea64",
+      "identity_sha256": "8499b2ef0322b9ff87a82e9765e370f941cb48e4664b47b4d24b780d9d852e25",
+      "rad_source": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\rad\\rad_2020_structured_annual.json",
+      "rad_source_sha256": "59deda11cdeb1adffa2d7d64d9cb4aa270ce619bb8ecdd99294879adab76783f",
+      "receipt": "2020-03-30T09:35:00",
+      "first_available_decision": "2020-03-30",
+      "event": [
+        {
+          "cnpj": "12049631000184",
+          "cvm_code": "021067",
+          "document_id": "91963",
+          "available_index": 2532,
+          "effective": "2020-01-17",
+          "kind": "audited_own_filing_share_change",
+          "effective_precision": "approval_bound"
+        }
+      ],
+      "rows": [
+        {
+          "date": "2020-03-30",
+          "isin": [
+            "BRMDNEACNOR9"
+          ],
+          "value_before_own_event_barrier": 2572827816.394699,
+          "after": null
+        },
+        {
+          "date": "2020-03-31",
+          "isin": [
+            "BRMDNEACNOR9"
+          ],
+          "value_before_own_event_barrier": 2524662597.848675,
+          "after": null
+        },
+        {
+          "date": "2020-04-01",
+          "isin": [
+            "BRMDNEACNOR9"
+          ],
+          "value_before_own_event_barrier": 2480511051.8190365,
+          "after": null
+        },
+        {
+          "date": "2020-04-02",
+          "isin": [
+            "BRMDNEACNOR9"
+          ],
+          "value_before_own_event_barrier": 2392208151.151325,
+          "after": null
+        },
+        {
+          "date": "2020-04-03",
+          "isin": [
+            "BRMDNEACNOR9"
+          ],
+          "value_before_own_event_barrier": 2163423075.9703617,
+          "after": null
+        },
+        {
+          "date": "2020-04-06",
+          "isin": [
+            "BRMDNEACNOR9"
+          ],
+          "value_before_own_event_barrier": 2006886020.0,
+          "after": null
+        },
+        {
+          "date": "2020-04-07",
+          "isin": [
+            "BRMDNEACNOR9"
+          ],
+          "value_before_own_event_barrier": 2135326794.1809635,
+          "after": null
+        }
+      ],
+      "all_seven_pre_event_counts_rejected": true
+    }
+  },
+  "prior_146_preservation": {
+    "prior": {
+      "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\accepted_priority_seven_20260911\\prior_capital_source_dispositions.json",
+      "sha256": "2bbec726a9bfcbf96c80ce00250f0828bc87f1d0f1b3df2d817ef9a4a3101457"
+    },
+    "current": {
+      "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_source_dispositions.json",
+      "sha256": "133f96d5d279f943732c045da31b061969b80cbf15ee5417981aa9cd44babfd0"
+    },
+    "prior_146_exact": true,
+    "new_positive_class_support_unchanged": {
+      "91963": true,
+      "135783": true,
+      "72147": true,
+      "136698": true,
+      "91841": true,
+      "109731": true,
+      "91916": true,
+      "95913": true
+    },
+    "source_selection": "Quantity-only selection remains unchanged. The new own-filing event changes valuation availability and requires final actual-family verification; no claim of unchanged valuation masks."
   }
 }

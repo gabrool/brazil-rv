@@ -917,6 +917,49 @@ def test_known_fre_capital_change_masks_prior_count_only_after_publication():
     assert unrelated["log_market_cap"][2] is not None
 
 
+@pytest.mark.parametrize("exact_time", (True, False))
+def test_own_filing_split_uses_receipt_clock_and_preserves_accounting(
+    tmp_path, exact_time
+):
+    (tmp_path / "annual_manifest.json").write_text('{"files": []}')
+    sessions, document, rad, identity, market = family_fixture()
+    notice = {
+        **deepcopy(document),
+        "id": "2",
+        "version": 2,
+        "receipt": sessions[2],
+        "capital_change_approval_dates": [sessions[0].isoformat()],
+    }
+    receipts = rad + (
+        [{**rad[0], "id": "2", "version": "2", "receipt": datetime(2024, 1, 4, 15, 44)}]
+        if exact_time
+        else []
+    )
+    changes = round5_cvm.capital_change_observations(
+        tmp_path, receipts, sessions, [notice]
+    )
+    first = 2 if exact_time else 3
+    assert changes[0]["available_index"] == first
+    base, _ = fundamental_features(
+        [deepcopy(document)], rad, identity, sessions, market
+    )
+    changed, _ = fundamental_features(
+        [deepcopy(document), notice], receipts, identity, sessions, market, changes
+    )
+    assert base.head(first).equals(changed.head(first))
+    assert changed["log_market_cap"][first] is None
+    assert changed["liabilities_to_assets"].equals(base["liabilities_to_assets"])
+    # A received post-event count restores valuation without inferring split terms.
+    notice["reference"] = sessions[0]
+    for receipt in receipts:
+        if receipt["id"] == "2":
+            receipt["reference"] = sessions[0]
+    restored, _ = fundamental_features(
+        [deepcopy(document), notice], receipts, identity, sessions, market, changes
+    )
+    assert restored["log_market_cap"][first] is not None
+
+
 def test_early_exact_legal_name_bridge_excludes_new_same_brand_security():
     sessions, _, _, _, _ = family_fixture()
     document = {

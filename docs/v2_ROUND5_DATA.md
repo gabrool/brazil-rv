@@ -11,6 +11,21 @@ The development boundary is 2024-12-30. Historical consumers are bounded to that
 date. The user stopped all forward capture on September 10, 2026. The existing
 Group-B snapshot remains quarantined evidence, outside historical consumers.
 
+The focused 50-filing review now has eight own-source corrections, 38 retained
+originals and four unresolved cases: Copasa 109371/114129, Multiplus 37068 and
+Terra Santa 96075. Retention preserves published precision and states where an
+independent note reconciliation is absent; it is not a claim that every original
+quantity was independently established. The new corrections repair three
+thousand-fold errors, two gross-versus-net errors, and two treasury counts.
+Moura Dubeux supplies the eighth correction: its own December count must be
+combined with its subsequently disclosed consolidation approval, rather than
+retrospective EPS shares. The event uses the original filing receipt and an
+approval-date uncertainty bound; no inferred split adjustment is introduced.
+Eighty-three targeted source, valuation and transformed-feature tests pass.
+There are now 154 dispositions: 147 reconciled and seven unavailable.
+See [the complete focused review](v2_round5_capital_priority_review.json).
+Final family/store acceptance and measured screen runtimes remain pending.
+
 The preflight checked 22,349 financial documents against 821,266 dated identity
 rows and 398 registrations. Its source gaps were specific: twelve capital pages
 and Santander DFP2023 version1. All twelve pages are recovered. Santander's
@@ -408,7 +423,7 @@ timing tables are complete; none is a Round-5 model input.
 
 ## Outstanding before closure
 
-Finish source archives and family proofs; build and accept the new store;
+Resolve the four remaining measurement reviews and final family proofs; build and accept the new store;
 run the registered 14-fold Ã— 5-seed CPU information screens and TreeSHAP. Then publish the final family coverage,
 revision shares, unavailable-source reasons, economic deltas, screen results,
 store identities and resulting Round-6 ordering here.

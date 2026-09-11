@@ -1,0 +1,2921 @@
+{
+  "scope": "Closure of the 50 priority cases. Retained records leave all quantities, masks and dates unchanged; source limitations are explicit and not represented as full independent reconciliations. No ratio supplies a value or exclusion.",
+  "priority_input": {
+    "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_review_priority_20260911T010805Z\\readout.json",
+    "sha256": "ead93042ed5a8b19a753699d3f1a4dca16b1dbe3a60dcb51cceb92b9d2177948"
+  },
+  "capital_dispositions": {
+    "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_source_dispositions.json",
+    "sha256": "133f96d5d279f943732c045da31b061969b80cbf15ee5417981aa9cd44babfd0"
+  },
+  "producer": {
+    "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\close_reviewed_priority_20260911.py",
+    "sha256": "f1f17f41933643fc5bce87f6ff395154fff2b85e94c929dcd116de53a5e4ae17"
+  },
+  "counts": {
+    "own_source_corrections": 8,
+    "retain_original": 38,
+    "open_measurement_review": 4
+  },
+  "records": [
+    {
+      "document": {
+        "id": "89520",
+        "cnpj": "91333666000117",
+        "cvm_code": "012572",
+        "reference": "2019-09-30",
+        "version": 2,
+        "receipt": "2019-11-14",
+        "kind": "ITR",
+        "name": "RECRUSUL S.A."
+      },
+      "valuation": {
+        "id": "89520",
+        "first_decision": "2019-11-14",
+        "last_decision": "2020-03-23",
+        "issuer_sessions": 85,
+        "name_days": 170
+      },
+      "original_capital_manifest": {
+        "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital\\89520\\manifest.json",
+        "sha256": "a58c8f1c2be7ec5ff7c2f0accc3a62a95ae78719cf942957055254a29ccc2a68"
+      },
+      "outcome": "retain_original",
+      "reason": "The original current-period composition remains authoritative. Its scale agrees with the own note's 25408950 ON / 50414424 PN subscribed counts at thousand-share precision. The note quotes prior December and unpaid monetary capital; it does not independently establish current fully paid counts. No new count is inferred from authorization or subscription.",
+      "reviewed_physical_pages": [
+        33
+      ],
+      "review_method": "Own original PDF text and/or previously recorded visual review; no new independent quantity is asserted where explicitly limited.",
+      "evidence": [
+        {
+          "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\documents\\89520\\result.json",
+          "sha256": "e1c35b15e4b5edefe2b678db6105a6b630efd25896ffb59bd0b953a3a3f22525"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\documents\\89520\\source.pdf",
+          "sha256": "aa7f041f0ad2426dcad313138a0a006ae41157df2012e89878c4ead0ebae088f"
+        }
+      ],
+      "original_capital": {
+        "reference": "2019-09-30",
+        "quantity_scale": 1000,
+        "paid_in": {
+          "ON": 25409000.0,
+          "PN": 50414000.0,
+          "total": 75823000.0
+        },
+        "treasury": {
+          "ON": 0.0,
+          "PN": 0.0,
+          "total": 0.0
+        },
+        "shares": {
+          "ON": 25409000.0,
+          "PN": 50414000.0
+        }
+      }
+    },
+    {
+      "document": {
+        "id": "63928",
+        "cnpj": "91333666000117",
+        "cvm_code": "012572",
+        "reference": "2016-12-31",
+        "version": 1,
+        "receipt": "2017-03-31",
+        "kind": "DFP",
+        "name": "RECRUSUL S.A."
+      },
+      "valuation": {
+        "id": "63928",
+        "first_decision": "2017-04-05",
+        "last_decision": "2017-07-28",
+        "issuer_sessions": 69,
+        "name_days": 138
+      },
+      "original_capital_manifest": {
+        "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital\\63928\\manifest.json",
+        "sha256": "f4caa1858066beaca40a8f7ad45aca0d0b7ea57ceb5fd591598b817996bb4a65"
+      },
+      "outcome": "retain_original",
+      "reason": "Own note explicitly uses thousands of shares. Its 12771 ON / 25339 PN / 38109 total is internally inconsistent by one thousand. Retain the original 12771 / 25338 / 38109 thousand composition; this is not evidence for a 1000-fold change. Authorized capital is not substituted for paid capital.",
+      "reviewed_physical_pages": [
+        34
+      ],
+      "review_method": "Own original PDF text and/or previously recorded visual review; no new independent quantity is asserted where explicitly limited.",
+      "evidence": [
+        {
+          "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\documents\\63928\\result.json",
+          "sha256": "4f18edcabf7e6a2ca253b4d756befae2866bfb25b28770e9864405725acd36e3"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\documents\\63928\\source.pdf",
+          "sha256": "2edcfb2e8a8be17f6b59ad8e57f980eca195173ef7bb0222d3e29be8952fe98d"
+        }
+      ],
+      "original_capital": {
+        "reference": "2016-12-31",
+        "quantity_scale": 1000,
+        "paid_in": {
+          "ON": 12771000.0,
+          "PN": 25338000.0,
+          "total": 38109000.0
+        },
+        "treasury": {
+          "ON": 0.0,
+          "PN": 0.0,
+          "total": 0.0
+        },
+        "shares": {
+          "ON": 12771000.0,
+          "PN": 25338000.0
+        }
+      }
+    },
+    {
+      "document": {
+        "id": "86297",
+        "cnpj": "91333666000117",
+        "cvm_code": "012572",
+        "reference": "2019-06-30",
+        "version": 2,
+        "receipt": "2019-08-12",
+        "kind": "ITR",
+        "name": "RECRUSUL S.A."
+      },
+      "valuation": {
+        "id": "86297",
+        "first_decision": "2019-08-12",
+        "last_decision": "2019-11-12",
+        "issuer_sessions": 67,
+        "name_days": 134
+      },
+      "original_capital_manifest": {
+        "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital\\86297\\manifest.json",
+        "sha256": "31d4395c6c2191a83888ea6fe79da9ae40d0fa8617aa2754f3fbe04b5cddedb9"
+      },
+      "outcome": "retain_original",
+      "reason": "The original current-period composition remains authoritative. Its scale agrees with the own note's 25408950 ON / 50414424 PN subscribed counts at thousand-share precision. The note quotes prior December and unpaid monetary capital; it does not independently establish current fully paid counts. No new count is inferred from authorization or subscription.",
+      "reviewed_physical_pages": [
+        33
+      ],
+      "review_method": "Own original PDF text and/or previously recorded visual review; no new independent quantity is asserted where explicitly limited.",
+      "evidence": [
+        {
+          "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\documents\\86297\\result.json",
+          "sha256": "93186e66a62efd9494b03e23b9c7f9cae5cc74023c5485afaf693020e736bfb8"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\documents\\86297\\source.pdf",
+          "sha256": "592729aa2ba00a81cef08ca3dba590eb383cd93825b0191d055da369daf15e2f"
+        }
+      ],
+      "original_capital": {
+        "reference": "2019-06-30",
+        "quantity_scale": 1000,
+        "paid_in": {
+          "ON": 25409000.0,
+          "PN": 50414000.0,
+          "total": 75823000.0
+        },
+        "treasury": {
+          "ON": 0.0,
+          "PN": 0.0,
+          "total": 0.0
+        },
+        "shares": {
+          "ON": 25409000.0,
+          "PN": 50414000.0
+        }
+      }
+    },
+    {
+      "document": {
+        "id": "109371",
+        "cnpj": "17281106000103",
+        "cvm_code": "019445",
+        "reference": "2021-09-30",
+        "version": 1,
+        "receipt": "2021-11-03",
+        "kind": "ITR",
+        "name": "CIA SANEAMENTO DE MINAS GERAIS-COPASA MG"
+      },
+      "valuation": {
+        "id": "109371",
+        "first_decision": "2021-11-04",
+        "last_decision": "2022-03-23",
+        "issuer_sessions": 95,
+        "name_days": 95
+      },
+      "original_capital_manifest": {
+        "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital\\109371\\manifest.json",
+        "sha256": "488d4912810664d2f1bac410500dfb6b47c68f30977f2ee5c7913e744242a503"
+      },
+      "outcome": "open_measurement_review",
+      "reason": "Gross/net interpretation still inconsistent within the own filing: original gross less treasury agrees with the note and EPS net magnitude, but the note labels that count paid capital. No arbitrary treasury deletion or double subtraction."
+    },
+    {
+      "document": {
+        "id": "132446",
+        "cnpj": "08170849000115",
+        "cvm_code": "026026",
+        "reference": "2023-09-30",
+        "version": 1,
+        "receipt": "2023-11-13",
+        "kind": "ITR",
+        "name": "DESKTOP S.A."
+      },
+      "valuation": {
+        "id": "132446",
+        "first_decision": "2023-11-14",
+        "last_decision": "2024-03-19",
+        "issuer_sessions": 85,
+        "name_days": 85
+      },
+      "original_capital_manifest": {
+        "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital\\132446\\manifest.json",
+        "sha256": "9db82e91d0b13b71335924e8de2f643b9b87562d44ddbe1fb76f77ce570103cc"
+      },
+      "outcome": "retain_original",
+      "reason": "Own PDF capital composition explicitly states 115243 thousand ON and zero treasury at the current reference. The note pages are not text-extractable; lack of an independent note match is not a demonstrated count error. No later filing supplies this value.",
+      "reviewed_physical_pages": [
+        2
+      ],
+      "review_method": "Own original PDF text and/or previously recorded visual review; no new independent quantity is asserted where explicitly limited.",
+      "evidence": [
+        {
+          "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\documents\\132446\\result.json",
+          "sha256": "1183ddaf57a013a240979959549f166b60735ee66e1230418cae7339363f1d15"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\documents\\132446\\source.pdf",
+          "sha256": "d31ce8586d6eb403cb90f8126b8e1ce32bdee5ec36ffff94c4a57815cb03397a"
+        }
+      ],
+      "original_capital": {
+        "reference": "2023-09-30",
+        "quantity_scale": 1000,
+        "paid_in": {
+          "ON": 115243000.0,
+          "PN": 0.0,
+          "total": 115243000.0
+        },
+        "treasury": {
+          "ON": 0.0,
+          "PN": 0.0,
+          "total": 0.0
+        },
+        "shares": {
+          "ON": 115243000.0,
+          "PN": 0.0
+        }
+      }
+    },
+    {
+      "document": {
+        "id": "98271",
+        "cnpj": "49263189000102",
+        "cvm_code": "020877",
+        "reference": "2020-09-30",
+        "version": 1,
+        "receipt": "2020-11-11",
+        "kind": "ITR",
+        "name": "HELBOR EMPREENDIMENTOS S.A."
+      },
+      "valuation": {
+        "id": "98271",
+        "first_decision": "2020-11-12",
+        "last_decision": "2021-03-16",
+        "issuer_sessions": 82,
+        "name_days": 82
+      },
+      "original_capital_manifest": {
+        "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital\\98271\\manifest.json",
+        "sha256": "7161e13d572a84ada5dd15cbfcfe957d736e753984c4674544e050c83590abb6"
+      },
+      "outcome": "retain_original",
+      "reason": "Own current shareholder table explicitly in units gives 133851072 gross ON and 1157460 treasury, supporting original thousand-share precision. The narrative treasury paragraph repeats pre-consolidation quantities and is not used over the dated current table.",
+      "reviewed_physical_pages": [
+        65,
+        78
+      ],
+      "review_method": "Own original PDF text and/or previously recorded visual review; no new independent quantity is asserted where explicitly limited.",
+      "evidence": [
+        {
+          "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\documents\\98271\\result.json",
+          "sha256": "0baa21a01d6dddf0847051bd17d74fac13fce7f8364766558c31978fd516427b"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\documents\\98271\\source.pdf",
+          "sha256": "531b2f141690cc1e7966ed938ace50af121eeff8fce5313a3fe5f499c99fb8cb"
+        }
+      ],
+      "original_capital": {
+        "reference": "2020-09-30",
+        "quantity_scale": 1000,
+        "paid_in": {
+          "ON": 133851000.0,
+          "PN": 0.0,
+          "total": 133851000.0
+        },
+        "treasury": {
+          "ON": 1157000.0,
+          "PN": 0.0,
+          "total": 1157000.0
+        },
+        "shares": {
+          "ON": 132694000.0,
+          "PN": 0.0
+        }
+      }
+    },
+    {
+      "document": {
+        "id": "98884",
+        "cnpj": "16922038000151",
+        "cvm_code": "025259",
+        "reference": "2020-09-30",
+        "version": 2,
+        "receipt": "2020-11-25",
+        "kind": "ITR",
+        "name": "ENJOEI S.A."
+      },
+      "valuation": {
+        "id": "98884",
+        "first_decision": "2020-11-26",
+        "last_decision": "2021-03-30",
+        "issuer_sessions": 82,
+        "name_days": 82
+      },
+      "original_capital_manifest": {
+        "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital\\98884\\manifest.json",
+        "sha256": "ff998cdb16672cecda5b88ccd6a0f77bf89ab58fede34b8178b761675c3f1e4b"
+      },
+      "outcome": "retain_original",
+      "reason": "Own current shareholder table and September 28 consolidation support 149533382 ON; original 149533000 is retained at published thousand-share precision.",
+      "reviewed_physical_pages": [
+        72
+      ],
+      "review_method": "Own original PDF text and/or previously recorded visual review; no new independent quantity is asserted where explicitly limited.",
+      "evidence": [
+        {
+          "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\transport_retry_20260910T200700Z\\documents\\98884\\result.json",
+          "sha256": "277cccbb387857a7939692d7d315e50aa89cfd08e97aa053acbfb1a348f43fe0"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\transport_retry_20260910T200700Z\\documents\\98884\\source.pdf",
+          "sha256": "ec32eb789c68ee60fd666da1ed7f014308a92470b6f83fb3bc97a16368c6b644"
+        }
+      ],
+      "original_capital": {
+        "reference": "2020-09-30",
+        "quantity_scale": 1000,
+        "paid_in": {
+          "ON": 149533000.0,
+          "PN": 0.0,
+          "total": 149533000.0
+        },
+        "treasury": {
+          "ON": 0.0,
+          "PN": 0.0,
+          "total": 0.0
+        },
+        "shares": {
+          "ON": 149533000.0,
+          "PN": 0.0
+        }
+      }
+    },
+    {
+      "document": {
+        "id": "125756",
+        "cnpj": "94813102000170",
+        "cvm_code": "025950",
+        "reference": "2023-03-31",
+        "version": 1,
+        "receipt": "2023-05-04",
+        "kind": "ITR",
+        "name": "TRÊS TENTOS AGROINDUSTRIAL S/A"
+      },
+      "valuation": {
+        "id": "125756",
+        "first_decision": "2023-05-05",
+        "last_decision": "2023-08-14",
+        "issuer_sessions": 71,
+        "name_days": 71
+      },
+      "original_capital_manifest": {
+        "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital\\125756\\manifest.json",
+        "sha256": "6de4c6708630a3b55fc3471db30af74be7ac6b917272792163fb4996cefdf2eb"
+      },
+      "outcome": "retain_original",
+      "reason": "Own current note spells out 498298000 ON, agreeing with the original count.",
+      "reviewed_physical_pages": [
+        98
+      ],
+      "review_method": "Own original PDF text and/or previously recorded visual review; no new independent quantity is asserted where explicitly limited.",
+      "evidence": [
+        {
+          "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\documents\\125756\\result.json",
+          "sha256": "8c26b1b2283d9a4a0683372bf6b680224c8797ef6b0d82ace82c160539d406d3"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\documents\\125756\\source.pdf",
+          "sha256": "143d120189efeed0377663979d02d726587c13fac57f296b7f04e219f1af7db7"
+        }
+      ],
+      "original_capital": {
+        "reference": "2023-03-31",
+        "quantity_scale": 1000,
+        "paid_in": {
+          "ON": 498298000.0,
+          "PN": 0.0,
+          "total": 498298000.0
+        },
+        "treasury": {
+          "ON": 0.0,
+          "PN": 0.0,
+          "total": 0.0
+        },
+        "shares": {
+          "ON": 498298000.0,
+          "PN": 0.0
+        }
+      }
+    },
+    {
+      "document": {
+        "id": "131799",
+        "cnpj": "94813102000170",
+        "cvm_code": "025950",
+        "reference": "2023-09-30",
+        "version": 1,
+        "receipt": "2023-11-06",
+        "kind": "ITR",
+        "name": "TRÊS TENTOS AGROINDUSTRIAL S/A"
+      },
+      "valuation": {
+        "id": "131799",
+        "first_decision": "2023-11-07",
+        "last_decision": "2024-02-20",
+        "issuer_sessions": 70,
+        "name_days": 70
+      },
+      "original_capital_manifest": {
+        "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital\\131799\\manifest.json",
+        "sha256": "e82f98f8099750dc00f39bf22f1b2af9d87f7508069f99682b67102482228e14"
+      },
+      "outcome": "retain_original",
+      "reason": "Own current capital note gives 498298000 ON and dated treasury table explicitly gives 85 thousand; both original values agree.",
+      "reviewed_physical_pages": [
+        107,
+        108,
+        109
+      ],
+      "review_method": "Own original PDF text and/or previously recorded visual review; no new independent quantity is asserted where explicitly limited.",
+      "evidence": [
+        {
+          "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\documents\\131799\\result.json",
+          "sha256": "aabc28730cf959e5e018a4e04a6cd64ed51f8d9adbca8ad4267d75ebaaf4d903"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\documents\\131799\\source.pdf",
+          "sha256": "3d5dcf7be5db12c81983665974ba869c8d2ff4ecea2f3c1c7f421d5d94d14b6d"
+        }
+      ],
+      "original_capital": {
+        "reference": "2023-09-30",
+        "quantity_scale": 1000,
+        "paid_in": {
+          "ON": 498298000.0,
+          "PN": 0.0,
+          "total": 498298000.0
+        },
+        "treasury": {
+          "ON": 85000.0,
+          "PN": 0.0,
+          "total": 85000.0
+        },
+        "shares": {
+          "ON": 498213000.0,
+          "PN": 0.0
+        }
+      }
+    },
+    {
+      "document": {
+        "id": "136698",
+        "cnpj": "94813102000170",
+        "cvm_code": "025950",
+        "reference": "2024-03-31",
+        "version": 1,
+        "receipt": "2024-05-08",
+        "kind": "ITR",
+        "name": "TRÊS TENTOS AGROINDUSTRIAL S/A"
+      },
+      "valuation": {
+        "id": "136698",
+        "first_decision": "2024-05-09",
+        "last_decision": "2024-08-12",
+        "issuer_sessions": 67,
+        "name_days": 67
+      },
+      "original_capital_manifest": {
+        "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital\\136698\\manifest.json",
+        "sha256": "dad3c194388077e2842302ec969acffda00d38eecc24436c1d49e769d3e5e611"
+      },
+      "outcome": "own_source_correction",
+      "disposition": {
+        "availability": "Exact original filing receipt; no later version, market price or adjacent ratio supplies the count.",
+        "disposition": "reconciled",
+        "document": {
+          "cnpj": "94813102000170",
+          "cvm_code": "025950",
+          "id": "136698",
+          "kind": "ITR",
+          "reference": "2024-03-31",
+          "version": "1"
+        },
+        "evidence": [
+          {
+            "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\transport_retry_20260910T200700Z\\documents\\136698\\result.json",
+            "sha256": "fd050af0276982261a49c97cdcb9e8ab1aff9f10e0405174a67a4109552176ec"
+          },
+          {
+            "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\original_zips\\136698\\source.zip",
+            "sha256": "5ffd19bc42f4383c30d402ae61398b6a4d2d3c447c17c87a47f48c08ff471199"
+          },
+          {
+            "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\transport_retry_20260910T200700Z\\documents\\136698\\source.pdf",
+            "sha256": "c1f053451b2928a7b5fcc5aa6657122a4771b1e47814514dfb7eea468033754a"
+          },
+          {
+            "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\transport_retry_20260910T200700Z\\documents\\136698\\capital_note_pages.json",
+            "sha256": "f11e922e7ba4ef34bb5d2a671c6788de5e209ea4dbb392edcc99ceb4478bfb3e"
+          },
+          {
+            "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\review_priority_seven_20260911.json",
+            "sha256": "9b0a35cd7642bba0776ecb3b8c8bcd7ae3264f768f0b7a75873379bfaf6c95de"
+          },
+          {
+            "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\transport_retry_20260910T200700Z\\documents\\136698\\page_97.png",
+            "sha256": "c0ea50c9ba9b259f0fe3fa94538c89fae4b50fa4723b18215cbab4ac3d704946"
+          },
+          {
+            "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\transport_retry_20260910T200700Z\\documents\\136698\\page_98.png",
+            "sha256": "9c8c07c7a809af0a7a89cdfedf55ca6e0bf0267cea382bc95ecf71f0bdd11f13"
+          },
+          {
+            "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital\\136698\\manifest.json",
+            "sha256": "dad3c194388077e2842302ec969acffda00d38eecc24436c1d49e769d3e5e611"
+          }
+        ],
+        "paid_in_shares": {
+          "ON": 498298000,
+          "PN": 0
+        },
+        "reason": "Own current capital note confirms 498298000 ON. The dated treasury rollforward ends at 1422 thousand on 2024-03-31; 135 thousand was the prior December balance, not the current count.",
+        "treasury_shares": {
+          "ON": 1422000,
+          "PN": 0
+        }
+      }
+    },
+    {
+      "document": {
+        "id": "91773",
+        "cnpj": "91333666000117",
+        "cvm_code": "012572",
+        "reference": "2019-12-31",
+        "version": 2,
+        "receipt": "2020-03-24",
+        "kind": "DFP",
+        "name": "RECRUSUL S.A."
+      },
+      "valuation": {
+        "id": "91773",
+        "first_decision": "2020-03-24",
+        "last_decision": "2020-05-11",
+        "issuer_sessions": 32,
+        "name_days": 64
+      },
+      "original_capital_manifest": {
+        "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital\\91773\\manifest.json",
+        "sha256": "cb15a6ba2f94e1f4701cb6bf4036ac765fa4de476e1751c0b442ced00150f17b"
+      },
+      "outcome": "retain_original",
+      "reason": "Retain the dated original composition with its explicit thousand-share unit. Own note repeats 25409 ON / 50414 PN / 75823 total without establishing an independent current unit; monetary amounts still awaiting payment do not supply an alternative share count.",
+      "reviewed_physical_pages": [
+        35
+      ],
+      "review_method": "Own original PDF text and/or previously recorded visual review; no new independent quantity is asserted where explicitly limited.",
+      "evidence": [
+        {
+          "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\documents\\91773\\result.json",
+          "sha256": "5242a42813646a60376148d0a3578f683da84984c00575af5bf4521410835ca5"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\documents\\91773\\source.pdf",
+          "sha256": "de4da34fa0abc604021b2075d1db655ca14cb87d8ecd364c5d27b91b52cf41da"
+        }
+      ],
+      "original_capital": {
+        "reference": "2019-12-31",
+        "quantity_scale": 1000,
+        "paid_in": {
+          "ON": 25409000.0,
+          "PN": 50414000.0,
+          "total": 75823000.0
+        },
+        "treasury": {
+          "ON": 0.0,
+          "PN": 0.0,
+          "total": 0.0
+        },
+        "shares": {
+          "ON": 25409000.0,
+          "PN": 50414000.0
+        }
+      }
+    },
+    {
+      "document": {
+        "id": "107739",
+        "cnpj": "11421994000136",
+        "cvm_code": "025550",
+        "reference": "2021-06-30",
+        "version": 1,
+        "receipt": "2021-08-12",
+        "kind": "ITR",
+        "name": "ORIZON VALORIZAÇÃO DE RESÍDUOS S.A."
+      },
+      "valuation": {
+        "id": "107739",
+        "first_decision": "2021-08-13",
+        "last_decision": "2021-11-11",
+        "issuer_sessions": 62,
+        "name_days": 62
+      },
+      "original_capital_manifest": {
+        "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital\\107739\\manifest.json",
+        "sha256": "fbe8a6c14afa51b4b3313c543c472a6ce651d537f61e0f7054fdf4fb82d07840"
+      },
+      "outcome": "retain_original",
+      "reason": "Own current shareholder table explicitly labels shares in thousands and totals 71500, agreeing with 71500000 original ON.",
+      "reviewed_physical_pages": [
+        82,
+        83
+      ],
+      "review_method": "Own original PDF text and/or previously recorded visual review; no new independent quantity is asserted where explicitly limited.",
+      "evidence": [
+        {
+          "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\transport_retry_20260910T200700Z\\documents\\107739\\result.json",
+          "sha256": "3663c5ea11641acf0657dc48e15b56b40916c9e5f6445e8ed9a5648d631f0eae"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\transport_retry_20260910T200700Z\\documents\\107739\\source.pdf",
+          "sha256": "8aefe5f71fe1d347f769286e5db29a9dc75fa0d75604e25cc509eb7dc4410c19"
+        }
+      ],
+      "original_capital": {
+        "reference": "2021-06-30",
+        "quantity_scale": 1000,
+        "paid_in": {
+          "ON": 71500000.0,
+          "PN": 0.0,
+          "total": 71500000.0
+        },
+        "treasury": {
+          "ON": 0.0,
+          "PN": 0.0,
+          "total": 0.0
+        },
+        "shares": {
+          "ON": 71500000.0,
+          "PN": 0.0
+        }
+      }
+    },
+    {
+      "document": {
+        "id": "126843",
+        "cnpj": "13270520000166",
+        "cvm_code": "025879",
+        "reference": "2023-03-31",
+        "version": 1,
+        "receipt": "2023-05-15",
+        "kind": "ITR",
+        "name": "KORA SAÚDE PARTICIPAÇÕES S.A."
+      },
+      "valuation": {
+        "id": "126843",
+        "first_decision": "2023-05-16",
+        "last_decision": "2023-08-07",
+        "issuer_sessions": 59,
+        "name_days": 59
+      },
+      "original_capital_manifest": {
+        "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital\\126843\\manifest.json",
+        "sha256": "849447e4a699bd8a686f0c371003568439bc8cd42d63f7f3f50a8fa122fc6e21"
+      },
+      "outcome": "retain_original",
+      "reason": "Retain the exact current composition at its explicit thousand-share unit. Recovered own notes describe monetary capital, approved issuances and repurchase limits but do not contradict the current composition or independently establish held treasury quantities. No weighted EPS, authorized repurchase or monetary amount supplies a count.",
+      "reviewed_physical_pages": [
+        24,
+        25
+      ],
+      "review_method": "Own original PDF text and/or previously recorded visual review; no new independent quantity is asserted where explicitly limited.",
+      "evidence": [
+        {
+          "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_note_viewer_recovery_20260910T233800Z\\126843\\result.json",
+          "sha256": "a3eedeb21f36072bd4674974117f3cdec1c73ffb481ab4f750dcfdab9254feaf"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_note_viewer_recovery_20260910T233800Z\\126843\\source.pdf",
+          "sha256": "c564bd6e510d5ac405e1adfb0a8a6f252d6a6d0974e742d0481c42243eb4b052"
+        }
+      ],
+      "original_capital": {
+        "reference": "2023-03-31",
+        "quantity_scale": 1000,
+        "paid_in": {
+          "ON": 773348000.0,
+          "PN": 0.0,
+          "total": 773348000.0
+        },
+        "treasury": {
+          "ON": 5394000.0,
+          "PN": 0.0,
+          "total": 5394000.0
+        },
+        "shares": {
+          "ON": 767954000.0,
+          "PN": 0.0
+        }
+      }
+    },
+    {
+      "document": {
+        "id": "121900",
+        "cnpj": "13270520000166",
+        "cvm_code": "025879",
+        "reference": "2022-09-30",
+        "version": 1,
+        "receipt": "2022-11-11",
+        "kind": "ITR",
+        "name": "KORA SAÚDE PARTICIPAÇÕES S.A."
+      },
+      "valuation": {
+        "id": "121900",
+        "first_decision": "2022-11-14",
+        "last_decision": "2023-03-28",
+        "issuer_sessions": 58,
+        "name_days": 58
+      },
+      "original_capital_manifest": {
+        "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital\\121900\\manifest.json",
+        "sha256": "427d7dc4d365acaee2057cb3c2e1c79cd6e93af51a0c884111d2ef2b02ee0ec2"
+      },
+      "outcome": "retain_original",
+      "reason": "Retain the exact current composition at its explicit thousand-share unit. Own notes give monetary capital and individual issuance events, not an independently established current share total. These are not grounds to replace or mask the original count.",
+      "reviewed_physical_pages": [
+        90,
+        91
+      ],
+      "review_method": "Own original PDF text and/or previously recorded visual review; no new independent quantity is asserted where explicitly limited.",
+      "evidence": [
+        {
+          "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\documents\\121900\\result.json",
+          "sha256": "0f27099097df54fcdbcae50c3255941bd0c110472c155860812c1a98fd824bfa"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\documents\\121900\\source.pdf",
+          "sha256": "bd3de95de81b1c9a43b744e248a2abc3050152b698953012da84b3968fa9af66"
+        }
+      ],
+      "original_capital": {
+        "reference": "2022-09-30",
+        "quantity_scale": 1000,
+        "paid_in": {
+          "ON": 772232000.0,
+          "PN": 0.0,
+          "total": 772232000.0
+        },
+        "treasury": {
+          "ON": 5394000.0,
+          "PN": 0.0,
+          "total": 5394000.0
+        },
+        "shares": {
+          "ON": 766838000.0,
+          "PN": 0.0
+        }
+      }
+    },
+    {
+      "document": {
+        "id": "116753",
+        "cnpj": "11421994000136",
+        "cvm_code": "025550",
+        "reference": "2022-03-31",
+        "version": 2,
+        "receipt": "2022-06-01",
+        "kind": "ITR",
+        "name": "ORIZON VALORIZAÇÃO DE RESÍDUOS S.A."
+      },
+      "valuation": {
+        "id": "116753",
+        "first_decision": "2022-06-01",
+        "last_decision": "2022-08-15",
+        "issuer_sessions": 53,
+        "name_days": 53
+      },
+      "original_capital_manifest": {
+        "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital\\116753\\manifest.json",
+        "sha256": "952110ff5d61d4cdba01ab035bfe67278347faf7317e7d0b030010e9b0a47614"
+      },
+      "outcome": "retain_original",
+      "reason": "Own current shareholder table explicitly labels shares in thousands and totals 71500, agreeing with original 71500000 ON.",
+      "reviewed_physical_pages": [
+        92,
+        93
+      ],
+      "review_method": "Own original PDF text and/or previously recorded visual review; no new independent quantity is asserted where explicitly limited.",
+      "evidence": [
+        {
+          "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\documents\\116753\\result.json",
+          "sha256": "d9ff5df8c812e74296c5ad8d9dadff0b2a3e39063d109f64612613081399a198"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\documents\\116753\\source.pdf",
+          "sha256": "151effb622a93ade9c0b58b8ea8b935d82b2ece4b97f5309220e1da09f0deab5"
+        }
+      ],
+      "original_capital": {
+        "reference": "2022-03-31",
+        "quantity_scale": 1000,
+        "paid_in": {
+          "ON": 71500000.0,
+          "PN": 0.0,
+          "total": 71500000.0
+        },
+        "treasury": {
+          "ON": 0.0,
+          "PN": 0.0,
+          "total": 0.0
+        },
+        "shares": {
+          "ON": 71500000.0,
+          "PN": 0.0
+        }
+      }
+    },
+    {
+      "document": {
+        "id": "105700",
+        "cnpj": "11421994000136",
+        "cvm_code": "025550",
+        "reference": "2021-03-31",
+        "version": 2,
+        "receipt": "2021-06-01",
+        "kind": "ITR",
+        "name": "ORIZON VALORIZAÇÃO DE RESÍDUOS S.A."
+      },
+      "valuation": {
+        "id": "105700",
+        "first_decision": "2021-06-01",
+        "last_decision": "2021-08-12",
+        "issuer_sessions": 51,
+        "name_days": 51
+      },
+      "original_capital_manifest": {
+        "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital\\105700\\manifest.json",
+        "sha256": "cc0a52160415c99911694646f1e034e510dafe222d71b56530852746087f1978"
+      },
+      "outcome": "retain_original",
+      "reason": "The dated current shareholder table totals 71500 thousand, supporting original 71499970 within its published precision. The introductory 5122089-share sentence is stale pre-IPO information and cannot replace the current table.",
+      "reviewed_physical_pages": [
+        81,
+        82
+      ],
+      "review_method": "Own original PDF text and/or previously recorded visual review; no new independent quantity is asserted where explicitly limited.",
+      "evidence": [
+        {
+          "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\documents\\105700\\result.json",
+          "sha256": "b74287deac09a109adea77af32ee92e52ce95e1978ed9558753188ea6416ace3"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\documents\\105700\\source.pdf",
+          "sha256": "d03c2b5a6af001069c0040eef8f7c6e42a2ecd8a0edb757bf6fad4066d1536dd"
+        }
+      ],
+      "original_capital": {
+        "reference": "2021-03-31",
+        "quantity_scale": 1,
+        "paid_in": {
+          "ON": 71499970.0,
+          "PN": 0.0,
+          "total": 71499970.0
+        },
+        "treasury": {
+          "ON": 0.0,
+          "PN": 0.0,
+          "total": 0.0
+        },
+        "shares": {
+          "ON": 71499970.0,
+          "PN": 0.0
+        }
+      }
+    },
+    {
+      "document": {
+        "id": "45084",
+        "cnpj": "03847461000192",
+        "cvm_code": "018724",
+        "reference": "2014-12-31",
+        "version": 2,
+        "receipt": "2015-03-19",
+        "kind": "DFP",
+        "name": "BRADESPAR S.A."
+      },
+      "valuation": {
+        "id": "45084",
+        "first_decision": "2015-03-20",
+        "last_decision": "2015-04-27",
+        "issuer_sessions": 25,
+        "name_days": 50
+      },
+      "original_capital_manifest": {
+        "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital\\45084\\manifest.json",
+        "sha256": "4009efb02fc86a17d1267fca46c45b873c05fb69a4abac9f91fc4f557c0db7f9"
+      },
+      "outcome": "retain_original",
+      "reason": "Own current table gives 122523049 ON / 227024896 PN; original 122523000 / 227025000 agrees at thousand-share precision.",
+      "reviewed_physical_pages": [
+        49
+      ],
+      "review_method": "Own original PDF text and/or previously recorded visual review; no new independent quantity is asserted where explicitly limited.",
+      "evidence": [
+        {
+          "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\documents\\45084\\result.json",
+          "sha256": "c12fd98e0a39369aeab59a5b0e665c53408c49449cb11a777ec76fc20bfb0e50"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\documents\\45084\\source.pdf",
+          "sha256": "ece23cd7f500c19bebf6e742e32d3072ed39fdef59323bca162b462ec60a3db2"
+        }
+      ],
+      "original_capital": {
+        "reference": "2014-12-31",
+        "quantity_scale": 1000,
+        "paid_in": {
+          "ON": 122523000.0,
+          "PN": 227025000.0,
+          "total": 349548000.0
+        },
+        "treasury": {
+          "ON": 0.0,
+          "PN": 0.0,
+          "total": 0.0
+        },
+        "shares": {
+          "ON": 122523000.0,
+          "PN": 227025000.0
+        }
+      }
+    },
+    {
+      "document": {
+        "id": "5577",
+        "cnpj": "02998609000127",
+        "cvm_code": "018350",
+        "reference": "2010-12-31",
+        "version": 2,
+        "receipt": "2011-03-25",
+        "kind": "DFP",
+        "name": "AES TIETE SA"
+      },
+      "valuation": {
+        "id": "5577",
+        "first_decision": "2011-03-25",
+        "last_decision": "2011-05-02",
+        "issuer_sessions": 25,
+        "name_days": 50
+      },
+      "original_capital_manifest": {
+        "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital\\5577\\manifest.json",
+        "sha256": "65615597a77db803df6d98f4126cb891ad9d53e443942c69710e40fe46529e39"
+      },
+      "outcome": "retain_original",
+      "reason": "Own current fully paid capital gives 197461211 ON / 183792282 PN; original 197461000 / 183792000 agrees at thousand-share precision.",
+      "reviewed_physical_pages": [
+        40
+      ],
+      "review_method": "Own original PDF text and/or previously recorded visual review; no new independent quantity is asserted where explicitly limited.",
+      "evidence": [
+        {
+          "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\documents\\5577\\result.json",
+          "sha256": "6b2f068d41b77c3bb68e530e5feaeaceb623e2e91e8dffd4296ca55ac4dcc811"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\documents\\5577\\source.pdf",
+          "sha256": "051b0ca46e77e285f7c7752bf8b00d5ce8ba8d484a2434b9cc2600b677baf650"
+        }
+      ],
+      "original_capital": {
+        "reference": "2010-12-31",
+        "quantity_scale": 1000,
+        "paid_in": {
+          "ON": 197461000.0,
+          "PN": 183792000.0,
+          "total": 381253000.0
+        },
+        "treasury": {
+          "ON": 0.0,
+          "PN": 0.0,
+          "total": 0.0
+        },
+        "shares": {
+          "ON": 197461000.0,
+          "PN": 183792000.0
+        }
+      }
+    },
+    {
+      "document": {
+        "id": "123594",
+        "cnpj": "28594234000123",
+        "cvm_code": "026620",
+        "reference": "2022-12-31",
+        "version": 1,
+        "receipt": "2023-02-16",
+        "kind": "DFP",
+        "name": "AUREN ENERGIA S.A."
+      },
+      "valuation": {
+        "id": "123594",
+        "first_decision": "2023-02-17",
+        "last_decision": "2023-05-04",
+        "issuer_sessions": 50,
+        "name_days": 50
+      },
+      "original_capital_manifest": {
+        "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital\\123594\\manifest.json",
+        "sha256": "0fad5f4b6b45dbadacfcb7a63f757526aac5e80b6ff3123b0c9702fa32a95c5a"
+      },
+      "outcome": "retain_original",
+      "reason": "Own current complete holder table and paid-capital note establish 1000000000 ON, agreeing with original.",
+      "reviewed_physical_pages": [
+        137
+      ],
+      "review_method": "Own original PDF text and/or previously recorded visual review; no new independent quantity is asserted where explicitly limited.",
+      "evidence": [
+        {
+          "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\documents\\123594\\result.json",
+          "sha256": "89e87c3590fcb3b339ffb7c65935b44e296191fcd98facd29b5b7b837909efb8"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\documents\\123594\\source.pdf",
+          "sha256": "46c42ba05a85fa083c84c3fbb93aefb9e468e4b9e22712d0bdc12d713ccb9de5"
+        }
+      ],
+      "original_capital": {
+        "reference": "2022-12-31",
+        "quantity_scale": 1000,
+        "paid_in": {
+          "ON": 1000000000.0,
+          "PN": 0.0,
+          "total": 1000000000.0
+        },
+        "treasury": {
+          "ON": 0.0,
+          "PN": 0.0,
+          "total": 0.0
+        },
+        "shares": {
+          "ON": 1000000000.0,
+          "PN": 0.0
+        }
+      }
+    },
+    {
+      "document": {
+        "id": "46604",
+        "cnpj": "06948969000175",
+        "cvm_code": "023035",
+        "reference": "2015-03-31",
+        "version": 2,
+        "receipt": "2015-05-07",
+        "kind": "ITR",
+        "name": "LINX S.A."
+      },
+      "valuation": {
+        "id": "46604",
+        "first_decision": "2015-05-08",
+        "last_decision": "2015-07-17",
+        "issuer_sessions": 49,
+        "name_days": 49
+      },
+      "original_capital_manifest": {
+        "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital\\46604\\manifest.json",
+        "sha256": "59ed6219cd5bb27c63141e91ce3a05c7e947180a5a484dc0d48676e96f05aff6"
+      },
+      "outcome": "retain_original",
+      "reason": "Own current complete holder table totals 46773377 ON, agreeing exactly with original.",
+      "reviewed_physical_pages": [
+        55,
+        56
+      ],
+      "review_method": "Own original PDF text and/or previously recorded visual review; no new independent quantity is asserted where explicitly limited.",
+      "evidence": [
+        {
+          "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\documents\\46604\\result.json",
+          "sha256": "bb2b320e5a2ec34fab86b7d9e808afda442785f838ad50602d3d443df08abd48"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\documents\\46604\\source.pdf",
+          "sha256": "4f519a4316da953a165b1c43125d7b282dee513a7c74f1759190874ad1149b66"
+        }
+      ],
+      "original_capital": {
+        "reference": "2015-03-31",
+        "quantity_scale": 1,
+        "paid_in": {
+          "ON": 46773377.0,
+          "PN": 0.0,
+          "total": 46773377.0
+        },
+        "treasury": {
+          "ON": 0.0,
+          "PN": 0.0,
+          "total": 0.0
+        },
+        "shares": {
+          "ON": 46773377.0,
+          "PN": 0.0
+        }
+      }
+    },
+    {
+      "document": {
+        "id": "106568",
+        "cnpj": "56720428000163",
+        "cvm_code": "007510",
+        "reference": "2021-06-30",
+        "version": 1,
+        "receipt": "2021-07-20",
+        "kind": "ITR",
+        "name": "ROMI S.A."
+      },
+      "valuation": {
+        "id": "106568",
+        "first_decision": "2021-07-21",
+        "last_decision": "2021-09-21",
+        "issuer_sessions": 44,
+        "name_days": 44
+      },
+      "original_capital_manifest": {
+        "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital\\106568\\manifest.json",
+        "sha256": "7ec6cae274a8d5eb2d1e058141f00a33405677108df593db5d4ba584da303b23"
+      },
+      "outcome": "retain_original",
+      "reason": "Own current fully paid capital gives 73333922 ON, agreeing exactly with original.",
+      "reviewed_physical_pages": [
+        66
+      ],
+      "review_method": "Own original PDF text and/or previously recorded visual review; no new independent quantity is asserted where explicitly limited.",
+      "evidence": [
+        {
+          "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\documents\\106568\\result.json",
+          "sha256": "8f32fb2f3fb5732babba3688a0cac81b2b45574908f568744e636172d6514cc9"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\documents\\106568\\source.pdf",
+          "sha256": "0c2ebe0a43aa2b1e2b06f67886d1e9b29130d458b8cd5051a50ba836e0375281"
+        }
+      ],
+      "original_capital": {
+        "reference": "2021-06-30",
+        "quantity_scale": 1,
+        "paid_in": {
+          "ON": 73333922.0,
+          "PN": 0.0,
+          "total": 73333922.0
+        },
+        "treasury": {
+          "ON": 0.0,
+          "PN": 0.0,
+          "total": 0.0
+        },
+        "shares": {
+          "ON": 73333922.0,
+          "PN": 0.0
+        }
+      }
+    },
+    {
+      "document": {
+        "id": "100689",
+        "cnpj": "16590234000176",
+        "cvm_code": "022349",
+        "reference": "2020-12-31",
+        "version": 2,
+        "receipt": "2021-03-04",
+        "kind": "DFP",
+        "name": "AZZAS 2154 S.A."
+      },
+      "valuation": {
+        "id": "100689",
+        "first_decision": "2021-03-05",
+        "last_decision": "2021-04-30",
+        "issuer_sessions": 39,
+        "name_days": 39
+      },
+      "original_capital_manifest": {
+        "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital\\100689\\manifest.json",
+        "sha256": "21b3dae92a57f18866a22ddd003651ad35a88cfb8f451576ebc7ea2c87da3012"
+      },
+      "outcome": "retain_original",
+      "reason": "Own dated capital rollforward explicitly in thousands gives 99631 thousand ON; treasury is 3679 actual shares, consistent with original 4000 at thousand-share precision. Preserve the original published precision.",
+      "reviewed_physical_pages": [
+        107,
+        109
+      ],
+      "review_method": "Own original PDF text and/or previously recorded visual review; no new independent quantity is asserted where explicitly limited.",
+      "evidence": [
+        {
+          "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\transport_retry_20260910T200700Z\\documents\\100689\\result.json",
+          "sha256": "fe4da99cba5f46fabb4eac9f703481a1474e441b6e62e5b8839fda4d3878b7ca"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\transport_retry_20260910T200700Z\\documents\\100689\\source.pdf",
+          "sha256": "efb3ac862b9a5c494b6f15ee613ca8e23c4965ee9ff42f17751bed17d30f960b"
+        }
+      ],
+      "original_capital": {
+        "reference": "2020-12-31",
+        "quantity_scale": 1000,
+        "paid_in": {
+          "ON": 99631000.0,
+          "PN": 0.0,
+          "total": 99631000.0
+        },
+        "treasury": {
+          "ON": 4000.0,
+          "PN": 0.0,
+          "total": 4000.0
+        },
+        "shares": {
+          "ON": 99627000.0,
+          "PN": 0.0
+        }
+      }
+    },
+    {
+      "document": {
+        "id": "121386",
+        "cnpj": "94813102000170",
+        "cvm_code": "025950",
+        "reference": "2022-09-30",
+        "version": 1,
+        "receipt": "2022-11-07",
+        "kind": "ITR",
+        "name": "TRÊS TENTOS AGROINDUSTRIAL S/A"
+      },
+      "valuation": {
+        "id": "121386",
+        "first_decision": "2022-12-21",
+        "last_decision": "2023-02-09",
+        "issuer_sessions": 36,
+        "name_days": 36
+      },
+      "original_capital_manifest": {
+        "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital\\121386\\manifest.json",
+        "sha256": "5151fe534dbb3beaae7c5c7ba8bdb99d160fa57a8dfcf2bb17fec96a1a461a2e"
+      },
+      "outcome": "retain_original",
+      "reason": "Own current capital discussion reports 496218 thousand-share magnitude after the disclosed issuance; retain original 496218000. No current total is inferred from a later filing.",
+      "reviewed_physical_pages": [
+        89,
+        90
+      ],
+      "review_method": "Own original PDF text and/or previously recorded visual review; no new independent quantity is asserted where explicitly limited.",
+      "evidence": [
+        {
+          "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\documents\\121386\\result.json",
+          "sha256": "f5393764a1ed831d01947954f03e1794d45ad39a95331dbf446d41bdbe2114de"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\documents\\121386\\source.pdf",
+          "sha256": "bc10c9ca84e556a5d203f4fc6ea8fc1dc0e5ebb8661703c839dc37f810a1ab46"
+        }
+      ],
+      "original_capital": {
+        "reference": "2022-09-30",
+        "quantity_scale": 1000,
+        "paid_in": {
+          "ON": 496218000.0,
+          "PN": 0.0,
+          "total": 496218000.0
+        },
+        "treasury": {
+          "ON": 0.0,
+          "PN": 0.0,
+          "total": 0.0
+        },
+        "shares": {
+          "ON": 496218000.0,
+          "PN": 0.0
+        }
+      }
+    },
+    {
+      "document": {
+        "id": "98190",
+        "cnpj": "60537263000166",
+        "cvm_code": "024953",
+        "reference": "2020-09-30",
+        "version": 1,
+        "receipt": "2020-11-10",
+        "kind": "ITR",
+        "name": "ALLPARK EMPREENDIMENTOS, PARTICIPAÇÕES E SERVIÇOS S.A."
+      },
+      "valuation": {
+        "id": "98190",
+        "first_decision": "2021-01-18",
+        "last_decision": "2021-03-09",
+        "issuer_sessions": 34,
+        "name_days": 34
+      },
+      "original_capital_manifest": {
+        "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital\\98190\\manifest.json",
+        "sha256": "57ca7654b61d53ddf9d464b643a0acc9239f793d49f64ece7274cbb927438c99"
+      },
+      "outcome": "retain_original",
+      "reason": "Own current capital and complete holder table give 193771106 ON, consistent with original 193771000 at thousand-share precision.",
+      "reviewed_physical_pages": [
+        77
+      ],
+      "review_method": "Own original PDF text and/or previously recorded visual review; no new independent quantity is asserted where explicitly limited.",
+      "evidence": [
+        {
+          "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\documents\\98190\\result.json",
+          "sha256": "1e2c4ccdebf771560ba6e830d59302333b580447bcf7cf903d9e384ed3ae48b5"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\documents\\98190\\source.pdf",
+          "sha256": "998c678c6ff529802c16448c2d5339379b0dd705a01b20b7b91660a8b9bc0114"
+        }
+      ],
+      "original_capital": {
+        "reference": "2020-09-30",
+        "quantity_scale": 1000,
+        "paid_in": {
+          "ON": 193771000.0,
+          "PN": 0.0,
+          "total": 193771000.0
+        },
+        "treasury": {
+          "ON": 0.0,
+          "PN": 0.0,
+          "total": 0.0
+        },
+        "shares": {
+          "ON": 193771000.0,
+          "PN": 0.0
+        }
+      }
+    },
+    {
+      "document": {
+        "id": "91841",
+        "cnpj": "33041260065290",
+        "cvm_code": "006505",
+        "reference": "2019-12-31",
+        "version": 1,
+        "receipt": "2020-03-26",
+        "kind": "DFP",
+        "name": "GRUPO CASAS BAHIA S.A."
+      },
+      "valuation": {
+        "id": "91841",
+        "first_decision": "2020-03-26",
+        "last_decision": "2020-05-13",
+        "issuer_sessions": 32,
+        "name_days": 32
+      },
+      "original_capital_manifest": {
+        "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital\\91841\\manifest.json",
+        "sha256": "1039cc401efe4faf21e6c5b7cf6e6250a3c16a30038c32130ff50d2b021bcd16"
+      },
+      "outcome": "own_source_correction",
+      "disposition": {
+        "availability": "Exact original filing receipt; no later version, market price or adjacent ratio supplies the count.",
+        "disposition": "reconciled",
+        "document": {
+          "cnpj": "33041260065290",
+          "cvm_code": "006505",
+          "id": "91841",
+          "kind": "DFP",
+          "reference": "2019-12-31",
+          "version": "1"
+        },
+        "evidence": [
+          {
+            "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\documents\\91841\\result.json",
+            "sha256": "393eaad9fa98312046686c30c852718b97fa724b98ec6a9d7e5a087b29a3c174"
+          },
+          {
+            "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\original_zips\\91841\\source.zip",
+            "sha256": "ab2c3720d815df75994b36b8eb5a9e72a649955caa0b0979508d22b1ffb150e4"
+          },
+          {
+            "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\documents\\91841\\source.pdf",
+            "sha256": "b8d4d3fcb2f6c4e22384b0f93d9d2b1080a1578798a96f8466279c84ada47725"
+          },
+          {
+            "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\documents\\91841\\capital_note_pages.json",
+            "sha256": "a0acec37267e93855bf7e3cc02d23986e87ce8cd9f4d729e84693208d794d435"
+          },
+          {
+            "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\review_priority_seven_20260911.json",
+            "sha256": "9b0a35cd7642bba0776ecb3b8c8bcd7ae3264f768f0b7a75873379bfaf6c95de"
+          },
+          {
+            "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\documents\\91841\\page_81.png",
+            "sha256": "dedd60a50bd8923899b0c55965247ec23c0a3d387b6582a4ae1204a141277d7b"
+          },
+          {
+            "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital\\91841\\manifest.json",
+            "sha256": "1039cc401efe4faf21e6c5b7cf6e6250a3c16a30038c32130ff50d2b021bcd16"
+          }
+        ],
+        "paid_in_shares": {
+          "ON": 1299653000,
+          "PN": 0
+        },
+        "reason": "Own current paid capital is explicitly 1299653 thousand ON; the treasury note retains 300 thousand shares after the PN-to-ON conversion. Restore gross paid count to avoid double subtraction.",
+        "treasury_shares": {
+          "ON": 300000,
+          "PN": 0
+        }
+      }
+    },
+    {
+      "document": {
+        "id": "109552",
+        "cnpj": "56720428000163",
+        "cvm_code": "007510",
+        "reference": "2021-09-30",
+        "version": 2,
+        "receipt": "2021-11-09",
+        "kind": "ITR",
+        "name": "ROMI S.A."
+      },
+      "valuation": {
+        "id": "109552",
+        "first_decision": "2021-11-09",
+        "last_decision": "2021-12-22",
+        "issuer_sessions": 31,
+        "name_days": 31
+      },
+      "original_capital_manifest": {
+        "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital\\109552\\manifest.json",
+        "sha256": "1970632a2f2491ca678dacf32254a8932f79cdd44a60df95cc9e6dde9df40333"
+      },
+      "outcome": "retain_original",
+      "reason": "Own current fully paid capital gives 73333922 ON, agreeing exactly with original.",
+      "reviewed_physical_pages": [
+        67
+      ],
+      "review_method": "Own original PDF text and/or previously recorded visual review; no new independent quantity is asserted where explicitly limited.",
+      "evidence": [
+        {
+          "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\transport_retry_20260910T200700Z\\documents\\109552\\result.json",
+          "sha256": "f37374df0e917bc33ad3c24b229b55c39888032644c4d80a058c4aab256e0453"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\transport_retry_20260910T200700Z\\documents\\109552\\source.pdf",
+          "sha256": "b60dbe5fb078817448dfba7319f1c5902e134f8729d2ea9c65218524b94cd012"
+        }
+      ],
+      "original_capital": {
+        "reference": "2021-09-30",
+        "quantity_scale": 1,
+        "paid_in": {
+          "ON": 73333922.0,
+          "PN": 0.0,
+          "total": 73333922.0
+        },
+        "treasury": {
+          "ON": 0.0,
+          "PN": 0.0,
+          "total": 0.0
+        },
+        "shares": {
+          "ON": 73333922.0,
+          "PN": 0.0
+        }
+      }
+    },
+    {
+      "document": {
+        "id": "7205",
+        "cnpj": "04752991000110",
+        "cvm_code": "019305",
+        "reference": "2010-12-31",
+        "version": 2,
+        "receipt": "2011-05-05",
+        "kind": "DFP",
+        "name": "BIOMM S.A."
+      },
+      "valuation": {
+        "id": "7205",
+        "first_decision": "2011-06-15",
+        "last_decision": "2012-03-15",
+        "issuer_sessions": 15,
+        "name_days": 30
+      },
+      "original_capital_manifest": {
+        "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital\\7205\\manifest.json",
+        "sha256": "4fb87bd60c6b8741bc829d1dc32be7af1544ed48081a685991f36b27f4af707d"
+      },
+      "outcome": "retain_original",
+      "reason": "Own note explicitly uses thousands of shares. The 9796 thousand PN note versus 9795 thousand original differs by one printed unit; retain original composition with this limitation. The note also contains inconsistent issuance arithmetic, so it does not supply a more precise correction. No 1000-fold contradiction is established.",
+      "reviewed_physical_pages": [
+        49,
+        50
+      ],
+      "review_method": "Own original PDF text and/or previously recorded visual review; no new independent quantity is asserted where explicitly limited.",
+      "evidence": [
+        {
+          "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\documents\\7205\\result.json",
+          "sha256": "6f0e7029639c2a08e732fd076d5f12db423d3f59bc2eb7dcd99a8cfd4004e8fa"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\documents\\7205\\source.pdf",
+          "sha256": "4407b588aefa6eb15313d419e9ed0e640e8ebd93e920816583deaef1d2ed8f8e"
+        }
+      ],
+      "original_capital": {
+        "reference": "2010-12-31",
+        "quantity_scale": 1000,
+        "paid_in": {
+          "ON": 7543000.0,
+          "PN": 9795000.0,
+          "total": 17338000.0
+        },
+        "treasury": {
+          "ON": 0.0,
+          "PN": 0.0,
+          "total": 0.0
+        },
+        "shares": {
+          "ON": 7543000.0,
+          "PN": 9795000.0
+        }
+      }
+    },
+    {
+      "document": {
+        "id": "15730",
+        "cnpj": "83475913000191",
+        "cvm_code": "013773",
+        "reference": "2011-12-31",
+        "version": 2,
+        "receipt": "2012-03-30",
+        "kind": "DFP",
+        "name": "PBG S/A"
+      },
+      "valuation": {
+        "id": "15730",
+        "first_decision": "2012-03-30",
+        "last_decision": "2012-05-10",
+        "issuer_sessions": 26,
+        "name_days": 26
+      },
+      "original_capital_manifest": {
+        "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital\\15730\\manifest.json",
+        "sha256": "0154a2d66aa2f24c4682ad9d869614b4d57b5439fe93ae63b0a18fc5d8bcb424"
+      },
+      "outcome": "retain_original",
+      "reason": "Own current fully paid capital gives 159008924 ON, consistent with original 159009000 at thousand-share precision. Free-float and authorized counts are not substituted.",
+      "reviewed_physical_pages": [
+        84
+      ],
+      "review_method": "Own original PDF text and/or previously recorded visual review; no new independent quantity is asserted where explicitly limited.",
+      "evidence": [
+        {
+          "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\documents\\15730\\result.json",
+          "sha256": "1c845230a0f212f04f177a9ba56222e1ff544374dbbccb1e366cb70ce490ef8a"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\documents\\15730\\source.pdf",
+          "sha256": "66c1bc72049b3901d78d6fa5ce814e9df0593bf10f7cad0194a3f076d0330367"
+        }
+      ],
+      "original_capital": {
+        "reference": "2011-12-31",
+        "quantity_scale": 1000,
+        "paid_in": {
+          "ON": 159009000.0,
+          "PN": 0.0,
+          "total": 159009000.0
+        },
+        "treasury": {
+          "ON": 0.0,
+          "PN": 0.0,
+          "total": 0.0
+        },
+        "shares": {
+          "ON": 159009000.0,
+          "PN": 0.0
+        }
+      }
+    },
+    {
+      "document": {
+        "id": "14175",
+        "cnpj": "92754738000162",
+        "cvm_code": "008133",
+        "reference": "2011-12-31",
+        "version": 1,
+        "receipt": "2012-02-08",
+        "kind": "DFP",
+        "name": "LOJAS RENNER S.A."
+      },
+      "valuation": {
+        "id": "14175",
+        "first_decision": "2012-02-09",
+        "last_decision": "2012-03-15",
+        "issuer_sessions": 24,
+        "name_days": 24
+      },
+      "original_capital_manifest": {
+        "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital\\14175\\manifest.json",
+        "sha256": "84ba85050da1250c1729201ebf3bc3bafcd6fc3992cb2a6d1d214486364b975f"
+      },
+      "outcome": "retain_original",
+      "reason": "Own current fully paid capital spells out 122821065 ON, consistent with original 122821000 at thousand-share precision.",
+      "reviewed_physical_pages": [
+        69
+      ],
+      "review_method": "Own original PDF text and/or previously recorded visual review; no new independent quantity is asserted where explicitly limited.",
+      "evidence": [
+        {
+          "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\transport_retry_20260910T200700Z\\documents\\14175\\result.json",
+          "sha256": "d6a476f7a19b71cb9afce86c882d2b178afe0366e783a12fdf1e5c800f3063a0"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\transport_retry_20260910T200700Z\\documents\\14175\\source.pdf",
+          "sha256": "5843bea1394b963682c36c37bb1f3c8f68a540a35cb327ac472644ad33ca1484"
+        }
+      ],
+      "original_capital": {
+        "reference": "2011-12-31",
+        "quantity_scale": 1000,
+        "paid_in": {
+          "ON": 122821000.0,
+          "PN": 0.0,
+          "total": 122821000.0
+        },
+        "treasury": {
+          "ON": 0.0,
+          "PN": 0.0,
+          "total": 0.0
+        },
+        "shares": {
+          "ON": 122821000.0,
+          "PN": 0.0
+        }
+      }
+    },
+    {
+      "document": {
+        "id": "5015",
+        "cnpj": "01832635000118",
+        "cvm_code": "016390",
+        "reference": "2010-12-31",
+        "version": 2,
+        "receipt": "2011-02-28",
+        "kind": "DFP",
+        "name": "TAM S.A."
+      },
+      "valuation": {
+        "id": "5015",
+        "first_decision": "2011-02-28",
+        "last_decision": "2011-03-16",
+        "issuer_sessions": 11,
+        "name_days": 22
+      },
+      "original_capital_manifest": {
+        "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital\\5015\\manifest.json",
+        "sha256": "7fa5c2fc4a1ba306b3c28cb2c2fcd5ba759278be9688998695f2dbad20b9a92f"
+      },
+      "outcome": "retain_original",
+      "reason": "Own current capital rollforward gives 55816683 ON / 100390098 PN, within one thousand shares of the published original 55816000 / 100390000. Retain original composition and its separately reported 213 thousand PN treasury; the capital note does not independently reconcile treasury.",
+      "reviewed_physical_pages": [
+        3,
+        111
+      ],
+      "review_method": "Own original PDF text and/or previously recorded visual review; no new independent quantity is asserted where explicitly limited.",
+      "evidence": [
+        {
+          "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\transport_retry_20260910T200700Z\\documents\\5015\\result.json",
+          "sha256": "02796850209b4943bbb650777558d97f62cce2ef2ffa3ecf72badfdf349db558"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\transport_retry_20260910T200700Z\\documents\\5015\\source.pdf",
+          "sha256": "4cd7f92fa0bfea771d926aac7383a8344a246a4966845d584928697bb999806a"
+        }
+      ],
+      "original_capital": {
+        "reference": "2010-12-31",
+        "quantity_scale": 1000,
+        "paid_in": {
+          "ON": 55816000.0,
+          "PN": 100390000.0,
+          "total": 156206000.0
+        },
+        "treasury": {
+          "ON": 0.0,
+          "PN": 213000.0,
+          "total": 213000.0
+        },
+        "shares": {
+          "ON": 55816000.0,
+          "PN": 100177000.0
+        }
+      }
+    },
+    {
+      "document": {
+        "id": "113354",
+        "cnpj": "11421994000136",
+        "cvm_code": "025550",
+        "reference": "2021-12-31",
+        "version": 2,
+        "receipt": "2022-03-31",
+        "kind": "DFP",
+        "name": "ORIZON VALORIZAÇÃO DE RESÍDUOS S.A."
+      },
+      "valuation": {
+        "id": "113354",
+        "first_decision": "2022-04-13",
+        "last_decision": "2022-05-16",
+        "issuer_sessions": 22,
+        "name_days": 22
+      },
+      "original_capital_manifest": {
+        "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital\\113354\\manifest.json",
+        "sha256": "cdd8e80083655633d1b51953b97eecbf114c37339c0c9cf79f665b6b1963f734"
+      },
+      "outcome": "retain_original",
+      "reason": "Own current complete shareholder table explicitly in thousands totals 71500, agreeing with original 71500000 ON.",
+      "reviewed_physical_pages": [
+        117
+      ],
+      "review_method": "Own original PDF text and/or previously recorded visual review; no new independent quantity is asserted where explicitly limited.",
+      "evidence": [
+        {
+          "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\transport_retry_20260910T200700Z\\documents\\113354\\result.json",
+          "sha256": "85fd34f954723a7e22cb98fe76b9ccebd10a60ea2c49d89831acd464508d5673"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\transport_retry_20260910T200700Z\\documents\\113354\\source.pdf",
+          "sha256": "18ff5d62aa7e6f67c873e9f8275d322d51b98918fd2ea45335e61cc28dd7e131"
+        }
+      ],
+      "original_capital": {
+        "reference": "2021-12-31",
+        "quantity_scale": 1000,
+        "paid_in": {
+          "ON": 71500000.0,
+          "PN": 0.0,
+          "total": 71500000.0
+        },
+        "treasury": {
+          "ON": 0.0,
+          "PN": 0.0,
+          "total": 0.0
+        },
+        "shares": {
+          "ON": 71500000.0,
+          "PN": 0.0
+        }
+      }
+    },
+    {
+      "document": {
+        "id": "72147",
+        "cnpj": "03983431000103",
+        "cvm_code": "019763",
+        "reference": "2017-12-31",
+        "version": 2,
+        "receipt": "2018-03-09",
+        "kind": "DFP",
+        "name": "EDP - ENERGIAS DO BRASIL S.A."
+      },
+      "valuation": {
+        "id": "72147",
+        "first_decision": "2018-03-12",
+        "last_decision": "2018-04-10",
+        "issuer_sessions": 21,
+        "name_days": 21
+      },
+      "original_capital_manifest": {
+        "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital\\72147\\manifest.json",
+        "sha256": "a2a75ae1a369844d0744049958e899244886a3e1f44d5408945286778fd223a1"
+      },
+      "outcome": "own_source_correction",
+      "disposition": {
+        "availability": "Exact original filing receipt; no later version, market price or adjacent ratio supplies the count.",
+        "disposition": "reconciled",
+        "document": {
+          "cnpj": "03983431000103",
+          "cvm_code": "019763",
+          "id": "72147",
+          "kind": "DFP",
+          "reference": "2017-12-31",
+          "version": "2"
+        },
+        "evidence": [
+          {
+            "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\documents\\72147\\result.json",
+            "sha256": "4188a28a744b9bb45221fc2d53524bf4933476051483697ba0f3d9f501e17253"
+          },
+          {
+            "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\original_zips\\72147\\source.zip",
+            "sha256": "0a7fdf85e2fb38206e174c961e9460927586adf78794d3aada3627ddc546677f"
+          },
+          {
+            "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\documents\\72147\\source.pdf",
+            "sha256": "fa52b154d56f775eec6a92acb6ca43f140719eaea84ed0f09cc3092b61c90423"
+          },
+          {
+            "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\documents\\72147\\capital_note_pages.json",
+            "sha256": "5e75e7718fef246e51006f577761c735b8591d47b3e4d6cb86ecdd592e897762"
+          },
+          {
+            "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\review_priority_seven_20260911.json",
+            "sha256": "9b0a35cd7642bba0776ecb3b8c8bcd7ae3264f768f0b7a75873379bfaf6c95de"
+          },
+          {
+            "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\documents\\72147\\page_121.png",
+            "sha256": "f9feb8bec09b67489ba06cc69c0beb184065401f788734b155805b796bc70e6f"
+          },
+          {
+            "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital\\72147\\manifest.json",
+            "sha256": "a2a75ae1a369844d0744049958e899244886a3e1f44d5408945286778fd223a1"
+          }
+        ],
+        "paid_in_shares": {
+          "ON": 606850394,
+          "PN": 0
+        },
+        "reason": "Own dated shareholder table shows gross paid 606850394 ON including 685476 treasury. The original paid field already represented rounded net shares, causing treasury to be subtracted twice.",
+        "treasury_shares": {
+          "ON": 685476,
+          "PN": 0
+        }
+      }
+    },
+    {
+      "document": {
+        "id": "60692",
+        "cnpj": "82640558000104",
+        "cvm_code": "004146",
+        "reference": "2016-09-30",
+        "version": 1,
+        "receipt": "2016-11-10",
+        "kind": "ITR",
+        "name": "KARSTEN S.A."
+      },
+      "valuation": {
+        "id": "60692",
+        "first_decision": "2016-12-07",
+        "last_decision": "2017-02-15",
+        "issuer_sessions": 10,
+        "name_days": 20
+      },
+      "original_capital_manifest": {
+        "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital\\60692\\manifest.json",
+        "sha256": "19c13e8f992fead5c21fb3f1069114bc20aaf5fc6b0ebbb1eee872ae47596436"
+      },
+      "outcome": "retain_original",
+      "reason": "Own current capital gives 2878404 ON / 3326971 PN following the disclosed consolidation, consistent with original 2878000 / 3327000 at thousand-share precision.",
+      "reviewed_physical_pages": [
+        54
+      ],
+      "review_method": "Own original PDF text and/or previously recorded visual review; no new independent quantity is asserted where explicitly limited.",
+      "evidence": [
+        {
+          "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\transport_retry_20260910T200700Z\\documents\\60692\\result.json",
+          "sha256": "6e3a4de53664e2ba627cbdd1ea113a883058b379239fcbd82a52e7b5aa4ebfec"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\transport_retry_20260910T200700Z\\documents\\60692\\source.pdf",
+          "sha256": "a776aa98a0c8a64a1eea611c6f1e1d7d625093304d2269a3a530a1bba5df1418"
+        }
+      ],
+      "original_capital": {
+        "reference": "2016-09-30",
+        "quantity_scale": 1000,
+        "paid_in": {
+          "ON": 2878000.0,
+          "PN": 3327000.0,
+          "total": 6205000.0
+        },
+        "treasury": {
+          "ON": 0.0,
+          "PN": 0.0,
+          "total": 0.0
+        },
+        "shares": {
+          "ON": 2878000.0,
+          "PN": 3327000.0
+        }
+      }
+    },
+    {
+      "document": {
+        "id": "122198",
+        "cnpj": "08170849000115",
+        "cvm_code": "026026",
+        "reference": "2022-09-30",
+        "version": 2,
+        "receipt": "2022-11-16",
+        "kind": "ITR",
+        "name": "DESKTOP S.A."
+      },
+      "valuation": {
+        "id": "122198",
+        "first_decision": "2022-11-17",
+        "last_decision": "2022-12-08",
+        "issuer_sessions": 16,
+        "name_days": 16
+      },
+      "original_capital_manifest": {
+        "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital\\122198\\manifest.json",
+        "sha256": "e7488383dd1a85c0eefad2277e3f4f7e667aabeea9f547f1ce43e14453456766"
+      },
+      "outcome": "retain_original",
+      "reason": "Own current share rollforward explicitly in thousands closes at 87180, agreeing with original 87180000 ON.",
+      "reviewed_physical_pages": [
+        54
+      ],
+      "review_method": "Own original PDF text and/or previously recorded visual review; no new independent quantity is asserted where explicitly limited.",
+      "evidence": [
+        {
+          "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\documents\\122198\\result.json",
+          "sha256": "cff610b431590bb93b0c15cb61ea4fdae919c5f9f2807cd09070b17435a43458"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\documents\\122198\\source.pdf",
+          "sha256": "d10e78be9b7adb2cd616c3b1f5f77cc217095acc3596ba1d732e7082f72195e0"
+        }
+      ],
+      "original_capital": {
+        "reference": "2022-09-30",
+        "quantity_scale": 1000,
+        "paid_in": {
+          "ON": 87180000.0,
+          "PN": 0.0,
+          "total": 87180000.0
+        },
+        "treasury": {
+          "ON": 0.0,
+          "PN": 0.0,
+          "total": 0.0
+        },
+        "shares": {
+          "ON": 87180000.0,
+          "PN": 0.0
+        }
+      }
+    },
+    {
+      "document": {
+        "id": "102747",
+        "cnpj": "49263189000102",
+        "cvm_code": "020877",
+        "reference": "2020-12-31",
+        "version": 2,
+        "receipt": "2021-04-08",
+        "kind": "DFP",
+        "name": "HELBOR EMPREENDIMENTOS S.A."
+      },
+      "valuation": {
+        "id": "102747",
+        "first_decision": "2021-04-09",
+        "last_decision": "2021-05-03",
+        "issuer_sessions": 16,
+        "name_days": 16
+      },
+      "original_capital_manifest": {
+        "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital\\102747\\manifest.json",
+        "sha256": "153e67c2b4669bc4452259ae1a7872dd98b10f8524823b06712dbe44ade28b42"
+      },
+      "outcome": "retain_original",
+      "reason": "Own dated current holder table explicitly in units gives 133851072 ON and 1157460 treasury, supporting original thousand-share counts. Historical repurchase quantities in the narrative are not substituted for the current post-consolidation table.",
+      "reviewed_physical_pages": [
+        88,
+        102
+      ],
+      "review_method": "Own original PDF text and/or previously recorded visual review; no new independent quantity is asserted where explicitly limited.",
+      "evidence": [
+        {
+          "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\transport_retry_20260910T200700Z\\documents\\102747\\result.json",
+          "sha256": "9b30aed9636b5703b93b8b6455507b0f85513075851c2c28e7ddaf53f641b8ab"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\transport_retry_20260910T200700Z\\documents\\102747\\source.pdf",
+          "sha256": "d297d03452195e6afa1107e9f0fa825429f2428a1e5eb8d68acfd9c73096d8bd"
+        }
+      ],
+      "original_capital": {
+        "reference": "2020-12-31",
+        "quantity_scale": 1000,
+        "paid_in": {
+          "ON": 133851000.0,
+          "PN": 0.0,
+          "total": 133851000.0
+        },
+        "treasury": {
+          "ON": 1157000.0,
+          "PN": 0.0,
+          "total": 1157000.0
+        },
+        "shares": {
+          "ON": 132694000.0,
+          "PN": 0.0
+        }
+      }
+    },
+    {
+      "document": {
+        "id": "96075",
+        "cnpj": "05799312000120",
+        "cvm_code": "020354",
+        "reference": "2020-06-30",
+        "version": 1,
+        "receipt": "2020-08-13",
+        "kind": "ITR",
+        "name": "TERRA SANTA AGRO S.A."
+      },
+      "valuation": {
+        "id": "96075",
+        "first_decision": "2020-08-14",
+        "last_decision": "2020-09-04",
+        "issuer_sessions": 16,
+        "name_days": 16
+      },
+      "original_capital_manifest": {
+        "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital\\96075\\manifest.json",
+        "sha256": "5e238e607cc79f434e2e8c7162105d5dfe7a5b3fa48a6725e857e0d446319805"
+      },
+      "outcome": "open_measurement_review",
+      "reason": "Original composition says 21656561 thousand ON; own notes remain unretrieved after completed bounded attempts. Do not substitute a later version or infer a correction/exclusion from the ratio or retrieval failure alone."
+    },
+    {
+      "document": {
+        "id": "47594",
+        "cnpj": "82640558000104",
+        "cvm_code": "004146",
+        "reference": "2015-03-31",
+        "version": 2,
+        "receipt": "2015-05-19",
+        "kind": "ITR",
+        "name": "KARSTEN S.A."
+      },
+      "valuation": {
+        "id": "47594",
+        "first_decision": "2015-07-13",
+        "last_decision": "2015-07-27",
+        "issuer_sessions": 7,
+        "name_days": 14
+      },
+      "original_capital_manifest": {
+        "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital\\47594\\manifest.json",
+        "sha256": "d7e42a1a77c1185b34781658ba6a054f179c48167f11eca8fb5ad4f16b83fe65"
+      },
+      "outcome": "retain_original",
+      "reason": "Own current note gives 28784041 ON / 33269710 PN, agreeing exactly with original.",
+      "reviewed_physical_pages": [
+        55
+      ],
+      "review_method": "Own original PDF text and/or previously recorded visual review; no new independent quantity is asserted where explicitly limited.",
+      "evidence": [
+        {
+          "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\transport_retry_20260910T200700Z\\documents\\47594\\result.json",
+          "sha256": "360aaba1b75249a7587ce1b67e26b6cec013514c2eea1191eb50b485d9f2d39b"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\transport_retry_20260910T200700Z\\documents\\47594\\source.pdf",
+          "sha256": "14527a48b86a19cf318da2959889942707a49843c654f8e9b414ad36ace197c7"
+        }
+      ],
+      "original_capital": {
+        "reference": "2015-03-31",
+        "quantity_scale": 1,
+        "paid_in": {
+          "ON": 28784041.0,
+          "PN": 33269710.0,
+          "total": 62053751.0
+        },
+        "treasury": {
+          "ON": 0.0,
+          "PN": 0.0,
+          "total": 0.0
+        },
+        "shares": {
+          "ON": 28784041.0,
+          "PN": 33269710.0
+        }
+      }
+    },
+    {
+      "document": {
+        "id": "45559",
+        "cnpj": "82640558000104",
+        "cvm_code": "004146",
+        "reference": "2014-12-31",
+        "version": 1,
+        "receipt": "2015-03-30",
+        "kind": "DFP",
+        "name": "KARSTEN S.A."
+      },
+      "valuation": {
+        "id": "45559",
+        "first_decision": "2015-04-01",
+        "last_decision": "2015-05-12",
+        "issuer_sessions": 5,
+        "name_days": 10
+      },
+      "original_capital_manifest": {
+        "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital\\45559\\manifest.json",
+        "sha256": "88643a9ade8df81383fa96bfd366870d626c8a14b51977870bf4ce558a25d2fa"
+      },
+      "outcome": "retain_original",
+      "reason": "Own narrative has an internally inconsistent PN number: 28784041 ON plus printed 33260710 PN does not equal its 62053751 total. Original 28784000 / 33270000 / 62054000 is retained; no exact correction is defensible from that typo. This does not establish a 1000-fold original-unit error.",
+      "reviewed_physical_pages": [
+        63
+      ],
+      "review_method": "Own original PDF text and/or previously recorded visual review; no new independent quantity is asserted where explicitly limited.",
+      "evidence": [
+        {
+          "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\documents\\45559\\result.json",
+          "sha256": "74b48ae7aec60c17441b830521d2837f6ad1781911f546612a5a06be288568b5"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\documents\\45559\\source.pdf",
+          "sha256": "fcc604616e9e8cbb420ecc83f118b53faadd050f54a6e4ae0ee5dc37a0f0af61"
+        }
+      ],
+      "original_capital": {
+        "reference": "2014-12-31",
+        "quantity_scale": 1000,
+        "paid_in": {
+          "ON": 28784000.0,
+          "PN": 33270000.0,
+          "total": 62054000.0
+        },
+        "treasury": {
+          "ON": 0.0,
+          "PN": 0.0,
+          "total": 0.0
+        },
+        "shares": {
+          "ON": 28784000.0,
+          "PN": 33270000.0
+        }
+      }
+    },
+    {
+      "document": {
+        "id": "94937",
+        "cnpj": "02328280000197",
+        "cvm_code": "017485",
+        "reference": "2020-06-30",
+        "version": 2,
+        "receipt": "2020-07-23",
+        "kind": "ITR",
+        "name": "ELEKTRO REDES S.A."
+      },
+      "valuation": {
+        "id": "94937",
+        "first_decision": "2020-08-27",
+        "last_decision": "2020-09-17",
+        "issuer_sessions": 4,
+        "name_days": 8
+      },
+      "original_capital_manifest": {
+        "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital\\94937\\manifest.json",
+        "sha256": "ba994718d1e97212b5cf7f726b2d8dad69a6f17f8acc11c73b5a7e92c8047c5a"
+      },
+      "outcome": "retain_original",
+      "reason": "Own current class table is explicitly in millions and gives 92 ON / 102 PN; original 91881000 / 101879000 is within that coarser published precision.",
+      "reviewed_physical_pages": [
+        54
+      ],
+      "review_method": "Own original PDF text and/or previously recorded visual review; no new independent quantity is asserted where explicitly limited.",
+      "evidence": [
+        {
+          "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\documents\\94937\\result.json",
+          "sha256": "dfd09df8cabf48a4f6d45f1a6d7b719dfd4e9f1fb1aa20c984a511f46fe1d9ab"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\documents\\94937\\source.pdf",
+          "sha256": "b3a3a711d0a805a7af58bb06e1aed741dd7d0cb13c5c5b9f543879321713148e"
+        }
+      ],
+      "original_capital": {
+        "reference": "2020-06-30",
+        "quantity_scale": 1000,
+        "paid_in": {
+          "ON": 91881000.0,
+          "PN": 101879000.0,
+          "total": 193760000.0
+        },
+        "treasury": {
+          "ON": 0.0,
+          "PN": 0.0,
+          "total": 0.0
+        },
+        "shares": {
+          "ON": 91881000.0,
+          "PN": 101879000.0
+        }
+      }
+    },
+    {
+      "document": {
+        "id": "95913",
+        "cnpj": "06948969000175",
+        "cvm_code": "023035",
+        "reference": "2020-06-30",
+        "version": 1,
+        "receipt": "2020-08-11",
+        "kind": "ITR",
+        "name": "LINX S.A."
+      },
+      "valuation": {
+        "id": "95913",
+        "first_decision": "2020-08-12",
+        "last_decision": "2020-08-21",
+        "issuer_sessions": 8,
+        "name_days": 8
+      },
+      "original_capital_manifest": {
+        "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital\\95913\\manifest.json",
+        "sha256": "81bc705bdcc5d902418c39f4793e5cd871a92f6e8da858f5b677977e6fb03988"
+      },
+      "outcome": "own_source_correction",
+      "disposition": {
+        "availability": "Exact original filing receipt; no later version, market price or adjacent ratio supplies the count.",
+        "disposition": "reconciled",
+        "document": {
+          "cnpj": "06948969000175",
+          "cvm_code": "023035",
+          "id": "95913",
+          "kind": "ITR",
+          "reference": "2020-06-30",
+          "version": "1"
+        },
+        "evidence": [
+          {
+            "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\transport_retry_20260910T200700Z\\documents\\95913\\result.json",
+            "sha256": "3b3e944f74fe880965be7f8f3640fb68b2834c922a0137705819e454f447dea9"
+          },
+          {
+            "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\original_zips\\95913\\source.zip",
+            "sha256": "8a2097a001b348e1afbe6e3edb326a129bd4e47fabb0147be39f9a117d2a4705"
+          },
+          {
+            "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\transport_retry_20260910T200700Z\\documents\\95913\\source.pdf",
+            "sha256": "c7ec6f09564cb09336bd56c5350f6b7a54d85eb51d4992684463f523a363ab34"
+          },
+          {
+            "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\transport_retry_20260910T200700Z\\documents\\95913\\capital_note_pages.json",
+            "sha256": "79d27dd9f6c6bab1876e3480d330324ff9d54c2e278fb6786e9350c1243cbfc5"
+          },
+          {
+            "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\review_priority_seven_20260911.json",
+            "sha256": "9b0a35cd7642bba0776ecb3b8c8bcd7ae3264f768f0b7a75873379bfaf6c95de"
+          },
+          {
+            "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\transport_retry_20260910T200700Z\\documents\\95913\\page_54.png",
+            "sha256": "fbbef328b89add8f9cfd6240214b79ef441785f2521bd09d566eaa00c3ad06f4"
+          },
+          {
+            "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital\\95913\\manifest.json",
+            "sha256": "81bc705bdcc5d902418c39f4793e5cd871a92f6e8da858f5b677977e6fb03988"
+          }
+        ],
+        "paid_in_shares": {
+          "ON": 189408960,
+          "PN": 0
+        },
+        "reason": "Own current fully paid shareholder table lists 189408960 ON including 14125991 treasury; correct the 1000-fold table unit error for both fields.",
+        "treasury_shares": {
+          "ON": 14125991,
+          "PN": 0
+        }
+      }
+    },
+    {
+      "document": {
+        "id": "91963",
+        "cnpj": "12049631000184",
+        "cvm_code": "021067",
+        "reference": "2019-12-31",
+        "version": 1,
+        "receipt": "2020-03-30",
+        "kind": "DFP",
+        "name": "MOURA DUBEUX ENGENHARIA S/A"
+      },
+      "valuation": {
+        "id": "91963",
+        "first_decision": "2020-03-30",
+        "last_decision": "2020-04-07",
+        "issuer_sessions": 7,
+        "name_days": 7
+      },
+      "original_capital_manifest": {
+        "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital\\91963\\manifest.json",
+        "sha256": "babfc38c72cc8a2871983ca975ae34823a363c5e4112129512c8ff41285635f8"
+      },
+      "outcome": "own_source_correction",
+      "disposition": {
+        "availability": "Exact original filing receipt; no later version, market price or adjacent ratio supplies the count.",
+        "capital_change_approval_dates": [
+          "2020-01-17"
+        ],
+        "disposition": "reconciled",
+        "document": {
+          "cnpj": "12049631000184",
+          "cvm_code": "021067",
+          "id": "91963",
+          "kind": "DFP",
+          "reference": "2019-12-31",
+          "version": "1"
+        },
+        "evidence": [
+          {
+            "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\documents\\91963\\result.json",
+            "sha256": "92047a3f3e8f68a24fa804cfb899461bbae8a6150e05f67c2ee3acc34ea9eb67"
+          },
+          {
+            "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\original_zips\\91963\\source.zip",
+            "sha256": "3684062c08d9ed3de31de6d050b0eef2288799be724236396db2fc68a2bd2d78"
+          },
+          {
+            "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\documents\\91963\\source.pdf",
+            "sha256": "34a0a11378429fbcbde81f653957389a985819f7fea1b259c001c2a5a83d1c6c"
+          },
+          {
+            "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\documents\\91963\\capital_note_pages.json",
+            "sha256": "117921ca008b804f3be98aacf6b163dd95531c33bbf78d4e3280dc929317ab63"
+          },
+          {
+            "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\review_moura_event_20260911.json",
+            "sha256": "a249be63935e1cee6420c72708ea9a89fa0d8688b96753aa970a72b7fd9d3615"
+          },
+          {
+            "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\documents\\91963\\page_79.png",
+            "sha256": "5b42a7e10372bd2c94df47bf41b27e38763b26bf91bb0312a44678057adcf74f"
+          },
+          {
+            "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\documents\\91963\\page_94.png",
+            "sha256": "9602dce25847d9127f25a61bd12f2db9b967ff42ac8d9597922f290151885e37"
+          },
+          {
+            "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital\\91963\\manifest.json",
+            "sha256": "babfc38c72cc8a2871983ca975ae34823a363c5e4112129512c8ff41285635f8"
+          }
+        ],
+        "paid_in_shares": {
+          "ON": 401377204,
+          "PN": 0
+        },
+        "reason": "Own page79 establishes 401377204 paid ON at 2019-12-31. Own page94 discloses approval of 15:1 consolidation on 2020-01-17 and retrospective post-consolidation EPS counts. Preserve the reference-date capital, retain reported zero treasury, and use the disclosed approval date as an uncertainty barrier from the exact filing receipt. Do not backdate EPS shares or infer an effective date/ratio adjustment for valuation.",
+        "treasury_shares": {
+          "ON": 0,
+          "PN": 0
+        }
+      }
+    },
+    {
+      "document": {
+        "id": "88802",
+        "cnpj": "02328280000197",
+        "cvm_code": "017485",
+        "reference": "2019-09-30",
+        "version": 2,
+        "receipt": "2019-10-24",
+        "kind": "ITR",
+        "name": "ELEKTRO REDES S.A."
+      },
+      "valuation": {
+        "id": "88802",
+        "first_decision": "2019-12-04",
+        "last_decision": "2020-01-03",
+        "issuer_sessions": 3,
+        "name_days": 6
+      },
+      "original_capital_manifest": {
+        "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital\\88802\\manifest.json",
+        "sha256": "621b4ffbb4aac50c05f24ef3debf24af6834a1d661af0aa18a9aab41974932ea"
+      },
+      "outcome": "retain_original",
+      "reason": "Own current class table explicitly in lots of a thousand gives 91881 ON / 101879 PN, agreeing with original 91881000 / 101879000.",
+      "reviewed_physical_pages": [
+        58
+      ],
+      "review_method": "Own original PDF text and/or previously recorded visual review; no new independent quantity is asserted where explicitly limited.",
+      "evidence": [
+        {
+          "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\documents\\88802\\result.json",
+          "sha256": "6d6e807f08a865963912c9ca34a1b6120228ede0ff91276b85edf83152b9d30e"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\documents\\88802\\source.pdf",
+          "sha256": "f8a2c6d1205c957472576122d31609cd7969af07312997b080fdbe65a9ebc074"
+        }
+      ],
+      "original_capital": {
+        "reference": "2019-09-30",
+        "quantity_scale": 1000,
+        "paid_in": {
+          "ON": 91881000.0,
+          "PN": 101879000.0,
+          "total": 193760000.0
+        },
+        "treasury": {
+          "ON": 0.0,
+          "PN": 0.0,
+          "total": 0.0
+        },
+        "shares": {
+          "ON": 91881000.0,
+          "PN": 101879000.0
+        }
+      }
+    },
+    {
+      "document": {
+        "id": "92532",
+        "cnpj": "02328280000197",
+        "cvm_code": "017485",
+        "reference": "2020-03-31",
+        "version": 1,
+        "receipt": "2020-04-27",
+        "kind": "ITR",
+        "name": "ELEKTRO REDES S.A."
+      },
+      "valuation": {
+        "id": "92532",
+        "first_decision": "2020-04-28",
+        "last_decision": "2020-06-09",
+        "issuer_sessions": 2,
+        "name_days": 4
+      },
+      "original_capital_manifest": {
+        "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital\\92532\\manifest.json",
+        "sha256": "80d7413120115e377c1bcbc754cb60bf6f9dd81135310ab7e810ecf41e5d015d"
+      },
+      "outcome": "retain_original",
+      "reason": "Own current class table explicitly in millions gives 91.9 ON / 101.9 PN; original 91881000 / 101879000 is within that coarser published precision.",
+      "reviewed_physical_pages": [
+        49
+      ],
+      "review_method": "Own original PDF text and/or previously recorded visual review; no new independent quantity is asserted where explicitly limited.",
+      "evidence": [
+        {
+          "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\documents\\92532\\result.json",
+          "sha256": "f9c1425bbaf39fdec3eda88d3bb1ceeedb28455fb6fd62a5023194d4aeef45ae"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\documents\\92532\\source.pdf",
+          "sha256": "20ba13dd47c8519febb646113ca507454768c209b30532ef6d838a4f2c8bfe3f"
+        }
+      ],
+      "original_capital": {
+        "reference": "2020-03-31",
+        "quantity_scale": 1000,
+        "paid_in": {
+          "ON": 91881000.0,
+          "PN": 101879000.0,
+          "total": 193760000.0
+        },
+        "treasury": {
+          "ON": 0.0,
+          "PN": 0.0,
+          "total": 0.0
+        },
+        "shares": {
+          "ON": 91881000.0,
+          "PN": 101879000.0
+        }
+      }
+    },
+    {
+      "document": {
+        "id": "102762",
+        "cnpj": "60537263000166",
+        "cvm_code": "024953",
+        "reference": "2020-12-31",
+        "version": 2,
+        "receipt": "2021-04-08",
+        "kind": "DFP",
+        "name": "ALLPARK EMPREENDIMENTOS, PARTICIPAÇÕES E SERVIÇOS S.A."
+      },
+      "valuation": {
+        "id": "102762",
+        "first_decision": "2021-04-09",
+        "last_decision": "2021-04-14",
+        "issuer_sessions": 4,
+        "name_days": 4
+      },
+      "original_capital_manifest": {
+        "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital\\102762\\manifest.json",
+        "sha256": "46ef9b36803a8425a5b811f4490332a7b6c811e3fda1d0373b1959ac195b1533"
+      },
+      "outcome": "retain_original",
+      "reason": "Own current paid capital and complete shareholder table give 193771106 ON, agreeing exactly with original.",
+      "reviewed_physical_pages": [
+        93
+      ],
+      "review_method": "Own original PDF text and/or previously recorded visual review; no new independent quantity is asserted where explicitly limited.",
+      "evidence": [
+        {
+          "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\documents\\102762\\result.json",
+          "sha256": "62af23457eeb4068619c989b84e22e892f4bb7d6249b7d74790ae2cd34e67978"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\documents\\102762\\source.pdf",
+          "sha256": "b0022c1cdd3f95fa67e0024709940be9b0a9151d7b5b800ec3c942328ddbb8ec"
+        }
+      ],
+      "original_capital": {
+        "reference": "2020-12-31",
+        "quantity_scale": 1,
+        "paid_in": {
+          "ON": 193771106.0,
+          "PN": 0.0,
+          "total": 193771106.0
+        },
+        "treasury": {
+          "ON": 0.0,
+          "PN": 0.0,
+          "total": 0.0
+        },
+        "shares": {
+          "ON": 193771106.0,
+          "PN": 0.0
+        }
+      }
+    },
+    {
+      "document": {
+        "id": "91916",
+        "cnpj": "07820907000146",
+        "cvm_code": "020630",
+        "reference": "2019-12-31",
+        "version": 1,
+        "receipt": "2020-03-27",
+        "kind": "DFP",
+        "name": "FICA EMPREENDIMENTOS IMOBILIÁRIOS S.A."
+      },
+      "valuation": {
+        "id": "91916",
+        "first_decision": "2020-03-30",
+        "last_decision": "2020-04-01",
+        "issuer_sessions": 3,
+        "name_days": 3
+      },
+      "original_capital_manifest": {
+        "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital\\91916\\manifest.json",
+        "sha256": "b975f18fe4c577f2cea6ec8b9560141e648dd6df17cd2cc19fd3adcd320aa47f"
+      },
+      "outcome": "own_source_correction",
+      "disposition": {
+        "availability": "Exact original filing receipt; no later version, market price or adjacent ratio supplies the count.",
+        "disposition": "reconciled",
+        "document": {
+          "cnpj": "07820907000146",
+          "cvm_code": "020630",
+          "id": "91916",
+          "kind": "DFP",
+          "reference": "2019-12-31",
+          "version": "1"
+        },
+        "evidence": [
+          {
+            "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\documents\\91916\\result.json",
+            "sha256": "4d21097fbe269fb50453c1c87730ca8ee35112bdadd1b7a5d2bc6d92329cc8b8"
+          },
+          {
+            "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\original_zips\\91916\\source.zip",
+            "sha256": "ce38997b121f513dbac33d0aef8deefb4f00b42730273844ca2846f4e987caa4"
+          },
+          {
+            "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\documents\\91916\\source.pdf",
+            "sha256": "c21d1639a26a3c6d595785eafea9541b4bbd38fbe7d0eaf55c23de002e36dd10"
+          },
+          {
+            "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\documents\\91916\\capital_note_pages.json",
+            "sha256": "245c7c58cff10e50ef7097fe5fefcc440836e43c9625446db808267363457645"
+          },
+          {
+            "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\review_priority_seven_20260911.json",
+            "sha256": "9b0a35cd7642bba0776ecb3b8c8bcd7ae3264f768f0b7a75873379bfaf6c95de"
+          },
+          {
+            "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\documents\\91916\\page_71.png",
+            "sha256": "f792050342178cd41a1e7aa150ca3051893d35d9d25e867bfda47e45667ad377"
+          },
+          {
+            "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital\\91916\\manifest.json",
+            "sha256": "b975f18fe4c577f2cea6ec8b9560141e648dd6df17cd2cc19fd3adcd320aa47f"
+          }
+        ],
+        "paid_in_shares": {
+          "ON": 2422153,
+          "PN": 0
+        },
+        "reason": "Own current paid capital is 2422153 ON after the disclosed 20-for-1 consolidation; correct the 1000-fold table unit error. Treasury remains the reported zero.",
+        "treasury_shares": {
+          "ON": 0,
+          "PN": 0
+        }
+      }
+    },
+    {
+      "document": {
+        "id": "135783",
+        "cnpj": "08170849000115",
+        "cvm_code": "026026",
+        "reference": "2023-12-31",
+        "version": 2,
+        "receipt": "2024-04-18",
+        "kind": "DFP",
+        "name": "DESKTOP S.A."
+      },
+      "valuation": {
+        "id": "135783",
+        "first_decision": "2024-04-19",
+        "last_decision": "2024-04-22",
+        "issuer_sessions": 2,
+        "name_days": 2
+      },
+      "original_capital_manifest": {
+        "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital\\135783\\manifest.json",
+        "sha256": "2db7e9580d169011348a8939448589d8763b210873fd311b49a566c561e72852"
+      },
+      "outcome": "own_source_correction",
+      "disposition": {
+        "availability": "Exact original filing receipt; no later version, market price or adjacent ratio supplies the count.",
+        "disposition": "reconciled",
+        "document": {
+          "cnpj": "08170849000115",
+          "cvm_code": "026026",
+          "id": "135783",
+          "kind": "DFP",
+          "reference": "2023-12-31",
+          "version": "2"
+        },
+        "evidence": [
+          {
+            "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\documents\\135783\\result.json",
+            "sha256": "d66dc36d783e00dad81b60135d64ff26f406ac5c4d4b014e2a24c687aff4cb5a"
+          },
+          {
+            "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\original_zips\\135783\\source.zip",
+            "sha256": "23dbd8990ca1972adf3d9f1d72382459a40ef0141929676ce5adb5ed9746656b"
+          },
+          {
+            "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\documents\\135783\\source.pdf",
+            "sha256": "ec87e24890d68b10fa8d09eda78c9f36e646f21ae4cd33ca824b29708aebdb53"
+          },
+          {
+            "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\documents\\135783\\capital_note_pages.json",
+            "sha256": "cd7bd1cda4b80965fb79a1735998189290eefbb507364c53d6f8d1ebf9dc81b1"
+          },
+          {
+            "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\review_priority_seven_20260911.json",
+            "sha256": "9b0a35cd7642bba0776ecb3b8c8bcd7ae3264f768f0b7a75873379bfaf6c95de"
+          },
+          {
+            "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\documents\\135783\\page_94.png",
+            "sha256": "20956c4721b3b0c62d37fd7c544430cc49f2a8c7ce04e9edfe0bea38216400b1"
+          },
+          {
+            "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital\\135783\\manifest.json",
+            "sha256": "2db7e9580d169011348a8939448589d8763b210873fd311b49a566c561e72852"
+          }
+        ],
+        "paid_in_shares": {
+          "ON": 115265345,
+          "PN": 0
+        },
+        "reason": "Own current capital rollforward confirms 115265345 ON; the following treasury paragraph states 20600 actual held shares on 2023-12-31. Replace the erroneous zero treasury; do not use subsequent 2024 issuance events.",
+        "treasury_shares": {
+          "ON": 20600,
+          "PN": 0
+        }
+      }
+    },
+    {
+      "document": {
+        "id": "15310",
+        "cnpj": "07689002000189",
+        "cvm_code": "020087",
+        "reference": "2011-12-31",
+        "version": 2,
+        "receipt": "2012-03-23",
+        "kind": "DFP",
+        "name": "EMBRAER S.A."
+      },
+      "valuation": {
+        "id": "15310",
+        "first_decision": "2012-03-26",
+        "last_decision": "2012-03-26",
+        "issuer_sessions": 1,
+        "name_days": 1
+      },
+      "original_capital_manifest": {
+        "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital\\15310\\manifest.json",
+        "sha256": "ad89c673beb0088b858e0a4bd60a5a6a2ed4bf3de1c46cb4a81b4bc4aee3f5e3"
+      },
+      "outcome": "retain_original",
+      "reason": "Own current note gives 740465044 ON and 16798400 treasury; original 740465000 / 16798000 agrees at thousand-share precision.",
+      "reviewed_physical_pages": [
+        125
+      ],
+      "review_method": "Own original PDF text and/or previously recorded visual review; no new independent quantity is asserted where explicitly limited.",
+      "evidence": [
+        {
+          "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\documents\\15310\\result.json",
+          "sha256": "8edb79d5118e7d701446889dee76eea74469665aaa60a5dc5fa401a53e790664"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\documents\\15310\\source.pdf",
+          "sha256": "24c8c652f538ad74ef8c26bbc8ece4c9a48e8a776aed44b5e60b2dfab5994247"
+        }
+      ],
+      "original_capital": {
+        "reference": "2011-12-31",
+        "quantity_scale": 1000,
+        "paid_in": {
+          "ON": 740465000.0,
+          "PN": 0.0,
+          "total": 740465000.0
+        },
+        "treasury": {
+          "ON": 16798000.0,
+          "PN": 0.0,
+          "total": 16798000.0
+        },
+        "shares": {
+          "ON": 723667000.0,
+          "PN": 0.0
+        }
+      }
+    },
+    {
+      "document": {
+        "id": "37068",
+        "cnpj": "11094546000175",
+        "cvm_code": "021946",
+        "reference": "2014-03-31",
+        "version": 1,
+        "receipt": "2014-05-08",
+        "kind": "ITR",
+        "name": "MULTIPLUS S.A."
+      },
+      "valuation": {
+        "id": "37068",
+        "first_decision": "2014-05-09",
+        "last_decision": "2014-05-09",
+        "issuer_sessions": 1,
+        "name_days": 1
+      },
+      "original_capital_manifest": {
+        "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital\\37068\\manifest.json",
+        "sha256": "947bb657d008623e0bf4789cd5bf98b891879a5bc4f3b1df4f242118ad8466be"
+      },
+      "outcome": "open_measurement_review",
+      "reason": "Original composition says 162125601 thousand ON; available own notes have no independent current capital count. Material scale concern remains unresolved; no count or mask is inferred from adjacent filings, dividends or subsidiary shares."
+    },
+    {
+      "document": {
+        "id": "109731",
+        "cnpj": "07594978000178",
+        "cvm_code": "024260",
+        "reference": "2021-09-30",
+        "version": 1,
+        "receipt": "2021-11-11",
+        "kind": "ITR",
+        "name": "SMARTFIT ESCOLA DE GINÁSTICA E DANÇA S.A."
+      },
+      "valuation": {
+        "id": "109731",
+        "first_decision": "2021-11-11",
+        "last_decision": "2021-11-11",
+        "issuer_sessions": 1,
+        "name_days": 1
+      },
+      "original_capital_manifest": {
+        "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital\\109731\\manifest.json",
+        "sha256": "8754096adf10a7977cd3aff3f257a8f73babe18b96d0d59e35451dc4c3c4afc6"
+      },
+      "outcome": "own_source_correction",
+      "disposition": {
+        "availability": "Exact original filing receipt; no later version, market price or adjacent ratio supplies the count.",
+        "disposition": "reconciled",
+        "document": {
+          "cnpj": "07594978000178",
+          "cvm_code": "024260",
+          "id": "109731",
+          "kind": "ITR",
+          "reference": "2021-09-30",
+          "version": "1"
+        },
+        "evidence": [
+          {
+            "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\documents\\109731\\result.json",
+            "sha256": "187184e7aa6d039126b2d437e0a75fe4def8d73897af91517fbc9047e183a45c"
+          },
+          {
+            "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\original_zips\\109731\\source.zip",
+            "sha256": "9659d19da24dc98be8d8927591018a6b36a7e0538c87edd2c34c1abb637d80be"
+          },
+          {
+            "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\documents\\109731\\source.pdf",
+            "sha256": "9db6f2bb1453e5a1730ff9c2203748131d612e39658c6567d1e0d7c9daa7f9b2"
+          },
+          {
+            "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\documents\\109731\\capital_note_pages.json",
+            "sha256": "e57ae9d15602c4f4bdd05e64d7b642c7c643ee18b1a0fc3cfcdec4c5ba5c3844"
+          },
+          {
+            "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\review_priority_seven_20260911.json",
+            "sha256": "9b0a35cd7642bba0776ecb3b8c8bcd7ae3264f768f0b7a75873379bfaf6c95de"
+          },
+          {
+            "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\documents\\109731\\page_82.png",
+            "sha256": "c39e4892b7513d8146bae11e411334d73ec9724143b301553dad12a1a5837bbb"
+          },
+          {
+            "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital\\109731\\manifest.json",
+            "sha256": "8754096adf10a7977cd3aff3f257a8f73babe18b96d0d59e35451dc4c3c4afc6"
+          }
+        ],
+        "paid_in_shares": {
+          "ON": 586242289,
+          "PN": 0
+        },
+        "reason": "Own post-IPO capital note closes at 586242289 ON after the supplementary offering. Correct the 1000-fold table unit error; preserve the reported zero treasury.",
+        "treasury_shares": {
+          "ON": 0,
+          "PN": 0
+        }
+      }
+    },
+    {
+      "document": {
+        "id": "114129",
+        "cnpj": "17281106000103",
+        "cvm_code": "019445",
+        "reference": "2022-03-31",
+        "version": 1,
+        "receipt": "2022-05-02",
+        "kind": "ITR",
+        "name": "CIA SANEAMENTO DE MINAS GERAIS-COPASA MG"
+      },
+      "valuation": {
+        "id": "114129",
+        "first_decision": "2022-05-03",
+        "last_decision": "2022-05-03",
+        "issuer_sessions": 1,
+        "name_days": 1
+      },
+      "original_capital_manifest": {
+        "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital\\114129\\manifest.json",
+        "sha256": "e7472399ee9567c6a868211c6cf9806b00b51c34069c80ef1aa471360e57e7ac"
+      },
+      "outcome": "open_measurement_review",
+      "reason": "Own note establishes the million-share magnitude, while gross/net and treasury meaning remain inconsistent. Resolve measurement without taking a weighted EPS count as current capital."
+    }
+  ],
+  "source_freeze_ready": false,
+  "remaining_priority_ids": [
+    "109371",
+    "114129",
+    "37068",
+    "96075"
+  ],
+  "downstream": "Final family/store and screens remain pending. The own-filing approval-event correction changes valuation availability for Moura Dubeux and must be included in the producing code; do not rebuild with 59ba9ab."
+}

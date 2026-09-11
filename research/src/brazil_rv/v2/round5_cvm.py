@@ -2203,9 +2203,9 @@ def public_float_observations(
 
 
 def capital_change_observations(
-    root: Path, rad: list[dict], sessions: list[date]
+    root: Path, rad: list[dict], sessions: list[date], documents: list[dict]
 ) -> list[dict]:
-    """Known FRE capital changes invalidate earlier capital counts.
+    """Known FRE and audited own-filing changes invalidate earlier counts.
 
     Approval dates lacking a distinct effective date are conservative ambiguity
     boundaries only. They are never used to adjust shares or backdate an event's
@@ -2258,6 +2258,25 @@ def capital_change_observations(
                         else "reported_effective_or_deliberation_bound",
                     }
                 )
+    financial_receipts = {
+        r["id"]: r["receipt"] for r in rad if r["id"] and r["group"] == "structured"
+    }
+    for document in documents:
+        for effective in document.get("capital_change_approval_dates", ()):
+            output.append(
+                {
+                    "cnpj": document["cnpj"],
+                    "cvm_code": document["cvm_code"],
+                    "document_id": document["id"],
+                    "available_index": available_session(
+                        financial_receipts.get(document["id"], document["receipt"]),
+                        sessions,
+                    ),
+                    "effective": date.fromisoformat(effective),
+                    "kind": "audited_own_filing_share_change",
+                    "effective_precision": "approval_bound",
+                }
+            )
     return output
 
 
@@ -2496,6 +2515,9 @@ def build(root: Path, store: Path, output: Path) -> dict:
         if document["id"] in capital_dispositions:
             disposition = capital_dispositions[document["id"]]
             document["shares"] = disposition["shares"]
+            document["capital_change_approval_dates"] = disposition.get(
+                "capital_change_approval_dates", []
+            )
             shares_source = (
                 "source_note_reconciliation"
                 if disposition["shares"] is not None
@@ -2516,7 +2538,7 @@ def build(root: Path, store: Path, output: Path) -> dict:
     write_json(output / "original_source_manifests.json", original_sources)
     write_json(output / "capital_source_manifests.json", capital_sources)
     write_json(output / "capital_quantity_issues.json", capital_issues)
-    capital_changes = capital_change_observations(root, rad, sessions)
+    capital_changes = capital_change_observations(root, rad, sessions, documents)
     write_json(output / "capital_change_observations.json", capital_changes)
     fundamentals, audit = fundamental_features(
         documents, rad, identity, sessions, valuation_market(store), capital_changes
