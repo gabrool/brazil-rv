@@ -1,12 +1,12 @@
 {
-  "status": "154 own-source dispositions accepted:147 reconciled and7 unavailable. The focused50-case review has8 corrections,38 retained originals and4 unresolved cases. Final family/store admission remains pending.",
+  "status": "Source review decisions complete:157 dispositions(150 reconciled,7 unavailable), with39 retained original priority filings. All50 priority cases have decisions; Copasa narrative uncertainty is explicit. Final actual family/store admission pending.",
   "capital_dispositions": {
     "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_source_dispositions.json",
-    "sha256": "133f96d5d279f943732c045da31b061969b80cbf15ee5417981aa9cd44babfd0"
+    "sha256": "d352f55be6419237d855159fd11c56922f1d0f854f8e065f16970e9da0e98375"
   },
   "counts": {
-    "audited_unavailable": 7,
-    "reconciled": 147
+    "reconciled": 150,
+    "audited_unavailable": 7
   },
   "accepted_batch": {
     "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\accepted_batch_20260910T192900Z\\acceptance.json",
@@ -3291,5 +3291,235 @@
       "95913": true
     },
     "source_selection": "Quantity-only selection remains unchanged. The new own-filing event changes valuation availability and requires final actual-family verification; no claim of unchanged valuation masks."
+  },
+  "priority_review_complete": {
+    "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\priority_review_complete_20260911.json",
+    "sha256": "def07dbef82a9d03c0ba3ca2c09b1ae67ed8dd7c2348097098244c17f4a76e6a"
+  },
+  "source_review_freeze": {
+    "review": {
+      "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\priority_review_complete_20260911.json",
+      "sha256": "def07dbef82a9d03c0ba3ca2c09b1ae67ed8dd7c2348097098244c17f4a76e6a"
+    },
+    "last_four": {
+      "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\review_last_four_20260911.json",
+      "sha256": "b7ef16a98d8fe9ea9322559d70984df360bd37779bfb7f2b5034d46cc6ddc3ba"
+    },
+    "source_contract": {
+      "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\accepted_last_four_20260911\\source_review_contract.md",
+      "sha256": "885820f696f86d109865f0480186b21f1d73e22b967fa1fda6e84950f3ce6f8d"
+    },
+    "capital_dispositions": {
+      "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_source_dispositions.json",
+      "sha256": "d352f55be6419237d855159fd11c56922f1d0f854f8e065f16970e9da0e98375"
+    },
+    "last_three_acceptance": {
+      "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\accepted_last_four_20260911\\acceptance.json",
+      "sha256": "02915687656b1e00b37f73293d56f4dba9f12d23310026090f3c91b687b9995a"
+    },
+    "partial_member_recovery": {
+      "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\partial_member_recovery_96075_20260911\\recovery.json",
+      "sha256": "33d8e3f891ca278756d22aa594fac92bba7a021a1889bcaf188d2ea86625a7ce"
+    },
+    "prior_154_dispositions_exact": true,
+    "last_three_positive_class_support_unchanged": true,
+    "source_freeze_ready": true,
+    "full_family_accepted": false,
+    "pending_acceptance": "Dated identity/transformed availability proofs, actual capital source/feature bindings and disclosed Copasa input sensitivity."
+  },
+  "last_four_review": {
+    "scope": "Final four review decisions: three same-document unit corrections and one retained specific current composition. Copasa narrative/weighted-EPS tensions remain expressly disclosed; no exact legal-count claim and no inference from a later filing. This closes review decisions without asserting source publications are error-free.",
+    "authority": "User standing authorization to choose recommended completion options. Source-review interpretation is registered before final build.",
+    "reconciliations": [
+      {
+        "id": "37068",
+        "reference": "2014-03-31",
+        "version": 1,
+        "paid_in_shares": {
+          "ON": 162125601,
+          "PN": 0
+        },
+        "treasury_shares": {
+          "ON": 0,
+          "PN": 0
+        },
+        "visually_reviewed_pages": [
+          2,
+          15
+        ],
+        "reason": "Own current composition supplies the literal 162125601 ON count and zero treasury. The same filing current-date administration report states a BRL25 quote and rounded BRL4.1bn market capitalization; 162125601*25=BRL4053140025 agrees at printed precision whereas a thousandfold quantity does not. Correct the quantity unit only; do not derive 164m shares by dividing the rounded valuation, and do not use external prices, dividends, EPS or later filings.",
+        "result": {
+          "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\documents\\37068\\result.json",
+          "sha256": "b0f41ef2733cce6a7559a9cd352870b531827daa936c413a064a1ee139fdd818"
+        }
+      },
+      {
+        "id": "114129",
+        "reference": "2022-03-31",
+        "version": 1,
+        "paid_in_shares": {
+          "ON": 379181430,
+          "PN": 0
+        },
+        "treasury_shares": {
+          "ON": 1071639,
+          "PN": 0
+        },
+        "visually_reviewed_pages": [
+          2,
+          51,
+          53
+        ],
+        "reason": "Own current composition explicitly separates paid ON379181430 and treasury1071639. Its common thousands heading is contradicted by the same-period paid-capital narrative in actual shares; correct that common unit, preserving the table meanings and treasury quantity. The resulting non-treasury count is378109791. The note/EPS elsewhere repeats379181430/379181thousand: do not relabel a weighted denominator as current capital or set treasury to zero. Remaining gross/net narrative tension is explicitly retained as source uncertainty, bounded by1071639 shares (about0.2834% of adopted net), not claimed independently resolved.",
+        "result": {
+          "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\transport_retry_20260910T200700Z\\documents\\114129\\result.json",
+          "sha256": "39fb9d50ca3645f33982f03584c6cc1c33a3cddd77ab531a028b89870926d55b"
+        }
+      },
+      {
+        "id": "96075",
+        "reference": "2020-06-30",
+        "version": 1,
+        "paid_in_shares": {
+          "ON": 21656561,
+          "PN": 0
+        },
+        "treasury_shares": {
+          "ON": 0,
+          "PN": 0
+        },
+        "visually_reviewed_pages": [
+          41
+        ],
+        "reason": "The complete original ITR member was recovered locally from the preserved partial download and verified by declared length, CRC32 and original issuer/reference/version. Its attached own note22.1 on physicalpage41 gives21656561 ordinary shares at2020-06-30. Correct the common1000-fold unit error and preserve the reported zero treasury. No later version or partial PDF supplies the value.",
+        "result": {
+          "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\partial_member_recovery_96075_20260911\\result.json",
+          "sha256": "0bfc3a524fef9e27484b6e7c60231eb5c8820bfe57c0743c7afbc5a33216d95d"
+        }
+      }
+    ],
+    "retained_original": [
+      {
+        "document": {
+          "id": "109371",
+          "cnpj": "17281106000103",
+          "cvm_code": "019445",
+          "reference": "2021-09-30",
+          "version": 1,
+          "receipt": "2021-11-03",
+          "kind": "ITR",
+          "name": "CIA SANEAMENTO DE MINAS GERAIS-COPASA MG"
+        },
+        "original_capital": {
+          "reference": "2021-09-30",
+          "quantity_scale": 1000,
+          "paid_in": {
+            "ON": 380253000.0,
+            "PN": 0.0,
+            "total": 380253000.0
+          },
+          "treasury": {
+            "ON": 1072000.0,
+            "PN": 0.0,
+            "total": 1072000.0
+          },
+          "shares": {
+            "ON": 379181000.0,
+            "PN": 0.0
+          }
+        },
+        "outcome": "retain_original_composition_with_disclosed_narrative_tension",
+        "reason": "The original dated class-and-treasury table gives380253000 gross ON and1072000 treasury, hence379181000 non-treasury shares. Retain this specific composition. The narrative calls379181430 paid and EPS uses379181thousand excluding treasury; these do not justify replacing current gross by a weighted/net number and subtracting treasury again. The original non-treasury result matches that narrative magnitude within430 shares. Exact gross/legal reconciliation is not asserted; the alternative literal narrative-minus-treasury reading differs by1071570 shares (about0.2826%).",
+        "visually_reviewed_pages": [
+          2,
+          55,
+          57
+        ],
+        "evidence": [
+          {
+            "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\transport_retry_20260910T200700Z\\documents\\109371\\result.json",
+            "sha256": "a15358d7077f79467eb58372ab644689f82f7ffb274180360e64aa2ac816ca3f"
+          },
+          {
+            "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\transport_retry_20260910T200700Z\\documents\\109371\\source.pdf",
+            "sha256": "7ac9d5f1dfbc7ae0997be90067744aefd0a42016061e6fa92c0226b9caa3a416"
+          },
+          {
+            "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\transport_retry_20260910T200700Z\\documents\\109371\\page_2.png",
+            "sha256": "0c842f1d3b99540c95849ceab598f8d0b1c7276d75e6012bd2fe9b9bf6a8bba3"
+          },
+          {
+            "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\transport_retry_20260910T200700Z\\documents\\109371\\page_55.png",
+            "sha256": "0bba1c7045f1b3ef8d8381af4b1761e60a26f7a4c81cad5e322b1e889789a9e3"
+          },
+          {
+            "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\transport_retry_20260910T200700Z\\documents\\109371\\page_57.png",
+            "sha256": "a51cae1baca71a8602926a78b266d3b2121ca16d68a4da7bbaa47dce4cb268df"
+          },
+          {
+            "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital\\109371\\manifest.json",
+            "sha256": "488d4912810664d2f1bac410500dfb6b47c68f30977f2ee5c7913e744242a503"
+          }
+        ]
+      }
+    ],
+    "copasa_source_sensitivity_required": "With final transformed fundamentals, report potential impact of alternative gross/net interpretation on log_market_cap, book_to_market and earnings_yield inputs. No extra predictive fits or held-out evaluation.",
+    "source_freeze_ready": true,
+    "final_family_admission": false
+  },
+  "partial_original_recovery": {
+    "original_result": {
+      "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\documents\\96075\\result.json",
+      "sha256": "ae4c2c421fa20f947a0bad6816573bb8af386a0da0aeb50e3b0dcb195548b234"
+    },
+    "partial_response": {
+      "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\documents\\96075\\partial_response_d7a3df746a379d0e.bin",
+      "sha256": "d7a3df746a379d0edc46f637cf01eb0a5ace53c82996c19a0ffdd4ad23b1b3f7"
+    },
+    "member": {
+      "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\partial_member_recovery_96075_20260911\\020354202006300301.itr",
+      "sha256": "93d2e1215be3d81b454e095c24dd0f3c70875b229a332027b5d07eef8b0071a2"
+    },
+    "member_name": "020354202006300301.itr",
+    "compressed_range": [
+      52,
+      35742057
+    ],
+    "compressed_bytes": 35742005,
+    "uncompressed_bytes": 36355017,
+    "crc32": "4cbdfbe0",
+    "crc_and_length_verified": true,
+    "identity": {
+      "DataReferenciaDocumento": "2020-06-30T00:00:00",
+      "NumeroVersaoDocumento": "1",
+      "CodigoTipoDocumento": "3",
+      "CodigoEscalaQuantidade": "2",
+      "CodigoEscalaMoeda": "2",
+      "CodigoCvm": "020354",
+      "NumeroCnpjCompanhiaAberta": "05799312000120"
+    },
+    "attachments": [
+      {
+        "NumeroGrupoRelacionado": "192",
+        "NumeroQuadroRelacionado": "0",
+        "NomeArquivoPdf": "C:\\CVM\\EmpresasNetV16000\\Temp\\files\\00121801920000000000000000.pdf.pdf",
+        "Idioma": "1",
+        "pdf": {
+          "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\partial_member_recovery_96075_20260911\\attachment_0.pdf",
+          "sha256": "0a2daa9cc6d4b2287c7822b6a5d2b39ac358b37b1dab5d16edcbe3e89cbe1699"
+        }
+      },
+      {
+        "NumeroGrupoRelacionado": "193",
+        "NumeroQuadroRelacionado": "0",
+        "NomeArquivoPdf": "C:\\CVM\\EmpresasNetV16000\\Temp\\files\\00121801930000000000000000.pdf.pdf",
+        "Idioma": "1",
+        "pdf": {
+          "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\partial_member_recovery_96075_20260911\\attachment_1.pdf",
+          "sha256": "307eca16d754a2cbfcc05c64fed954d8fb9363549de67db37f13c48b3f98b46f"
+        }
+      }
+    ],
+    "scope": "Complete first ZIP member recovered from preserved truncated response; no partial PDF is treated as complete and no bytes are synthesized."
   }
 }

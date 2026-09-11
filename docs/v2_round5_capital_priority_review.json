@@ -1,21 +1,21 @@
 {
-  "scope": "Closure of the 50 priority cases. Retained records leave all quantities, masks and dates unchanged; source limitations are explicit and not represented as full independent reconciliations. No ratio supplies a value or exclusion.",
+  "scope": "Completed source-review decisions for all50 priority filings.11 own-source corrections and39 retained originals. Copasa narrative ambiguity is explicitly bounded, with current composition preferred over weighted EPS. No new mask is inferred from ratios or missing notes; full family acceptance remains required.",
   "priority_input": {
     "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_review_priority_20260911T010805Z\\readout.json",
     "sha256": "ead93042ed5a8b19a753699d3f1a4dca16b1dbe3a60dcb51cceb92b9d2177948"
   },
   "capital_dispositions": {
     "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_source_dispositions.json",
-    "sha256": "133f96d5d279f943732c045da31b061969b80cbf15ee5417981aa9cd44babfd0"
+    "sha256": "d352f55be6419237d855159fd11c56922f1d0f854f8e065f16970e9da0e98375"
   },
   "producer": {
     "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\close_reviewed_priority_20260911.py",
     "sha256": "f1f17f41933643fc5bce87f6ff395154fff2b85e94c929dcd116de53a5e4ae17"
   },
   "counts": {
-    "own_source_corrections": 8,
-    "retain_original": 38,
-    "open_measurement_review": 4
+    "own_source_corrections": 11,
+    "retain_original": 39,
+    "open_measurement_review": 0
   },
   "records": [
     {
@@ -211,8 +211,57 @@
         "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital\\109371\\manifest.json",
         "sha256": "488d4912810664d2f1bac410500dfb6b47c68f30977f2ee5c7913e744242a503"
       },
-      "outcome": "open_measurement_review",
-      "reason": "Gross/net interpretation still inconsistent within the own filing: original gross less treasury agrees with the note and EPS net magnitude, but the note labels that count paid capital. No arbitrary treasury deletion or double subtraction."
+      "outcome": "retain_original",
+      "reason": "The original dated class-and-treasury table gives380253000 gross ON and1072000 treasury, hence379181000 non-treasury shares. Retain this specific composition. The narrative calls379181430 paid and EPS uses379181thousand excluding treasury; these do not justify replacing current gross by a weighted/net number and subtracting treasury again. The original non-treasury result matches that narrative magnitude within430 shares. Exact gross/legal reconciliation is not asserted; the alternative literal narrative-minus-treasury reading differs by1071570 shares (about0.2826%).",
+      "original_capital": {
+        "reference": "2021-09-30",
+        "quantity_scale": 1000,
+        "paid_in": {
+          "ON": 380253000.0,
+          "PN": 0.0,
+          "total": 380253000.0
+        },
+        "treasury": {
+          "ON": 1072000.0,
+          "PN": 0.0,
+          "total": 1072000.0
+        },
+        "shares": {
+          "ON": 379181000.0,
+          "PN": 0.0
+        }
+      },
+      "visually_reviewed_pages": [
+        2,
+        55,
+        57
+      ],
+      "evidence": [
+        {
+          "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\transport_retry_20260910T200700Z\\documents\\109371\\result.json",
+          "sha256": "a15358d7077f79467eb58372ab644689f82f7ffb274180360e64aa2ac816ca3f"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\transport_retry_20260910T200700Z\\documents\\109371\\source.pdf",
+          "sha256": "7ac9d5f1dfbc7ae0997be90067744aefd0a42016061e6fa92c0226b9caa3a416"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\transport_retry_20260910T200700Z\\documents\\109371\\page_2.png",
+          "sha256": "0c842f1d3b99540c95849ceab598f8d0b1c7276d75e6012bd2fe9b9bf6a8bba3"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\transport_retry_20260910T200700Z\\documents\\109371\\page_55.png",
+          "sha256": "0bba1c7045f1b3ef8d8381af4b1761e60a26f7a4c81cad5e322b1e889789a9e3"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\transport_retry_20260910T200700Z\\documents\\109371\\page_57.png",
+          "sha256": "a51cae1baca71a8602926a78b266d3b2121ca16d68a4da7bbaa47dce4cb268df"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital\\109371\\manifest.json",
+          "sha256": "488d4912810664d2f1bac410500dfb6b47c68f30977f2ee5c7913e744242a503"
+        }
+      ]
     },
     {
       "document": {
@@ -2075,8 +2124,70 @@
         "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital\\96075\\manifest.json",
         "sha256": "5e238e607cc79f434e2e8c7162105d5dfe7a5b3fa48a6725e857e0d446319805"
       },
-      "outcome": "open_measurement_review",
-      "reason": "Original composition says 21656561 thousand ON; own notes remain unretrieved after completed bounded attempts. Do not substitute a later version or infer a correction/exclusion from the ratio or retrieval failure alone."
+      "outcome": "own_source_correction",
+      "disposition": {
+        "availability": "Exact original filing receipt; counts come from the same document. No later version, external market data or adjacent-filing ratio supplies a count.",
+        "disposition": "reconciled",
+        "document": {
+          "cnpj": "05799312000120",
+          "cvm_code": "020354",
+          "id": "96075",
+          "kind": "ITR",
+          "reference": "2020-06-30",
+          "version": "1"
+        },
+        "evidence": [
+          {
+            "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\partial_member_recovery_96075_20260911\\result.json",
+            "sha256": "0bfc3a524fef9e27484b6e7c60231eb5c8820bfe57c0743c7afbc5a33216d95d"
+          },
+          {
+            "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\partial_member_recovery_96075_20260911\\020354202006300301.itr",
+            "sha256": "93d2e1215be3d81b454e095c24dd0f3c70875b229a332027b5d07eef8b0071a2"
+          },
+          {
+            "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\documents\\96075\\result.json",
+            "sha256": "ae4c2c421fa20f947a0bad6816573bb8af386a0da0aeb50e3b0dcb195548b234"
+          },
+          {
+            "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\documents\\96075\\partial_response_d7a3df746a379d0e.bin",
+            "sha256": "d7a3df746a379d0edc46f637cf01eb0a5ace53c82996c19a0ffdd4ad23b1b3f7"
+          },
+          {
+            "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\partial_member_recovery_96075_20260911\\recovery.json",
+            "sha256": "33d8e3f891ca278756d22aa594fac92bba7a021a1889bcaf188d2ea86625a7ce"
+          },
+          {
+            "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\partial_member_recovery_96075_20260911\\attachment_1.pdf",
+            "sha256": "307eca16d754a2cbfcc05c64fed954d8fb9363549de67db37f13c48b3f98b46f"
+          },
+          {
+            "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\partial_member_recovery_96075_20260911\\review_pages.json",
+            "sha256": "58ac4af4a8a9a4c2fb524959aaef096b314f90569f14d03de3946ea3b35af551"
+          },
+          {
+            "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\review_last_four_20260911.json",
+            "sha256": "b7ef16a98d8fe9ea9322559d70984df360bd37779bfb7f2b5034d46cc6ddc3ba"
+          },
+          {
+            "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\partial_member_recovery_96075_20260911\\page_41.png",
+            "sha256": "0be69b40582d22b6dc83bca47f782483d9d175b9bb60877c29c746f058e82e55"
+          },
+          {
+            "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital\\96075\\manifest.json",
+            "sha256": "5e238e607cc79f434e2e8c7162105d5dfe7a5b3fa48a6725e857e0d446319805"
+          }
+        ],
+        "paid_in_shares": {
+          "ON": 21656561,
+          "PN": 0
+        },
+        "reason": "The complete original ITR member was recovered locally from the preserved partial download and verified by declared length, CRC32 and original issuer/reference/version. Its attached own note22.1 on physicalpage41 gives21656561 ordinary shares at2020-06-30. Correct the common1000-fold unit error and preserve the reported zero treasury. No later version or partial PDF supplies the value.",
+        "treasury_shares": {
+          "ON": 0,
+          "PN": 0
+        }
+      }
     },
     {
       "document": {
@@ -2806,8 +2917,62 @@
         "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital\\37068\\manifest.json",
         "sha256": "947bb657d008623e0bf4789cd5bf98b891879a5bc4f3b1df4f242118ad8466be"
       },
-      "outcome": "open_measurement_review",
-      "reason": "Original composition says 162125601 thousand ON; available own notes have no independent current capital count. Material scale concern remains unresolved; no count or mask is inferred from adjacent filings, dividends or subsidiary shares."
+      "outcome": "own_source_correction",
+      "disposition": {
+        "availability": "Exact original filing receipt; counts come from the same document. No later version, external market data or adjacent-filing ratio supplies a count.",
+        "disposition": "reconciled",
+        "document": {
+          "cnpj": "11094546000175",
+          "cvm_code": "021946",
+          "id": "37068",
+          "kind": "ITR",
+          "reference": "2014-03-31",
+          "version": "1"
+        },
+        "evidence": [
+          {
+            "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\documents\\37068\\result.json",
+            "sha256": "b0f41ef2733cce6a7559a9cd352870b531827daa936c413a064a1ee139fdd818"
+          },
+          {
+            "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\original_zips\\37068\\source.zip",
+            "sha256": "92ddac6059973c882e346952db930dbcd7d77bef58c3c5b11bfa4f14c5284d8c"
+          },
+          {
+            "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\documents\\37068\\source.pdf",
+            "sha256": "98e401d4d1a33db23f20221185744d79ae61d9008143359e9debd57549891896"
+          },
+          {
+            "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\documents\\37068\\capital_note_pages.json",
+            "sha256": "317c8037651e11f947de30a2a52478aab0663f2d934e73d000aef1f2544315b6"
+          },
+          {
+            "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\review_last_four_20260911.json",
+            "sha256": "b7ef16a98d8fe9ea9322559d70984df360bd37779bfb7f2b5034d46cc6ddc3ba"
+          },
+          {
+            "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\documents\\37068\\page_2.png",
+            "sha256": "9907d674053893108057d36a4d315dda1518dc0d765ecb28e5434a79cd202ffe"
+          },
+          {
+            "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\documents\\37068\\page_15.png",
+            "sha256": "c413a409eec239faf932987ebbe435ca03677830fe3c9e632dc53ceb51ac4016"
+          },
+          {
+            "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital\\37068\\manifest.json",
+            "sha256": "947bb657d008623e0bf4789cd5bf98b891879a5bc4f3b1df4f242118ad8466be"
+          }
+        ],
+        "paid_in_shares": {
+          "ON": 162125601,
+          "PN": 0
+        },
+        "reason": "Own current composition supplies the literal 162125601 ON count and zero treasury. The same filing current-date administration report states a BRL25 quote and rounded BRL4.1bn market capitalization; 162125601*25=BRL4053140025 agrees at printed precision whereas a thousandfold quantity does not. Correct the quantity unit only; do not derive 164m shares by dividing the rounded valuation, and do not use external prices, dividends, EPS or later filings.",
+        "treasury_shares": {
+          "ON": 0,
+          "PN": 0
+        }
+      }
     },
     {
       "document": {
@@ -2906,16 +3071,73 @@
         "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital\\114129\\manifest.json",
         "sha256": "e7472399ee9567c6a868211c6cf9806b00b51c34069c80ef1aa471360e57e7ac"
       },
-      "outcome": "open_measurement_review",
-      "reason": "Own note establishes the million-share magnitude, while gross/net and treasury meaning remain inconsistent. Resolve measurement without taking a weighted EPS count as current capital."
+      "outcome": "own_source_correction",
+      "disposition": {
+        "availability": "Exact original filing receipt; counts come from the same document. No later version, external market data or adjacent-filing ratio supplies a count.",
+        "disposition": "reconciled",
+        "document": {
+          "cnpj": "17281106000103",
+          "cvm_code": "019445",
+          "id": "114129",
+          "kind": "ITR",
+          "reference": "2022-03-31",
+          "version": "1"
+        },
+        "evidence": [
+          {
+            "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\transport_retry_20260910T200700Z\\documents\\114129\\result.json",
+            "sha256": "39fb9d50ca3645f33982f03584c6cc1c33a3cddd77ab531a028b89870926d55b"
+          },
+          {
+            "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\original_zips\\114129\\source.zip",
+            "sha256": "5aacbf5bf27066b3b311eaf783bd0ee4fbf731de8a93443d4516a69215ae5861"
+          },
+          {
+            "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\transport_retry_20260910T200700Z\\documents\\114129\\source.pdf",
+            "sha256": "ecf3614cd648f1670155fc0044b0c243eff60a9f54c3840567d5a2651c4e6464"
+          },
+          {
+            "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\transport_retry_20260910T200700Z\\documents\\114129\\capital_note_pages.json",
+            "sha256": "569a492f4e53b673171adfcc8b7ec501aa96c3b4b22be66af015f694049ab1af"
+          },
+          {
+            "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\review_last_four_20260911.json",
+            "sha256": "b7ef16a98d8fe9ea9322559d70984df360bd37779bfb7f2b5034d46cc6ddc3ba"
+          },
+          {
+            "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\transport_retry_20260910T200700Z\\documents\\114129\\page_2.png",
+            "sha256": "72f71040e88dc9fd10cbc390ae47f42c88fff5611c1d8bd5f4429922574efc66"
+          },
+          {
+            "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\transport_retry_20260910T200700Z\\documents\\114129\\page_51.png",
+            "sha256": "e0e4c68ed4cd7ca8bff864fa8395b6c4cf5dcddcfb6c31b5cd489c3d17663495"
+          },
+          {
+            "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\transport_retry_20260910T200700Z\\documents\\114129\\page_53.png",
+            "sha256": "1a165d3d4fee846965b9995a57287cbd8587278d23bd431fd86a578674cf8258"
+          },
+          {
+            "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital\\114129\\manifest.json",
+            "sha256": "e7472399ee9567c6a868211c6cf9806b00b51c34069c80ef1aa471360e57e7ac"
+          }
+        ],
+        "paid_in_shares": {
+          "ON": 379181430,
+          "PN": 0
+        },
+        "reason": "Own current composition explicitly separates paid ON379181430 and treasury1071639. Its common thousands heading is contradicted by the same-period paid-capital narrative in actual shares; correct that common unit, preserving the table meanings and treasury quantity. The resulting non-treasury count is378109791. The note/EPS elsewhere repeats379181430/379181thousand: do not relabel a weighted denominator as current capital or set treasury to zero. Remaining gross/net narrative tension is explicitly retained as source uncertainty, bounded by1071639 shares (about0.2834% of adopted net), not claimed independently resolved.",
+        "treasury_shares": {
+          "ON": 1071639,
+          "PN": 0
+        }
+      }
     }
   ],
-  "source_freeze_ready": false,
-  "remaining_priority_ids": [
-    "109371",
-    "114129",
-    "37068",
-    "96075"
-  ],
-  "downstream": "Final family/store and screens remain pending. The own-filing approval-event correction changes valuation availability for Moura Dubeux and must be included in the producing code; do not rebuild with 59ba9ab."
+  "source_freeze_ready": true,
+  "remaining_priority_ids": [],
+  "downstream": "Source decisions complete. Build with the own-filing approval-barrier code, verify actual transformed fields including disclosed Copasa alternatives, then final store/screens. No acquisition or existing source scan rerun.",
+  "last_four_review": {
+    "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\review_last_four_20260911.json",
+    "sha256": "b7ef16a98d8fe9ea9322559d70984df360bd37779bfb7f2b5034d46cc6ddc3ba"
+  }
 }

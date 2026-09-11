@@ -2,7 +2,7 @@
 
 Status: historical acquisition and the corrected-class source preflight are complete.
 Its twelve capital gaps and one account gap now have verified own-filing sources;
-capital review and final identity admission remain open. **The final store and
+source-review decisions are complete; final family and identity admission remain open. **The final store and
 GBDT screens are not yet complete. The continuous-book replay is complete.** This document
 will be replaced with the completed acceptance tables and readouts before the
 round is closed. CPU only; no paid instance or neural fit has run this round.
@@ -11,20 +11,26 @@ The development boundary is 2024-12-30. Historical consumers are bounded to that
 date. The user stopped all forward capture on September 10, 2026. The existing
 Group-B snapshot remains quarantined evidence, outside historical consumers.
 
-The focused 50-filing review now has eight own-source corrections, 38 retained
-originals and four unresolved cases: Copasa 109371/114129, Multiplus 37068 and
-Terra Santa 96075. Retention preserves published precision and states where an
-independent note reconciliation is absent; it is not a claim that every original
-quantity was independently established. The new corrections repair three
-thousand-fold errors, two gross-versus-net errors, and two treasury counts.
-Moura Dubeux supplies the eighth correction: its own December count must be
-combined with its subsequently disclosed consolidation approval, rather than
-retrospective EPS shares. The event uses the original filing receipt and an
-approval-date uncertainty bound; no inferred split adjustment is introduced.
-Eighty-three targeted source, valuation and transformed-feature tests pass.
-There are now 154 dispositions: 147 reconciled and seven unavailable.
-See [the complete focused review](v2_round5_capital_priority_review.json).
-Final family/store acceptance and measured screen runtimes remain pending.
+The focused 50-filing review is complete: eleven own-source corrections and
+39 retained originals. There are 157 dispositions: 150 reconciled and seven
+unavailable. The final three corrections are Multiplus, Copasa2022Q1 and Terra
+Santa2020Q2v1. Terra Santa's failed download contained a complete original ITR
+member before the truncated outer PDF; its length/CRC32, issuer, reference and
+version are verified, and its own attached note confirms the count. Multiplus's
+same-filing, same-reference quoted price and rounded market capitalization
+corroborate the unit of its explicitly reported count; no count is invented by
+dividing rounded figures and no external price is used.
+
+Copasa's specific current capital-and-treasury composition is retained after
+correcting the2022Q1 common unit. The narrative/weighted-EPS discrepancy remains
+explicit: alternative gross/net readings differ by about0.283%. These are source
+review decisions, not exact legal-count certifications. The final transformed
+feature readout will quantify this remaining input uncertainty, without further
+predictive fits. See [the completed focused review](v2_round5_capital_priority_review.json).
+The own-filing capital-approval barrier also prevents Moura Dubeux's December
+share count from being paired with post-consolidation prices; the seven affected
+actual decision dates are verified. Eighty-three targeted tests pass. Final
+family/store acceptance and measured screen runtimes remain pending.
 
 The preflight checked 22,349 financial documents against 821,266 dated identity
 rows and 398 registrations. Its source gaps were specific: twelve capital pages
@@ -423,7 +429,7 @@ timing tables are complete; none is a Round-5 model input.
 
 ## Outstanding before closure
 
-Resolve the four remaining measurement reviews and final family proofs; build and accept the new store;
+Complete the final family proofs and disclosed source sensitivity; build and accept the new store;
 run the registered 14-fold Ã— 5-seed CPU information screens and TreeSHAP. Then publish the final family coverage,
 revision shares, unavailable-source reasons, economic deltas, screen results,
 store identities and resulting Round-6 ordering here.

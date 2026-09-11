@@ -103,6 +103,15 @@ original registration and replay bindings remain intact.
   uncertainty barrier to older counts, including older fallback snapshots. The
   approval date is not an asserted effective date, and retrospective EPS counts
   do not replace reference-date capital. Unrelated accounting remains available.
+- Manual source reconciliation distinguishes a current class-and-treasury
+  composition from a narrative total or weighted EPS denominator. Where the
+  specific current table remains the best supported observation, retain its
+  meaning and explicitly report conflicting narrative quantities; do not replace
+  a current count by a weighted average. An own-filing, same-reference published
+  market capitalization and quote can corroborate a table's unit at their
+  printed precision. They cannot supply an invented count by dividing rounded
+  values, and no external or later price may choose the correction. These are
+  documented source-review decisions, not automatic scale heuristics.
 
 Exact ordered field descriptions and transforms are in `feature_spec.py` and are
 hashed into the new store. Joined fixtures bind first admissible decisions to the
