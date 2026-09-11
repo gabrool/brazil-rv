@@ -11,7 +11,12 @@ import numpy as np
 from . import research_rounds as rr
 from .artifacts import sha256_file, write_json_atomic
 from .checkpoint_readouts import paired_readouts, retained
-from .contract import ALLOWED_SEEDS, DEVELOPMENT_FOLDS, TRADED_PRIMARY_HORIZONS
+from .contract import (
+    ALLOWED_SEEDS,
+    CONFIRMATION_SEEDS,
+    DEVELOPMENT_FOLDS,
+    TRADED_PRIMARY_HORIZONS,
+)
 from .evaluate import _primary_daily_metrics, _primary_population_components
 from .research_checkpoint import _context_arguments, _finish_cell
 from .round4_seed_audit import isolated_occupancy_failure
@@ -46,7 +51,10 @@ def panel(root: Path, review: Path, output: Path, omitted: int) -> str:
         raise ValueError("seed audit differs from the reviewed experiment")
     roster = full["registered_C6_roster"]
     arms = tuple(full["readouts"])
-    seeds = tuple(s for s in ALLOWED_SEEDS if s != omitted)
+    registered_seeds = full["seeds"]
+    if omitted not in registered_seeds:
+        raise ValueError("omitted seed is outside the reviewed panel")
+    seeds = tuple(s for s in registered_seeds if s != omitted)
     destination = output / f"omit_{omitted}"
     destination.mkdir(parents=True, exist_ok=False)
     write_json_atomic(
@@ -121,7 +129,7 @@ def panel(root: Path, review: Path, output: Path, omitted: int) -> str:
                         {
                             "engineering_acceptance": "failed",
                             "error": str(error),
-                            "excluded_from_all_four_panel_choices": True,
+                            "excluded_from_all_panel_choices": True,
                             "evaluation_sha256": sha256_file(dest / "evaluation.json"),
                             "score_manifest_sha256": sha256_file(
                                 dest / "score_manifest.json"
@@ -228,7 +236,9 @@ def panel(root: Path, review: Path, output: Path, omitted: int) -> str:
                     }
                     for a in arms
                 },
-                "C6_roster_sensitivity": roster_sensitivity(pairs),
+                "C6_roster_sensitivity": None
+                if full.get("confirmation_complete")
+                else roster_sensitivity(pairs),
                 "roster_changes_applied": False,
                 "new_training_runs": 0,
                 **rr.RESEARCH_FLAGS,
@@ -242,18 +252,18 @@ def finish(root: Path, review: Path, output: Path) -> str:
     full = rr._read_json(review / "result.json")
     if full["frozen_design_sha256"] != sha256_file(root / "frozen_design.json"):
         raise ValueError("seed audit differs from the reviewed experiment")
+    seeds = full["seeds"]
     results = {
-        f"omit_{s}": rr._read_json(output / f"omit_{s}" / "result.json")
-        for s in ALLOWED_SEEDS
+        f"omit_{s}": rr._read_json(output / f"omit_{s}" / "result.json") for s in seeds
     }
-    for seed in ALLOWED_SEEDS:
+    for seed in seeds:
         panel_result = results[f"omit_{seed}"]
         if (
             panel_result["status"] != "completed"
-            or panel_result["seeds"] != [s for s in ALLOWED_SEEDS if s != seed]
+            or panel_result["seeds"] != [s for s in seeds if s != seed]
             or panel_result["review_sha256"] != sha256_file(review / "result.json")
         ):
-            raise ValueError("seed audit requires all three matched fixed omissions")
+            raise ValueError("seed audit requires every matched fixed omission")
     excluded = sorted({a for row in results.values() for a in row["rejected_books"]})
     panels = {"full": full, **results}
     design = rr._read_json(root / "frozen_design.json")
@@ -264,7 +274,9 @@ def finish(root: Path, review: Path, output: Path) -> str:
         for name, result in panels.items():
             paths = {}
             for arm in full["readouts"]:
-                group = "session1" if arm in ("S0", *SESSION1) else "session2"
+                group = full.get("aggregate_group") or (
+                    "session1" if arm in ("S0", *SESSION1) else "session2"
+                )
                 base = root / "aggregates" / group if name == "full" else output / name
                 paths[arm] = {f: base / arm / f for f in DEVELOPMENT_FOLDS}
             pairs = leader_comparisons(
@@ -276,7 +288,12 @@ def finish(root: Path, review: Path, output: Path) -> str:
                 {a: informative_folds(design, a, roster) for a in paths},
                 excluded=excluded,
             )
-            traces[name] = promotion_trace(result["readouts"], pairs, excluded=excluded)
+            traces[name] = promotion_trace(
+                result["readouts"],
+                pairs,
+                excluded=excluded,
+                confirmation_complete=full.get("confirmation_complete", False),
+            )
             write_json_atomic(output / "decision_pairs" / name / "result.json", pairs)
         path = output / "seed_audit_result.json"
         if path.exists():
@@ -287,13 +304,14 @@ def finish(root: Path, review: Path, output: Path) -> str:
                 "status": "completed",
                 "review_sha256": sha256_file(review / "result.json"),
                 "frozen_design_sha256": sha256_file(root / "frozen_design.json"),
+                "seeds": seeds,
                 "omission_result_sha256": {
                     str(s): sha256_file(output / f"omit_{s}" / "result.json")
-                    for s in ALLOWED_SEEDS
+                    for s in seeds
                 },
                 "excluded_arms": excluded,
                 "decision_traces": traces,
-                "decision": seed_stability(traces),
+                "decision": seed_stability(traces, seeds),
                 "C6_roster_sensitivity": {
                     k: v["C6_roster_sensitivity"] for k, v in results.items()
                 },
@@ -313,7 +331,9 @@ def main():
     parser.add_argument("--root", required=True, type=Path)
     parser.add_argument("--review", required=True, type=Path)
     parser.add_argument("--output", required=True, type=Path)
-    parser.add_argument("--omitted", type=int, choices=ALLOWED_SEEDS)
+    parser.add_argument(
+        "--omitted", type=int, choices=(*ALLOWED_SEEDS, *CONFIRMATION_SEEDS)
+    )
     args = parser.parse_args()
     if args.action == "panel":
         if args.omitted is None:

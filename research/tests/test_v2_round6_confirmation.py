@@ -25,6 +25,7 @@ def test_confirmation_plan_uses_fresh_same_seed_P_and_cannot_launch_without_trig
     design = {
         **confirmation.rr.DEVELOPMENT_SOURCE_TIER_LABELS,
         "store": {"root": "current_store"},
+        "s0_store": {"root": "parent_store"},
         "fast_initialization": {
             "mode": "native_fresh",
             "transfer_chronology_clean": True,
@@ -41,6 +42,13 @@ def test_confirmation_plan_uses_fresh_same_seed_P_and_cannot_launch_without_trig
         return {"epochs_completed": 1, "artifacts": {"raw_patience.pt": "a" * 64}}
 
     monkeypatch.setattr(confirmation, "completed", completed)
+    monkeypatch.setattr(
+        confirmation,
+        "initialization_completed",
+        lambda run, design, arm, seed, **kw: completed(
+            run, design, arm, "P", seed, "pretrain_internal"
+        ),
+    )
     decision = {
         "status": "completed",
         "frozen_design_sha256": sha256_file(root / "frozen_design.json"),
@@ -72,10 +80,35 @@ def test_confirmation_plan_uses_fresh_same_seed_P_and_cannot_launch_without_trig
             / "raw_patience.pt"
         )
         assert cmd[cmd.index("--pretrain-checkpoint") + 1] == str(checkpoint)
-        assert "--pretrain-parent-store" not in cmd
-        assert cmd[cmd.index("--maximum-epochs") + 1] == "20"
+        if own == "S0":
+            assert cmd[cmd.index("--pretrain-parent-store") + 1] == "parent_store"
+        else:
+            assert "--pretrain-parent-store" not in cmd
+        assert cmd[cmd.index("--maximum-epochs") + 1] == "60"
         assert job["expected_manifest"]["scoring_complete"]
     decision["decision_traces"]["full"]["confirmation_reasons"] = []
     path.write_text(json.dumps(decision))
     with pytest.raises(ValueError, match="did not trigger"):
         confirmation.write_plan(root, path, "p")
+
+
+def test_confirmation_parent_keeps_original_precision_sampling_and_budget(tmp_path):
+    command = [
+        "python",
+        "-m",
+        "brazil_rv.v2.train",
+        "--maximum-epochs",
+        "60",
+        "--selection-interval",
+        "2",
+        "--use-bf16",
+        "--slow-only",
+    ]
+    original = confirmation.initialization_command(command, tmp_path, smoke=False)
+    assert original[original.index("--maximum-epochs") + 1] == "20"
+    assert "--use-bf16" not in original and "--selection-interval" not in original
+    assert repr(str(tmp_path / "research/src")) in original[2]
+    assert confirmation.confirmation_tasks(["S0", "mlp", "magnitudes"], "smoke") == [
+        ("S0", 11, "pretrain_internal", "P"),
+        ("mlp", 11, "pretrain_internal", "P"),
+    ]

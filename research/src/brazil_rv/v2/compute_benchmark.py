@@ -49,6 +49,7 @@ def main() -> None:
         include_fast=False,
         purpose="training",
         target_window_indices=target_window,
+        compact_names=args.mode != "dense_fp32",
     )
     holdout = V2DailyDataset(
         args.store,

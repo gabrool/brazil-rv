@@ -94,6 +94,8 @@ def read_scalar_feature_view(
     store: V2Store,
     date_indices: Sequence[int] | NDArray[np.integer],
     families: Sequence[str],
+    *,
+    name_indices: NDArray[np.int64] | None = None,
 ) -> ScalarFeatureView:
     """Read one canonical date/security scalar view for any model consumer."""
 
@@ -109,6 +111,11 @@ def read_scalar_feature_view(
     expected_axis = (indices.size, len(store.isins))
     if active.shape != expected_axis:
         raise ValueError("scalar feature activity is misaligned with the store axes")
+    isins = tuple(store.isins)
+    if name_indices is not None:
+        active = active[:, name_indices]
+        isins = tuple(isins[int(i)] for i in name_indices)
+        expected_axis = (indices.size, len(isins))
     values: list[NDArray[np.float32]] = []
     validity: list[NDArray[np.bool_]] = []
     ages: list[NDArray[np.float32]] = []
@@ -122,6 +129,10 @@ def read_scalar_feature_view(
         family_age = np.asarray(
             store.read(f"{family}_age_sessions", indices), dtype=np.float32
         )
+        if name_indices is not None:
+            family_values = family_values[:, name_indices]
+            family_valid = family_valid[:, name_indices]
+            family_age = family_age[:, name_indices]
         if (
             family_values.ndim != 3
             or family_valid.shape != family_values.shape
@@ -155,7 +166,7 @@ def read_scalar_feature_view(
     return ScalarFeatureView(
         date_indices=indices,
         dates=np.asarray(store.dates[indices], dtype="datetime64[D]"),
-        isins=tuple(store.isins),
+        isins=isins,
         active=active,
         names=names,
         values=combined_values,
@@ -267,7 +278,7 @@ def collate_v2_daily(
 
 
 def _compact_active_sample(
-    sample: Mapping[str, object], width: int
+    sample: Mapping[str, object], width: int, *, history_is_compact: bool = False
 ) -> dict[str, object]:
     # Targets and sidecars have already been constructed on the canonical
     # population. Select by eligibility alone, including names without labels.
@@ -305,10 +316,16 @@ def _compact_active_sample(
         if key in name_fields or key.startswith("sidecar_"):
             value = np.asarray(value)
             packed = np.zeros((width, *value.shape[1:]), dtype=value.dtype)
-            packed[: indices.size] = value[indices]
+            packed[: indices.size] = (
+                value
+                if history_is_compact and key.startswith("slow_")
+                else value[indices]
+            )
             result[key] = packed
     name_index = np.full(width, -1, dtype=np.int64)
-    name_index[: indices.size] = indices
+    name_index[: indices.size] = (
+        np.asarray(sample["name_index"])[indices] if "name_index" in sample else indices
+    )
     result["name_index"] = name_index
     if "fast_name_index" in sample:
         inverse = np.full(active.size, -1, dtype=np.int64)
@@ -549,6 +566,7 @@ class V2DailyDataset(Dataset[dict[str, object]]):
         include_intraday: bool = True,
         include_fast: bool = True,
         include_common_state: bool = False,
+        compact_names: bool = False,
         target_window_indices: Sequence[int] | None = None,
         fast_store: str | Path | None = None,
         verify_fast_hashes: bool = True,
@@ -562,6 +580,7 @@ class V2DailyDataset(Dataset[dict[str, object]]):
         self.include_intraday = include_intraday
         self.include_fast = include_fast
         self.include_common_state = include_common_state
+        self.compact_names = compact_names
         self.primary_target_name = REGISTERED_PRIMARY_TARGET
         self.primary_target_mask_name = REGISTERED_PRIMARY_TARGET_MASK
         if len(set(enabled_sidecars)) != len(enabled_sidecars):
@@ -832,7 +851,9 @@ class V2DailyDataset(Dataset[dict[str, object]]):
         )
 
     def _slow_window(
-        self, end_index: int
+        self,
+        end_index: int,
+        name_indices: NDArray[np.int64] | None = None,
     ) -> tuple[
         NDArray[np.float32],
         NDArray[np.bool_],
@@ -847,11 +868,15 @@ class V2DailyDataset(Dataset[dict[str, object]]):
             self.store,
             indices,
             ("slow",),
+            name_indices=name_indices,
         )
+        timesteps = self.store.read("slow_timestep_valid", indices)
+        if name_indices is not None:
+            timesteps = timesteps[:, name_indices]
         return lazy_slow_window(
             view.values,
             view.valid,
-            self.store.read("slow_timestep_valid", indices),
+            timesteps,
             view.age_sessions,
             end_index=len(indices) - 1,
             lookback=self.lookback,
@@ -1030,8 +1055,11 @@ class V2DailyDataset(Dataset[dict[str, object]]):
     def __getitem__(self, item: int) -> dict[str, object]:
         date_index = int(self.date_indices[item])
         slow_end = slow_row_index(date_index, self.stage)
-        history, feature_mask, history_mask, feature_age = self._slow_window(slow_end)
         active = np.asarray(self.store.read("active", date_index), dtype=np.bool_)
+        name_indices = np.flatnonzero(active) if self.compact_names else None
+        history, feature_mask, history_mask, feature_age = self._slow_window(
+            slow_end, name_indices
+        )
         fast_present = np.zeros(active.shape, dtype=np.bool_)
         sample: dict[str, object] = {
             "schema": DECISION_SAMPLE_SCHEMA,
@@ -1205,4 +1233,8 @@ class V2DailyDataset(Dataset[dict[str, object]]):
                 and not np.isfinite(value).all()
             ):
                 raise ValueError(f"dataset boundary produced non-finite {key}")
-        return sample
+        return (
+            _compact_active_sample(sample, len(name_indices), history_is_compact=True)
+            if name_indices is not None
+            else sample
+        )

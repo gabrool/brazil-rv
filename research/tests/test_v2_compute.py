@@ -1,11 +1,12 @@
 from copy import deepcopy
+from functools import partial
 
 import numpy as np
 import pytest
 import torch
 
 from brazil_rv.v2.config import ModelConfig
-from brazil_rv.v2.data import collate_v2_daily, restore_name_axis
+from brazil_rv.v2.data import V2DailyDataset, collate_v2_daily, restore_name_axis
 from brazil_rv.v2.losses import multi_horizon_loss, multi_horizon_loss_normalizers
 from brazil_rv.v2.model import DailyMultiHorizonModel
 from brazil_rv.v2.train import DateBatchSampler, _model_forward, fit_date_weights
@@ -147,4 +148,50 @@ def test_vectorized_horizons_preserve_separate_head_objective_and_gradients():
     torch.testing.assert_close(
         torch.autograd.grad(actual, scores, retain_graph=True)[0],
         torch.autograd.grad(expected, scores)[0],
+    )
+
+
+def test_early_history_packing_and_scoring_keep_canonical_identities(tmp_path):
+    from torch.utils.data import DataLoader
+    from brazil_rv.v2.score import score_checkpoint_artifact
+    from test_v2_score import _scoring_fixture
+
+    dense, config, checkpoint, _ = _scoring_fixture(tmp_path)
+    packed = V2DailyDataset(
+        dense.store.root,
+        dense.date_indices,
+        stage=dense.stage,
+        lookback=dense.lookback,
+        purpose="evaluation",
+        compact_names=True,
+    )
+    dense_rows = [dense[i] for i in range(len(dense))]
+    packed_rows = [packed[i] for i in range(len(packed))]
+    left = collate_v2_daily(dense_rows, fixed_name_count=16)
+    right = collate_v2_daily(packed_rows, fixed_name_count=16)
+    for key in left:
+        if isinstance(left[key], torch.Tensor):
+            assert torch.equal(left[key], right[key]), key
+        else:
+            assert left[key] == right[key]
+    for name, dataset, collate in (
+        ("dense", dense, collate_v2_daily),
+        ("packed", packed, partial(collate_v2_daily, fixed_name_count=16)),
+    ):
+        score_checkpoint_artifact(
+            checkpoint=checkpoint,
+            model_config=config,
+            loader=DataLoader(dataset, batch_size=2, collate_fn=collate),
+            output_dir=tmp_path / name,
+            device=torch.device("cpu"),
+        )
+    np.testing.assert_array_equal(
+        np.load(tmp_path / "dense/score_mask.npy"),
+        np.load(tmp_path / "packed/score_mask.npy"),
+    )
+    np.testing.assert_allclose(
+        np.load(tmp_path / "dense/scores.npy"),
+        np.load(tmp_path / "packed/scores.npy"),
+        atol=2e-6,
+        rtol=2e-5,
     )

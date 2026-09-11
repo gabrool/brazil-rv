@@ -2558,6 +2558,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         include_intraday=not arguments.slow_only,
         include_fast=not (arguments.disable_fast_stream or arguments.slow_only),
         include_common_state=arguments.common_state,
+        compact_names=not bool(arguments.lambda_persistence),
     )
     train_dataset = V2DailyDataset(
         store_root,

@@ -10,9 +10,11 @@ from brazil_rv.v2.contract import INTRADAY_DAILY_FEATURES
 from v2_store_fixtures import write_fixture_store as write_store
 
 
-def _native_fast_store(tmp_path, *, fast_present_on_decision: bool = True):
-    dates = [date(2021, 7, 1) + timedelta(days=index) for index in range(21)]
-    dates.append(date(2021, 8, 16))
+def _native_fast_store(
+    tmp_path, *, fast_present_on_decision: bool = True, year: int = 2021
+):
+    dates = [date(year, 7, 1) + timedelta(days=index) for index in range(21)]
+    dates.append(date(year, 8, 16))
     name_count = 3
     values = np.zeros((len(dates), 2, 5, 7), dtype=np.float32)
     valid = np.zeros_like(values, dtype=np.bool_)
@@ -34,9 +36,7 @@ def _native_fast_store(tmp_path, *, fast_present_on_decision: bool = True):
             "slow_age_sessions": np.zeros(
                 (len(dates), name_count, 1), dtype=np.float32
             ),
-            "slow_timestep_valid": np.ones(
-                (len(dates), name_count), dtype=np.bool_
-            ),
+            "slow_timestep_valid": np.ones((len(dates), name_count), dtype=np.bool_),
             "intraday_values": np.zeros(
                 (len(dates), name_count, len(INTRADAY_DAILY_FEATURES)),
                 dtype=np.float32,
@@ -68,7 +68,9 @@ def _native_fast_store(tmp_path, *, fast_present_on_decision: bool = True):
     )
 
 
-def test_dataset_compacts_native_fast_slots_and_zeroes_invalid_payload(tmp_path) -> None:
+def test_dataset_compacts_native_fast_slots_and_zeroes_invalid_payload(
+    tmp_path,
+) -> None:
     dataset = V2DailyDataset(
         _native_fast_store(tmp_path), [21], stage="finetune", lookback=20
     )
@@ -84,7 +86,9 @@ def test_dataset_compacts_native_fast_slots_and_zeroes_invalid_payload(tmp_path)
     assert np.isfinite(sample["fast_patch_values"]).all()
 
 
-def test_native_fast_uses_stored_presence_not_merely_scheduled_patches(tmp_path) -> None:
+def test_native_fast_uses_stored_presence_not_merely_scheduled_patches(
+    tmp_path,
+) -> None:
     path = _native_fast_store(tmp_path, fast_present_on_decision=False)
 
     sample = V2DailyDataset(path, [21], stage="finetune", lookback=20)[0]
@@ -95,7 +99,7 @@ def test_native_fast_uses_stored_presence_not_merely_scheduled_patches(tmp_path)
 
 def test_pretraining_dataset_never_allocates_fast_name_rows(tmp_path) -> None:
     dataset = V2DailyDataset(
-        _native_fast_store(tmp_path), [1], stage="pretrain", lookback=20
+        _native_fast_store(tmp_path, year=2015), [1], stage="pretrain", lookback=20
     )
     sample = dataset[0]
     batch = collate_v2_daily((sample, sample), fixed_fast_name_count=0)

@@ -175,6 +175,7 @@ def freeze(output: Path) -> str:
             "patience": 3,
             "date_sampling": "unique_dates",
         },
+        "initialization_recipe": protocol["initialization_recipe"],
         "input_acceptance_sha256": sha256_file(INPUTS),
         "input_coverage": inputs["input_coverage"],
         "feature_names": manifest["feature_names"],

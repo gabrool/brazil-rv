@@ -269,5 +269,13 @@
       "path": "D:/quant-data/b3/processed/model_runs/v2_round6_6e9a411_20260911T121622Z/trajectories/mlp/stage_P/seed_47/raw_patience.pt",
       "sha256": "586a81ef808cdc629dc1215111f2a61877ee82e4ba8339a075b82af3c587065e"
     }
+  },
+  "initialization_recipe": {
+    "commit": "6e9a411db49471c7f0744c1b45e5ddcfcb72b7f2",
+    "use_bf16": false,
+    "date_sampling": "adjacent_pairs",
+    "maximum_epochs": 20,
+    "patience": 3,
+    "scope": "Reused S0/MLP screening P and any triggered new S0/MLP confirmation P. Fresh-P research arms use the revised recipe for all seeds."
   }
 }

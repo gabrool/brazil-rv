@@ -22,6 +22,10 @@ The accepted development store has at most 243 active names. A width of 192 woul
 drop eligible names on 704 dates. No valid canonical target cell is inactive.
 Compaction tests must preserve histories, predictions, loss, gradients, and output
 identity within FP32 rounding tolerance. Padding itself is not extra training data.
+Select the same eligible columns before copying slow histories, retaining all
+historical rows. On sixteen spread-out F12 fit dates, early and late packing
+produce bit-identical tensors for every batch field. This CPU-only copy reduction
+does not invalidate the training bridge performed with late packing.
 
 Use CUDA BF16 autocast, retaining FP32 model/optimizer state, rank loss and
 cross-sectional moments. Compare FP32 dense, FP32 packed and BF16 packed compute
@@ -86,6 +90,18 @@ The MLP P hashes are recorded in the accompanying JSON registration. Completed
 old F fits and economic readouts remain archived under their original design;
 do not mix them into the revised comparison. Keep all original seed, fold,
 Session-2 roster, attribution, economic, confirmation and shutdown requirements.
+
+If confirmation triggers, new S0/MLP parent seeds 61/79/97 must use the same
+FP32, adjacent-pair, 20-epoch P recipe as their reused screening initializations,
+from clean commit `6e9a411db49471c7f0744c1b45e5ddcfcb72b7f2`. S0 P uses its original
+source store; MLP P uses the accepted Round-6 store, as in screening. The explicitly
+fresh-P arms use the revised P recipe for every seed. All confirmation F fits use
+the revised recipe. Thus a seed extension does not silently change the parent
+training recipe. This does not authorize untriggered confirmation fits.
+After a triggered extension, reapply the same promotion rule to the registered
+confirmation roster's six-seed ensembles and all six fixed leave-one-seed-out
+books. Keep the screening C6 roster fixed. Retain trigger diagnostics but do not
+recursively request another seed extension. No new positivity threshold is added.
 
 Recover and verify all completed old artifacts before retiring the stopped old
 dispatch processes. Never resume their queued jobs. Terminate the exact paid

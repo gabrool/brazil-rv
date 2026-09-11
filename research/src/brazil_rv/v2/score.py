@@ -532,6 +532,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         include_fast=bool(selection["features"]["ordered_native_fast_names"])
         or model_config.fast_encoder_mode == "legacy_v1_contaminated",
         include_common_state=model_config.common_state_feature_count > 0,
+        compact_names=True,
         purpose="evaluation",
     )
     loader = DataLoader(

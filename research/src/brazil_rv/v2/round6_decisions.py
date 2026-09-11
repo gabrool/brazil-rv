@@ -11,7 +11,7 @@ import numpy as np
 from . import research_rounds as rr
 from .artifacts import sha256_file, write_json_atomic
 from .checkpoint_readouts import paired_readouts
-from .contract import ALLOWED_SEEDS, DEVELOPMENT_FOLDS
+from .contract import ALLOWED_SEEDS, CONFIRMATION_SEEDS, DEVELOPMENT_FOLDS
 from .research_checkpoint import _completed
 from .round6 import SESSION1, SESSION1_FAMILIES, SESSION2, derive_session2_roster
 from .round6_readouts import evaluation_design, informative_folds
@@ -33,7 +33,9 @@ def eligible_arms(readouts: dict, excluded=()) -> list[str]:
     ]
 
 
-def promotion_trace(readouts: dict, pairs: dict, *, excluded=()) -> dict:
+def promotion_trace(
+    readouts: dict, pairs: dict, *, excluded=(), confirmation_complete=False
+) -> dict:
     """All-fold leader; informative comparison determines the confirmation trigger."""
     eligible = eligible_arms(readouts, excluded)
     leader = max(eligible, key=lambda a: readouts[a][IC]["estimate"], default=None)
@@ -63,7 +65,11 @@ def promotion_trace(readouts: dict, pairs: dict, *, excluded=()) -> dict:
     ]
     # An override is a candidate-versus-leader claim. Retain that matched pair
     # as well as the candidate-versus-S0 comparison required by the registration.
-    needed = {"S0", candidate, leader if override else candidate} if reasons else set()
+    needed = (
+        {"S0", candidate, leader if override else candidate}
+        if reasons and not confirmation_complete
+        else set()
+    )
     return {
         "eligible": eligible,
         "excluded_arms": list(excluded),
@@ -74,7 +80,8 @@ def promotion_trace(readouts: dict, pairs: dict, *, excluded=()) -> dict:
         "informative_comparison_to_S0": informative,
         "confirmation_reasons": reasons,
         "confirmation_arms": [a for a in readouts if a in needed],
-        "confirmation_seeds": [61, 79, 97] if reasons else [],
+        "confirmation_seeds": list(CONFIRMATION_SEEDS) if needed else [],
+        "confirmation_complete": confirmation_complete,
         "tie_rule": "registration_order",
         "economics_basis": "original_rates_A1_full_calendar_fold_reset",
         "sensitivity_cost_promotion_weight": 0,
@@ -87,12 +94,12 @@ def promotion_trace(readouts: dict, pairs: dict, *, excluded=()) -> dict:
     }
 
 
-def seed_stability(traces: dict) -> dict:
-    panels = [traces["full"], *(traces[f"omit_{s}"] for s in ALLOWED_SEEDS)]
+def seed_stability(traces: dict, seeds=ALLOWED_SEEDS) -> dict:
+    panels = [traces["full"], *(traces[f"omit_{s}"] for s in seeds)]
     choices = [p["provisional_designation"] for p in panels]
     stable = choices[0] is not None and len(set(choices)) == 1
     return {
-        "panel_order": ["full", *(f"omit_{s}" for s in ALLOWED_SEEDS)],
+        "panel_order": ["full", *(f"omit_{s}" for s in seeds)],
         "provisional_designations": choices,
         "designation_stable": stable,
         "research_designation": choices[0] if stable else None,
@@ -101,7 +108,9 @@ def seed_stability(traces: dict) -> dict:
             (choices[0] if stable else "S0") in p["eligible"] for p in panels
         ),
         "parent_inconclusive": not stable,
-        "confirmation_rules_still_apply": True,
+        "confirmation_rules_still_apply": not traces["full"].get(
+            "confirmation_complete", False
+        ),
         "independent_replication": False,
     }
 
@@ -236,6 +245,7 @@ def review(root: Path, output: Path, *, excluded=()) -> str:
             output / "result.json",
             {
                 "status": "provisional_requires_fixed_seed_audit",
+                "seeds": list(ALLOWED_SEEDS),
                 "implementation": rr._git_identity(),
                 "source_results": {
                     g: sha256_file(root / f"{g}_result.json") for g in groups
@@ -261,13 +271,85 @@ def review(root: Path, output: Path, *, excluded=()) -> str:
         context.store.close()
 
 
+def confirmation_review(root: Path, output: Path, decision_path: Path) -> str:
+    """Reapply the registered rule only to the roster that triggered confirmation."""
+    design_hash = sha256_file(root / "frozen_design.json")
+    prior = rr._read_json(decision_path)
+    trace = prior["decision_traces"]["full"]
+    arms = trace["confirmation_arms"]
+    result = rr._read_json(root / "confirmation_result.json")
+    if (
+        prior["status"] != "completed"
+        or prior["frozen_design_sha256"] != design_hash
+        or not trace["confirmation_reasons"]
+        or trace["confirmation_seeds"] != list(CONFIRMATION_SEEDS)
+        or result["status"] != "completed"
+        or result["frozen_design_sha256"] != design_hash
+        or result["seeds"] != [*ALLOWED_SEEDS, *CONFIRMATION_SEEDS]
+        or set(result["readouts"]) != set(arms)
+    ):
+        raise ValueError(
+            "confirmation review requires the triggered matched six-seed panel"
+        )
+    design = rr._read_json(root / "frozen_design.json")
+    roster = rr._read_json(root / "session2_roster.json")
+    readouts = {a: result["readouts"][a]["pooled"] for a in arms}
+    paths = {
+        a: {f: root / "aggregates/confirmation" / a / f for f in DEVELOPMENT_FOLDS}
+        for a in arms
+    }
+    if not all(_completed(p) for folds in paths.values() for p in folds.values()):
+        raise ValueError("confirmation review requires all accepted books")
+    output.mkdir(parents=True, exist_ok=False)
+    context = rr._open_ledger_replay(evaluation_design(design))
+    try:
+        pairs = leader_comparisons(
+            context,
+            paths,
+            readouts,
+            dict(result["paired"]),
+            output / "paired",
+            {a: informative_folds(design, a, roster) for a in arms},
+        )
+        return write_json_atomic(
+            output / "result.json",
+            {
+                "status": "provisional_requires_fixed_seed_audit",
+                "implementation": rr._git_identity(),
+                "frozen_design_sha256": design_hash,
+                "seeds": result["seeds"],
+                "aggregate_group": "confirmation",
+                "confirmation_complete": True,
+                "screening_decision_sha256": sha256_file(decision_path),
+                "confirmation_result_sha256": sha256_file(
+                    root / "confirmation_result.json"
+                ),
+                "readouts": readouts,
+                "paired": pairs,
+                "promotion_trace": promotion_trace(
+                    readouts, pairs, confirmation_complete=True
+                ),
+                "registered_C6_roster": roster,
+                "roster_changes_applied": False,
+                **rr.RESEARCH_FLAGS,
+            },
+        )
+    finally:
+        context.store.close()
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--root", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--excluded", nargs="*", default=[])
+    parser.add_argument("--confirmation-decision", type=Path)
     args = parser.parse_args()
-    print(review(args.root, args.output, excluded=args.excluded))
+    print(
+        confirmation_review(args.root, args.output, args.confirmation_decision)
+        if args.confirmation_decision
+        else review(args.root, args.output, excluded=args.excluded)
+    )
 
 
 if __name__ == "__main__":

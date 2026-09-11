@@ -1,6 +1,7 @@
 from copy import deepcopy
 import json
 from types import SimpleNamespace
+import pytest
 
 from brazil_rv.v2.round4_seed_audit import isolated_occupancy_failure
 from brazil_rv.v2.round6_decisions import IC, NET, promotion_trace, seed_stability
@@ -89,6 +90,32 @@ def test_all_fixed_omissions_must_agree_without_selecting_a_favorable_subset():
     assert decision["parent_inconclusive"]
 
 
+def test_confirmation_finishes_without_retriggering_and_checks_all_six_seeds():
+    rows = {
+        "S0": {IC: interval(0.02), NET: interval(4)},
+        "lending": {IC: interval(0.025), NET: interval(4)},
+    }
+    pairs = {
+        "S0_minus_lending": pair(
+            "S0", interval(-0.005, -0.01, 0.001), interval(0, -1, 1)
+        ),
+        "lending_minus_S0": pair(
+            "lending", interval(0.005, -0.001, 0.01), interval(0, -1, 1)
+        ),
+    }
+    trace = promotion_trace(rows, pairs, confirmation_complete=True)
+    assert trace["provisional_designation"] == "lending"
+    assert trace["confirmation_reasons"]
+    assert trace["confirmation_arms"] == trace["confirmation_seeds"] == []
+    seeds = (11, 29, 47, 61, 79, 97)
+    panels = {key: deepcopy(trace) for key in ("full", *(f"omit_{s}" for s in seeds))}
+    result = seed_stability(panels, seeds)
+    assert result["research_designation"] == "lending"
+    assert not result["confirmation_rules_still_apply"]
+    panels["omit_97"]["provisional_designation"] = "S0"
+    assert seed_stability(panels, seeds)["parent_inconclusive"]
+
+
 def test_only_isolated_nonbaseline_occupancy_can_be_rejected_locally():
     occupancy = RuntimeError(
         "registered book stop: {'headline': ['mean_quintile_occupancy_deviation_long_above_two']}"
@@ -125,8 +152,9 @@ def test_era_readout_preserves_calendar_missingness_and_fold_boundaries(
     assert row["fold_boundary_preserved"]
 
 
+@pytest.mark.parametrize("seeds", [(11, 29, 47), (11, 29, 47, 61, 79, 97)])
 def test_finished_seed_audit_binds_the_design_consumed_by_confirmation(
-    tmp_path, monkeypatch
+    tmp_path, monkeypatch, seeds
 ):
     root, review, output = (tmp_path / p for p in ("root", "review", "audit"))
     root.mkdir()
@@ -135,13 +163,15 @@ def test_finished_seed_audit_binds_the_design_consumed_by_confirmation(
     digest = sha256_file(root / "frozen_design.json")
     rows = {"S0": {IC: interval(0.02), NET: interval(4)}}
     full = {
+        "seeds": list(seeds),
+        "confirmation_complete": len(seeds) == 6,
         "frozen_design_sha256": digest,
         "readouts": rows,
         "registered_C6_roster": {"c6_families": []},
         "paired": {},
     }
     (review / "result.json").write_text(json.dumps(full))
-    for seed in (11, 29, 47):
+    for seed in seeds:
         dest = output / f"omit_{seed}"
         dest.mkdir(parents=True)
         (dest / "result.json").write_text(
@@ -149,7 +179,7 @@ def test_finished_seed_audit_binds_the_design_consumed_by_confirmation(
                 {
                     "status": "completed",
                     "review_sha256": sha256_file(review / "result.json"),
-                    "seeds": [s for s in (11, 29, 47) if s != seed],
+                    "seeds": [s for s in seeds if s != seed],
                     "readouts": rows,
                     "paired": {},
                     "rejected_books": {},
@@ -168,3 +198,4 @@ def test_finished_seed_audit_binds_the_design_consumed_by_confirmation(
     assert result["frozen_design_sha256"] == digest
     assert result["decision"]["research_designation"] == "S0"
     assert result["decision_traces"]["full"]["confirmation_arms"] == []
+    assert len(result["omission_result_sha256"]) == len(seeds)

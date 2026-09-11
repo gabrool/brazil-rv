@@ -57,7 +57,7 @@ from parse_b3_cotahist import RECORD_LENGTH, parse_year  # noqa: E402
 
 
 _DATE_AXIS = np.arange(
-    np.datetime64("2022-11-01"),
+    np.datetime64("2016-07-18"),
     np.datetime64("2024-12-31"),
     dtype="datetime64[D]",
 )
@@ -619,7 +619,7 @@ def test_t24_raw_store_native_fit_score_ledger_report_relocation_and_stale_resum
     )
     assert np.isfinite(fit_loss)
     checkpoint_sha256 = sha256_file(checkpoint)
-    evaluation_indices = _f1_axes(store)[-1][:10]
+    evaluation_indices = _f1_axes(store)[-1][:40]
     scoring_loader = _loader(
         store,
         evaluation_indices,
