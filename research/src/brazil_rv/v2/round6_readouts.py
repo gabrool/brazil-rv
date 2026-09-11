@@ -132,7 +132,15 @@ def ensemble(
     return rr.rank_average_ensemble(members, mask), mask, records
 
 
-def evaluate(root: Path, arms, *, seeds=ALLOWED_SEEDS, group="session1", roster=None):
+def evaluate(
+    root: Path,
+    arms,
+    *,
+    seeds=ALLOWED_SEEDS,
+    group="session1",
+    roster=None,
+    cells_only=False,
+):
     design = rr._read_json(root / "frozen_design.json")
     original = evaluation_design(design)
     context = rr._open_ledger_replay(original)
@@ -154,7 +162,13 @@ def evaluate(root: Path, arms, *, seeds=ALLOWED_SEEDS, group="session1", roster=
                 paths[arm][fold] = output
                 if _completed(output):
                     metadata = rr._read_json(output / "score_manifest.json")["metadata"]
-                    if metadata["seeds"] != list(seeds) or metadata["arm"] != arm:
+                    if (
+                        metadata["seeds"] != list(seeds)
+                        or metadata["arm"] != arm
+                        or metadata["fold"] != fold
+                        or metadata["round6_frozen_design_sha256"]
+                        != source_hashes["round6_frozen_design"]
+                    ):
                         raise ValueError("completed aggregate uses another panel")
                     continue
                 if (output / "score_manifest.json").exists():
@@ -199,6 +213,12 @@ def evaluate(root: Path, arms, *, seeds=ALLOWED_SEEDS, group="session1", roster=
                 _finish_cell(output, evaluated, name=arm, fold=fold)
                 del evaluated
                 print(f"accepted {group}/{arm}/{fold}", flush=True)
+        if cells_only:
+            # Completed arm books can overlap later GPU fits. Existing accepted
+            # markers are sufficient; do not publish an incomplete session result.
+            return (
+                f"accepted {len(arms) * len(DEVELOPMENT_FOLDS)} {group} aggregate cells"
+            )
         readouts = {a: candidate_readout(p) for a, p in paths.items()}
         pairs = {}
         support = {a: informative_folds(design, a, roster) for a in arms}
@@ -396,7 +416,9 @@ def freeze_roster(root: Path):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("action", choices=("evaluate", "roster", "attribution"))
+    parser.add_argument(
+        "action", choices=("evaluate", "cells", "roster", "attribution")
+    )
     parser.add_argument("--root", required=True, type=Path)
     parser.add_argument("--arms", nargs="+", default=["S0", *SESSION1])
     parser.add_argument("--seeds", type=int, nargs="+", default=list(ALLOWED_SEEDS))
@@ -429,6 +451,7 @@ def main():
                 seeds=tuple(args.seeds),
                 group=args.group,
                 roster=roster,
+                cells_only=args.action == "cells",
             )
         )
 

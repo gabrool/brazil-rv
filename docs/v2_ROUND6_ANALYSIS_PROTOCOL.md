@@ -74,6 +74,14 @@ can be described as confirmed. No candidate outcome is implied by this document.
 Run the three panel processes concurrently only when memory permits. Their
 fresh output directories preserve partial failures for diagnosis.
 
+As each arm finishes all 42 fitted score panels, `round6_readouts cells --arms ARM
+--group session1` (or `session2`) can evaluate its fourteen books while later arms
+train. It writes the same accepted fold artifacts and publishes no session-level
+result. The final `evaluate` action reuses those exact accepted cells after the
+complete registered roster is available. Family attribution and cost sensitivities
+can also run once that arm's accepted cells exist. This changes scheduling only;
+the C6 roster still waits for the complete Session 1 result.
+
 Analysis code is isolated on the `round6-readouts` branch while the GPU checkout
 remains at its frozen training commit. Recover and validate completed training
 artifacts before evaluation. Publish both implementation and evidence; merge the
