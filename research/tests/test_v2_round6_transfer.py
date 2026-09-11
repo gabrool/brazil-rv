@@ -109,6 +109,23 @@ def test_registered_additive_transfer_preserves_parent_and_reports_new_keys(tmp_
     assert torch.equal(_model_forward(parent, batch), _model_forward(child, extended))
 
 
+def test_fp32_parent_parameters_can_initialize_bf16_without_relaxing_source_identity(
+    tmp_path,
+):
+    parent, child, _, checkpoint, options, _ = _handoff(tmp_path)
+    child = DailyMultiHorizonModel(replace(child.config, use_bf16=True))
+    options["fine_tune_input_contract"]["model_config"] = model_config_contract(
+        child.config
+    )
+    load_pretrain_handoff(child, checkpoint, **options)
+    for name, value in parent.state_dict().items():
+        assert torch.equal(child.state_dict()[name], value)
+    assert child.pretrain_transfer_audit["precision"] == {
+        "source_bf16": False,
+        "destination_bf16": True,
+    }
+
+
 @pytest.mark.parametrize(
     "mutation", ["target", "names", "nonzero_projection", "architecture"]
 )

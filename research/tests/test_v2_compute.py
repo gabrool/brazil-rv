@@ -9,6 +9,7 @@ from brazil_rv.v2.data import collate_v2_daily, restore_name_axis
 from brazil_rv.v2.losses import multi_horizon_loss, multi_horizon_loss_normalizers
 from brazil_rv.v2.model import DailyMultiHorizonModel
 from brazil_rv.v2.train import DateBatchSampler, _model_forward, fit_date_weights
+from brazil_rv.modeling.engine import _soft_spearman_loss_sum
 
 
 def test_compaction_preserves_eligible_history_predictions_and_gradients():
@@ -122,4 +123,28 @@ def test_unique_date_decay_matches_full_weighted_objective_and_microbatch_gradie
     torch.testing.assert_close(
         torch.autograd.grad(full, scores, retain_graph=True)[0],
         torch.autograd.grad(split, scores)[0],
+    )
+
+
+def test_vectorized_horizons_preserve_separate_head_objective_and_gradients():
+    torch.manual_seed(47)
+    scores = torch.randn(6, 13, 6, requires_grad=True)
+    targets = torch.randn_like(scores)
+    mask = torch.rand_like(scores) > 0.3
+    mask[:3, :, 1] = False
+    mask[0, :, 4] = False
+    individual = []
+    for h in range(6):
+        total, count = _soft_spearman_loss_sum(
+            scores[..., h : h + 1], targets[..., h : h + 1], mask[..., h : h + 1], 0.1
+        )
+        individual.append(total / count.clamp_min(1))
+    expected = torch.stack(individual[:5]).mean() + 0.2 * individual[5]
+    actual = multi_horizon_loss(
+        scores, targets, mask, temperature=0.1, to_close_weight=0.2
+    )
+    torch.testing.assert_close(actual, expected)
+    torch.testing.assert_close(
+        torch.autograd.grad(actual, scores, retain_graph=True)[0],
+        torch.autograd.grad(expected, scores)[0],
     )

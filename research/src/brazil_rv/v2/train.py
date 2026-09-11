@@ -2160,13 +2160,13 @@ def train_stage(
             def make_closure(
                 cpu_microbatch: Mapping[str, object],
             ) -> Callable[[], torch.Tensor]:
+                batch = _to_device(
+                    cpu_microbatch,
+                    device,
+                    omit_fast_stream=stage == "P" or model_config.disable_fast_stream,
+                )
+
                 def closure() -> torch.Tensor:
-                    batch = _to_device(
-                        cpu_microbatch,
-                        device,
-                        omit_fast_stream=stage == "P"
-                        or model_config.disable_fast_stream,
-                    )
                     with torch.autocast(
                         device_type=device.type,
                         dtype=torch.bfloat16,

@@ -30,6 +30,11 @@ not a claim of bit-identical optimization. A parent trained in FP32 may initiali
 a BF16 fit when all structural and source/chronology identities match; record
 both precisions in the transfer audit.
 
+Compute the independent horizon losses in one vectorized operation with the
+same separate per-head denominators, and transfer each input microbatch once for
+both SAM passes. These execution changes must pass loss/gradient equivalence
+tests and do not change the objective or add optimizer updates.
+
 ## Sampling and epoch budget
 
 Without persistence regularization, shuffle all fit dates without replacement.
@@ -74,7 +79,10 @@ not promotion thresholds. Keep the bridge separate from the final experiment roo
 Freeze a new clean implementation and run root after validation. Refit a matched
 S0 and every candidate F panel under the same new recipe; the old sealed S0 F
 scores are historical reference only. Existing immutable stores, source audits,
-borrow sensitivities and compatible P initializations are retained. Completed
+borrow sensitivities and compatible P initializations are retained. Reuse the
+three completed, hash-bound MLP P checkpoints as well as the sealed S0 P weights:
+both sets used the pre-amendment recipe, and every revised F fit is matched.
+The MLP P hashes are recorded in the accompanying JSON registration. Completed
 old F fits and economic readouts remain archived under their original design;
 do not mix them into the revised comparison. Keep all original seed, fold,
 Session-2 roster, attribution, economic, confirmation and shutdown requirements.

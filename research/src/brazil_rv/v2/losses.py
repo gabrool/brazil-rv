@@ -5,7 +5,7 @@ from collections.abc import Mapping
 import torch
 
 from brazil_rv.modeling.contract import SOFT_RANK_STANDARDIZATION_EPS
-from brazil_rv.modeling.engine import _soft_spearman_loss_sum
+from brazil_rv.modeling.engine import _soft_spearman_group_losses
 
 from .contract import DEFAULT_HORIZON_LOSS_WEIGHTS, SOFT_RANK_TEMPERATURE
 
@@ -18,23 +18,6 @@ def _flatten_date_pairs(values: torch.Tensor) -> torch.Tensor:
             "model arrays must have shape [date, name, head] or [pair, 2, name, head]"
         )
     return values
-
-
-def _masked_head_loss(
-    scores: torch.Tensor,
-    targets: torch.Tensor,
-    mask: torch.Tensor,
-    temperature: float,
-    normalization_count: torch.Tensor | None = None,
-    date_weights: torch.Tensor | None = None,
-) -> torch.Tensor:
-    clean_scores = torch.where(mask, scores, torch.zeros_like(scores))
-    clean_targets = torch.where(mask, targets, torch.zeros_like(targets))
-    total, count = _soft_spearman_loss_sum(
-        clean_scores, clean_targets, mask, temperature, group_weights=date_weights
-    )
-    denominator = count if normalization_count is None else normalization_count
-    return total / denominator.clamp_min(1)
 
 
 def score_persistence_penalty(
@@ -173,19 +156,16 @@ def multi_horizon_loss_components(
         or persistence_count.numel() != 1
     ):
         raise ValueError("loss normalization counts are malformed")
-    head_losses = torch.stack(
-        tuple(
-            _masked_head_loss(
-                flat_scores[..., head : head + 1],
-                flat_targets[..., head : head + 1],
-                flat_mask[..., head : head + 1],
-                temperature,
-                per_horizon_counts[head],
-                None if date_weights is None else date_weights[:, head : head + 1],
-            )
-            for head in range(5)
-        )
+    group_losses, _ = _soft_spearman_group_losses(
+        torch.where(flat_mask, flat_scores, 0),
+        torch.where(flat_mask, flat_targets, 0),
+        flat_mask,
+        temperature,
     )
+    daily_losses = group_losses[..., :5]
+    if date_weights is not None:
+        daily_losses = daily_losses * date_weights
+    head_losses = daily_losses.sum(dim=0) / per_horizon_counts.clamp_min(1)
     # Preserve the exact reduction (and gradients) of the uniform contract.
     horizon = (
         head_losses.mean()
@@ -193,13 +173,7 @@ def multi_horizon_loss_components(
         else (head_losses * head_losses.new_tensor(horizon_loss_weights)).sum()
     )
     to_close = (
-        _masked_head_loss(
-            flat_scores[..., 5:],
-            flat_targets[..., 5:],
-            flat_mask[..., 5:],
-            temperature,
-            to_close_count,
-        )
+        group_losses[..., 5:].sum() / to_close_count.clamp_min(1)
         if scores.shape[-1] == 6
         else scores.new_zeros((), dtype=torch.float32)
     )

@@ -183,9 +183,9 @@
   },
   "leave_one_seed_out": "All three fixed seed omissions for every research designation.",
   "mlp_initialization": {
-    "additional_stage_p_runs": 3,
-    "mode": "architecture_matched_stage_p",
-    "reason": "The point-in-time encoder cannot reuse recurrent weights; same P data/objective/selection as S0."
+    "additional_stage_p_runs": 0,
+    "mode": "reuse_completed_architecture_matched_stage_p",
+    "reason": "Preserve the three completed pre-amendment MLP P fits, paired with the same pre-amendment recipe used by sealed S0 P. All F fits use the revised matched compute recipe."
   },
   "operational_root": "D:/quant-data/b3/interim/round6_20260911T111805Z",
   "preflight": [
@@ -255,5 +255,19 @@
     "rebalance"
   ],
   "stage_p_reuse": "Hash-bound unchanged S0 Stage-P parameters for additive sidecar arms; record all newly initialized projection keys and transfer identities. Fresh-P best-single/C6 variants are independent registered arms.",
-  "status": "registered_preflight"
+  "status": "registered_preflight",
+  "mlp_stage_p": {
+    "11": {
+      "path": "D:/quant-data/b3/processed/model_runs/v2_round6_6e9a411_20260911T121622Z/trajectories/mlp/stage_P/seed_11/raw_patience.pt",
+      "sha256": "2cc1f935e8e99f6877dceb018c6b4d8fdf81a7fd7289521f46cccf500f694ded"
+    },
+    "29": {
+      "path": "D:/quant-data/b3/processed/model_runs/v2_round6_6e9a411_20260911T121622Z/trajectories/mlp/stage_P/seed_29/raw_patience.pt",
+      "sha256": "14e52b78a8015ee19be8277c00943f963571e142072b07dc3525f4b8e2d91fca"
+    },
+    "47": {
+      "path": "D:/quant-data/b3/processed/model_runs/v2_round6_6e9a411_20260911T121622Z/trajectories/mlp/stage_P/seed_47/raw_patience.pt",
+      "sha256": "586a81ef808cdc629dc1215111f2a61877ee82e4ba8339a075b82af3c587065e"
+    }
+  }
 }

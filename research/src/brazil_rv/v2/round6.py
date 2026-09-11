@@ -162,6 +162,10 @@ def freeze(output: Path) -> str:
         "store": {**inputs["store"], "root": str(store_root)},
         "s0_store": {**inputs["s0_store"], "root": str(source_store)},
         "s0_stage_p": checkpoints,
+        "mlp_stage_p": {
+            s: {"path": str(resolve_file(r)), "sha256": r["sha256"]}
+            for s, r in protocol["mlp_stage_p"].items()
+        },
         "s0_panels": {**protocol["s0_panels"], "root": str(parent_root)},
         "preregistration": bindings,
         "baseline": "matched_refit_S0",
@@ -335,16 +339,12 @@ def write_plan(root: Path, phase: str) -> str:
     )
     smoke = phase.endswith("smoke")
     if phase == "session1_smoke":
-        tasks = [(a, 11, "F14", "F") for a in ("S0", *SESSION1)] + [
-            ("mlp", 11, "pretrain_internal", "P")
-        ]
+        tasks = [(a, 11, "F14", "F") for a in ("S0", *SESSION1)]
     elif phase == "session2_smoke":
         tasks = [(a, 11, "F14", "F") for a in second]
         tasks += [
             (a, 11, "pretrain_internal", "P") for a in second if a.endswith("fresh_p")
         ]
-    elif phase == "mlp_p":
-        tasks = [("mlp", s, "pretrain_internal", "P") for s in ALLOWED_SEEDS]
     elif phase == "session1":
         tasks = [
             (a, s, f, "F")
@@ -388,15 +388,18 @@ def write_plan(root: Path, phase: str) -> str:
                 raise ValueError("smoke must be one epoch without scores")
     jobs = []
     for arm, seed, fold, stage in tasks:
-        fresh = arm == "mlp" or arm.endswith("fresh_p")
+        fresh = arm.endswith("fresh_p")
         run = (
             root / "smoke" / f"{arm}_{stage}"
             if smoke
             else trajectory(root, arm, seed, fold, stage)
         )
         checkpoint, digest = None, None
-        reused = stage == "F" and not fresh
-        if reused:
+        reused = stage == "F" and not fresh and arm != "mlp"
+        if arm == "mlp" and stage == "F":
+            record = design["mlp_stage_p"][str(seed)]
+            checkpoint, digest = Path(record["path"]), record["sha256"]
+        elif reused:
             record = design["s0_stage_p"][str(seed)]
             checkpoint, digest = Path(record["path"]), record["sha256"]
         elif stage == "F" and not smoke:

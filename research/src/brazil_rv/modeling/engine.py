@@ -66,13 +66,11 @@ def sam_metadata(rho: float = SAM_RHO) -> dict[str, object]:
     return {"rho": rho, "base_optimizer": "adamw"}
 
 
-def _soft_spearman_loss_sum(
+def _soft_spearman_group_losses(
     predictions: torch.Tensor,
     targets: torch.Tensor,
     label_mask: torch.Tensor,
     temperature: float = SOFT_RANK_TEMPERATURE,
-    *,
-    group_weights: torch.Tensor | None = None,
 ) -> tuple[torch.Tensor, torch.Tensor]:
     with torch.autocast(device_type=predictions.device.type, enabled=False):
         scores = predictions.float().transpose(1, 2)
@@ -110,9 +108,19 @@ def _soft_spearman_loss_sum(
             .sqrt()
         )
         losses = (1 - covariance / denominator) * valid_groups
-        if group_weights is not None:
-            losses = losses * group_weights
-        return losses.sum(), valid_groups.sum()
+        return losses, valid_groups
+
+
+def _soft_spearman_loss_sum(
+    predictions: torch.Tensor,
+    targets: torch.Tensor,
+    label_mask: torch.Tensor,
+    temperature: float = SOFT_RANK_TEMPERATURE,
+) -> tuple[torch.Tensor, torch.Tensor]:
+    losses, valid_groups = _soft_spearman_group_losses(
+        predictions, targets, label_mask, temperature
+    )
+    return losses.sum(), valid_groups.sum()
 
 
 def soft_spearman_loss(
