@@ -32,6 +32,7 @@ from brazil_rv.v2.losses import (
 from brazil_rv.v2.model import DailyMultiHorizonModel
 from brazil_rv.v2.train import (
     DatePairBatchSampler,
+    DateBatchSampler,
     PatienceTracker,
     build_optimizer,
     compile_forward,
@@ -45,11 +46,11 @@ from brazil_rv.v2.train import (
     train_stage,
     _common_primary_selection_score,
     _configure_inductor_compiler,
-    _date_pair_microbatches,
+    _date_microbatches,
     _input_static_identity,
     _loader_input_payload,
     _model_input_segments,
-    _require_production_pair_sampler,
+    _require_production_sampler,
     _validate_tracked_stage_inputs,
 )
 from v2_store_fixtures import write_fixture_store as write_store
@@ -225,7 +226,7 @@ def test_microbatch_slicing_never_splits_a_date_pair() -> None:
         "date_index": torch.arange(100, 116),
         "static": "kept",
     }
-    pieces = _date_pair_microbatches(batch, 3)
+    pieces = _date_microbatches(batch, 6)
     assert [piece["slow_features"].shape[0] for piece in pieces] == [6, 6, 4]
     assert [piece["date_index"].tolist() for piece in pieces] == [
         list(range(100, 106)),
@@ -247,22 +248,26 @@ def test_production_pair_sampler_emits_only_exact_eight_pair_batches() -> None:
         for batch in batches
         for offset in range(0, len(batch), 2)
     )
-    _require_production_pair_sampler(SimpleNamespace(batch_sampler=sampler))
+    _require_production_sampler(
+        SimpleNamespace(batch_sampler=sampler), persistence=True
+    )
     with pytest.raises(ValueError, match="exactly 8 pairs and drop_last=True"):
-        _require_production_pair_sampler(
+        _require_production_sampler(
             SimpleNamespace(
                 batch_sampler=DatePairBatchSampler(
                     range(18), pairs_per_batch=7, drop_last=True
                 )
-            )
+            ),
+            persistence=True,
         )
     with pytest.raises(ValueError, match="exactly 8 pairs and drop_last=True"):
-        _require_production_pair_sampler(
+        _require_production_sampler(
             SimpleNamespace(
                 batch_sampler=DatePairBatchSampler(
                     range(18), pairs_per_batch=8, drop_last=False
                 )
-            )
+            ),
+            persistence=True,
         )
 
 
@@ -728,11 +733,9 @@ def _tracked_pretrain_loaders(tmp_path):
     def train_loader():
         return DataLoader(
             train_dataset,
-            batch_sampler=DatePairBatchSampler(
+            batch_sampler=DateBatchSampler(
                 train_dataset.date_indices,
-                pairs_per_batch=8,
                 seed=19,
-                drop_last=True,
             ),
             num_workers=0,
         )
@@ -847,7 +850,13 @@ def test_stage_runner_archives_patience_ema_and_handoff(tmp_path) -> None:
         patience=1,
         device=torch.device("cpu"),
     )
-    assert result.history_path.read_bytes() == repeated.history_path.read_bytes()
+    histories = [
+        json.loads(p.read_text()) for p in (result.history_path, repeated.history_path)
+    ]
+    for history in histories:
+        for row in history:
+            assert row.pop("seconds") > 0
+    assert histories[0] == histories[1]
     raw_payload = torch.load(
         result.raw_patience_checkpoint, map_location="cpu", weights_only=False
     )

@@ -47,7 +47,7 @@ from brazil_rv.v2.score import score_checkpoint_artifact
 from brazil_rv.v2.sidecars import SidecarResult
 from brazil_rv.v2.splits import development_folds
 from brazil_rv.v2.store import STORE_SCHEMA
-from brazil_rv.v2.train import DatePairBatchSampler, train_stage
+from brazil_rv.v2.train import DateBatchSampler, train_stage
 from brazil_rv.v2.validate_pipeline import _evaluation_inputs
 from hedge_beta_fixtures import write_hedge_beta_fixture
 
@@ -512,11 +512,9 @@ def _tiny_native_fit(store: Path, output_dir: Path) -> tuple[ModelConfig, float,
     )
     fit_loader = DataLoader(
         fit_dataset,
-        batch_sampler=DatePairBatchSampler(
+        batch_sampler=DateBatchSampler(
             fit_indices,
-            pairs_per_batch=8,
             seed=29,
-            drop_last=True,
         ),
         collate_fn=collate_v2_daily,
     )
@@ -549,7 +547,7 @@ def _tiny_native_fit(store: Path, output_dir: Path) -> tuple[ModelConfig, float,
         model_config=config,
         maximum_epochs=1,
         patience=1,
-        microbatch_pairs=1,
+        microbatch_dates=2,
         device=torch.device("cpu"),
     )
     history = json.loads(result.history_path.read_text(encoding="utf-8"))

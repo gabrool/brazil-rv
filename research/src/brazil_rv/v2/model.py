@@ -779,9 +779,15 @@ class DailyMultiHorizonModel(nn.Module):
 
         weights = active_mask.bool()[..., None]
         count = weights.sum(dim=1).clamp_min(1)
-        mean = torch.where(weights, slow, torch.zeros_like(slow)).sum(dim=1) / count
+        population = slow.float()
+        mean = (
+            torch.where(weights, population, torch.zeros_like(population)).sum(dim=1)
+            / count
+        )
         second = (
-            torch.where(weights, slow.square(), torch.zeros_like(slow)).sum(dim=1)
+            torch.where(weights, population.square(), torch.zeros_like(population)).sum(
+                dim=1
+            )
             / count
         )
         dispersion = torch.sqrt(torch.clamp(second - mean.square(), min=1e-6))

@@ -168,11 +168,16 @@ def collate_v2_daily(
     samples: Sequence[Mapping[str, object]],
     *,
     fixed_fast_name_count: int | None = None,
+    fixed_name_count: int | None = None,
 ) -> dict[str, object]:
-    """Collate daily panels on one stage-fixed sparse fast-name axis."""
+    """Pack complete PIT-active cross-sections, preserving canonical ISIN indices."""
 
     if not samples:
         raise ValueError("cannot collate an empty v2 batch")
+    if fixed_name_count is not None:
+        samples = [
+            _compact_active_sample(sample, fixed_name_count) for sample in samples
+        ]
     if all(not (_COMPACT_FAST_KEYS & sample.keys()) for sample in samples):
         return dict(default_collate(samples))
     compact: list[dict[str, NDArray[np.generic]]] = []
@@ -261,13 +266,76 @@ def collate_v2_daily(
     return result
 
 
-def stage_fast_name_count(*datasets: "V2DailyDataset") -> int:
+def _compact_active_sample(
+    sample: Mapping[str, object], width: int
+) -> dict[str, object]:
+    # Targets and sidecars have already been constructed on the canonical
+    # population. Select by eligibility alone, including names without labels.
+    active = np.asarray(sample["active_mask"], dtype=np.bool_)
+    indices = np.flatnonzero(active)
+    if indices.size > width:
+        raise ValueError(
+            "active universe exceeds stage padding; truncation is forbidden"
+        )
+    result = dict(sample)
+    name_fields = {
+        "active_mask",
+        "fast_present",
+        "slow_features",
+        "slow_feature_mask",
+        "slow_history_mask",
+        "slow_feature_age_sessions",
+        "current_features",
+        "current_feature_mask",
+        "current_feature_age_sessions",
+        "targets",
+        "target_mask",
+        "shareholder_targets",
+        "shareholder_target_mask",
+        "shareholder_simple_returns",
+        "terminal_wealth",
+        "terminal_loss",
+        "price_targets",
+        "price_target_mask",
+        "price_simple_returns",
+        "to_close_mask",
+        "to_close_target",
+    }
+    for key, value in sample.items():
+        if key in name_fields or key.startswith("sidecar_"):
+            value = np.asarray(value)
+            packed = np.zeros((width, *value.shape[1:]), dtype=value.dtype)
+            packed[: indices.size] = value[indices]
+            result[key] = packed
+    name_index = np.full(width, -1, dtype=np.int64)
+    name_index[: indices.size] = indices
+    result["name_index"] = name_index
+    if "fast_name_index" in sample:
+        inverse = np.full(active.size, -1, dtype=np.int64)
+        inverse[indices] = np.arange(indices.size)
+        old = np.asarray(sample["fast_name_index"])
+        keep = (old >= 0) & active[old.clip(min=0)]
+        for key in _COMPACT_FAST_KEYS:
+            result[key] = np.asarray(sample[key])[keep]
+        result["fast_name_index"] = inverse[old[keep]]
+    return result
+
+
+def restore_name_axis(
+    values: np.ndarray, name_index: np.ndarray, count: int
+) -> np.ndarray:
+    """Scatter packed date/name arrays to the immutable store axis, zero elsewhere."""
+    result = np.zeros((values.shape[0], count, *values.shape[2:]), dtype=values.dtype)
+    dates, slots = np.nonzero(name_index >= 0)
+    result[dates, name_index[dates, slots]] = values[dates, slots]
+    return result
+
+
+def stage_name_count(*datasets: "V2DailyDataset") -> int:
     """Return the fixed stage name width: maximum active names rounded to 16."""
 
     if not datasets:
         raise ValueError("at least one dataset is required")
-    if all(not dataset.include_fast for dataset in datasets):
-        return 0
     maximum = 0
     for dataset in datasets:
         active = np.asarray(
@@ -277,6 +345,10 @@ def stage_fast_name_count(*datasets: "V2DailyDataset") -> int:
     if maximum <= 0:
         raise ValueError("stage contains no active names")
     return ((maximum + 15) // 16) * 16
+
+
+def stage_fast_name_count(*datasets: "V2DailyDataset") -> int:
+    return stage_name_count(*datasets) if any(d.include_fast for d in datasets) else 0
 
 
 def _validate_stage_dates(selected_dates: NDArray[np.datetime64], stage: Stage) -> None:

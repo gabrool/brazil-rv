@@ -9,6 +9,7 @@ import platform
 import random
 import shutil
 import subprocess
+import time
 from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence
 from dataclasses import asdict, dataclass, field, replace
 from functools import partial
@@ -53,17 +54,67 @@ from .contract import (
     MODEL_INPUT_SCHEMA,
     PRETRAIN_END,
     RAW_PATIENCE_SCHEMA,
+    REGISTERED_PRIMARY_TARGET_MASK,
     SOFT_RANK_TEMPERATURE,
     STORE_START,
     TRAINING_STAGE_SCHEMA,
     V1_READ_SEEDS,
 )
-from .data import V2DailyDataset, collate_v2_daily, stage_fast_name_count
+from .data import (
+    V2DailyDataset,
+    collate_v2_daily,
+    stage_fast_name_count,
+    stage_name_count,
+)
 from .losses import multi_horizon_loss, multi_horizon_loss_normalizers
 from .model import DailyMultiHorizonModel
 from .normalization import average_ranks
 from .round5_magnitude import FitClip
 from .splits import development_folds
+
+
+class DateBatchSampler(Sampler[list[int]]):
+    """Visit every fit date exactly once per epoch, including the remainder."""
+
+    def __init__(self, date_indices: Sequence[int], *, seed: int = 29) -> None:
+        self.date_indices = np.asarray(date_indices, dtype=np.int64)
+        self.seed = seed
+        self.epoch = 0
+
+    def set_epoch(self, epoch: int) -> None:
+        self.epoch = epoch
+
+    def __len__(self) -> int:
+        return math.ceil(len(self.date_indices) / 16)
+
+    def __iter__(self) -> Iterator[list[int]]:
+        order = np.random.default_rng(self.seed + self.epoch).permutation(
+            len(self.date_indices)
+        )
+        # Balanced batches avoid a one-row tail and its separate compiled graph.
+        for positions in np.array_split(order, len(self)):
+            yield positions.tolist()
+
+
+def fit_date_weights(
+    date_indices: np.ndarray, target_mask: np.ndarray, half_life: float
+) -> torch.Tensor:
+    """Fit-only decay, globally normalized separately for each valid horizon.
+
+    Uniform unique-date batches average w(date, head) * loss over all dates.
+    Unlike minibatch self-normalization, this estimates the intended weighted
+    mean even when availability changes over history.
+    """
+    raw = np.exp2(-(date_indices[-1] - date_indices) / half_life)
+    valid = target_mask.sum(axis=1) >= 2
+    totals = (raw[:, None] * valid).sum(axis=0)
+    weights = np.divide(
+        raw[:, None] * len(date_indices),
+        totals,
+        out=np.zeros(valid.shape, dtype=np.float64),
+        where=totals > 0,
+    )
+    return torch.from_numpy(weights.astype(np.float32))
 
 
 class DatePairBatchSampler(Sampler[list[int]]):
@@ -573,7 +624,15 @@ def load_pretrain_handoff(
         reuse_audit = _verify_additive_parent_transfer(
             contract, fine_tune_input_contract, parent_store_roots
         )
-    if source_config != pretrain_config:
+    # AMP changes arithmetic during this new fit, not the FP32 parameter
+    # identity or the historical information available to its parent.
+    precision_transfer = {
+        "source_bf16": source_config["use_bf16"],
+        "destination_bf16": pretrain_config["use_bf16"],
+    }
+    if {k: v for k, v in source_config.items() if k != "use_bf16"} != {
+        k: v for k, v in pretrain_config.items() if k != "use_bf16"
+    }:
         raise ValueError("stage-P model contract differs from stage F")
     if fine_tune_input_contract is not None:
         if fine_tune_input_contract.get("model_config") != fine_config:
@@ -637,6 +696,7 @@ def load_pretrain_handoff(
     model.pretrained_parameter_names |= names
     model.pretrain_checkpoint_sha256 = actual_sha256
     model.pretrain_transfer_audit = {
+        "precision": precision_transfer,
         "parent_extension": reuse_audit,
         "missing_projection_keys_initialized_zero": missing_projection_keys,
         "transferred_parameter_count": len(names),
@@ -799,18 +859,15 @@ def _to_device(
     return transferred
 
 
-def _date_pair_microbatches(
-    batch: Mapping[str, object], pairs_per_microbatch: int
+def _date_microbatches(
+    batch: Mapping[str, object], dates_per_microbatch: int
 ) -> tuple[dict[str, object], ...]:
-    """Slice a collated effective batch without splitting an adjacent-date pair."""
+    """Slice dates and all their aligned data using the same boundaries."""
 
     slow = batch.get("slow_features")
-    if not isinstance(slow, torch.Tensor) or slow.ndim < 1 or slow.shape[0] % 2:
-        raise ValueError("microbatching requires complete adjacent date pairs")
-    pair_count = slow.shape[0] // 2
-    if not 1 <= pairs_per_microbatch <= pair_count:
-        raise ValueError("pairs_per_microbatch is outside the effective batch")
-    step = 2 * pairs_per_microbatch
+    if not isinstance(slow, torch.Tensor) or slow.ndim < 1:
+        raise ValueError("microbatching requires a date axis")
+    step = dates_per_microbatch
     output: list[dict[str, object]] = []
     for start in range(0, slow.shape[0], step):
         stop = min(start + step, slow.shape[0])
@@ -1022,12 +1079,19 @@ def _set_loader_epoch(loader: Iterable[Mapping[str, object]], epoch: int) -> Non
             setter(epoch)
 
 
-def _require_production_pair_sampler(
+def _require_production_sampler(
     loader: Iterable[Mapping[str, object]],
     *,
     time_decay_half_life: float | None = None,
+    persistence: bool = False,
 ) -> None:
     sampler = getattr(loader, "batch_sampler", None)
+    if not persistence:
+        if not isinstance(sampler, DateBatchSampler):
+            raise ValueError(
+                "training without persistence requires unique date batches"
+            )
+        return
     if (
         not isinstance(sampler, DatePairBatchSampler)
         or sampler.pairs_per_batch != 8
@@ -1847,7 +1911,8 @@ def train_stage(
     sam_rho: float = SAM_RHO,
     device: torch.device | None = None,
     selection_parity: int | None = None,
-    microbatch_pairs: int = 8,
+    microbatch_dates: int = 16,
+    selection_interval: int = 1,
     record_branch_diagnostics: bool = False,
 ) -> StageTrainingResult:
     """Run one frozen P/F/J trajectory and archive raw-Patience plus final EMA."""
@@ -1860,10 +1925,13 @@ def train_stage(
         raise ValueError("seed differs from the accepted v1 read roster")
     if not fold:
         raise ValueError("fold must be nonempty")
-    if not 1 <= maximum_epochs <= MAX_EPOCHS:
-        raise ValueError("maximum_epochs must be between one and twenty")
-    if not 1 <= microbatch_pairs <= 8:
-        raise ValueError("microbatch_pairs must be between one and eight")
+    if maximum_epochs < 1 or selection_interval < 1:
+        raise ValueError("epoch budget and selection interval must be positive")
+    if not 1 <= microbatch_dates <= 16:
+        raise ValueError("microbatch_dates must be between one and sixteen")
+    paired = bool(model_config.lambda_persistence)
+    if paired and microbatch_dates % 2:
+        raise ValueError("persistence microbatches must retain whole date pairs")
     if stage == "P" and pretrain_checkpoint is not None:
         raise ValueError("stage P cannot initialize itself from a pretrain checkpoint")
     if (
@@ -1938,10 +2006,32 @@ def train_stage(
         raise ValueError(
             "stage-P handoff checkpoint and expected SHA-256 must be set together"
         )
-    _require_production_pair_sampler(
+    _require_production_sampler(
         train_loader,
         time_decay_half_life=model_config.time_decay_half_life_sessions,
+        persistence=paired,
     )
+    date_weights = None
+    if not paired and model_config.time_decay_half_life_sessions is not None:
+        dataset = train_loader.dataset
+        fit_mask = dataset.store.read(
+            REGISTERED_PRIMARY_TARGET_MASK, dataset.date_indices
+        ).copy()
+        allowed = np.asarray(sorted(dataset._target_date_indices))
+        for head, horizon in enumerate(HORIZONS):
+            admitted = np.logical_and.reduce(
+                [
+                    np.isin(dataset.date_indices + offset, allowed)
+                    for offset in range(horizon + 1)
+                ]
+            )
+            fit_mask[..., head] &= admitted[:, None]
+        date_weights = fit_date_weights(
+            dataset.date_indices,
+            fit_mask,
+            model_config.time_decay_half_life_sessions,
+        )
+    pack_dates = reshape_date_pair_batch if paired else lambda value: value
     set_deterministic_seed(seed)
     model = DailyMultiHorizonModel(model_config)
     pretrain_provenance: dict[str, object] | None = None
@@ -2021,6 +2111,7 @@ def train_stage(
     selection_compiled_graph_count = 0
     history: list[dict[str, object]] = []
     for epoch in range(1, maximum_epochs + 1):
+        epoch_started = time.perf_counter()
         _set_loader_epoch(train_loader, epoch - 1)
         model.train()
         losses: list[float] = []
@@ -2029,10 +2120,11 @@ def train_stage(
             _validate_stage_batch(
                 stage,
                 cpu_batch,
-                expected_pairs=8,
+                require_date_pairs=paired,
+                expected_pairs=8 if paired else None,
                 slow_only=model_config.current_feature_count == 0,
             )
-            full_target_mask = reshape_date_pair_batch(cpu_batch["target_mask"]).bool()
+            full_target_mask = pack_dates(cpu_batch["target_mask"]).bool()
             if model_config.to_close_weight:
                 full_to_close_mask = cpu_batch.get("to_close_mask")
                 if not isinstance(full_to_close_mask, torch.Tensor):
@@ -2044,11 +2136,11 @@ def train_stage(
                 full_target_mask = torch.cat(
                     (
                         full_target_mask,
-                        reshape_date_pair_batch(full_to_close_mask).bool(),
+                        pack_dates(full_to_close_mask).bool(),
                     ),
                     dim=-1,
                 )
-            full_active = reshape_date_pair_batch(cpu_batch["active_mask"]).bool()
+            full_active = pack_dates(cpu_batch["active_mask"]).bool()
             normalization_counts = {
                 name: value.to(device, non_blocking=device.type == "cuda")
                 for name, value in multi_horizon_loss_normalizers(
@@ -2058,6 +2150,12 @@ def train_stage(
                     ),
                 ).items()
             }
+            if date_weights is not None:
+                positions = np.searchsorted(
+                    train_loader.dataset.date_indices, cpu_batch["date_index"].numpy()
+                )
+                cpu_batch["date_weights"] = date_weights[positions]
+                normalization_counts["per_horizon"].fill_(len(positions))
 
             def make_closure(
                 cpu_microbatch: Mapping[str, object],
@@ -2075,9 +2173,9 @@ def train_stage(
                         enabled=model_config.use_bf16 and device.type == "cuda",
                     ):
                         flat_scores = _model_forward(forward_model, batch)
-                        scores = reshape_date_pair_batch(flat_scores[..., :5])
-                        targets = reshape_date_pair_batch(batch["targets"])
-                        target_mask = reshape_date_pair_batch(batch["target_mask"])
+                        scores = pack_dates(flat_scores[..., :5])
+                        targets = pack_dates(batch["targets"])
+                        target_mask = pack_dates(batch["target_mask"])
                         if model_config.to_close_weight:
                             to_close = batch.get("to_close_target")
                             to_close_mask = batch.get("to_close_mask")
@@ -2088,21 +2186,19 @@ def train_stage(
                             scores = torch.cat(
                                 (
                                     scores,
-                                    reshape_date_pair_batch(flat_scores[..., 5:]),
+                                    pack_dates(flat_scores[..., 5:]),
                                 ),
                                 dim=-1,
                             )
-                            targets = torch.cat(
-                                (targets, reshape_date_pair_batch(to_close)), dim=-1
-                            )
+                            targets = torch.cat((targets, pack_dates(to_close)), dim=-1)
                             target_mask = torch.cat(
                                 (
                                     target_mask,
-                                    reshape_date_pair_batch(to_close_mask).bool(),
+                                    pack_dates(to_close_mask).bool(),
                                 ),
                                 dim=-1,
                             )
-                        active = reshape_date_pair_batch(batch["active_mask"])
+                        active = pack_dates(batch["active_mask"])
                         return multi_horizon_loss(
                             scores,
                             targets,
@@ -2113,13 +2209,16 @@ def train_stage(
                             temperature=model_config.soft_rank_temperature,
                             to_close_weight=model_config.to_close_weight,
                             normalization_counts=normalization_counts,
+                            date_weights=cpu_microbatch["date_weights"].to(device)
+                            if date_weights is not None
+                            else None,
                         )
 
                 return closure
 
             closures = tuple(
                 make_closure(microbatch)
-                for microbatch in _date_pair_microbatches(cpu_batch, microbatch_pairs)
+                for microbatch in _date_microbatches(cpu_batch, microbatch_dates)
             )
             compiled_before_update = _unique_compiled_graphs()
             update = sam_accumulated_step(
@@ -2140,15 +2239,19 @@ def train_stage(
         if not losses:
             raise ValueError("training loader produced no date pairs")
         compiled_before_selection = _unique_compiled_graphs()
-        selection_score = _selection_score(
-            forward_model,
-            selection_loader,
-            device,
-            stage=stage,
-            use_bf16=model_config.use_bf16,
-            disable_fast_stream=model_config.disable_fast_stream,
-            selection_horizons=model_config.selection_horizons,
-            slow_only=model_config.current_feature_count == 0,
+        selection_score = (
+            _selection_score(
+                forward_model,
+                selection_loader,
+                device,
+                stage=stage,
+                use_bf16=model_config.use_bf16,
+                disable_fast_stream=model_config.disable_fast_stream,
+                selection_horizons=model_config.selection_horizons,
+                slow_only=model_config.current_feature_count == 0,
+            )
+            if epoch % selection_interval == 0 or epoch == maximum_epochs
+            else None
         )
         selection_compiled_graph_count += (
             _unique_compiled_graphs() - compiled_before_selection
@@ -2158,6 +2261,8 @@ def train_stage(
                 "epoch": epoch,
                 "training_loss": float(np.mean(losses)),
                 "selection_score": selection_score,
+                "updates": len(losses),
+                "seconds": time.perf_counter() - epoch_started,
             }
         )
         if record_branch_diagnostics:
@@ -2170,7 +2275,9 @@ def train_stage(
                 for name, values in branch_norms.items()
             }
             history[-1]["gradient_timing"] = "second_SAM_pass_before_global_clipping"
-        if tracker.update(epoch, selection_score, model):
+        if selection_score is not None and tracker.update(
+            epoch, selection_score, model
+        ):
             break
     if tracker.best_state_dict is None or tracker.stopped_epoch is None:
         raise RuntimeError("training ended without a selected Patience state")
@@ -2267,8 +2374,17 @@ def train_stage(
                 "rho": sam_rho,
                 "weight_decay": ADAMW_WEIGHT_DECAY,
                 "pretrained_parameter_count": len(model.pretrained_parameter_names),
-                "effective_batch_date_pairs": 8,
-                "microbatch_date_pairs": microbatch_pairs,
+                "maximum_batch_dates": 16,
+                "microbatch_dates": microbatch_dates,
+                "date_sampling": "adjacent_pairs" if paired else "unique_dates",
+                "padded_name_count": getattr(
+                    train_loader.collate_fn, "keywords", {}
+                ).get("fixed_name_count"),
+                "steps_per_epoch": steps_per_epoch,
+                "selection_interval_epochs": selection_interval,
+                "date_weighting": "fit_normalized_loss"
+                if date_weights is not None
+                else "sampler",
             },
             "patience": tracker.metadata(),
             "artifacts": {
@@ -2377,8 +2493,8 @@ def _train_parser() -> argparse.ArgumentParser:
     parser.add_argument("--maximum-epochs", type=int, default=MAX_EPOCHS)
     parser.add_argument("--patience", type=int, default=EARLY_STOP_PATIENCE)
     parser.add_argument("--lookback", type=int, default=60)
-    parser.add_argument("--pairs-per-batch", type=int, default=8)
-    parser.add_argument("--microbatch-pairs", type=int, default=8)
+    parser.add_argument("--microbatch-dates", type=int, default=16)
+    parser.add_argument("--selection-interval", type=int, default=1)
     parser.add_argument("--selection-batch-size", type=int, default=16)
     parser.add_argument("--num-workers", type=int, default=0)
     parser.add_argument("--sidecar", action="append", default=[])
@@ -2466,18 +2582,25 @@ def main(argv: Sequence[str] | None = None) -> int:
     if stage == "P" and arguments.time_decay_half_life is not None:
         raise ValueError("stage P uses uniform date-pair sampling")
     decay = 756.0 if stage == "J" else arguments.time_decay_half_life
-    sampler = DatePairBatchSampler(
-        train_dataset.date_indices,
-        pairs_per_batch=arguments.pairs_per_batch,
-        seed=arguments.seed,
-        time_decay_half_life=decay,
-        drop_last=True,
+    sampler = (
+        DatePairBatchSampler(
+            train_dataset.date_indices,
+            seed=arguments.seed,
+            time_decay_half_life=decay,
+            drop_last=True,
+        )
+        if arguments.lambda_persistence
+        else DateBatchSampler(train_dataset.date_indices, seed=arguments.seed)
     )
     fixed_fast_name_count = (
         0 if stage == "P" else stage_fast_name_count(train_dataset, selection_dataset)
     )
     stage_collate = partial(
-        collate_v2_daily, fixed_fast_name_count=fixed_fast_name_count
+        collate_v2_daily,
+        fixed_fast_name_count=fixed_fast_name_count,
+        fixed_name_count=None
+        if arguments.lambda_persistence
+        else stage_name_count(train_dataset, selection_dataset),
     )
     train_loader = DataLoader(
         train_dataset,
@@ -2542,7 +2665,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         patience=arguments.patience,
         pretrained_lr_multiplier=arguments.pretrained_lr_multiplier,
         device=device,
-        microbatch_pairs=arguments.microbatch_pairs,
+        microbatch_dates=arguments.microbatch_dates,
+        selection_interval=arguments.selection_interval,
         record_branch_diagnostics=arguments.record_branch_diagnostics,
     )
     if arguments.score_output_dir is not None:
@@ -2564,6 +2688,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             num_workers=arguments.num_workers,
             collate_fn=partial(
                 collate_v2_daily,
+                fixed_name_count=stage_name_count(score_dataset),
                 fixed_fast_name_count=(
                     0
                     if stage == "P"

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from functools import partial
+
 import argparse
 import hashlib
 import os
@@ -21,7 +23,7 @@ from .contract import (
     SCORE_ARTIFACT_SCHEMA,
     V1_READ_SEEDS,
 )
-from .data import V2DailyDataset, collate_v2_daily
+from .data import V2DailyDataset, collate_v2_daily, restore_name_axis, stage_name_count
 from .model import DailyMultiHorizonModel
 from .round5_magnitude import FitClip
 from .train import (
@@ -338,8 +340,14 @@ def score_checkpoint_artifact(
             if predictions.shape[:2] != batch["active_mask"].shape:
                 raise ValueError("model scores are misaligned with the active universe")
             date_parts.append(date_index.detach().cpu().numpy().astype(np.int64))
-            score_parts.append(predictions.float().cpu().numpy())
-            active_parts.append(batch["active_mask"].bool().cpu().numpy())
+            scores = predictions.float().cpu().numpy()
+            active = batch["active_mask"].bool().cpu().numpy()
+            if "name_index" in cpu_batch:
+                indices = cpu_batch["name_index"].numpy()
+                scores = restore_name_axis(scores, indices, len(dataset.store.isins))
+                active = restore_name_axis(active, indices, len(dataset.store.isins))
+            score_parts.append(scores)
+            active_parts.append(active)
     if not score_parts:
         raise ValueError("scoring loader produced no rows")
     actual_indices = np.concatenate(date_parts)
@@ -531,7 +539,9 @@ def main(argv: Sequence[str] | None = None) -> int:
         batch_size=arguments.batch_size,
         shuffle=False,
         num_workers=arguments.num_workers,
-        collate_fn=collate_v2_daily,
+        collate_fn=partial(
+            collate_v2_daily, fixed_name_count=stage_name_count(dataset)
+        ),
     )
     device = None if arguments.device == "auto" else torch.device(arguments.device)
     score_checkpoint_artifact(

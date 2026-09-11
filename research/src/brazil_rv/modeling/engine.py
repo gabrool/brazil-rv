@@ -71,6 +71,8 @@ def _soft_spearman_loss_sum(
     targets: torch.Tensor,
     label_mask: torch.Tensor,
     temperature: float = SOFT_RANK_TEMPERATURE,
+    *,
+    group_weights: torch.Tensor | None = None,
 ) -> tuple[torch.Tensor, torch.Tensor]:
     with torch.autocast(device_type=predictions.device.type, enabled=False):
         scores = predictions.float().transpose(1, 2)
@@ -108,6 +110,8 @@ def _soft_spearman_loss_sum(
             .sqrt()
         )
         losses = (1 - covariance / denominator) * valid_groups
+        if group_weights is not None:
+            losses = losses * group_weights
         return losses.sum(), valid_groups.sum()
 
 

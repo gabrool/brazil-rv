@@ -2,6 +2,17 @@
 
 Last verified: 2026-09-11.
 
+Round 6's user-authorized compute amendment is recorded in
+[the registered contract](research/preregistrations/v2_round6_compute_amendment.md).
+The revised comparison uses every PIT-active name on a stage-fixed compact axis,
+BF16 autocast with FP32 loss/moments, and unique-date batches. Its 60-epoch ceiling
+and two-epoch validation cadence account for the old duplicated-date visits and
+improving validation curves at the prior cap. A bounded engineering bridge must
+pass before full dispatch. S0 and candidate F panels are refit together in a new
+frozen root; prior completed runs remain historical references. Sealed compatible
+P weights and accepted data are reusable. The fourteen-fold development boundary,
+original research decisions, economic contract and ban on forward capture remain.
+
 ## Purpose and current research state
 
 Brazil-RV has two offline research programs. The accepted v1 intraday system

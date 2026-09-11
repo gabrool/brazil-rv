@@ -26,11 +26,12 @@ def _masked_head_loss(
     mask: torch.Tensor,
     temperature: float,
     normalization_count: torch.Tensor | None = None,
+    date_weights: torch.Tensor | None = None,
 ) -> torch.Tensor:
     clean_scores = torch.where(mask, scores, torch.zeros_like(scores))
     clean_targets = torch.where(mask, targets, torch.zeros_like(targets))
     total, count = _soft_spearman_loss_sum(
-        clean_scores, clean_targets, mask, temperature
+        clean_scores, clean_targets, mask, temperature, group_weights=date_weights
     )
     denominator = count if normalization_count is None else normalization_count
     return total / denominator.clamp_min(1)
@@ -144,6 +145,7 @@ def multi_horizon_loss_components(
     to_close_weight: float = 0.0,
     horizon_loss_weights: tuple[float, ...] = DEFAULT_HORIZON_LOSS_WEIGHTS,
     normalization_counts: Mapping[str, torch.Tensor] | None = None,
+    date_weights: torch.Tensor | None = None,
 ) -> dict[str, torch.Tensor]:
     if scores.shape != targets.shape or scores.shape != target_mask.shape:
         raise ValueError("scores, targets, and target_mask must have identical shapes")
@@ -179,6 +181,7 @@ def multi_horizon_loss_components(
                 flat_mask[..., head : head + 1],
                 temperature,
                 per_horizon_counts[head],
+                None if date_weights is None else date_weights[:, head : head + 1],
             )
             for head in range(5)
         )
@@ -233,6 +236,7 @@ def multi_horizon_loss(
     to_close_weight: float = 0.0,
     horizon_loss_weights: tuple[float, ...] = DEFAULT_HORIZON_LOSS_WEIGHTS,
     normalization_counts: Mapping[str, torch.Tensor] | None = None,
+    date_weights: torch.Tensor | None = None,
 ) -> torch.Tensor:
     return multi_horizon_loss_components(
         scores,
@@ -244,4 +248,5 @@ def multi_horizon_loss(
         to_close_weight=to_close_weight,
         horizon_loss_weights=horizon_loss_weights,
         normalization_counts=normalization_counts,
+        date_weights=date_weights,
     )["total"]

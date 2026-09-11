@@ -3608,8 +3608,6 @@ def _training_command(
         "3",
         "--lookback",
         "60",
-        "--pairs-per-batch",
-        "8",
         "--selection-batch-size",
         "1",
         "--num-workers",

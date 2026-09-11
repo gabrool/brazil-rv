@@ -72,49 +72,16 @@ def ensemble(
     ablation=None,
 ):
     members, mask, records = [], None, []
-    parent_root = None
-    inventory_files = {}
-    if arm == "S0" and any(seed in ALLOWED_SEEDS for seed in seeds):
-        parent_root = resolve_external_root(design["s0_panels"]["root"])[0]
-        inventory_path = parent_root / "artifact_inventory.json"
-        if sha256_file(inventory_path) != design["s0_panels"]["inventory_sha256"]:
-            raise ValueError("parent score inventory changed")
-        inventory_files = {
-            record["path"]: record for record in rr._read_json(inventory_path)["files"]
-        }
     for seed in seeds:
         run = trajectory(root, arm, seed, fold)
-        if arm == "S0" and seed in ALLOWED_SEEDS:
-            run = trajectory(parent_root, arm, seed, fold)
-            manifest = rr._read_json(run / "run_manifest.json")
-            rr._assert_current_clean_training(manifest, path=run / "run_manifest.json")
-            # Every reused byte is bound by the sealed, registered inventory.
-            relative = run.relative_to(parent_root).as_posix()
-            for name in (
-                "run_manifest.json",
-                "scores/score_manifest.json",
-                "scores/scores.npy",
-                "scores/score_mask.npy",
-                "scores/date_index.npy",
-                "scores/isin_index.npy",
-            ):
-                record = inventory_files[f"{relative}/{name}"]
-                digest = record["sha256"]
-                if sha256_file(run / name) != digest:
-                    raise ValueError("sealed parent artifact changed")
-        else:
-            manifest = completed(run, design, arm, "F", seed, fold, roster=roster)
+        manifest = completed(run, design, arm, "F", seed, fold, roster=roster)
         directory = run / "scores" if ablation is None else run / "ablations" / ablation
         score, member_mask = rr._score_artifact(
             directory,
             require_clean_transfer=True,
             expected_dates=dates,
             expected_isins=isins,
-            expected_feature_schema_sha256=rr._read_json(
-                resolve_external_root(design["s0_store"]["root"])[0] / "manifest.json"
-            )["feature_schema_sha256"]
-            if arm == "S0" and seed in ALLOWED_SEEDS
-            else design["feature_schema_sha256"],
+            expected_feature_schema_sha256=design["feature_schema_sha256"],
         )
         if mask is not None and not np.array_equal(mask, member_mask):
             raise ValueError("Round-6 seed populations differ")

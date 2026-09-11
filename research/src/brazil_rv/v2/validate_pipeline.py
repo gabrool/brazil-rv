@@ -70,6 +70,7 @@ from .splits import AccessPurpose, development_folds
 from .store import STORE_SCHEMA, V2Store, open_store_for_samples
 from .train import (
     DatePairBatchSampler,
+    DateBatchSampler,
     StageTrainingResult,
     pretrain_internal_split,
     train_stage,
@@ -169,7 +170,6 @@ class ValidationRuntime:
     max_pretrain_fit_sessions: int | None = None
     max_pretrain_selection_sessions: int | None = None
     slow_lookback: int = 60
-    pairs_per_batch: int = 8
     evaluation_batch_size: int = 1
     compile_forward: bool = True
     device: str | None = None
@@ -197,8 +197,6 @@ class ValidationRuntime:
                 )
         if self.slow_lookback not in ALLOWED_LOOKBACKS:
             raise ValueError("slow_lookback must be 20, 60, or 120")
-        if self.pairs_per_batch != 8:
-            raise ValueError("pipeline validation requires exactly 8 date pairs")
         if self.evaluation_batch_size <= 0:
             raise ValueError("validation evaluation_batch_size must be positive")
 
@@ -417,6 +415,7 @@ def _training_loaders(
     sidecars: Sequence[str],
     seed: int,
     time_decay_half_life: float | None = None,
+    persistence: bool = False,
     fit_target_window_indices: NDArray[np.int64] | None = None,
 ) -> tuple[DataLoader[dict[str, object]], DataLoader[dict[str, object]]]:
     fit = _dataset(
@@ -441,12 +440,15 @@ def _training_loaders(
         sidecars=sidecars,
         target_window_indices=selection_indices,
     )
-    sampler = DatePairBatchSampler(
-        fit.date_indices,
-        pairs_per_batch=runtime.pairs_per_batch,
-        seed=seed,
-        time_decay_half_life=time_decay_half_life,
-        drop_last=True,
+    sampler = (
+        DatePairBatchSampler(
+            fit.date_indices,
+            seed=seed,
+            time_decay_half_life=time_decay_half_life,
+            drop_last=True,
+        )
+        if persistence
+        else DateBatchSampler(fit.date_indices, seed=seed)
     )
     fixed_fast_name_count = stage_fast_name_count(fit, selection)
     stage_collate = partial(
@@ -1546,6 +1548,7 @@ def _train_once(
         sidecars=sidecars,
         seed=seed,
         time_decay_half_life=model_config.time_decay_half_life_sessions,
+        persistence=bool(model_config.lambda_persistence),
         fit_target_window_indices=fit_target_window_indices,
     )
     result = train_stage(
@@ -3658,7 +3661,6 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--slow-lookback", type=int, choices=ALLOWED_LOOKBACKS, default=60
     )
-    parser.add_argument("--pairs-per-batch", type=int, default=8)
     parser.add_argument("--evaluation-batch-size", type=int, default=1)
     parser.add_argument("--device", choices=("cpu", "cuda"))
     parser.add_argument(
@@ -3681,7 +3683,6 @@ def main(argv: Sequence[str] | None = None) -> int:
         max_pretrain_fit_sessions=arguments.max_pretrain_fit_sessions,
         max_pretrain_selection_sessions=arguments.max_pretrain_selection_sessions,
         slow_lookback=arguments.slow_lookback,
-        pairs_per_batch=arguments.pairs_per_batch,
         evaluation_batch_size=arguments.evaluation_batch_size,
         compile_forward=arguments.compile_forward,
         device=arguments.device,

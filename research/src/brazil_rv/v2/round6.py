@@ -106,6 +106,7 @@ def arm_config(feature_names: dict, arm: str, *, stage="F", roster=None) -> Mode
         slow_feature_count=len(feature_names["slow"]),
         current_feature_count=0,
         disable_fast_stream=True,
+        use_bf16=True,
         slow_encoder_kind="mlp" if arm == "mlp" else "gru",
         time_decay_half_life_sessions=756.0
         if arm == "time_decay_756" and stage != "P"
@@ -163,13 +164,20 @@ def freeze(output: Path) -> str:
         "s0_stage_p": checkpoints,
         "s0_panels": {**protocol["s0_panels"], "root": str(parent_root)},
         "preregistration": bindings,
+        "baseline": "matched_refit_S0",
+        "training_recipe": {
+            "maximum_epochs": 60,
+            "selection_interval": 2,
+            "patience": 3,
+            "date_sampling": "unique_dates",
+        },
         "input_acceptance_sha256": sha256_file(INPUTS),
         "input_coverage": inputs["input_coverage"],
         "feature_names": manifest["feature_names"],
         "feature_schema_sha256": manifest["feature_schema_sha256"],
         "model_contracts": {
             a: model_config_contract(arm_config(manifest["feature_names"], a))
-            for a in (*SESSION1, *SESSION2)
+            for a in ("S0", *SESSION1, *SESSION2)
         },
         "enabled_sidecars": [],
         "fast_initialization": {
@@ -213,6 +221,13 @@ def completed(
         raise ValueError("trajectory training commit changed")
     if manifest["compiled_graphs"] != {"training": 1, "selection": 1, "total": 2}:
         raise ValueError(f"trajectory compile smoke failed: {run}")
+    optimizer = manifest["optimizer"]
+    if (
+        optimizer["date_sampling"] != "unique_dates"
+        or optimizer["selection_interval_epochs"] != 2
+        or optimizer["padded_name_count"] is None
+    ):
+        raise ValueError("trajectory differs from the compact unique-date recipe")
     for name, digest in manifest["artifacts"].items():
         if sha256_file(run / name) != digest:
             raise ValueError(f"trajectory artifact changed: {run / name}")
@@ -258,12 +273,18 @@ def training_command(
         stage=stage,
         seed=seed,
         fold=None if stage == "P" else fold,
-        maximum_epochs=1 if smoke else 20,
+        maximum_epochs=1 if smoke else 60,
         score_output=not smoke and stage == "F",
         pretrain_checkpoint=checkpoint,
         pretrain_sha256=digest,
     )
-    command += ["--slow-only", "--record-branch-diagnostics"]
+    command += [
+        "--slow-only",
+        "--record-branch-diagnostics",
+        "--use-bf16",
+        "--selection-interval",
+        "2",
+    ]
     if families and not smoke and stage == "F":
         command.append("--score-sidecar-ablations")
     if reused_s0:
@@ -314,7 +335,7 @@ def write_plan(root: Path, phase: str) -> str:
     )
     smoke = phase.endswith("smoke")
     if phase == "session1_smoke":
-        tasks = [(a, 11, "F14", "F") for a in SESSION1] + [
+        tasks = [(a, 11, "F14", "F") for a in ("S0", *SESSION1)] + [
             ("mlp", 11, "pretrain_internal", "P")
         ]
     elif phase == "session2_smoke":
@@ -327,7 +348,7 @@ def write_plan(root: Path, phase: str) -> str:
     elif phase == "session1":
         tasks = [
             (a, s, f, "F")
-            for a in SESSION1
+            for a in ("S0", *SESSION1)
             for f in DEVELOPMENT_FOLDS
             for s in ALLOWED_SEEDS
         ]
