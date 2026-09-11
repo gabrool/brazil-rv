@@ -452,9 +452,6 @@ def parse_us(payload: bytes, symbol: str, source_file: str) -> list[dict]:
                 for field in ("open", "high", "low", "close", "volume")
             }
         )
-        # Source OHLC is split-adjusted vendor history, not a contemporaneous
-        # cash-price archive. Ratios and raw price proof are absent: no premium.
-        row["adr_premium_close"] = None
         rows.append(row)
     return rows
 

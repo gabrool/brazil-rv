@@ -239,7 +239,6 @@ def test_us_preserves_vendor_fields_without_fabricating_cash_price_or_premium():
     payload = json.dumps({"chart": {"error": None, "result": [result]}}).encode()
     row = parse_us(payload, "PBR", "PBR.json")[0]
     assert row["close"] == 10.5 and row["adjusted_close"] == 5.25
-    assert row["adr_premium_close"] is None
     assert "regularMarketPrice" not in row
     assert row["available_at"] == us_close(date(2024, 7, 3))
     result["meta"]["symbol"] = "SUZ"

@@ -49,7 +49,29 @@ def publication_date(page: str) -> date:
     values = re.findall(r"<small[^>]*>\s*(\d{2}/\d{2}/\d{4})\s*</small>", page)
     if len(set(values)) != 1:
         raise ValueError("announcement has no unambiguous publication date")
-    return datetime.strptime(values[0], "%d/%m/%Y").date()
+    published = datetime.strptime(values[0], "%d/%m/%Y").date()
+    # Some migrated B3 pages swapped day/month in <small>. Their Portuguese
+    # dateline still states the real release date, e.g. 02 August 2021.
+    text = re.sub(r"\s+", " ", html.unescape(re.sub(r"<[^>]+>", " ", page)))
+    months = "janeiro fevereiro março abril maio junho julho agosto setembro outubro novembro dezembro".split()
+    datelines = re.findall(r"São Paulo,?\s*(\d{1,2}) de (\w+) de (\d{4})", text, re.I)
+    body_dates = {
+        date(int(y), months.index(m.lower()) + 1, int(d))
+        for d, m, y in datelines
+        if m.lower() in months
+    }
+    if len(body_dates) > 1:
+        raise ValueError("announcement has conflicting body publication dates")
+    if body_dates and published not in body_dates:
+        body = body_dates.pop()
+        if (published.year, published.month, published.day) != (
+            body.year,
+            body.day,
+            body.month,
+        ):
+            raise ValueError("announcement body and metadata dates conflict")
+        published = body
+    return published
 
 
 def parse_bdi_tables(pages: list[str]) -> tuple[dict, dict]:

@@ -38,6 +38,13 @@ def test_publication_date_and_explicit_safe_link_resolution():
     assert linked_assets(page, "https://b3.test/page") == {"https://b3.test/x.xlsx"}
     with pytest.raises(ValueError, match="publication date"):
         publication_date('<meta name="last-modified" content="2024-04-01">')
+    assert publication_date(
+        "<small>08/02/2021</small><p>São Paulo, <b>02 de agosto de 2021</b></p>"
+    ) == date(2021, 8, 2)
+    with pytest.raises(ValueError, match="dates conflict"):
+        publication_date(
+            "<small>08/02/2021</small><p>São Paulo, 03 de agosto de 2021</p>"
+        )
 
 
 def _cash():

@@ -1,0 +1,43 @@
+{
+  "pairs": [
+    {"symbol":"ABEV","ticker":"ABEV3","start":"2013-11-11","end":"2024-12-30"},
+    {"symbol":"BBD","ticker":"BBDC4","start":"2010-01-01","end":"2024-12-30"},
+    {"symbol":"BBDO","ticker":"BBDC3","start":"2012-03-13","end":"2024-12-30"},
+    {"symbol":"BAK","ticker":"BRKM5","start":"2010-01-01","end":"2024-12-30"},
+    {"symbol":"BSBR","ticker":"SANB11","start":"2010-01-01","end":"2024-12-30"},
+    {"symbol":"CIG","ticker":"CMIG4","start":"2010-01-01","end":"2024-12-30"},
+    {"symbol":"SID","ticker":"CSNA3","start":"2010-01-01","end":"2024-12-30"},
+    {"symbol":"EMBJ","ticker":"EMBR3","start":"2010-01-01","end":"2024-12-30"},
+    {"symbol":"GGB","ticker":"GGBR4","start":"2010-01-01","end":"2024-12-30"},
+    {"symbol":"ITUB","ticker":"ITUB4","start":"2010-01-01","end":"2024-12-30"},
+    {"symbol":"PBR","ticker":"PETR3","start":"2010-01-01","end":"2024-12-30"},
+    {"symbol":"PBR-A","ticker":"PETR4","start":"2010-01-01","end":"2024-12-30"},
+    {"symbol":"SBS","ticker":"SBSP3","start":"2010-01-01","end":"2024-12-30"},
+    {"symbol":"SUZ","ticker":"SUZB3","start":"2018-12-10","end":"2024-12-30"},
+    {"symbol":"VALE","ticker":"VALE3","start":"2010-01-01","end":"2024-12-30"},
+    {"symbol":"TIMB","ticker":"TCSL4","start":"2010-01-01","end":"2011-08-02"},
+    {"symbol":"TIMB","ticker":"TIMP3","start":"2011-08-05","end":"2020-10-09"},
+    {"symbol":"TIMB","ticker":"TIMS3","start":"2020-10-13","end":"2024-12-30"},
+    {"symbol":"VIV","ticker":"VIVT4","start":"2011-10-06","end":"2020-11-20"},
+    {"symbol":"VIV","ticker":"VIVT3","start":"2020-11-23","end":"2024-12-30"},
+    {"symbol":"UGP","ticker":"UGPA4","start":"2010-01-01","end":"2011-08-16"},
+    {"symbol":"UGP","ticker":"UGPA3","start":"2011-08-17","end":"2024-12-30"}
+  ],
+  "source_evidence": [
+    {"symbols":["ABEV"],"url":"https://www.sec.gov/Archives/edgar/data/1565025/000129281415000588/ambevsaform20f_2014.htm","fact":"ABEV/ABEV3 trading began 2013-11-11. Exclude earlier vendor prices."},
+    {"symbols":["VIV"],"url":"https://www.sec.gov/Archives/edgar/data/1066119/000095010317001652/dp73142_20f.htm","fact":"TLPP3/TLPP4 renamed VIVT3/VIVT4 from 2011-10-06 after reorganization. Earlier vendor predecessor remains unverified."},
+    {"symbols":["VIV"],"url":"https://depositaryreceipts.citi.com/adr/common/file.aspx?idf=5408","fact":"Preferred ADSs exchanged for common ADSs effective 2020-11-23."},
+    {"symbols":["TIMB"],"url":"https://www.sec.gov/Archives/edgar/data/1066116/000129281420001580/tsuform20f_2019.htm","fact":"B3 conversion to TIMP3 on 2011-08-03; US common ADSs began 2011-08-05. Intervening mismatch excluded."},
+    {"symbols":["TIMB"],"url":"https://api.markitdigital.com/jpmadr-public/v1/cms/document?cmsId=1860d9c7f6114b50ac3539f74f6d99b1","fact":"2020-10-06 depositary notice: new TIMB WI/TIMS3 begins 2020-10-13."},
+    {"symbols":["UGP"],"url":"https://www.adrbny.com/content/dam/adr/documents/corporate-actions-dr/files/ad33557.pdf","fact":"ADSs change to common on 2011-08-17; dated COTAHIST UGPA4 ends 2011-08-16."},
+    {"symbols":["BBD","BBDO"],"url":"https://www.sec.gov/Archives/edgar/data/1160330/000129281416006731/bbdbook3q16_6k.htm","fact":"BBD preferred; BBDO common from March 2012. First adjacent observed BBDO return is 2012-03-14."},
+    {"symbols":["EMBJ"],"url":"https://www.sec.gov/Archives/edgar/data/1355444/000119312507022318/d424b3.htm","fact":"Post-2006 ERJ ADSs represent common shares. EMBJ is the vendor alias, not a historical-symbol claim."},
+    {"symbols":["BSBR"],"url":"https://cms.santander.com.br/sites/WRI/documentos/url-rel-fr-url3/19-09-11_141837_fr%202011%20v16.pdf","fact":"SANB11 units/BSBR ADRs began in 2009."}
+  ],
+  "base_roster":"Existing preprocessing/adr_overnight.py PAIRS; same covered programs with the dated corrections above.",
+  "identity_rule":"Both exact adjacent COTAHIST ticker/date observations must resolve to the same permanent ISIN within one dated ADR segment.",
+  "flag_scope":"Explicit covered ADR roster, not exhaustive worldwide dual-listing status.",
+  "return_basis":"Latest-vintage adjusted-close USD log returns plus exact PTAX log return, minus same-endpoint B3 shareholder-wealth log return. EWZ is also converted to BRL before subtraction of BOVA11. Changing vendor adjustments and distribution-date differences remain caveats.",
+  "unverified_history":["VIV before 2011-10-06","ABEV before 2013-11-11","SUZ before 2018-12-10"],
+  "no_2025_consumer_rows":true
+}

@@ -561,20 +561,54 @@ _ROUND5_FORMULAS: dict[str, tuple[str, str, Transform]] = {
         "equal-issuer mean of exact wealth return252 minus return21 through t-1 among at least two other issuers in current known sector",
         "rank_gauss",
     ),
-    "adr_premium_close": (
-        "price_ratio_minus_one",
-        "ADR close converted with decision-known FX and dated conversion ratio / B3 close minus one; contemporaneous unadjusted price and dated identity required",
+    "adr_return_gap_1": (
+        "log_return",
+        "prior US-session adjusted-close log return plus same-endpoint PTAX log return minus B3 shareholder-wealth log return; exact adjacent common endpoints, dated ADR class and ISIN; no conversion boundary",
         "precomputed_native",
     ),
-    "foreign_flow_5": (
-        "billion_brl",
-        "sum of five consecutive published B3 foreign net trading flows in billions of BRL; actual publication version, no stock-lending or balance-of-payments substitution",
+    "ewz_minus_bova11_1": (
+        "log_return",
+        "prior US-session EWZ adjusted-close log return converted to BRL by exact PTAX log return minus same-endpoint BOVA11 log return; both exchanges require matching adjacent endpoints",
         "precomputed_native",
     ),
-    "foreign_flow_5_times_log_volume_mean_20": (
-        "billion_brl_times_log_brl",
-        "decision-known foreign_flow_5 times causal unranked log mean BRL turnover20",
-        "precomputed_native",
+    "adr_listed_flag": (
+        "flag",
+        "dated membership in the registered covered ADR roster using past observed ticker-to-ISIN assignment; not exhaustive worldwide ADR listing status",
+        "binary",
+    ),
+    **{
+        f"foreign_flow_{h}": (
+            "billion_brl",
+            f"sum of {h} consecutive same-methodology reference-session changes between published foreign MTD buy-minus-sell totals; verified first-month-session zero reset; published_total_difference, date-only BDI at next decision, latest-vintage caveat",
+            "precomputed_native",
+        )
+        for h in (1, 5)
+    },
+    **{
+        f"foreign_flow_{h}_times_log_volume_mean_20": (
+            "billion_brl_times_log_brl",
+            f"decision-known foreign_flow_{h} times causal unranked log mean BRL turnover20 ending t-1",
+            "precomputed_native",
+        )
+        for h in (1, 5)
+    },
+    **{
+        f"foreign_flow_{h}_times_adr_listed_flag": (
+            "billion_brl",
+            f"decision-known foreign_flow_{h} times the dated covered-ADR-program flag",
+            "precomputed_native",
+        )
+        for h in (1, 5)
+    },
+    "foreign_flow_month_reset": (
+        "flag",
+        "latest published reference date is the first B3 session of a new calendar month",
+        "binary",
+    ),
+    "foreign_flow_methodology_change": (
+        "flag",
+        "latest publication changes the source methodology regime; no flow difference crosses the change",
+        "binary",
     ),
     "index_pressure": (
         "weight_percentage_points_times_sessions_per_million_brl",

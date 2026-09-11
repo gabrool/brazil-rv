@@ -32,3 +32,17 @@ clocks, since that archive includes the corresponding positive registered
 quantities. Original observations are preserved, and no zero-flow bulletin
 becomes a rate or positive flow observation. All outputs retain the separate
 latest-vintage label.
+
+ADR and EWZ gaps compare BRL returns with identical adjacent session endpoints.
+EWZ therefore also receives the PTAX conversion before subtracting BOVA11.
+The historical program/class segments are fixed in `v2_round6_adr_identity.json`;
+the ADR flag describes this covered roster. Retroactive ABEV history before its
+2013 launch and ambiguous VIV predecessor history before October 2011 are
+excluded. No return crosses an ISIN or share-class conversion. Vendor
+latest-vintage total returns retain their adjustment/distribution-date caveat.
+
+The B3 August-2021 preview page has a migrated metadata date of 08/02/2021,
+but its Portuguese dateline explicitly says 02 August 2021 and its portfolio
+uses 30 July prices. The parser resolves this exact day/month inversion from
+the dateline; it rejects other conflicting dates. It never admits that August
+portfolio in February.

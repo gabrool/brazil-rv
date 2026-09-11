@@ -34,9 +34,16 @@ FEATURE_NAMES = (
     *(f"shock_{key}_{h}" for key in SERIES.values() for h in (1, 5)),
     *(f"exposure_{key}" for key in EXPOSURES),
     *(f"exposure_{key}_times_shock_{h}" for key in EXPOSURES for h in (1, 5)),
-    "adr_premium_close",
-    "foreign_flow_5",
-    "foreign_flow_5_times_log_volume_mean_20",
+    "adr_return_gap_1",
+    "ewz_minus_bova11_1",
+    "adr_listed_flag",
+    *(
+        f"foreign_flow_{h}{suffix}"
+        for h in (1, 5)
+        for suffix in ("", "_times_log_volume_mean_20", "_times_adr_listed_flag")
+    ),
+    "foreign_flow_month_reset",
+    "foreign_flow_methodology_change",
 )
 SECTOR_FEATURE_NAMES = (
     "name_minus_sector_return_5",
