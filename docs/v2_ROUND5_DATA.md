@@ -1,6 +1,6 @@
 # Round 5 data round â€” work in progress
 
-Status: historical acquisition and the first full dated source preflight are complete.
+Status: historical acquisition and the corrected-class source preflight are complete.
 Its twelve capital gaps and one account gap now have verified own-filing sources;
 capital review and final identity admission remain open. **The final store and
 GBDT screens are not yet complete. The continuous-book replay is complete.** This document
@@ -26,12 +26,12 @@ review or the final source/store acceptance.
 
 The refreshed full source check passes with no missing account/capital source
 or invalid cache in the admitted cohort. Exact capital selection plus the
-production valuation helper narrows1,352 original flags to242 currently valued,
-unreviewed filings before the latest batch. Seven more own-filing reviews now
+production valuation helper initially narrowed1,352 original flags to242 valued,
+unreviewed filings under the earlier identity. Seven own-filing reviews
 resolve Nexpe, two Suzano versions, Ser Educacional, Trisul, Eternit and Armac;
 six affected actual valuation windows. After the subsequent eight-note batch,
-there remain 228 currently valued flags and 218 conditional, currently nonvalued
-flags. No source ratio or failed note
+that earlier queue contained 228 valued flags and 218 conditional, nonvalued
+flags. These counts are superseded by the corrected identity below. No source ratio or failed note
 retrieval determines a value or a mask. Quantity-only corrections preserve class
 support, receipts and source selection, so the already completed source scan is
 reused for this batch. The [capital review evidence](v2_round5_capital_note_audit.json)
@@ -51,9 +51,9 @@ DFP2022 version 1 require thousand-fold quantity corrections. Terra Santa
 version 2 supplies an exact count 439 shares below its rounded table. Armac,
 Cambuci, HBR and Azevedo version 2 confirm existing counts. These four
 corrections and four confirmations preserve receipts, class support and source
-selection, so they do not require another whole-source scan. All 91 dispositions
-pass their evidence checks; the primary capital acquisition gate also passes.
-Five recovered notes still need disposition, including Kora, whose monetary
+selection, so they do not require another whole-source scan. That batch brought
+the accepted total to 91. Five recovered notes then still needed disposition,
+including Kora, whose monetary
 capital, repurchase authorization and weighted-average EPS shares cannot replace
 current paid-in and treasury quantities. The final source and store acceptance
 remain open.
@@ -61,9 +61,17 @@ remain open.
 Four further recovered notes now resolve Hering, Plano & Plano, PBG and Nexpe.
 Hering supplies a 79-share precision correction; Plano & Plano explicitly has
 10,000 pre-IPO shares, and Nexpe corrects both capital and treasury quantities.
-PBG confirms its existing count and zero treasury. The source dispositions now
-total 95: 88 reconciled and seven unavailable. Kora remains the only recovered
+PBG confirms its existing count and zero treasury. That batch brought the
+total to 95: 88 reconciled and seven unavailable. Kora remains the only recovered
 alternate-route note awaiting disposition.
+
+Ten additional own-filing reviews are now sealed, bringing the total to 105:
+98 reconciled and seven unavailable. Seven confirm existing quantities. Positivo
+and PBG refine rounded counts; Plano & Plano's own treasury roll-forward establishes
+400,000 repurchased shares, replacing a monetary carrying value that had been
+read as a share quantity. Exact source evidence verifies all ten. Positive class
+support, source selection and valuation availability are unchanged; only three
+quantity magnitudes change. The completed source scan is reused for this batch.
 
 The actual dated identity comparison exposed an additional join defect:
 explicit `PNA` and `Preferencial Classe A` labels were compared with observed
@@ -71,7 +79,12 @@ B3 `PNA` by incorrectly prepending another `PN`. Equivalent labels now resolve
 to suffix `A`; different letters and unresolved descriptions remain rejected.
 Twenty-seven targeted identity, FCA and valuation tests pass, with Ruff checks.
 The earlier 83650bb identity and its capital-review population are therefore
-pre-correction diagnostics; the new source and valuation queues must be rebuilt.
+pre-correction diagnostics. The corrected 59ba9ab source check is complete:
+22,349 financial documents, 880,858 dated identity rows and 399 registrations,
+with zero missing required account/capital sources, unresolved FCA sources or
+invalid caches. Its selected review queue has 433 outstanding flags after all
+105 dispositions; the actual valuation-use trace is running to prioritize them.
+These are candidate flags, not 433 established data errors.
 The diagnostic identity comparison also exposed an acceptance-helper endpoint
 error: two December 30 receipts first become available beyond the development
 axis. They are absent from historical identity and are excluded from the helper's
