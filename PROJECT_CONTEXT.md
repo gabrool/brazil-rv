@@ -206,6 +206,23 @@ CPU source amendments and diagnostics precede the required clean paid-compute
 freeze. No Round-6 score exists at registration.
 See `docs/v2_ROUND5_DATA.md` and `docs/v2_round5_store_acceptance.json`.
 
+Round-6 input acceptance now binds
+`D:/quant-data/b3/processed/v2_round6_store_b72950b_20260911T145000Z`, manifest
+`968df3947b68ec68d62638ee53402c908b9ea2e24dfd27291e156e17d31a31c1`.
+The 94 protected arrays, both axes and 36 tables match exactly; seven other
+families remain unchanged. Lending is informative in F6-F14, sector in F2-F14,
+and recovered rebalance releases in F3-F10 and F12-F14; other families retain
+all fourteen informative folds. See `docs/v2_round6_inputs.json` for source
+hashes, measured fit/selection/evaluation support and the accepted borrow
+sensitivity contract. The new ADR gap and Brent exposure omit returns ending
+on inferred action dates; subsequent ordinary returns remain usable. The
+bounded check found artificial wealth adjustments on PETR3's 2020-03-09 and
+EMBR3's 2020-03-12 large price falls. This does not repair or change S0,
+targets or the accepted inferred-action economics. Round-6 comparisons remain
+conditional on that development-grade contract; contractual action rebuilding
+and a separately registered rebaseline precede exact wealth or implementability
+claims. No Round-7 fit or 2025 consumer read is authorized.
+
 Its neural input contract changes enabled
 sidecars to separate decision-row, zero-initialized residual projections, gated
 after cross-sectional pooling. The slow GRU inputs remain unchanged. Invalid

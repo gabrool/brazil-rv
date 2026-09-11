@@ -216,6 +216,9 @@ def completed(
     for name, digest in manifest["artifacts"].items():
         if sha256_file(run / name) != digest:
             raise ValueError(f"trajectory artifact changed: {run / name}")
+    for relative, digest in manifest.get("score_manifests", {}).items():
+        if sha256_file(run / relative / "score_manifest.json") != digest:
+            raise ValueError("trajectory scoring or attribution artifact changed")
     expected_lr = 1.0 if arm == "finetune_lr_1" else 0.3
     if (
         stage == "F"
@@ -408,6 +411,8 @@ def write_plan(root: Path, phase: str) -> str:
                 source_tiers=rr._source_tier_labels({"metadata": design}),
             )
         )
+        if not smoke and stage == "F":
+            jobs[-1]["expected_manifest"]["scoring_complete"] = True
     path = root / f"round6_plan_{phase}.json"
     if path.exists():
         raise FileExistsError(path)

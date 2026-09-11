@@ -89,9 +89,10 @@ def _verify_raw_snapshot(root: Path) -> str:
         if not isinstance(record, dict) or record.get("status") != "downloaded":
             continue
         path = root / str(record["filename"])
-        if path.stat().st_size != int(record["bytes"]) or _sha256(path) != record[
-            "sha256"
-        ]:
+        if (
+            path.stat().st_size != int(record["bytes"])
+            or _sha256(path) != record["sha256"]
+        ):
             raise ValueError(f"raw BDI PDF identity mismatch: {path}")
         downloaded += 1
     if downloaded != 127 or downloaded != int(manifest.get("downloaded_pdf_count", -1)):
@@ -222,9 +223,7 @@ def build_lending_archive_v2(
         new_rates_all = _raw_rate_rows(
             pl.read_parquet(new_rate_root / "bdi_lending_strong.parquet")
         )
-        new_rates = new_rates_all.filter(
-            pl.col("available_date") <= pl.lit(SOURCE_END)
-        )
+        new_rates = new_rates_all.filter(pl.col("available_date") <= pl.lit(SOURCE_END))
         excluded_rate_rows = new_rates_all.height - new_rates.height
         rates = pl.concat([old_rates, new_rates], how="vertical").sort(
             "available_date", "source_trade_date", "security_id"
@@ -285,12 +284,8 @@ def build_lending_archive_v2(
             "last_balance_observation": str(
                 balances.get_column("source_position_date").max()
             ),
-            "first_rate_observation": str(
-                rates.get_column("source_trade_date").min()
-            ),
-            "last_rate_observation": str(
-                rates.get_column("source_trade_date").max()
-            ),
+            "first_rate_observation": str(rates.get_column("source_trade_date").min()),
+            "last_rate_observation": str(rates.get_column("source_trade_date").max()),
             "availability_rule": (
                 "source report/trade publication session D first available on the "
                 "next B3 session"
@@ -413,6 +408,30 @@ def load_lending_borrow_panels(
         ):
             raise ValueError(f"lending archive artifact mismatch: {filename}")
 
+    return align_lending_borrow_panels(
+        pl.read_parquet(archive / "lending_balances.parquet"),
+        pl.read_parquet(archive / "lending_rates.parquet"),
+        canonical_dates=canonical_dates,
+        canonical_isins=canonical_isins,
+        manifest_sha256=manifest_sha,
+        balance_sha256=str(artifacts["lending_balances.parquet"]["sha256"]),
+        rate_sha256=str(artifacts["lending_rates.parquet"]["sha256"]),
+        source_label=BORROW_SOURCE_LABEL,
+    )
+
+
+def align_lending_borrow_panels(
+    balances: pl.DataFrame,
+    rates: pl.DataFrame,
+    *,
+    canonical_dates: Sequence[date],
+    canonical_isins: Sequence[str],
+    manifest_sha256: str,
+    balance_sha256: str,
+    rate_sha256: str,
+    source_label: str,
+) -> LendingBorrowPanels:
+    """Apply the same pricing/availability rule to a caller-verified archive."""
     dates = tuple(canonical_dates)
     if not dates or any(left >= right for left, right in zip(dates, dates[1:])):
         raise ValueError("canonical lending calendar must be strictly increasing")
@@ -423,8 +442,6 @@ def load_lending_borrow_panels(
     }
     if len(name_positions) != len(canonical_isins):
         raise ValueError("canonical lending security axis contains duplicates")
-    balances = pl.read_parquet(archive / "lending_balances.parquet")
-    rates = pl.read_parquet(archive / "lending_rates.parquet")
     for column in ("source_position_date", "source_report_date", "available_date"):
         if any(value.year >= 2025 for value in balances.get_column(column).to_list()):
             raise PermissionError("lending archive loader refuses 2025/2026 rows")
@@ -483,8 +500,10 @@ def load_lending_borrow_panels(
             last_rate[name] = value
             last_rate_session[name] = source
         rate_age = day - last_rate_session
-        rate_recent = np.isfinite(last_rate) & (rate_age >= 0) & (
-            rate_age <= RATE_LOOKBACK_SESSIONS
+        rate_recent = (
+            np.isfinite(last_rate)
+            & (rate_age >= 0)
+            & (rate_age <= RATE_LOOKBACK_SESSIONS)
         )
         observed = last_rate[rate_recent]
         cross_sectional_rate = (
@@ -508,9 +527,7 @@ def load_lending_borrow_panels(
         # ``borrow_strict`` is the observed-trade comparator.  A published
         # balance without a lending trade is intentionally insufficient here;
         # that broader causal evidence belongs to ``borrow_balance``.
-        strict[day] = priced & rate_recent & (
-            rate_age <= STRICT_LOOKBACK_SESSIONS
-        )
+        strict[day] = priced & rate_recent & (rate_age <= STRICT_LOOKBACK_SESSIONS)
         balance_cell[day] = priced & (positive_balance | rate_recent)
         open_cell[day] = priced
     return LendingBorrowPanels(
@@ -520,10 +537,10 @@ def load_lending_borrow_panels(
         shortable_strict=strict,
         shortable_balance=balance_cell,
         shortable_open=open_cell,
-        manifest_sha256=manifest_sha,
-        balance_sha256=str(artifacts["lending_balances.parquet"]["sha256"]),
-        rate_sha256=str(artifacts["lending_rates.parquet"]["sha256"]),
-        source_label=BORROW_SOURCE_LABEL,
+        manifest_sha256=manifest_sha256,
+        balance_sha256=balance_sha256,
+        rate_sha256=rate_sha256,
+        source_label=source_label,
         source_unavailable_dates=tuple(unavailable_dates),
         source_placeholder_dates=tuple(placeholder_dates),
     )

@@ -2574,7 +2574,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                 ),
             ),
         )
-        score_checkpoint_artifact(
+        scored = score_checkpoint_artifact(
             checkpoint=result.raw_patience_checkpoint,
             model_config=model_config,
             loader=score_loader,
@@ -2583,12 +2583,13 @@ def main(argv: Sequence[str] | None = None) -> int:
             device=device,
             record_branch_diagnostics=arguments.record_branch_diagnostics,
         )
+        score_records = {"scores": scored.manifest_sha256}
         if arguments.score_sidecar_ablations:
             ablations = [(family, (family,)) for family in sidecars]
             if len(sidecars) > 1:
                 ablations.append(("all", sidecars))
             for name, invalid in ablations:
-                score_checkpoint_artifact(
+                ablated = score_checkpoint_artifact(
                     checkpoint=result.raw_patience_checkpoint,
                     model_config=model_config,
                     loader=score_loader,
@@ -2599,6 +2600,11 @@ def main(argv: Sequence[str] | None = None) -> int:
                     device=device,
                     invalid_sidecars=invalid,
                 )
+                score_records[f"ablations/{name}"] = ablated.manifest_sha256
+        manifest = json.loads(result.manifest_path.read_text(encoding="utf-8"))
+        manifest["scoring_complete"] = True
+        manifest["score_manifests"] = score_records
+        write_json_atomic(result.manifest_path, manifest)
     return 0
 
 
