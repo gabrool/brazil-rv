@@ -96,3 +96,24 @@ fixed seed omissions, targeted leader comparisons and conditional confirmation.
 Analysis changes are pushed on `round6-readouts`; the training checkout remains
 frozen. Full Session 1/2 readouts, final conditional decision and final recovery
 remain outstanding.
+
+## First complete-arm checkpoint, 2026-09-11 20:01 UTC
+
+All 42 magnitudes F fits are complete. Their 924 files were recovered locally
+with exact hashes; the recovery inventory is
+`82cad2a9a4ebf4ac88e749c32d7b48bfcd62a813d5fb1ae2742ac8a337634b1a`.
+The canonical `session1/magnitudes` CPU evaluation accepted all fourteen folds.
+Same-checkpoint forced-invalid attribution is complete (result SHA-256
+`9003cda3f0986b6e264339d3bd0ad3de5c1cfc520410444dec015569a7c7fb94`).
+All fourteen folds also passed each of the three rate-scenario ledger gates,
+and original-cost headlines reproduce the canonical evaluations exactly;
+cost-summary SHA-256 is
+`2d195624a4a1a7e0a448189d7893216ecdbfa962154db5125c179ee93aefed7e`.
+
+These CPU artifacts and their completion record (201 files) are hash-verified
+in the persistent remote run root; inventory SHA-256 is
+`e15af7c8519b46f185c6e09dcc35d1e041c6e7ce94490cb3cc75cf9598d1d77c`.
+The GPU continues later Session 1 arms while these readouts run locally.
+No incomplete session result or C6 roster was published, and no model or
+training setting was selected from this partial experiment matrix. The full
+Session 1 result will reuse these accepted cells after every arm is complete.
