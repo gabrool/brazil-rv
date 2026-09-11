@@ -16,6 +16,8 @@ research/preregistrations/v2_round6_implementation.md text eol=lf
 research/preregistrations/v2_round6_model_contract.md text eol=lf
 research/preregistrations/v2_round6_source_amendments.md text eol=lf
 research/preregistrations/v2_round6_adr_identity.json text eol=lf
+research/preregistrations/v2_round6_return_basis_amendment.md text eol=lf
+research/preregistrations/v2_round6_economics_contract.md text eol=lf
 # Keep audit evidence hashes identical on the host and in GitHub's file bytes.
 docs/*.json text eol=lf
 docs/*.sha256 text eol=lf
