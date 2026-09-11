@@ -26,10 +26,12 @@ REGISTRATION = PROJECT_ROOT / "research/preregistrations/v2_round4_budget_amendm
 METRICS = ("primary_neutral_target_ic", "headline_net_excess_bps")
 
 
-def isolated_occupancy_failure(error: RuntimeError, arm: str) -> bool:
+def isolated_occupancy_failure(
+    error: RuntimeError, arm: str, *, baseline="fast_off"
+) -> bool:
     """Only a non-baseline occupancy failure can reject one arm under A4.1."""
     prefix = "registered book stop: "
-    if arm == "fast_off" or not str(error).startswith(prefix):
+    if arm == baseline or not str(error).startswith(prefix):
         return False
     failures = ast.literal_eval(str(error)[len(prefix) :])
     flags = {flag for values in failures.values() for flag in values}
