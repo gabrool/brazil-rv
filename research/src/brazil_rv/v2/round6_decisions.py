@@ -6,6 +6,8 @@ import argparse
 import math
 from pathlib import Path
 
+import numpy as np
+
 from . import research_rounds as rr
 from .artifacts import sha256_file, write_json_atomic
 from .checkpoint_readouts import paired_readouts
@@ -115,6 +117,50 @@ def roster_sensitivity(pairs: dict) -> dict:
     )
 
 
+def era_readout(paired_root: Path) -> dict:
+    eras = {
+        "2018_2019": (2018, 2019),
+        "2020_2021": (2020, 2021),
+        "2022_2024": (2022, 2024),
+    }
+    panels = {era: {} for era in eras}
+    sources = {}
+    for fold in DEVELOPMENT_FOLDS:
+        path = paired_root / f"{fold}.json"
+        sources[fold] = sha256_file(path)
+        daily = rr._read_json(path)["population_audit"][fold]
+        for era, (first, last) in eras.items():
+            values = {
+                metric: np.asarray(
+                    [
+                        row["delta"]
+                        for row in rows
+                        if first <= int(row["date"][:4]) <= last
+                    ],
+                    float,
+                )
+                for metric, rows in daily.items()
+            }
+            if len(values[IC]):
+                panels[era][fold] = values
+    return {
+        "direction": "arm_minus_S0",
+        "promotion_weight": 0,
+        "source_paired_sha256": sources,
+        "eras": {
+            era: {
+                "folds": list(folds),
+                "paired": {
+                    key: rr._folded_bootstrap(tuple(row[key] for row in folds.values()))
+                    for key in next(iter(folds.values()))
+                },
+            }
+            for era, folds in panels.items()
+            if folds
+        },
+    }
+
+
 def leader_comparisons(
     context, paths, readouts, pairs, output, support, *, excluded=()
 ):
@@ -199,6 +245,15 @@ def review(root: Path, output: Path, *, excluded=()) -> str:
                 "paired": pairs,
                 "promotion_trace": promotion_trace(readouts, pairs, excluded=excluded),
                 "registered_C6_roster": roster,
+                "era_diagnostics": {
+                    arm: era_readout(root / "paired/session1" / f"{arm}_minus_S0")
+                    for arm in ("finetune_lr_1", "time_decay_756")
+                },
+                "temporal_modelling_premium": {
+                    "direction": "S0_minus_mlp",
+                    "comparison": pairs["S0_minus_mlp"],
+                    "promotion_weight": 0,
+                },
                 **rr.RESEARCH_FLAGS,
             },
         )

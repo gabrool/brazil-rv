@@ -1,7 +1,9 @@
 from copy import deepcopy
+import json
 
 from brazil_rv.v2.round4_seed_audit import isolated_occupancy_failure
 from brazil_rv.v2.round6_decisions import IC, NET, promotion_trace, seed_stability
+from brazil_rv.v2 import round6_decisions as decisions
 
 
 def interval(point, low=None, high=None):
@@ -97,3 +99,24 @@ def test_only_isolated_nonbaseline_occupancy_can_be_rejected_locally():
     assert not isolated_occupancy_failure(
         RuntimeError("identity mismatch"), "lending", baseline="S0"
     )
+
+
+def test_era_readout_preserves_calendar_missingness_and_fold_boundaries(
+    tmp_path, monkeypatch
+):
+    monkeypatch.setattr(decisions, "DEVELOPMENT_FOLDS", ("F1", "F2"))
+    for fold, year, value in (("F1", 2018, 0.01), ("F2", 2020, -0.02)):
+        rows = [
+            {"date": f"{year}-01-{day:02d}", "delta": value if day <= 5 else None}
+            for day in range(1, 21)
+        ]
+        (tmp_path / f"{fold}.json").write_text(
+            json.dumps({"population_audit": {fold: {IC: rows}}})
+        )
+    result = decisions.era_readout(tmp_path)
+    assert set(result["eras"]) == {"2018_2019", "2020_2021"}
+    row = result["eras"]["2020_2021"]["paired"][IC]
+    assert row["estimate"] == -0.02
+    assert row["possible_observations"] == 20
+    assert row["finite_observations"] == 5
+    assert row["fold_boundary_preserved"]
