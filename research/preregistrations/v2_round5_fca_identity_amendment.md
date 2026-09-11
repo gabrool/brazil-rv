@@ -95,3 +95,13 @@ ID/version/reference/envelope identity remains required. The nested original
 and exact-ID HTML use the same legal-root-plus-CVM contract already used by
 the dated identity bridge; a changed legal root, missing CNPJ or changed CVM
 registration still fails. No legal-name alias or issuer-succession merge is added.
+
+Explicit preferred-class spellings `A`, `PNA`, `Classe A` and `Preferencial
+Classe A` denote the same suffix for matching against an observed B3 `PNA`
+security, and analogously for other explicit letters. Normalize these spellings
+at the identity join while retaining the raw cadastre metadata. Do not construct
+`PNPNA` or compare a prose label to a B3 specification. An explicit different
+letter or an unresolved description remains incompatible; this correction does
+not erase class constraints, substitute a later label, or allocate aggregate PN
+capital among subclasses. The actual dated source and valuation queues must be
+recomputed after this correction, before final family construction.

@@ -1,12 +1,12 @@
 {
-  "status": "91 own-source dispositions accepted: 84 reconciled and 7 unavailable. Source coverage passes; 228 currently valued flagged filings remain. Final source/identity/store admission remains open.",
+  "status": "95 own-source dispositions accepted: 88 reconciled and 7 unavailable. Preferred-class identity correction requires fresh source-selection and valuation traces before final admission.",
   "capital_dispositions": {
     "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_source_dispositions.json",
-    "sha256": "d7824f6398e3e823582dc87e5caaf8c37efbbab573165af45b7b26877cb8688d"
+    "sha256": "1bebba1ebfaddc2614b0fd2c38f9654f9471ab9b6ada7651a118d421365d2b50"
   },
   "counts": {
     "audited_unavailable": 7,
-    "reconciled": 84
+    "reconciled": 88
   },
   "accepted_batch": {
     "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\accepted_batch_20260910T192900Z\\acceptance.json",
@@ -1707,6 +1707,108 @@
         "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\accepted_viewer_eight_20260910T235046Z\\selection_preservation.json",
         "sha256": "5d325d2fd3ce12447a66109b8d4b3cf1377d3708b3bae0441f6813d1d2f1bbf7"
       }
+    },
+    {
+      "acceptance": {
+        "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\accepted_viewer_four_20260911T000702Z\\acceptance.json",
+        "sha256": "8b91b28f2bc96af273dbe5e3e5bc07273aabce8421255325842d4a0d014efc88"
+      },
+      "review": {
+        "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\review_viewer_four_20260911T000702Z.json",
+        "sha256": "3032eee1f83af29fb2428c7dfc7cf1fa0ee95f31398ccbd215c586c05fb82621"
+      },
+      "counts_after": {
+        "audited_unavailable": 7,
+        "reconciled": 88
+      },
+      "reconciliations": [
+        {
+          "id": "5143",
+          "reference": "2010-12-31",
+          "version": 2,
+          "paid_in_shares": {
+            "ON": 162722079,
+            "PN": 0
+          },
+          "treasury_shares": {
+            "ON": 0,
+            "PN": 0
+          },
+          "visually_reviewed_pages": [
+            60
+          ],
+          "reason": "Own DFP 2010 version 2 note 24a explicitly dates the fully paid ordinary-share allocation to 31 December 2010. Its eight holders sum to 162722079 and 100%, confirming the same filing explicit zero treasury. Replace the rounded 162722000 composition with the own-period exact total, a 79-share precision correction. Authorized 350000000 capital and pre-split quantities are not used.",
+          "result": {
+            "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_note_viewer_recovery_20260910T233800Z\\5143\\result.json",
+            "sha256": "c9e9dcef4ca923f3e68927284e79540eb5cd3fd466e01a7a05d2a1b69692dc9c"
+          }
+        },
+        {
+          "id": "94920",
+          "reference": "2020-06-30",
+          "version": 1,
+          "paid_in_shares": {
+            "ON": 10000,
+            "PN": 0
+          },
+          "treasury_shares": {
+            "ON": 0,
+            "PN": 0
+          },
+          "visually_reviewed_pages": [
+            39
+          ],
+          "reason": "Own June 2020 note 18a explicitly states fully paid 10000 ordinary shares, spelling dez mil and reconciling one share per former quota in the June conversion. Correct the composition thousand-fold overstatement. Retain its explicit zero treasury. The EPS table retrospectively applies a later split to 200000000 weighted shares and cannot replace the June capital quantity.",
+          "result": {
+            "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_note_viewer_recovery_20260910T233800Z\\94920\\result.json",
+            "sha256": "0c39a3c2b31e0bab91638a836123db2ace750cc99d9b610114502d6d2411b7c7"
+          }
+        },
+        {
+          "id": "10933",
+          "reference": "2011-06-30",
+          "version": 2,
+          "paid_in_shares": {
+            "ON": 159008924,
+            "PN": 0
+          },
+          "treasury_shares": {
+            "ON": 0,
+            "PN": 0
+          },
+          "visually_reviewed_pages": [
+            46,
+            55
+          ],
+          "reason": "No count change. Own June 2011 capital note 31a explicitly labels its quantities integral and unrounded and reports 159008924 ordinary shares. Note 38 states that the company does not hold treasury shares; its historical 2010/2009 comparison is not used as a new current date. Current source zero treasury is retained. Free-float shares of 61947847 and the authorized issuance ceiling are distinct from outstanding capital.",
+          "result": {
+            "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_note_viewer_recovery_20260910T233800Z\\10933\\result.json",
+            "sha256": "76c76302df0de7c4dffad869eae768fa8b5436b396a890a46acd5e2d21c26775"
+          }
+        },
+        {
+          "id": "86286",
+          "reference": "2019-06-30",
+          "version": 1,
+          "paid_in_shares": {
+            "ON": 36278304,
+            "PN": 0
+          },
+          "treasury_shares": {
+            "ON": 797366,
+            "PN": 0
+          },
+          "visually_reviewed_pages": [
+            36,
+            39
+          ],
+          "reason": "Own June 2019 note 22a gives 36278304 current ordinary shares and a dated unchanged capital roll-forward. Note 22f separately gives 797366 current treasury shares. Correct both truncated quantity units and the composition treasury error (printed 707). Do not mechanically multiply that incorrect 707 or use weighted-average EPS shares. Net ordinary shares are 35480938.",
+          "result": {
+            "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_note_viewer_recovery_20260910T233800Z\\86286\\result.json",
+            "sha256": "350edacf0ff82d22ef024d2bd620b64a49b40eaf98d97368eed76ac9b09b9324"
+          }
+        }
+      ]
     }
   ],
   "review_priority": {
@@ -1823,7 +1925,8 @@
       "sha256": "5d325d2fd3ce12447a66109b8d4b3cf1377d3708b3bae0441f6813d1d2f1bbf7"
     },
     "pending_valued": 228,
-    "pending_selected": 446
+    "pending_selected": 446,
+    "status": "Superseded for the corrected preferred-class join; rebuild under the new clean code. Prior immutable trace remains valid for 83650bb only."
   },
   "viewer_note_recovery": {
     "result": {
@@ -1845,11 +1948,7 @@
     "ocr_role": "Local Windows OCR for search only; actual PDF renders determine reviewed quantities.",
     "further_automatic_retry": false,
     "unreviewed_recovered_ids": [
-      "126843",
-      "5143",
-      "94920",
-      "10933",
-      "86286"
+      "126843"
     ],
     "partial_review": {
       "126843": "Viewed own note pages 24-25: no current total/treasury quantity independent of the composition table. Authorized repurchases, monetary capital, partially unpaid new issuance and EPS weighted average cannot replace those counts. No disposition yet."

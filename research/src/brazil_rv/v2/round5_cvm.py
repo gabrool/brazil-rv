@@ -1167,6 +1167,13 @@ def build_identity(
                     spec = observed.get("security_spec_base", "")
                     share_class = security["class"]
                     preferred = security.get("preferred_class", "")
+                    if share_class == "PN" and preferred:
+                        suffix = re.fullmatch(
+                            r"(?:pn|(?:preferencial\s+)?classe\s+)?([a-z])",
+                            normalized(preferred).strip(),
+                        )
+                        if suffix:
+                            preferred = suffix[1].upper()
                     identity_method = method
                     cls = (
                         "ON"

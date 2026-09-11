@@ -58,6 +58,27 @@ capital, repurchase authorization and weighted-average EPS shares cannot replace
 current paid-in and treasury quantities. The final source and store acceptance
 remain open.
 
+Four further recovered notes now resolve Hering, Plano & Plano, PBG and Nexpe.
+Hering supplies a 79-share precision correction; Plano & Plano explicitly has
+10,000 pre-IPO shares, and Nexpe corrects both capital and treasury quantities.
+PBG confirms its existing count and zero treasury. The source dispositions now
+total 95: 88 reconciled and seven unavailable. Kora remains the only recovered
+alternate-route note awaiting disposition.
+
+The actual dated identity comparison exposed an additional join defect:
+explicit `PNA` and `Preferencial Classe A` labels were compared with observed
+B3 `PNA` by incorrectly prepending another `PN`. Equivalent labels now resolve
+to suffix `A`; different letters and unresolved descriptions remain rejected.
+Twenty-seven targeted identity, FCA and valuation tests pass, with Ruff checks.
+The earlier 83650bb identity and its capital-review population are therefore
+pre-correction diagnostics; the new source and valuation queues must be rebuilt.
+The diagnostic identity comparison also exposed an acceptance-helper endpoint
+error: two December 30 receipts first become available beyond the development
+axis. They are absent from historical identity and are excluded from the helper's
+session indexing, without importing any later consumer date. Class comparisons
+now include transitions to or from missing values. The [identity review evidence](v2_round5_fca_identity_review.json)
+records the findings; final source/store acceptance remains open.
+
 ## Completed economic correction
 
 The BOVA11 filter now accepts BDI02 and14 for the exact ETF ISIN, market and

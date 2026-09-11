@@ -104,6 +104,23 @@ def test_original_end_date_and_future_version_are_causal():
     assert set(changed.filter(pl.col("date") == days[3])["sector"]) == {"18"}
 
 
+def test_equivalent_preferred_class_source_labels_match_without_erasing_conflicts():
+    days, document, observations = fixture()
+    security = document["securities"][0]
+    security["class"] = "PN"
+    for ticker in ("ABCD5", ""):
+        security["ticker"] = ticker
+        for label in ("A", "PNA", "Classe A", "Preferencial Classe A"):
+            security["preferred_class"] = label
+            identity = build_identity([document], observations, days, ["PNA"])
+            assert set(identity["isin"]) == {"PNA"}, (ticker, label)
+            assert set(identity["preferred_class"]) == {"A"}
+            assert identity["date"].min() == days[1]
+        for label in ("PNB", "Preferencial Classe B", "unresolved description"):
+            security["preferred_class"] = label
+            assert build_identity([document], observations, days, ["PNA"]).is_empty()
+
+
 def test_sector_translation_enters_first_known_decision_without_refiling():
     days, document, observations = fixture()
     document["sector_code"] = None

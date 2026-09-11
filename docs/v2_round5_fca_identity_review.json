@@ -1,0 +1,291 @@
+{
+  "status": "Join spelling correction tested; new full dated source selection and valuation trace pending. No final family/store/fit.",
+  "pre_correction_identity_diagnostic": {
+    "binding": {
+      "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\dated_identity_review_20260911T000415Z\\readout.json",
+      "sha256": "01770784d647949647f9b65ea7dd4668a639fd82d04a0b6ea055c05ea82a910a"
+    },
+    "result": {
+      "scope": "Actual preflight identity review; final family must reproduce this source identity. No source hold is released by this readout.",
+      "inputs": [
+        {
+          "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\source_preflight_83650bb_20260910T230949Z\\identity.parquet",
+          "sha256": "eac242fbb07ef05ca2917a07c783915d25a73d05f27118ab15ba4ce6fe18b49a"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\free_float_9120d7d\\identity.parquet",
+          "sha256": "5351261001da2b2afb366e0392017b374fe4e94a514c4c3293b27fba6969dba5"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\source_preflight_83650bb_20260910T230949Z\\fca_identity_documents.json",
+          "sha256": "374b353f4f74dcaff3b4b361e73582c4d98985d0ba3b1e794d4abb871485f812"
+        }
+      ],
+      "program": {
+        "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\inspect_dated_identity.py",
+        "sha256": "333ed5e54d80ddc6e1052a4e7550f99a1891bf59867bffb1dd579fe0baee60f9"
+      },
+      "acceptance_helper": {
+        "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm_acceptance.py",
+        "sha256": "ad70655d228c922940ed35468336921c42cef5085151a958ba12e572f4174f0d"
+      },
+      "sector": {
+        "sector_receipt_and_mapping_sources_passed": true,
+        "sector_unambiguous_asof_mapping_passed": true,
+        "direct_code_name_days": 299723,
+        "translated_code_name_days": 519090,
+        "missing_sector_name_days": 2453
+      },
+      "own_source_identity_passed": true,
+      "known_and_effective_bounds_passed": true,
+      "current_rows": 821266,
+      "prior_rows": 861673,
+      "differences": {
+        "added": {
+          "rows": 117145,
+          "isins": 322,
+          "by_year": [
+            {
+              "year": 2010,
+              "rows": 8034
+            },
+            {
+              "year": 2011,
+              "rows": 9451
+            },
+            {
+              "year": 2012,
+              "rows": 8703
+            },
+            {
+              "year": 2013,
+              "rows": 7265
+            },
+            {
+              "year": 2014,
+              "rows": 9085
+            },
+            {
+              "year": 2015,
+              "rows": 10072
+            },
+            {
+              "year": 2016,
+              "rows": 10337
+            },
+            {
+              "year": 2017,
+              "rows": 9876
+            },
+            {
+              "year": 2018,
+              "rows": 19537
+            },
+            {
+              "year": 2019,
+              "rows": 6128
+            },
+            {
+              "year": 2020,
+              "rows": 3743
+            },
+            {
+              "year": 2021,
+              "rows": 4803
+            },
+            {
+              "year": 2022,
+              "rows": 3840
+            },
+            {
+              "year": 2023,
+              "rows": 3059
+            },
+            {
+              "year": 2024,
+              "rows": 3212
+            }
+          ],
+          "detail": {
+            "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\dated_identity_review_20260911T000415Z\\added.parquet",
+            "sha256": "f87e38a098c79b258080d05f9dac69dd45908a706b989306e55c61e423324e46"
+          },
+          "summary": {
+            "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\dated_identity_review_20260911T000415Z\\added_summary.parquet",
+            "sha256": "e4282cb2f170d0db5364f658b3eea1f19b27814cae8782a6e76bd027fee4f261"
+          }
+        },
+        "removed": {
+          "rows": 157552,
+          "isins": 415,
+          "by_year": [
+            {
+              "year": 2011,
+              "rows": 558
+            },
+            {
+              "year": 2012,
+              "rows": 1234
+            },
+            {
+              "year": 2013,
+              "rows": 1316
+            },
+            {
+              "year": 2014,
+              "rows": 123
+            },
+            {
+              "year": 2015,
+              "rows": 227
+            },
+            {
+              "year": 2016,
+              "rows": 460
+            },
+            {
+              "year": 2017,
+              "rows": 137
+            },
+            {
+              "year": 2018,
+              "rows": 8055
+            },
+            {
+              "year": 2019,
+              "rows": 17867
+            },
+            {
+              "year": 2020,
+              "rows": 18368
+            },
+            {
+              "year": 2021,
+              "rows": 20881
+            },
+            {
+              "year": 2022,
+              "rows": 32853
+            },
+            {
+              "year": 2023,
+              "rows": 28408
+            },
+            {
+              "year": 2024,
+              "rows": 27065
+            }
+          ],
+          "detail": {
+            "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\dated_identity_review_20260911T000415Z\\removed.parquet",
+            "sha256": "f501d3d7dad4e50e69478b0530922cf69af77593365bcdd0cc0a12bb1bb1af05"
+          },
+          "summary": {
+            "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\dated_identity_review_20260911T000415Z\\removed_summary.parquet",
+            "sha256": "e67a0af0698b034054ca61f83b8df174da8e53421b339a39abd2773f8ea32849"
+          }
+        },
+        "issuer_changed": {
+          "rows": 0,
+          "isins": 0,
+          "by_year": [],
+          "detail": {
+            "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\dated_identity_review_20260911T000415Z\\issuer_changed.parquet",
+            "sha256": "34e2ff3b26e883916c43c41220ca9d171b9d793bd5b9b440b347737a75b4a6be"
+          },
+          "summary": {
+            "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\dated_identity_review_20260911T000415Z\\issuer_changed_summary.parquet",
+            "sha256": "d326eacda953589b5c2d693fd5407ee7c24a4506930faa5aeca2d0a612202cb3"
+          }
+        },
+        "class_changed": {
+          "rows": 2642,
+          "isins": 8,
+          "by_year": [
+            {
+              "year": 2018,
+              "rows": 163
+            },
+            {
+              "year": 2019,
+              "rows": 276
+            },
+            {
+              "year": 2020,
+              "rows": 682
+            },
+            {
+              "year": 2021,
+              "rows": 383
+            },
+            {
+              "year": 2022,
+              "rows": 250
+            },
+            {
+              "year": 2023,
+              "rows": 543
+            },
+            {
+              "year": 2024,
+              "rows": 345
+            }
+          ],
+          "detail": {
+            "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\dated_identity_review_20260911T000415Z\\class_changed.parquet",
+            "sha256": "b7447a0241a3515b737370495913323fc56ab25db213a3ca04d64368c7bd20da"
+          },
+          "summary": {
+            "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\dated_identity_review_20260911T000415Z\\class_changed_summary.parquet",
+            "sha256": "16c03c22863ac88a0c74fc7bf08d224f83cd41d3073ac6a8f25c16040ac8c051"
+          }
+        }
+      },
+      "after_endpoint_documents": [
+        {
+          "id": "144034",
+          "receipt": "2024-12-30",
+          "reference": "2024-01-01",
+          "available_index": 3717
+        },
+        {
+          "id": "144043",
+          "receipt": "2024-12-30",
+          "reference": "2024-01-01",
+          "available_index": 3717
+        }
+      ],
+      "after_endpoint_absent_from_identity": true,
+      "null_class_transition_fixture_passed": true
+    }
+  },
+  "defect": {
+    "location": "research/src/brazil_rv/v2/round5_cvm.py:build_identity",
+    "behavior": "The join prepended PN to raw preferred-class PNA or Preferencial Classe A, rejecting compatible B3 PNA observations. Normalize only explicit equivalent suffixes, preserving raw metadata and all identity/receipt/class constraints.",
+    "observed_source_spellings": {
+      "PNA": 328,
+      "Preferencial Classe A": 216,
+      "PNB": 138,
+      "Preferencial Classe B": 101
+    },
+    "regression": "Ticker and exact-name paths accept A/PNA/Classe A/Preferencial Classe A only against PNA, starting at source availability; PNB, descriptive B and unresolved labels remain incompatible.",
+    "tests_passed": 27,
+    "lint_and_format_passed": true
+  },
+  "acceptance_helper_fix": {
+    "before": {
+      "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\cvm_acceptance_before_endpoint_audit.py",
+      "sha256": "97be1fc4c62a8602eac556e1cf505160443129613236c02c3968998462e9b11b"
+    },
+    "after": {
+      "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm_acceptance.py",
+      "sha256": "ad70655d228c922940ed35468336921c42cef5085151a958ba12e572f4174f0d"
+    },
+    "changes": [
+      "Filter documents whose first usable session is beyond the development axis before indexing session dates; two actual endpoint records are not present in historical identity.",
+      "Use null-aware comparisons for issuer/class diff counts; a four-row fixture detects exactly the two transitions into/out of a missing preferred class."
+    ]
+  },
+  "source_freeze_ready": false,
+  "forward_capture_enabled": false
+}

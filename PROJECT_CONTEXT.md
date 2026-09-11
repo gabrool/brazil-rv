@@ -201,6 +201,10 @@ display labels remain usable for accounting at their original receipt.
 Original FCA establishment suffixes are preserved as `source_cnpj`; the legal
 eight-digit CNPJ root and exact CVM registration must match the public envelope.
 A modern establishment suffix cannot invalidate the same historical issuer.
+Explicit preferred-class codes and descriptions are normalized to their letter
+at the identity join: `PNA` and `Preferencial Classe A` both match observed B3
+`PNA`. Raw source labels remain intact; different or unresolved classes stay
+incompatible, and aggregate PN quantities are not assigned to subclasses.
 Issuer valuation requires own-version
 capital quantities with an explicit share-unit scale. The annual capital CSV
 omits that scale and is not a model count source. Negative treasury quantities
