@@ -194,7 +194,16 @@ horizon models, 112.68 minutes, maximum fitted-cell RSS 4.103 GiB. Magnitudes,
 oddlot and options have positive paired nominal 95% IC intervals; these order
 future neural arms and have zero network-selection weight. Null screens do not
 remove families. Round 5 is complete with the final readout and Round-6 ordering;
-Round 6 has not started and S0 remains the accepted neural parent.
+S0 remains the accepted neural parent. Round 6 is now registered in
+`research/preregistrations/v2_round6.md` and its JSON, with implementation
+clarifications fixed before outcomes. It tests one information family per arm,
+reuses compatible S0 Stage-P checkpoints and sealed parent scores, and retains
+the fourteen folds and three matched seeds. The MLP needs architecture-matched
+Stage P; the 2023–2024-calibrated borrow placeholder is a hindsight sensitivity,
+not a feature or promotion basis. Experiment speed and quality are joint
+requirements: reuse proven work and measure concurrent throughput before ETAs.
+CPU source amendments and diagnostics precede the required clean paid-compute
+freeze. No Round-6 score exists at registration.
 See `docs/v2_ROUND5_DATA.md` and `docs/v2_round5_store_acceptance.json`.
 
 Its neural input contract changes enabled

@@ -1,0 +1,259 @@
+{
+  "base_store": {
+    "manifest_sha256": "44a19df181f4896d12e510d1f49cc815762a057c0a74ca7bad879ea02a86cf7b",
+    "root": "D:/quant-data/b3/processed/v2_round5_store_9020bde_20260911T023227Z"
+  },
+  "best_single_rule": "Highest session-1 informative-fold paired primary IC point estimate among the six family arms; ties use session-1 registration order.",
+  "c6_rule": "Every session-1 family with strictly positive informative-fold paired primary IC point estimate; no non-data arm enters C6.",
+  "compute_rule": "No paid launch until required CPU checks and clean freeze; benchmark score-free smokes and total concurrent throughput, then use the fastest valid configuration.",
+  "confirmation_rule": "Both sides if candidate informative-fold paired IC lower bound is within +/-0.001 of zero, or economic override fires.",
+  "confirmation_seeds": [
+    61,
+    79,
+    97
+  ],
+  "coverage_rule": "Freeze actual fit/evaluation input support from the accepted arm store before fitting; rebuild rebalance and lending coverage when sources change.",
+  "development_end": "2024-12-30",
+  "economic_basis": "A1 full-calendar fold-reset, repaired BOVA, adopted execution policy; continuous designated-candidate readout",
+  "folds": [
+    "F1",
+    "F2",
+    "F3",
+    "F4",
+    "F5",
+    "F6",
+    "F7",
+    "F8",
+    "F9",
+    "F10",
+    "F11",
+    "F12",
+    "F13",
+    "F14"
+  ],
+  "forward_capture": false,
+  "heldout_access": false,
+  "implementation_clarifications": {
+    "path": "research/preregistrations/v2_round6_implementation.md",
+    "sha256": "a6bbf7b53f9446e425294ecaf7d09d28d2f5fd6b7285f7be6b4dd547f34882c1"
+  },
+  "informative_folds_before_extensions": {
+    "cross_market": [
+      "F1",
+      "F10",
+      "F11",
+      "F12",
+      "F13",
+      "F14",
+      "F2",
+      "F3",
+      "F4",
+      "F5",
+      "F6",
+      "F7",
+      "F8",
+      "F9"
+    ],
+    "events": [
+      "F1",
+      "F10",
+      "F11",
+      "F12",
+      "F13",
+      "F14",
+      "F2",
+      "F3",
+      "F4",
+      "F5",
+      "F6",
+      "F7",
+      "F8",
+      "F9"
+    ],
+    "fundamentals": [
+      "F1",
+      "F10",
+      "F11",
+      "F12",
+      "F13",
+      "F14",
+      "F2",
+      "F3",
+      "F4",
+      "F5",
+      "F6",
+      "F7",
+      "F8",
+      "F9"
+    ],
+    "lending": [
+      "F10",
+      "F11",
+      "F12",
+      "F13",
+      "F14",
+      "F6",
+      "F7",
+      "F8",
+      "F9"
+    ],
+    "magnitudes": [
+      "F1",
+      "F10",
+      "F11",
+      "F12",
+      "F13",
+      "F14",
+      "F2",
+      "F3",
+      "F4",
+      "F5",
+      "F6",
+      "F7",
+      "F8",
+      "F9"
+    ],
+    "microstructure": [
+      "F1",
+      "F10",
+      "F11",
+      "F12",
+      "F13",
+      "F14",
+      "F2",
+      "F3",
+      "F4",
+      "F5",
+      "F6",
+      "F7",
+      "F8",
+      "F9"
+    ],
+    "oddlot": [
+      "F1",
+      "F10",
+      "F11",
+      "F12",
+      "F13",
+      "F14",
+      "F2",
+      "F3",
+      "F4",
+      "F5",
+      "F6",
+      "F7",
+      "F8",
+      "F9"
+    ],
+    "options": [
+      "F1",
+      "F10",
+      "F11",
+      "F12",
+      "F13",
+      "F14",
+      "F2",
+      "F3",
+      "F4",
+      "F5",
+      "F6",
+      "F7",
+      "F8",
+      "F9"
+    ],
+    "rebalance": [
+      "F13",
+      "F14"
+    ],
+    "sector": [
+      "F10",
+      "F11",
+      "F12",
+      "F13",
+      "F14",
+      "F2",
+      "F3",
+      "F4",
+      "F5",
+      "F6",
+      "F7",
+      "F8",
+      "F9"
+    ]
+  },
+  "leave_one_seed_out": "All three fixed seed omissions for every research designation.",
+  "mlp_initialization": {
+    "additional_stage_p_runs": 3,
+    "mode": "architecture_matched_stage_p",
+    "reason": "The point-in-time encoder cannot reuse recurrent weights; same P data/objective/selection as S0."
+  },
+  "operational_root": "D:/quant-data/b3/interim/round6_20260911T111805Z",
+  "preflight": [
+    "cross_market_extension",
+    "fundamentals_events_sign_diagnostic",
+    "historical_index_extension",
+    "ledger_realism"
+  ],
+  "primary_horizons": [
+    3,
+    5,
+    10
+  ],
+  "registered_at_utc": "2026-09-11T11:18:05.571837+00:00",
+  "registration": {
+    "path": "research/preregistrations/v2_round6.md",
+    "sha256": "a558b38709b9db9d01bd431894805e193cfc54885d2210057613446c02c571e7"
+  },
+  "round5_screen_readout": {
+    "path": "docs/v2_round5_cpu_screen_readout.json",
+    "sha256": "41d31ff88021fb244c0fd216ce1b60a1bcf33c32a2f4a9e1b0d2c6131405a6ef"
+  },
+  "s0_panels": {
+    "inventory_sha256": "a4c9d098124515594c27acc970b0f3805adc3a36ebbed74e9ddf5be82b284c76",
+    "root": "D:/quant-data/b3/processed/model_runs/v2_round4_arms_3d1e95f_20260910T015000Z"
+  },
+  "s0_stage_p": {
+    "11": {
+      "path": "D:/quant-data/b3/processed/model_runs/v2_round4_arms_3d1e95f_20260910T015000Z/trajectories/S0/stage_P/seed_11/raw_patience.pt",
+      "sha256": "e6feef4ce5450260573b8d8f764f867937693dae3b434eaa86323d230371b0c5"
+    },
+    "29": {
+      "path": "D:/quant-data/b3/processed/model_runs/v2_round4_arms_3d1e95f_20260910T015000Z/trajectories/S0/stage_P/seed_29/raw_patience.pt",
+      "sha256": "b69a67e691f2bffdc0cc79047fd8f677ab0e75a1bde4d614d7ab86c375a19d91"
+    },
+    "47": {
+      "path": "D:/quant-data/b3/processed/model_runs/v2_round4_arms_3d1e95f_20260910T015000Z/trajectories/S0/stage_P/seed_47/raw_patience.pt",
+      "sha256": "24ccb7d1edc8f78c73420b94bf0800aca5d60ac58de3015fe4d412790857c5a2"
+    }
+  },
+  "schema": "BRAZIL_RV_V2_ROUND6_PROTOCOL_V1",
+  "seeds": [
+    11,
+    29,
+    47
+  ],
+  "session_1": [
+    "magnitudes",
+    "oddlot",
+    "options",
+    "events",
+    "fundamentals",
+    "lending",
+    "finetune_lr_1",
+    "time_decay_756",
+    "mlp"
+  ],
+  "session_2_derived": [
+    "C6",
+    "best_single_fresh_p",
+    "C6_fresh_p"
+  ],
+  "session_2_fixed": [
+    "cross_market",
+    "sector",
+    "microstructure",
+    "rebalance"
+  ],
+  "stage_p_reuse": "Hash-bound unchanged S0 Stage-P parameters for additive sidecar arms; record all newly initialized projection keys and transfer identities. Fresh-P best-single/C6 variants are independent registered arms.",
+  "status": "registered_preflight"
+}
