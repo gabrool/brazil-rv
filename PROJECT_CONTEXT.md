@@ -179,7 +179,20 @@ value is invalid. The canonical fast branch uses native, compact, separately
 masked five-minute inputs and fresh weights; v1 fast artifacts are isolated as
 contaminated historical diagnostics and are not a clean-path dependency.
 
-Round 5 is a CPU-only data round. Its neural input contract changes enabled
+Round 5 is a CPU-only data round. Its extended development store is accepted at
+`D:/quant-data/b3/processed/v2_round5_store_9020bde_20260911T023227Z`, manifest
+`44a19df181f4896d12e510d1f49cc815762a057c0a74ca7bad879ea02a86cf7b`.
+The 3,717 sessions and 933-ISIN axis still end on 2024-12-30. All 76 protected
+base arrays and 36 tables are exact; three old lending arrays are authorized
+replacements. Ten sidecar families provide 103 scalar fields, including explicitly
+unavailable masked fields and the two unchanged oddlot fields. Full build took
+46.13 seconds and peaked at 4.034 GiB. S0 slow-input hashes are unchanged, so
+its sealed scores remain valid without a neural refit. Source collection and
+family admissions are complete. Registered 14-fold, five-seed CPU screens are
+running; Round 5 remains open until their final readout and Round-6 ordering.
+See `docs/v2_ROUND5_DATA.md` and `docs/v2_round5_store_acceptance.json`.
+
+Its neural input contract changes enabled
 sidecars to separate decision-row, zero-initialized residual projections, gated
 after cross-sectional pooling. The slow GRU inputs remain unchanged. Invalid
 families preserve S0 forwards, parent gradients and RNG state exactly; no neural
@@ -218,8 +231,8 @@ Issuer valuation requires own-version
 capital quantities with an explicit share-unit scale. The annual capital CSV
 omits that scale and is not a model count source. Negative treasury quantities
 require a separately evidenced same-filing reconciliation; otherwise the count
-stays unavailable while unrelated accounting fields remain usable. The final
-extended store is still pending; `docs/v2_ROUND5_DATA.md` records current status.
+stays unavailable while unrelated accounting fields remain usable. The accepted
+extended store and its limitations are recorded in `docs/v2_ROUND5_DATA.md`.
 Financial attribution rows also require compatibility with any observed parent
 account in the same statement; stale noncontrolling-shareholder labels beneath
 liability accounts are not equity. Parent meanings are resolved independently
