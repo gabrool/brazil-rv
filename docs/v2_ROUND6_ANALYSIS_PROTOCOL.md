@@ -79,3 +79,13 @@ remains at its frozen training commit. Recover and validate completed training
 artifacts before evaluation. Publish both implementation and evidence; merge the
 analysis branch after frozen training work is complete. No 2025/2026 consumer
 access, forward capture, or Round 7 experiments are authorized.
+
+`round6_confirmation.py` can be copied outside the training checkout and executed
+by absolute path using that checkout's Python environment. Its imports must
+resolve to the original frozen package (do not set the analysis `PYTHONPATH`).
+The planner binds its own file hash separately and requires the completed seed
+audit's matching design and triggered roster. Its `smoke`, `p` and `f` phases
+are sequential. New S0 P checkpoints use the current accepted schema; other
+compatible arms reuse those same-seed checkpoints, while MLP and fresh-P variants
+use their own. The planner never sends these fresh checkpoints through the
+older archived-store transfer path.

@@ -205,6 +205,7 @@ def panel(root: Path, review: Path, output: Path, omitted: int) -> str:
             {
                 "status": "completed",
                 "review_sha256": sha256_file(review / "result.json"),
+                "frozen_design_sha256": sha256_file(root / "frozen_design.json"),
                 "seeds": list(seeds),
                 "omitted_seed": omitted,
                 "readouts": readouts,
