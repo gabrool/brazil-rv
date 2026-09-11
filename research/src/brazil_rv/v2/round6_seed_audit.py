@@ -286,6 +286,7 @@ def finish(root: Path, review: Path, output: Path) -> str:
             {
                 "status": "completed",
                 "review_sha256": sha256_file(review / "result.json"),
+                "frozen_design_sha256": sha256_file(root / "frozen_design.json"),
                 "omission_result_sha256": {
                     str(s): sha256_file(output / f"omit_{s}" / "result.json")
                     for s in ALLOWED_SEEDS

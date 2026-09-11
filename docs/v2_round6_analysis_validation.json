@@ -1,0 +1,80 @@
+{
+  "status": "passed",
+  "analysis_commit": "138321e",
+  "training_commit": "6e9a411",
+  "checks": {
+    "F1": {
+      "primary_ic_exact": true,
+      "headline_economics_exact": true
+    },
+    "F2": {
+      "primary_ic_exact": true,
+      "headline_economics_exact": true
+    },
+    "F3": {
+      "primary_ic_exact": true,
+      "headline_economics_exact": true
+    },
+    "F4": {
+      "primary_ic_exact": true,
+      "headline_economics_exact": true
+    },
+    "F5": {
+      "primary_ic_exact": true,
+      "headline_economics_exact": true
+    },
+    "F6": {
+      "primary_ic_exact": true,
+      "headline_economics_exact": true
+    },
+    "F7": {
+      "primary_ic_exact": true,
+      "headline_economics_exact": true
+    },
+    "F8": {
+      "primary_ic_exact": true,
+      "headline_economics_exact": true
+    },
+    "F9": {
+      "primary_ic_exact": true,
+      "headline_economics_exact": true
+    },
+    "F10": {
+      "primary_ic_exact": true,
+      "headline_economics_exact": true
+    },
+    "F11": {
+      "primary_ic_exact": true,
+      "headline_economics_exact": true
+    },
+    "F12": {
+      "primary_ic_exact": true,
+      "headline_economics_exact": true
+    },
+    "F13": {
+      "primary_ic_exact": true,
+      "headline_economics_exact": true
+    },
+    "F14": {
+      "primary_ic_exact": true,
+      "headline_economics_exact": true
+    }
+  },
+  "parent_result_sha256": "6e0999dbe9db5ae404c848d81673481cb1748a5885f6c470caefd6bf6f393273",
+  "cost_summary_sha256": "f381fc7cee608311ed6c4b12685c49313007d1b4c60f6580fcfbec0d785fb892",
+  "seed_audit_integration": {
+    "scope": "S0 F14 only; control harness bounded both fold roster and informative support; first incomplete-support harness preserved separately",
+    "seconds": 14.3124436000071,
+    "result_sha256": "95d25daa29676fbc56fc03b3f63987105a4bf46f6deb99f8754d1e845ac3a2fd"
+  },
+  "attribution_integration": {
+    "scope": "S0 and magnitudes F1 only; non-promotion integration control",
+    "seconds": 34.018100499990396,
+    "aggregate_result_sha256": "2019249e661c2f99b801e3be81b4766ad61fc85e58900508277e832daad0b5d9",
+    "attribution_result_sha256": "6ee9771e71e546b67bcf6a141710e3759341bb4af7b2fbf99a5bd41939064790"
+  },
+  "partial_recovery_inventory_sha256": "a22ced379a1747c97317f50afe64dd75925a5bcc51bc0d42e7900d2e80896fd8",
+  "new_candidate_result_used_for_selection": false,
+  "forward_capture": false,
+  "heldout_access": false
+}

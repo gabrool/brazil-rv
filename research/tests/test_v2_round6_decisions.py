@@ -1,9 +1,12 @@
 from copy import deepcopy
 import json
+from types import SimpleNamespace
 
 from brazil_rv.v2.round4_seed_audit import isolated_occupancy_failure
 from brazil_rv.v2.round6_decisions import IC, NET, promotion_trace, seed_stability
 from brazil_rv.v2 import round6_decisions as decisions
+from brazil_rv.v2 import round6_seed_audit as seed_audit
+from brazil_rv.v2.artifacts import sha256_file
 
 
 def interval(point, low=None, high=None):
@@ -120,3 +123,48 @@ def test_era_readout_preserves_calendar_missingness_and_fold_boundaries(
     assert row["possible_observations"] == 20
     assert row["finite_observations"] == 5
     assert row["fold_boundary_preserved"]
+
+
+def test_finished_seed_audit_binds_the_design_consumed_by_confirmation(
+    tmp_path, monkeypatch
+):
+    root, review, output = (tmp_path / p for p in ("root", "review", "audit"))
+    root.mkdir()
+    review.mkdir()
+    (root / "frozen_design.json").write_text('{"input_coverage": {"folds": {}}}')
+    digest = sha256_file(root / "frozen_design.json")
+    rows = {"S0": {IC: interval(0.02), NET: interval(4)}}
+    full = {
+        "frozen_design_sha256": digest,
+        "readouts": rows,
+        "registered_C6_roster": {"c6_families": []},
+        "paired": {},
+    }
+    (review / "result.json").write_text(json.dumps(full))
+    for seed in (11, 29, 47):
+        dest = output / f"omit_{seed}"
+        dest.mkdir(parents=True)
+        (dest / "result.json").write_text(
+            json.dumps(
+                {
+                    "status": "completed",
+                    "review_sha256": sha256_file(review / "result.json"),
+                    "seeds": [s for s in (11, 29, 47) if s != seed],
+                    "readouts": rows,
+                    "paired": {},
+                    "rejected_books": {},
+                    "C6_roster_sensitivity": {},
+                }
+            )
+        )
+    monkeypatch.setattr(seed_audit, "evaluation_design", lambda d: d)
+    monkeypatch.setattr(
+        seed_audit.rr,
+        "_open_ledger_replay",
+        lambda d: SimpleNamespace(store=SimpleNamespace(close=lambda: None)),
+    )
+    seed_audit.finish(root, review, output)
+    result = json.loads((output / "seed_audit_result.json").read_text())
+    assert result["frozen_design_sha256"] == digest
+    assert result["decision"]["research_designation"] == "S0"
+    assert result["decision_traces"]["full"]["confirmation_arms"] == []
