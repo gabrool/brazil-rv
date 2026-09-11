@@ -26,10 +26,12 @@ class _Sheet:
 
 
 class _Workbook:
-    def __init__(self, frame: pl.DataFrame) -> None:
+    def __init__(self, frame: pl.DataFrame, ibrx_sheet: str = "IBXX") -> None:
         self._frame = frame
+        self.sheet_names = ["IBOV", ibrx_sheet, "SMLL"]
 
     def load_sheet(self, _name: str, *, header_row: None) -> _Sheet:
+        assert _name in self.sheet_names
         return _Sheet(self._frame)
 
 
@@ -43,8 +45,10 @@ def test_http_timestamp_activates_strictly_after_release() -> None:
     ) == (date(2023, 8, 2), 0)
 
 
+@pytest.mark.parametrize("ibrx_sheet", ["IBXX", "IBRX"])
 def test_composition_parser_does_not_multiply_numeric_quantities(
     monkeypatch: pytest.MonkeyPatch,
+    ibrx_sheet: str,
 ) -> None:
     frame = pl.DataFrame(
         {
@@ -59,7 +63,7 @@ def test_composition_parser_does_not_multiply_numeric_quantities(
     monkeypatch.setattr(
         module.fastexcel,
         "read_excel",
-        lambda _source: _Workbook(frame),
+        lambda _source: _Workbook(frame, ibrx_sheet),
     )
     portfolios = parse_composition(Path("ignored.xlsx"))
     assert {item.index for item in portfolios} == set(INDEXES)

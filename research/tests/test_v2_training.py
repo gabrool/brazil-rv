@@ -278,12 +278,12 @@ def test_time_decay_sampler_is_epoch_deterministic() -> None:
     assert list(left) == list(right)
 
 
-def test_stage_j_requires_the_frozen_time_decay_and_other_stages_reject_it(
+def test_stage_j_requires_decay_p_rejects_it_and_f_accepts_the_registered_option(
     tmp_path,
 ) -> None:
     base = ModelConfig(slow_feature_count=32, compile_forward=False)
     with pytest.raises(
-        ValueError, match="stage J requires time_decay_half_life_sessions=756.0"
+        ValueError, match="stage J requires a 756-session decay half-life"
     ):
         train_stage(
             stage="J",
@@ -296,24 +296,26 @@ def test_stage_j_requires_the_frozen_time_decay_and_other_stages_reject_it(
             selection_parity=None,
             maximum_epochs=1,
         )
-    with pytest.raises(
-        ValueError, match="stage F requires time_decay_half_life_sessions=None"
+    for stage, error in (
+        ("P", "stage P uses uniform"),
+        ("F", "authorized access ledgers"),
     ):
-        train_stage(
-            stage="F",
-            seed=11,
-            fold="F1",
-            train_loader=[],
-            selection_loader=[],
-            output_dir=tmp_path / "f_with_decay",
-            model_config=ModelConfig(
-                slow_feature_count=32,
-                compile_forward=False,
-                time_decay_half_life_sessions=756.0,
-            ),
-            selection_parity=None,
-            maximum_epochs=1,
-        )
+        with pytest.raises(ValueError, match=error):
+            train_stage(
+                stage=stage,
+                seed=11,
+                fold="F1",
+                train_loader=[],
+                selection_loader=[],
+                output_dir=tmp_path / f"{stage}_with_decay",
+                model_config=ModelConfig(
+                    slow_feature_count=32,
+                    compile_forward=False,
+                    time_decay_half_life_sessions=756.0,
+                ),
+                selection_parity=None,
+                maximum_epochs=1,
+            )
 
 
 def test_date_pair_sampler_never_crosses_a_window_gap() -> None:

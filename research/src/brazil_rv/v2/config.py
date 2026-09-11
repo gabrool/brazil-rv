@@ -44,6 +44,7 @@ class ModelConfig:
     common_state_feature_count: int = 0
     sidecar_feature_counts: tuple[tuple[str, int], ...] = ()
     slow_lookback: int = DEFAULT_LOOKBACK
+    slow_encoder_kind: Literal["gru", "mlp"] = "gru"
     gru_layers: int = 1
     hidden_width: int = 64
     fusion_width: int = 128
@@ -109,6 +110,8 @@ class ModelConfig:
             raise ValueError("slow_lookback must be 20, 60, or 120 sessions")
         if self.gru_layers not in (1, 2):
             raise ValueError("gru_layers must be one or two")
+        if self.slow_encoder_kind not in ("gru", "mlp"):
+            raise ValueError("slow encoder must be gru or mlp")
         if (
             min(
                 self.hidden_width,

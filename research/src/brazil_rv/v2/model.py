@@ -253,13 +253,23 @@ class DailyMultiHorizonModel(nn.Module):
             4 * config.slow_feature_count, config.hidden_width
         )
         self.slow_input_norm = nn.LayerNorm(config.hidden_width)
-        self.slow_encoder = nn.GRU(
-            config.hidden_width,
-            config.hidden_width,
-            num_layers=config.gru_layers,
-            batch_first=True,
-            dropout=config.dropout if config.gru_layers == 2 else 0.0,
-        )
+        if config.slow_encoder_kind == "mlp":
+            self.slow_encoder = nn.Sequential(
+                *(
+                    VectorSwiGLUResidualBlock(
+                        config.hidden_width, config.trunk_swiglu_hidden, config.dropout
+                    )
+                    for _ in range(2)
+                )
+            )
+        else:
+            self.slow_encoder = nn.GRU(
+                config.hidden_width,
+                config.hidden_width,
+                num_layers=config.gru_layers,
+                batch_first=True,
+                dropout=config.dropout if config.gru_layers == 2 else 0.0,
+            )
         if config.current_feature_count:
             self.current_input_projection = nn.Linear(
                 4 * config.current_feature_count, config.hidden_width
@@ -353,6 +363,13 @@ class DailyMultiHorizonModel(nn.Module):
             torch.all(~valid[..., :-1] | valid[..., 1:]),
             "slow history must be a left-padded calendar suffix",
         )
+        if self.config.slow_encoder_kind == "mlp":
+            # E8 sees only the final permitted slow row (t-1), including that
+            # row's masks and ages. Never substitute an older observed row.
+            slow_features = slow_features[..., -1:, :]
+            feature_valid = feature_valid[..., -1:, :]
+            slow_feature_age_sessions = slow_feature_age_sessions[..., -1:, :]
+            valid = valid[..., -1:]
         clean = torch.where(
             feature_valid, slow_features, torch.zeros_like(slow_features)
         )
@@ -375,6 +392,9 @@ class DailyMultiHorizonModel(nn.Module):
         projected = torch.where(
             valid[..., None], projected, torch.zeros_like(projected)
         )
+        if self.config.slow_encoder_kind == "mlp":
+            state = self.slow_encoder(projected[..., 0, :])
+            return torch.where(valid[..., -1, None], state, torch.zeros_like(state))
         flat = projected.reshape(batch_size * name_count, lookback, -1)
         lengths = valid.reshape(batch_size * name_count, lookback).sum(dim=1)
         has_history = lengths > 0

@@ -444,6 +444,82 @@ def rank_average_ensemble(
     return result
 
 
+def _verify_additive_parent_transfer(source_contract, fine_contract, store_roots):
+    """Prove an unchanged slow parent across an explicitly requested extension."""
+    source_root, destination_root = store_roots
+    manifests = [
+        json.loads((root / "manifest.json").read_text(encoding="utf-8"))
+        for root in store_roots
+    ]
+    source, destination = manifests
+    inputs = [source_contract["training"], fine_contract["training"]]
+    for root, contract in zip(store_roots, inputs, strict=True):
+        if sha256_file(root / "manifest.json") != contract["store"]["manifest_sha256"]:
+            raise ValueError(
+                "parent transfer store differs from checkpoint/input identity"
+            )
+    protected = {
+        key: value
+        for key, value in source["arrays"].items()
+        if not key.startswith("sidecar_")
+    }
+    if (
+        source["axes"] != destination["axes"]
+        or source["tables"] != destination["tables"]
+        or any(
+            destination["arrays"].get(key) != value for key, value in protected.items()
+        )
+    ):
+        raise ValueError("parent transfer changed a protected array, table or axis")
+    parent_specs = [
+        [
+            spec
+            for spec in manifest["metadata"]["feature_schema"]["specifications"]
+            if spec["family"] == "slow"
+        ]
+        for manifest in manifests
+    ]
+    if parent_specs[0] != parent_specs[1]:
+        raise ValueError("parent transfer changed slow feature definitions")
+    if inputs[0]["features"]["enabled_sidecar_groups"]:
+        raise ValueError(
+            "additive transfer requires the registered sidecar-free parent"
+        )
+    identities = []
+    for contract in inputs:
+        identity = _input_static_identity(contract)
+        features = dict(identity["features"])
+        # The sealed S0 predates the residual-sidecar encoding. Its recorded
+        # concatenated name list contains slow fields only, checked above.
+        if "ordered_slow_and_sidecar_names" in features:
+            features["ordered_slow_names"] = features.pop(
+                "ordered_slow_and_sidecar_names"
+            )
+        for name in (
+            "sidecar_encoding",
+            "enabled_sidecar_groups",
+            "ordered_sidecar_names",
+            "magnitude_clip",
+        ):
+            features.pop(name, None)
+        identity["features"] = features
+        identity["store"] = dict(identity["store"])
+        for name in ("manifest_sha256", "feature_schema_sha256"):
+            identity["store"].pop(name)
+        identities.append(identity)
+    if identities[0] != identities[1] or inputs[0]["target"] != inputs[1]["target"]:
+        raise ValueError("additive transfer changed parent input or target semantics")
+    return {
+        "source_store": str(source_root),
+        "destination_store": str(destination_root),
+        "source_manifest_sha256": inputs[0]["store"]["manifest_sha256"],
+        "destination_manifest_sha256": inputs[1]["store"]["manifest_sha256"],
+        "protected_arrays_exact": len(protected),
+        "tables_and_axes_exact": True,
+        "slow_definitions_exact": True,
+    }
+
+
 def load_pretrain_handoff(
     model: DailyMultiHorizonModel,
     checkpoint: Path,
@@ -451,6 +527,7 @@ def load_pretrain_handoff(
     expected_sha256: str | None = None,
     expected_seed: int | None = None,
     fine_tune_input_contract: Mapping[str, object] | None = None,
+    parent_store_roots: tuple[Path, Path] | None = None,
 ) -> frozenset[str]:
     """Load stage-P state while retaining the stage-F fast initialization."""
 
@@ -476,7 +553,27 @@ def load_pretrain_handoff(
     contract = _verified_checkpoint_input_contract(payload)
     fine_config = model_config_contract(model.config)
     pretrain_config = model_config_contract(stage_p_model_config(model.config))
-    if contract.get("model_config") != pretrain_config:
+    source_config = contract.get("model_config")
+    reuse_audit = None
+    if parent_store_roots is not None:
+        if fine_tune_input_contract is None:
+            raise ValueError(
+                "additive transfer requires the actual fine-tune input contract"
+            )
+        normalized_source = ModelConfig(**source_config)
+        if (
+            normalized_source.current_feature_count
+            or normalized_source.sidecar_feature_counts
+        ):
+            raise ValueError("additive transfer requires the S0 slow-only parent")
+        source_config = model_config_contract(normalized_source)
+        pretrain_config = model_config_contract(
+            replace(stage_p_model_config(model.config), sidecar_feature_counts=())
+        )
+        reuse_audit = _verify_additive_parent_transfer(
+            contract, fine_tune_input_contract, parent_store_roots
+        )
+    if source_config != pretrain_config:
         raise ValueError("stage-P model contract differs from stage F")
     if fine_tune_input_contract is not None:
         if fine_tune_input_contract.get("model_config") != fine_config:
@@ -501,7 +598,7 @@ def load_pretrain_handoff(
                     for name, value in features.items()
                     if name != "magnitude_clip"
                 }
-        if identities[0] != identities[1]:
+        if parent_store_roots is None and identities[0] != identities[1]:
             raise ValueError("stage-P and stage-F store/feature identities differ")
     state = payload.get("model_state_dict")
     if not isinstance(state, Mapping):
@@ -515,9 +612,20 @@ def load_pretrain_handoff(
     transferred: dict[str, torch.Tensor] = {}
     initialized: set[str] = set()
     parameter_names = dict(model.named_parameters())
+    missing_projection_keys = []
     for name, expected in current.items():
         if name.startswith("fast_encoder."):
             transferred[name] = expected
+            continue
+        if (
+            parent_store_roots is not None
+            and name.startswith("sidecar_projections.")
+            and name not in source
+        ):
+            if torch.count_nonzero(expected):
+                raise ValueError("new sidecar projection is not zero initialized")
+            transferred[name] = expected
+            missing_projection_keys.append(name)
             continue
         if name not in source or source[name].shape != expected.shape:
             raise ValueError(f"stage-P checkpoint is incompatible at {name}")
@@ -528,6 +636,11 @@ def load_pretrain_handoff(
     names = frozenset(initialized)
     model.pretrained_parameter_names |= names
     model.pretrain_checkpoint_sha256 = actual_sha256
+    model.pretrain_transfer_audit = {
+        "parent_extension": reuse_audit,
+        "missing_projection_keys_initialized_zero": missing_projection_keys,
+        "transferred_parameter_count": len(names),
+    }
     return names
 
 
@@ -1297,6 +1410,7 @@ def stage_p_model_config(config: ModelConfig) -> ModelConfig:
         lambda_persistence=0.0,
         selection_horizons=TRADED_PRIMARY_HORIZONS,
         disable_fast_stream=config.current_feature_count == 0,
+        time_decay_half_life_sessions=None,
     )
 
 
@@ -1725,9 +1839,11 @@ def train_stage(
     model_config: ModelConfig,
     pretrain_checkpoint: Path | None = None,
     expected_pretrain_sha256: str | None = None,
+    parent_store_roots: tuple[Path, Path] | None = None,
     maximum_epochs: int = MAX_EPOCHS,
     patience: int = EARLY_STOP_PATIENCE,
     learning_rate: float = ADAMW_LR,
+    pretrained_lr_multiplier: float = 0.3,
     sam_rho: float = SAM_RHO,
     device: torch.device | None = None,
     selection_parity: int | None = None,
@@ -1757,11 +1873,10 @@ def train_stage(
         raise ValueError(
             "training in contaminated legacy mode requires its declared v1 checkpoint"
         )
-    expected_decay = 756.0 if stage == "J" else None
-    if model_config.time_decay_half_life_sessions != expected_decay:
-        raise ValueError(
-            f"stage {stage} requires time_decay_half_life_sessions={expected_decay}"
-        )
+    if stage == "P" and model_config.time_decay_half_life_sessions is not None:
+        raise ValueError("stage P uses uniform date-pair sampling")
+    if stage == "J" and model_config.time_decay_half_life_sessions != 756.0:
+        raise ValueError("stage J requires a 756-session decay half-life")
     access_ledgers = {
         "training": _loader_access_payload(train_loader),
         "selection": _loader_access_payload(selection_loader),
@@ -1836,8 +1951,9 @@ def train_stage(
             model,
             pretrain_checkpoint,
             expected_sha256=expected_pretrain_sha256,
-            expected_seed=None,
+            expected_seed=seed,
             fine_tune_input_contract=checkpoint_input_contract,
+            parent_store_roots=parent_store_roots,
         )
         pretrain_payload = torch.load(
             pretrain_checkpoint, map_location="cpu", weights_only=True
@@ -1856,6 +1972,7 @@ def train_stage(
             "checkpoint_sha256": model.pretrain_checkpoint_sha256,
             "input_contract_sha256": pretrain_contract["sha256"],
             "transfer_chronology_clean": pretrain_transfer_clean,
+            "transfer_audit": model.pretrain_transfer_audit,
         }
     owned_names = {
         "raw_patience.pt",
@@ -1877,6 +1994,7 @@ def train_stage(
     optimizer = build_optimizer(
         model,
         learning_rate=learning_rate,
+        pretrained_lr_multiplier=pretrained_lr_multiplier,
     )
     try:
         steps_per_epoch = len(train_loader)  # type: ignore[arg-type]
@@ -2145,7 +2263,7 @@ def train_stage(
             "optimizer": {
                 "name": "sam_adamw",
                 "learning_rate": learning_rate,
-                "pretrained_lr_multiplier": 0.3,
+                "pretrained_lr_multiplier": pretrained_lr_multiplier,
                 "rho": sam_rho,
                 "weight_decay": ADAMW_WEIGHT_DECAY,
                 "pretrained_parameter_count": len(model.pretrained_parameter_names),
@@ -2265,6 +2383,11 @@ def _train_parser() -> argparse.ArgumentParser:
     parser.add_argument("--sidecar", action="append", default=[])
     parser.add_argument("--disable-fast-stream", action="store_true")
     parser.add_argument("--slow-only", action="store_true")
+    parser.add_argument("--slow-encoder-kind", choices=("gru", "mlp"), default="gru")
+    parser.add_argument(
+        "--pretrained-lr-multiplier", type=float, choices=(0.3, 1.0), default=0.3
+    )
+    parser.add_argument("--time-decay-half-life", type=float, choices=(756.0,))
     parser.add_argument("--common-state", action="store_true")
     parser.add_argument(
         "--horizon-loss-weights",
@@ -2294,6 +2417,7 @@ def _train_parser() -> argparse.ArgumentParser:
     parser.add_argument("--allow-contaminated-v1-initialization", action="store_true")
     parser.add_argument("--pretrain-checkpoint", type=Path)
     parser.add_argument("--pretrain-sha256")
+    parser.add_argument("--pretrain-parent-store", type=Path)
     parser.add_argument("--device", choices=("auto", "cpu", "cuda"), default="auto")
     return parser
 
@@ -2338,7 +2462,9 @@ def main(argv: Sequence[str] | None = None) -> int:
         purpose="selection",
         target_window_indices=selection_indices,
     )
-    decay = 756.0 if stage == "J" else None
+    if stage == "P" and arguments.time_decay_half_life is not None:
+        raise ValueError("stage P uses uniform date-pair sampling")
+    decay = 756.0 if stage == "J" else arguments.time_decay_half_life
     sampler = DatePairBatchSampler(
         train_dataset.date_indices,
         pairs_per_batch=arguments.pairs_per_batch,
@@ -2375,6 +2501,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         else _cli_current_feature_count(store_root),
         common_state_feature_count=3 if arguments.common_state else 0,
         slow_lookback=arguments.lookback,
+        slow_encoder_kind=arguments.slow_encoder_kind,
         disable_fast_stream=arguments.disable_fast_stream or arguments.slow_only,
         fast_encoder_mode=(
             "legacy_v1_contaminated" if fast_checkpoint is not None else "native"
@@ -2407,8 +2534,12 @@ def main(argv: Sequence[str] | None = None) -> int:
         model_config=model_config,
         pretrain_checkpoint=arguments.pretrain_checkpoint,
         expected_pretrain_sha256=arguments.pretrain_sha256,
+        parent_store_roots=(arguments.pretrain_parent_store, store_root)
+        if arguments.pretrain_parent_store is not None
+        else None,
         maximum_epochs=arguments.maximum_epochs,
         patience=arguments.patience,
+        pretrained_lr_multiplier=arguments.pretrained_lr_multiplier,
         device=device,
         microbatch_pairs=arguments.microbatch_pairs,
         record_branch_diagnostics=arguments.record_branch_diagnostics,

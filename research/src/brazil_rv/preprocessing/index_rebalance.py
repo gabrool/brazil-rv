@@ -261,7 +261,10 @@ def _composition_workbook(path: Path) -> bytes:
                 continue
             workbook = archive.read(name)
             reader = fastexcel.read_excel(workbook)
-            if set(INDEXES).issubset(reader.sheet_names):
+            sheets = set(reader.sheet_names)
+            if "IBRX" in sheets:
+                sheets.add("IBXX")  # Historical B3 name for the IBrX-100 sheet.
+            if set(INDEXES).issubset(sheets):
                 candidates.append(workbook)
     if len(candidates) != 1:
         raise ValueError(
@@ -274,7 +277,10 @@ def parse_composition(path: Path) -> list[Portfolio]:
     workbook = fastexcel.read_excel(_composition_workbook(path))
     portfolios: list[Portfolio] = []
     for index in INDEXES:
-        frame = workbook.load_sheet(index, header_row=None).to_polars()
+        sheet = (
+            "IBRX" if index == "IBXX" and "IBXX" not in workbook.sheet_names else index
+        )
+        frame = workbook.load_sheet(sheet, header_row=None).to_polars()
         if frame.width < 5:
             raise ValueError(f"Malformed {index} sheet in {path}")
         columns = frame.columns
