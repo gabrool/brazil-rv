@@ -142,11 +142,16 @@ def normalize_events(events: list[dict]) -> tuple[pl.DataFrame, list[dict]]:
                 raise ValueError(
                     "identity announcement does not precede the source day"
                 )
-        bdi_path = _verify(event["bdi"])
-        text_path = bdi_path.with_suffix(".pages.json")
-        extracted = json.loads(text_path.read_text("utf8"))
-        pages = [item["text"] if isinstance(item, dict) else item for item in extracted]
-        tables, opening = parse_bdi_tables(pages)
+        tables, opening, text_digest = {}, {}, None
+        if event.get("bdi") is not None:
+            bdi_path = _verify(event["bdi"])
+            text_path = bdi_path.with_suffix(".pages.json")
+            extracted = json.loads(text_path.read_text("utf8"))
+            pages = [
+                item["text"] if isinstance(item, dict) else item for item in extracted
+            ]
+            tables, opening = parse_bdi_tables(pages)
+            text_digest = sha256_file(text_path)
         phase = "effective" if event["stage"] == "effective" else "preview"
         differences = {}
         for index, portfolio in portfolios.items():
@@ -191,7 +196,7 @@ def normalize_events(events: list[dict]) -> tuple[pl.DataFrame, list[dict]]:
                 "composition_source": source,
                 "bdi_weight_differences": differences,
                 "bdi_opening_dates": opening,
-                "bdi_text_sha256": sha256_file(text_path),
+                "bdi_text_sha256": text_digest,
                 "available_at": available.isoformat(),
                 "availability_evidence": "dated_bdi_exact_weights_disclosed_for_open"
                 if at_open
@@ -269,7 +274,15 @@ def pressure_panel(
             for value, record in effective.items()
             if value < effective_day and value <= day and record[0] <= available
         ]
-        prior = effective[max(previous_days)] if previous_days else None
+        prior_day = max(previous_days) if previous_days else None
+        # A recovered preview must use the immediately preceding Jan/May/Sep
+        # composition. A missing whole cycle cannot make an older workbook
+        # its baseline. All regular B3 four-month cycles fit within 135 days.
+        prior = (
+            effective[prior_day]
+            if prior_day is not None and (day - prior_day).days <= 135
+            else None
+        )
         known = prior is not None and not unmapped and not prior[2]
         delta = {}
         if known:

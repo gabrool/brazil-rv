@@ -143,6 +143,64 @@ def test_missing_prior_snapshot_or_identity_is_not_zero_information():
     assert _panel(_snapshots(), _cash().filter(pl.col("ticker") != "OLD3")).is_empty()
 
 
+def test_missing_effective_cycle_does_not_reuse_an_older_composition():
+    source = _snapshots().with_columns(
+        pl.when(pl.col("stage") == "effective")
+        .then(pl.lit(date(2023, 9, 4)))
+        .otherwise(pl.col("effective_date"))
+        .alias("effective_date")
+    )
+    assert _panel(source).is_empty()
+
+
+def test_official_dated_workbook_without_bdi_uses_next_decision(tmp_path, monkeypatch):
+    from brazil_rv.preprocessing.index_rebalance import Portfolio
+    from brazil_rv.v2 import round5_index as module
+    from brazil_rv.v2.artifacts import sha256_file
+
+    page = tmp_path / "page.html"
+    page.write_text(
+        '<small>01/04/2024</small><a href="https://b3.test/composition.xlsx">data</a>'
+    )
+    asset = tmp_path / "composition.xlsx"
+    asset.write_bytes(b"fixture")
+    monkeypatch.setattr(
+        module,
+        "parse_composition",
+        lambda _: [
+            Portfolio(index=i, weights={"AAAA3": 1.0}, quantities={"AAAA3": 1.0})
+            for i in ("IBOV", "IBXX", "SMLL")
+        ],
+    )
+    rows, audit = module.normalize_events(
+        [
+            {
+                "disclosure_date": "2024-04-01",
+                "effective_date": "2024-05-06",
+                "stage": "preview_1",
+                "page": {
+                    "path": str(page),
+                    "sha256": sha256_file(page),
+                    "url": "https://b3.test/news",
+                },
+                "assets": [
+                    {
+                        "path": str(asset),
+                        "sha256": sha256_file(asset),
+                        "url": "https://b3.test/composition.xlsx",
+                    }
+                ],
+            }
+        ]
+    )
+    assert rows["available_at"][0] == datetime(2024, 4, 2, 2, 59, 59, tzinfo=UTC)
+    assert audit[0]["bdi_text_sha256"] is None
+    assert (
+        audit[0]["availability_evidence"]
+        == "official_announcement_date_only_end_of_day_bound"
+    )
+
+
 def test_unknown_new_preview_stops_previous_preview_instead_of_hiding_update():
     source = _snapshots().with_columns(
         pl.when(pl.col("stage") == "preview_2")
