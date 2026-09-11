@@ -1,10 +1,12 @@
-# Round 5 data round — dataset accepted; CPU screens running
+# Round 5 data round — complete
 
-The historical dataset, source admissions, BOVA correction and continuous-book
-evaluator are complete. The registered CPU information screens are running.
-Round 5 remains open until their readout and the resulting Round-6 ordering are
-published. No neural fit, paid compute or held-out evaluation has run. Forward
-capture remains stopped; its existing snapshot is quarantined.
+The historical dataset, source admissions, BOVA correction, continuous-book
+evaluator and all registered CPU information screens are complete. Magnitudes,
+oddlot and options have positive paired nominal 95% IC intervals in the tree
+screens; these prioritize neural experiments without establishing an S0 gain.
+This report supplies the Round-6 order and ends Round 5. No neural fit, paid
+compute or held-out evaluation has run. Forward capture remains stopped; its
+existing snapshot is quarantined.
 
 ## Accepted store
 
@@ -175,34 +177,122 @@ the registered convention, and 66.96% of short notional still uses placeholder
 borrow pricing. No unsupported historical rate backfill is presented as observed
 borrow. Peak RSS was 3.438 GiB. [Continuous-book readout](v2_round5_continuous_book.md).
 
-## CPU screens and remaining work
+## Completed CPU information screens
 
-The immutable screen cache is ready and the run is active at
-`D:/quant-data/b3/processed/model_runs/v2_round5_screens_9020bde_20260911T023500Z`.
-It uses fourteen chronological folds and seeds 11/29/47/61/79, one `a_slow`
-parent per fold/seed reused across ten family comparisons. Cells without any
-family fit observations reuse their matched parent explicitly. Two local
-workers use four LightGBM threads each. Cache preparation peaked at 5.732 GiB.
+The run at
+`D:/quant-data/b3/processed/model_runs/v2_round5_screens_9020bde_20260911T023500Z`
+completed at 2026-09-11 04:28:47 UTC, exit code 0 and empty stderr. All 770
+registered cells are accounted for: 680 trained and 90 explicitly reused their
+matched parent because no family observation existed in that fit window.
+Fourteen chronological folds, seeds 11/29/47/61/79 and five horizon models per
+trained cell produced 3,400 saved models, whose individual hashes were verified.
+Two local workers with four LightGBM threads each took 112.68 minutes, including
+the paired summary. Maximum fitted-cell RSS was 4.103 GiB; cache preparation
+peaked at 5.732 GiB. Model size, stopping rules, seeds and chronology were retained.
 
-Each fitted cell includes the five registered horizon models and exact TreeSHAP
-on at most 16 eligible names per evaluation day. Primary IC is the matched
-D3/D5/D10 readout; five-seed rank ensembles and paired folded block-bootstrap
-intervals follow. The original model size, stopping rule, seeds and chronology
-remain unchanged. A null GBDT screen cannot reject a neural family, and screens
-carry zero network-selection weight. No arm is promoted from an unfinished run.
+Primary IC is equal-head D3/D5/D10 neutral-target Spearman for the five-seed rank
+ensemble. Every comparison uses the same supported names, dates and outcomes.
+There are 1,598 finite daily IC observations across 1,738 roster sessions: the
+last ten outcome dates per fold are masked by the registered target-window rule,
+while scores remain available. Intervals use 20-session blocks and 10,000 draws,
+preserving fold boundaries. Input coverage determined informative folds before
+fitting. The `a_slow` parent IC is **0.017440 [0.009502, 0.023782]**.
 
-At 2026-09-11 02:48 UTC, 81 fitted cells were complete. The 70 parent cells
-averaged 15.59 seconds and the first 11 cross-market cells averaged 17.81 seconds,
-including all five horizons and TreeSHAP. There are 680 actual fitted cells;
-90 of the 770 roster cells reuse the parent because the family is unlearnable
-in that fit window. These are runtime observations, not completed scientific
-readouts. The provisional remaining budget is 2–3 hours including summary/report;
-later families may differ. All completed models and cells are resumable.
+| Added family | All-fold IC | All-fold paired delta | Informative-fold paired delta [95% interval] | Informative folds | Folds with positive delta |
+|---|---:|---:|---|---:|---:|
+| magnitudes | 0.020662 | +0.003223 | +0.003223 [+0.001033, +0.005823] | 14 | 11 |
+| oddlot | 0.020542 | +0.003103 | +0.003103 [+0.000858, +0.005128] | 14 | 11 |
+| options | 0.020202 | +0.002762 | +0.002762 [+0.000329, +0.004708] | 14 | 10 |
+| events | 0.019788 | +0.002348 | +0.002348 [-0.001593, +0.005382] | 14 | 9 |
+| fundamentals | 0.014896 | -0.002543 | -0.002543 [-0.009227, +0.003572] | 14 | 6 |
+| lending | 0.019522 | +0.002082 | +0.003224 [-0.000126, +0.005053] | 9 | 6 |
+| cross_market | 0.017343 | -0.000097 | -0.000097 [-0.003897, +0.003331] | 14 | 9 |
+| sector | 0.017138 | -0.000302 | -0.000325 [-0.003431, +0.002157] | 13 | 7 |
+| microstructure | 0.018197 | +0.000757 | +0.000757 [-0.001371, +0.003139] | 14 | 6 |
+| rebalance | 0.016524 | -0.000915 | -0.006333 [-0.014179, +0.000018] | 2 | 0 |
 
-Only completion/summary of these screens and the final Round-6 ordering remain.
-Events/fundamentals, lending, cross-market and options remain research candidates,
-with the registered magnitude and other non-data arms available for Round 6.
-No neural improvement is claimed from data coverage alone.
+The positive intervals for magnitudes, oddlot and options are promising
+**exploratory** evidence. These are ten comparisons with nominal intervals,
+without a multiplicity adjustment. Lending has a similar informative-period
+point estimate, but its interval includes zero. Events are also suggestive;
+fundamentals and cross-market do not demonstrate improvement in this learner.
+Rebalance has only 231 finite dates in F13/F14 and cannot support a broad
+historical conclusion. An informative fold requires some family observations,
+not full coverage of every field or name. The JSON retains exact coverage.
+
+The [full readout](v2_round5_cpu_screen_readout.json) contains every fold, seed,
+daily ensemble IC, both summary populations and field-level attribution. It is
+a byte-identical copy of the immutable completed readout, SHA-256
+`41d31ff88021fb244c0fd216ce1b60a1bcf33c32a2f4a9e1b0d2c6131405a6ef`.
+The [screen acceptance](v2_round5_cpu_screen_acceptance.json) binds the producing
+code, store, design, cell inventory, serialized models, timing and memory.
+These screens have **zero network-selection weight**. They do not measure
+strategy P&L, promote a neural parent or reject a neural family after a null result.
+
+### What the tree model used
+
+Exact TreeSHAP uses at most 16 mask-selected eligible ISINs per evaluation day,
+without outcome-based sampling. The following ranks sum each field's value and
+age contributions, averaging equally across the five heads, seeds and
+informative folds. Age share is relative to the appended family's absolute
+contribution, not the whole prediction or P&L. It includes only the separate
+age channels; an explicitly named event-age feature is still a value channel.
+
+| Family | Leading fields, in attribution order | Separate age-channel share |
+|---|---|---:|
+| magnitudes | `log_traded_value_20`, `economic_beta_60`, `daily_vol_20_raw` | 0.0% |
+| oddlot | `oddlot_volume_share`, `oddlot_volume_share_change_5` | 0.0% |
+| options | `put_call_volume_ratio_5`, `option_to_stock_volume_20`, `observed_series_put_call_oi_log_ratio` | 2.3% |
+| events | `sessions_until_expected_filing`, `dividend_announcement_age`, `sessions_since_material_fact` | 28.7% |
+| fundamentals | `gross_profitability`, `liabilities_to_assets`, `sue` | 24.6% |
+| lending | `loan_balance_to_volume_20`, `loan_balance_change_5`, `loan_balance_change_1` | 5.5% |
+| cross_market | `exposure_vix`, `exposure_rates_br`, `exposure_rates_us` | 3.8% |
+| sector | `sector_momentum_12_1`, `name_minus_sector_return_21`, `name_minus_sector_return_5` | 1.6% |
+| microstructure | `avg_trade_size_20`, `after_hours_volume_share_5` | 3.1% |
+| rebalance | `index_pressure`, `index_event_age` | 10.3% |
+
+Attribution describes fitted usage, not the causal source of incremental IC.
+For example, the options result does not isolate volume from observed-subset OI,
+and fundamentals can receive substantial attribution without improving the
+paired readout. Sparse source eras and age channels remain visible for review.
+No field is removed or selected from these descriptive rankings.
+
+## Round-6 experiment order and end state
+
+The recommended execution order below combines the registered source priorities
+with the three positive screens. It advances promising screens; null screens do
+not remove any family from the research program. Each arm starts from the same
+S0 and adds one family through the tested validity-gated sidecar contract.
+
+1. **Magnitude channels (E6).** Broad history, four fields and the strongest
+   full-period paired screen; test whether retaining scale helps the network.
+2. **Oddlot.** Broad coverage and a positive screen across 11 of 14 folds.
+3. **Options.** Positive screen, while preserving distinct volume and observed-OI
+   masks; the full family is tested before any field attribution ablation.
+4. **Events**, then **fundamentals** as separate arms. Retain the registration's
+   high prior for information absent from prices. The weaker fundamental tree
+   result does not settle how the neural model will use it.
+5. **Backfilled lending.** Retain its prior neural evidence and test the longer
+   balance history; do not describe unavailable early rates as new information.
+6. **Cross-market exposures**, then **sector-relative**, **microstructure** and
+   **rebalance** arms. Preserve all candidates; identify the short rebalance
+   evaluation history explicitly when interpreting its result.
+
+Alongside these single-family arms, retain the registered cheap checks:
+fine-tuning multiplier 1.0 versus 0.3, time decay 756, and the point-in-time MLP
+comparator. Fix their protocol before fitting and use matched seeds and folds.
+Only after the individual neural results should a combination of helpful
+families be registered. The existing close-call confirmation-seed rule remains;
+no extra confirmation run is launched by this report. Attention and the broader
+hyperparameter pass remain Round 7. The continuous evaluator is ready for a
+separately registered portfolio round once meaningful-capital costs are fixed.
+
+The delivered artifact is a processed, model-ready development store with
+source provenance, masks, ages, feature definitions, leakage/identity proofs,
+economic repairs and completed information screens. No further retrieval,
+processing, feature build or CPU screen is pending within Round 5. Unsupported
+fields and source limitations are explicit research constraints, not promises
+of a later capture job. **Stop here; Round 6 has not begun.**
 
 ## Group B and forward capture
 
@@ -210,5 +300,6 @@ No neural improvement is claimed from data coverage alone.
 [Focus](v2_round5_group_b_focus.md) timing tables are complete and supply no
 Round-5 model arrays. The sole pre-stop 36-response snapshot is immutable and
 quarantined. No forward capture process or capture schedule is authorized.
-The five-minute continuation advances this historical CPU task only and will
-pause when the complete report and results have been pushed.
+The historical five-minute continuation ends with publication of this complete
+report. Its automation is to be paused after the final push; daily capture must
+not be restored.

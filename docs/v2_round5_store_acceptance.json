@@ -1,5 +1,5 @@
 {
-  "status": "data_accepted_screens_running",
+  "status": "round5_complete",
   "store": {
     "path": "D:\\quant-data\\b3\\processed\\v2_round5_store_9020bde_20260911T023227Z\\manifest.json",
     "sha256": "44a19df181f4896d12e510d1f49cc815762a057c0a74ca7bad879ea02a86cf7b"
@@ -8827,5 +8827,21 @@
     "Stage": "Registered CPU screens",
     "Root": "D:/quant-data/b3/processed/model_runs/v2_round5_screens_9020bde_20260911T023500Z"
   },
-  "screen_results_complete": false
+  "screen_results_complete": true,
+  "round6_started": false,
+  "screen_acceptance": {
+    "path": "docs/v2_round5_cpu_screen_acceptance.json",
+    "sha256": "54c552e66b12d5dbec4c53578a35a1dd86ae0d0732a973962c885b5a714c5b5b"
+  },
+  "screen_readout": {
+    "path": "D:/quant-data/b3/processed/model_runs/v2_round5_screens_9020bde_20260911T023500Z/readout.json",
+    "sha256": "41d31ff88021fb244c0fd216ce1b60a1bcf33c32a2f4a9e1b0d2c6131405a6ef"
+  },
+  "screen_runtime": {
+    "ExitCode": 0,
+    "FinishedUtc": "2026-09-11T04:28:47.8606773Z",
+    "Root": "D:/quant-data/b3/processed/model_runs/v2_round5_screens_9020bde_20260911T023500Z",
+    "StartedUtc": "2026-09-11T02:36:07.0729760Z",
+    "WallSeconds": 6760.7780661
+  }
 }

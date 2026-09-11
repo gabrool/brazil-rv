@@ -1,6 +1,6 @@
 # Brazil-RV project context
 
-Last verified: 2026-09-10.
+Last verified: 2026-09-11.
 
 ## Purpose and current research state
 
@@ -189,7 +189,12 @@ unavailable masked fields and the two unchanged oddlot fields. Full build took
 46.13 seconds and peaked at 4.034 GiB. S0 slow-input hashes are unchanged, so
 its sealed scores remain valid without a neural refit. Source collection and
 family admissions are complete. Registered 14-fold, five-seed CPU screens are
-running; Round 5 remains open until their final readout and Round-6 ordering.
+complete: 680 fitted and 90 explicit unlearnable-parent reuse cells, 3,400 saved
+horizon models, 112.68 minutes, maximum fitted-cell RSS 4.103 GiB. Magnitudes,
+oddlot and options have positive paired nominal 95% IC intervals; these order
+future neural arms and have zero network-selection weight. Null screens do not
+remove families. Round 5 is complete with the final readout and Round-6 ordering;
+Round 6 has not started and S0 remains the accepted neural parent.
 See `docs/v2_ROUND5_DATA.md` and `docs/v2_round5_store_acceptance.json`.
 
 Its neural input contract changes enabled
