@@ -65,13 +65,27 @@ PBG confirms its existing count and zero treasury. That batch brought the
 total to 95: 88 reconciled and seven unavailable. Kora remains the only recovered
 alternate-route note awaiting disposition.
 
-Ten additional own-filing reviews are now sealed, bringing the total to 105:
+Ten additional own-filing reviews brought the total to 105:
 98 reconciled and seven unavailable. Seven confirm existing quantities. Positivo
 and PBG refine rounded counts; Plano & Plano's own treasury roll-forward establishes
 400,000 repurchased shares, replacing a monetary carrying value that had been
 read as a share quantity. Exact source evidence verifies all ten. Positive class
 support, source selection and valuation availability are unchanged; only three
 quantity magnitudes change. The completed source scan is reused for this batch.
+
+A further 29 reviews are sealed: 25 numerical corrections and four confirmations.
+The current total is **134 dispositions: 127 reconciled and seven unavailable**.
+These include individually verified thousand-fold errors, Desktop's stale
+pre-IPO capital count, AREZZO's omitted 618 treasury shares in both original
+DFP2022 versions, and PBG's non-treasury count incorrectly labelled gross
+capital. Desktop uses its own dated fully paid share roll-forward at published
+thousand-share precision. PBG's gross capital is restored before subtracting
+treasury once. Ourofino's common share-table unit heading is corrected from its
+own capital note; its printed treasury quantity is retained under that same
+unit correction, without claiming an independent treasury-note count. All
+previous dispositions and positive class support remain unchanged. Source
+selection and valuation availability are therefore reused; numerical valuations
+will incorporate the corrections in the final family build.
 
 The actual dated identity comparison exposed an additional join defect:
 explicit `PNA` and `Preferencial Classe A` labels were compared with observed
@@ -82,15 +96,26 @@ The earlier 83650bb identity and its capital-review population are therefore
 pre-correction diagnostics. The corrected 59ba9ab source check is complete:
 22,349 financial documents, 880,858 dated identity rows and 399 registrations,
 with zero missing required account/capital sources, unresolved FCA sources or
-invalid caches. Its selected review queue has 433 outstanding flags after all
-105 dispositions; the actual valuation-use trace is running to prioritize them.
-These are candidate flags, not 433 established data errors.
+invalid caches. Its completed valuation trace now leaves 404 selected candidate
+flags after all 134 dispositions: 185 affecting current valuation inputs and
+219 conditional, currently nonvalued. These are candidate flags, not established
+data errors. Exact copies of the scan's consumed mutable source pointers are
+preserved alongside the original unchanged manifest for subsequent verification.
 The diagnostic identity comparison also exposed an acceptance-helper endpoint
 error: two December 30 receipts first become available beyond the development
 axis. They are absent from historical identity and are excluded from the helper's
 session indexing, without importing any later consumer date. Class comparisons
 now include transitions to or from missing values. The [identity review evidence](v2_round5_fca_identity_review.json)
 records the findings; final source/store acceptance remains open.
+
+The corrected full identity diagnostic passes own-source issuer, receipt,
+effective-date and causal-sector checks. Against the older bridge, it adds
+121,589 and removes 102,404 date/ISIN rows, with no issuer changes among common
+rows. Of 57,790 class-label changes, 55,796 normalize equivalent suffix spellings;
+1,397 Comgas rows resolve a generic preferred class using dated B3 PNA; 597
+follow newly recovered generic-source records. Identity name-days include
+periods without usable prices and are not model coverage. The final family must
+reproduce this identity and pass its transformed-feature availability proofs.
 
 ## Completed economic correction
 

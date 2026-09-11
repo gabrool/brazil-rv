@@ -287,5 +287,118 @@
     ]
   },
   "source_freeze_ready": false,
-  "forward_capture_enabled": false
+  "forward_capture_enabled": false,
+  "post_correction_diagnostic": {
+    "readout": {
+      "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\dated_identity_review_20260911T002931Z\\readout.json",
+      "sha256": "55562906cae7e8a97a29cc1b3f101013af84b7947751bb478a6add2388306b4e"
+    },
+    "scope": "Corrected actual source-only identity diagnostic. Final family must reproduce it and pass transformed-feature availability proofs before admission.",
+    "current_rows": 880858,
+    "prior_rows": 861673,
+    "own_source_identity_passed": true,
+    "known_and_effective_bounds_passed": true,
+    "sector": {
+      "sector_receipt_and_mapping_sources_passed": true,
+      "sector_unambiguous_asof_mapping_passed": true,
+      "direct_code_name_days": 313675,
+      "translated_code_name_days": 564730,
+      "missing_sector_name_days": 2453
+    },
+    "differences": {
+      "added": {
+        "rows": 121589,
+        "isins": 354
+      },
+      "removed": {
+        "rows": 102404,
+        "isins": 406
+      },
+      "issuer_changed": {
+        "rows": 0,
+        "isins": 0
+      },
+      "class_changed": {
+        "rows": 57790,
+        "isins": 51
+      }
+    },
+    "class_transition_groups": [
+      {
+        "class": "PN",
+        "class_old": "PN",
+        "preferred_class": "A",
+        "preferred_class_old": "PNA",
+        "len": 26842
+      },
+      {
+        "class": "PN",
+        "class_old": "PN",
+        "preferred_class": "B",
+        "preferred_class_old": "PNB",
+        "len": 21882
+      },
+      {
+        "class": "PN",
+        "class_old": "PN",
+        "preferred_class": "C",
+        "preferred_class_old": "PNC",
+        "len": 2617
+      },
+      {
+        "class": "PN",
+        "class_old": "PN",
+        "preferred_class": "F",
+        "preferred_class_old": "PNF",
+        "len": 1485
+      },
+      {
+        "class": "PN",
+        "class_old": "PN",
+        "preferred_class": "E",
+        "preferred_class_old": "PNE",
+        "len": 1485
+      },
+      {
+        "class": "PN",
+        "class_old": "PN",
+        "preferred_class": "D",
+        "preferred_class_old": "PND",
+        "len": 1485
+      },
+      {
+        "class": "PN",
+        "class_old": "PN",
+        "preferred_class": "A",
+        "preferred_class_old": "",
+        "len": 1397
+      },
+      {
+        "class": "PN",
+        "class_old": "PN",
+        "preferred_class": "",
+        "preferred_class_old": "PNA",
+        "len": 502
+      },
+      {
+        "class": "PN",
+        "class_old": "PN",
+        "preferred_class": "",
+        "preferred_class_old": "PNU",
+        "len": 95
+      }
+    ],
+    "class_interpretation": "55,796 rows normalize equivalent PNA-PNF spellings to A-F. Another1,397 Comgas rows resolve its generic preferred class using dated B3 PNA. The597 remaining transitions follow newly recovered own FCA records:502 generic PN rows and95 Schulz rows resolved from generic equity plus dated B3 identity; stale prior inferred PNA/PNU labels do not persist. No issuer changes occur among common date/ISIN rows. PlainPN versus explicit FCA subclass disagreements remain excluded, and aggregatePN quantities are not allocated to subclasses.",
+    "reviewed_fca_ids": [
+      "73665",
+      "80019",
+      "82379",
+      "93610",
+      "91186",
+      "90511",
+      "99616",
+      "100697"
+    ],
+    "limitation": "Identity name-days include periods without usable prices and are not model coverage. Additions/removals need not match the older incomplete bridge. Final feature coverage and source availability proofs remain pending."
+  }
 }
