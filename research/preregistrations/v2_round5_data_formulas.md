@@ -87,6 +87,16 @@ original registration and replay bindings remain intact.
   cannot be verified. Retain retrieved raw evidence and distinguish download
   failure, missing original vintage, identity ambiguity and timing ambiguity.
   No guessed extra lag cures these problems.
+- Source quality is assessed at the source's published numerical precision.
+  Ordinary rounding does not require replacement by an exact legal count.
+  A note-extractor non-match is not an admission failure. Refresh diagnostic
+  warnings after accepted corrections instead of requiring individual PDF
+  reconciliations for both sides of every obsolete comparison. This does not
+  resolve independently documented contradictions: those still require own-source
+  evidence or an explicitly justified unavailable result for the affected field.
+  Adjacent-filing ratios remain review signals and never supply values, masks or
+  availability. The registered feature, chronology and five-seed screen contracts
+  remain unchanged.
 
 Exact ordered field descriptions and transforms are in `feature_spec.py` and are
 hashed into the new store. Joined fixtures bind first admissible decisions to the

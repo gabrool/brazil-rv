@@ -3149,5 +3149,20 @@
         }
       }
     ]
+  },
+  "current_review_priority": {
+    "evidence": {
+      "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_review_priority_20260911T010805Z\\readout.json",
+      "sha256": "ead93042ed5a8b19a753699d3f1a4dca16b1dbe3a60dcb51cceb92b9d2177948"
+    },
+    "counts": {
+      "known_own_source_issue": 9,
+      "persistent_larger_side": 41,
+      "original_scale_signal_removed": 52,
+      "comparison_context_only": 71
+    },
+    "original_scale_signal_removed_count": 52,
+    "scope": "Diagnostic review priorities only. No source value, receipt, consumer mask or disposition changes. Ratios cannot choose corrected counts or establish historical availability. A removed warning is not an own-filing reconciliation. Known own-source issues remain open.",
+    "criteria": "The original roughly 1000-fold warning is removed when every original edge is now within a factor of 2 using already approved own-source corrections. A persistent larger side above 250 is review priority, not an error or exclusion rule. Correct values are never inferred from an adjacent filing."
   }
 }

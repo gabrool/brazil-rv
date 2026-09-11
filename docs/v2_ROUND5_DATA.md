@@ -99,6 +99,18 @@ note lacks an independent current capital count. Their evidence and limitations
 are recorded in the capital review JSON. No new quantities or masks are inferred
 for these unresolved cases.
 
+The historical queue count is not a requirement for 173 further PDF reviews.
+Refreshing the original comparisons after the accepted corrections removes the
+scale-warning trigger for 52 records. Nine documented own-source issues and 41
+other persistent larger-side candidates now receive priority; 71 records are
+comparison context. These categories guide review only and do not change source
+values or consumer masks. All eight remaining literal paid-count differences
+fit the source's thousand-share rounding precision, although independent
+treasury or timing contradictions still require resolution. The completion
+criterion is supported historical information and the registered feature proofs,
+not exact-count reconciliation of every parser non-match. Screening folds and
+seeds are unchanged.
+
 The actual dated identity comparison exposed an additional join defect:
 explicit `PNA` and `Preferencial Classe A` labels were compared with observed
 B3 `PNA` by incorrectly prepending another `PN`. Equivalent labels now resolve
