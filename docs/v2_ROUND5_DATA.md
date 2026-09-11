@@ -74,7 +74,7 @@ support, source selection and valuation availability are unchanged; only three
 quantity magnitudes change. The completed source scan is reused for this batch.
 
 A further 29 reviews are sealed: 25 numerical corrections and four confirmations.
-The current total is **134 dispositions: 127 reconciled and seven unavailable**.
+That batch brought the total to 134 dispositions: 127 reconciled and seven unavailable.
 These include individually verified thousand-fold errors, Desktop's stale
 pre-IPO capital count, AREZZO's omitted 618 treasury shares in both original
 DFP2022 versions, and PBG's non-treasury count incorrectly labelled gross
@@ -87,6 +87,18 @@ previous dispositions and positive class support remain unchanged. Source
 selection and valuation availability are therefore reused; numerical valuations
 will incorporate the corrections in the final family build.
 
+Twelve further original filings now have verified quantity corrections, bringing
+the total to **146 dispositions: 139 reconciled and seven unavailable**. BR Malls'
+2017 composition also reported non-treasury shares as gross capital; its own
+holder table restores gross capital before treasury is subtracted once. The
+Localiza 2023 versions are each bound to their own capital and treasury notes.
+The completed source scans remain reusable. Three inspected cases remain open:
+Moura Dubeux's post-reference share consolidation requires a correctly dated
+capital event; Copasa's gross/treasury meaning remains ambiguous; Multiplus's
+note lacks an independent current capital count. Their evidence and limitations
+are recorded in the capital review JSON. No new quantities or masks are inferred
+for these unresolved cases.
+
 The actual dated identity comparison exposed an additional join defect:
 explicit `PNA` and `Preferencial Classe A` labels were compared with observed
 B3 `PNA` by incorrectly prepending another `PN`. Equivalent labels now resolve
@@ -96,8 +108,8 @@ The earlier 83650bb identity and its capital-review population are therefore
 pre-correction diagnostics. The corrected 59ba9ab source check is complete:
 22,349 financial documents, 880,858 dated identity rows and 399 registrations,
 with zero missing required account/capital sources, unresolved FCA sources or
-invalid caches. Its completed valuation trace now leaves 404 selected candidate
-flags after all 134 dispositions: 185 affecting current valuation inputs and
+invalid caches. Its completed valuation trace now leaves 392 selected candidate
+flags after all 146 dispositions: 173 affecting current valuation inputs and
 219 conditional, currently nonvalued. These are candidate flags, not established
 data errors. Exact copies of the scan's consumed mutable source pointers are
 preserved alongside the original unchanged manifest for subsequent verification.
@@ -145,7 +157,7 @@ frozen replay. Original registration bytes are retained.
 
 | Family | Verified finding | Remaining admission work |
 |---|---|---|
-| Events and fundamentals | The initial 4,344 missing account versions are recovered. Both capital queues are complete, including all 6,728 scale-supplement documents and its nine audited exceptions. The 1,352-document note collection and bounded ZIP retry produced 1,299 readable originals; an alternate exact ENET notes route recovered 13 more. All 47 identified currency discrepancies are reconciled. The capital disposition file now has 84 reconciled and seven audited unavailable records. | Finish the 228 currently valued capital-source flags and final joined admission tables. Source retrieval is not admission. Candidate ratios do not determine corrections or masks. Unsupported quantities do not erase usable accounts. |
+| Events and fundamentals | The initial 4,344 missing account versions are recovered. Both capital queues are complete, including all 6,728 scale-supplement documents and its nine audited exceptions. The 1,352-document note collection and bounded ZIP retry produced 1,299 readable originals; an alternate exact ENET notes route recovered 13 more. All 47 identified currency discrepancies are reconciled. The capital disposition file now has 139 reconciled and seven audited unavailable records. | Resolve the remaining 173 valued candidate flags and final joined admission tables. Source retrieval is not admission. Candidate ratios do not determine corrections or masks. Unsupported quantities do not erase usable accounts. |
 | Identity and sectors | Dated FCA plus COTAHIST, including historical legal-name matches before ticker fields improve. The 2,196-document supplement is complete and both failures are recovered: 1,766 original XML and 430 exact HTML metadata sources. The main 6,768-document queue and all seven exceptions are complete (6,761 original successes, five bounded recoveries and two own-package dispositions). Sector translation uses only evidence received by each decision. | Audit actual newly admitted account/capital gaps and capital-source selection; accept the revised dated bridge, then rebuild sector, cross-market exposures and lending utilization. Candidate retrieval is not automatic identity admission. Existing archives remain immutable comparators. |
 | Lending | Sealed seven-field archive adds 160,908 balance rows from 2019-10-02, including the recovered October legacy archive. All 81,324 old balances and 41,353 accepted rates remain exact. True free-float utilization and observed contract-flow surprise are built. | Refresh utilization against the accepted new identity/free float, then admit the final store. The other six fields remain exact. No additional historical rates passed source-vintage admission. |
 | Options | Sealed seven-field archive has 274,580 decision/name rows across 268 ISINs. Opening OI has a different position date from traded volume. Two separately named observed-subset fields preserve useful incomplete coverage. | Final store admission; unverified omission-as-zero is not admitted. |

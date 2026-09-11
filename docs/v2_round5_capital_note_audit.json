@@ -1,12 +1,12 @@
 {
-  "status": "134 own-source dispositions accepted:127 reconciled and7 unavailable. Corrected source/identity checks complete; material quantity review and final family admission remain pending.",
+  "status": "146 own-source dispositions accepted: 139 reconciled and 7 unavailable. Material source review and final family admission remain pending.",
   "capital_dispositions": {
     "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_source_dispositions.json",
-    "sha256": "2ae8d477bd8cfe92745b7f437480761c0e3e4df82716f66302609807a634c3a2"
+    "sha256": "2bbec726a9bfcbf96c80ce00250f0828bc87f1d0f1b3df2d817ef9a4a3101457"
   },
   "counts": {
     "audited_unavailable": 7,
-    "reconciled": 127
+    "reconciled": 139
   },
   "accepted_batch": {
     "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\accepted_batch_20260910T192900Z\\acceptance.json",
@@ -2691,6 +2691,279 @@
         ],
         "source_freeze_ready": false
       }
+    },
+    {
+      "acceptance": {
+        "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\accepted_material_twelve_20260911T005500Z\\acceptance.json",
+        "sha256": "9f22806d2cdf4c08be0f234f78013f2ad11d729c64448309d3d08a01a7d5e339"
+      },
+      "review": {
+        "scope": "Twelve own-filing quantity reconciliations after visual review. Original reference, receipt, version and positive share classes remain unchanged. Final family admission remains open.",
+        "reconciliations": [
+          {
+            "id": "72104",
+            "reference": "2017-12-31",
+            "version": 1,
+            "paid_in_shares": {
+              "ON": 222278169,
+              "PN": 0
+            },
+            "treasury_shares": {
+              "ON": 0,
+              "PN": 0
+            },
+            "visually_reviewed_pages": [
+              77
+            ],
+            "reason": "Own DFP 2017 current capital note and subscribed/paid holder table both give 222278169 ON. Correct the composition table unit by 1000; preserve its zero treasury. The 237673167 authorized shares and prior capital history are not current quantities.",
+            "result": {
+              "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\documents\\72104\\result.json",
+              "sha256": "592ca4d9a93feba3d4764e764a17626b6aa4bb0fd4b6b5e17316dc710d659952"
+            }
+          },
+          {
+            "id": "72274",
+            "reference": "2017-12-31",
+            "version": 1,
+            "paid_in_shares": {
+              "ON": 872532653,
+              "PN": 0
+            },
+            "treasury_shares": {
+              "ON": 1585404,
+              "PN": 0
+            },
+            "visually_reviewed_pages": [
+              112,
+              113,
+              114,
+              115
+            ],
+            "reason": "Own DFP 2017 capital rollforward and current holder table give 872532653 gross ON. The same table and treasury paragraph give 1585404 held shares. The original composition value 870947249 is already the non-treasury total, so simply rescaling it and subtracting treasury would subtract twice. Correct both the unit and gross/net classification using only this filing.",
+            "result": {
+              "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\documents\\72274\\result.json",
+              "sha256": "c4d2920a1488d1fa62bfff273f7690bdf1019cb5a13b5ece1d4c408d43ac8304"
+            }
+          },
+          {
+            "id": "74380",
+            "reference": "2018-03-31",
+            "version": 1,
+            "paid_in_shares": {
+              "ON": 467591549,
+              "PN": 0
+            },
+            "treasury_shares": {
+              "ON": 308099,
+              "PN": 0
+            },
+            "visually_reviewed_pages": [
+              74,
+              77
+            ],
+            "reason": "Own 31 March 2018 note explicitly gives 467591549 subscribed and fully paid ON and 308099 treasury shares, both after the 27 March consolidation. Correct both composition units by 1000. Prior-year comparative values and authorized options are excluded; this count is the actual current reference, after the disclosed consolidation.",
+            "result": {
+              "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\documents\\74380\\result.json",
+              "sha256": "c79189d1d076469d12cfcb1fdcc84336c15eb37d824c13d7c5567cb1a2026d6c"
+            }
+          },
+          {
+            "id": "98196",
+            "reference": "2020-09-30",
+            "version": 1,
+            "paid_in_shares": {
+              "ON": 70548812,
+              "PN": 0
+            },
+            "treasury_shares": {
+              "ON": 133468,
+              "PN": 0
+            },
+            "visually_reviewed_pages": [
+              64,
+              65
+            ],
+            "reason": "Own 30 September 2020 capital note and dated holder table give 70548812 ON, including 133468 treasury shares. Correct both composition units by 1000. The separate repurchase authorization and earlier gross purchases are not the current holding.",
+            "result": {
+              "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\documents\\98196\\result.json",
+              "sha256": "b37fa5e75f38ce213a70b0b0ba11bc260364b92b44ea0a688d61ef3117285a1d"
+            }
+          },
+          {
+            "id": "107910",
+            "reference": "2021-06-30",
+            "version": 1,
+            "paid_in_shares": {
+              "ON": 147529703,
+              "PN": 0
+            },
+            "treasury_shares": {
+              "ON": 71200,
+              "PN": 0
+            },
+            "visually_reviewed_pages": [
+              72
+            ],
+            "reason": "Own 30 June 2021 capital note and complete share rollforward give 147529703 gross ON, 71200 treasury and 147458503 non-treasury. The paragraph confirms the 71200 current repurchase remains held. Correct both composition units by 1000; already cancelled shares and the new authorization are excluded.",
+            "result": {
+              "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\documents\\107910\\result.json",
+              "sha256": "7be41824d191c3c098a0f163036e2677241e455f589bb4c880f5d9f33d959af8"
+            }
+          },
+          {
+            "id": "112554",
+            "reference": "2021-12-31",
+            "version": 1,
+            "paid_in_shares": {
+              "ON": 586242289,
+              "PN": 0
+            },
+            "treasury_shares": {
+              "ON": 0,
+              "PN": 0
+            },
+            "visually_reviewed_pages": [
+              97
+            ],
+            "reason": "Own DFP 2021 capital note traces the current capital through the conversion, split, IPO and supplementary issuance to 586242289 ON. Correct the composition unit by 1000 and retain its zero treasury. The prior-year preferred classes and earlier 471242289/571242289 totals do not replace the current total.",
+            "result": {
+              "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\documents\\112554\\result.json",
+              "sha256": "4e32118c3fceca67f1517fbfa311ae4d6045e3cf56e4d84222e677a0713586de"
+            }
+          },
+          {
+            "id": "112822",
+            "reference": "2021-12-31",
+            "version": 1,
+            "paid_in_shares": {
+              "ON": 141800000,
+              "PN": 0
+            },
+            "treasury_shares": {
+              "ON": 2022008,
+              "PN": 0
+            },
+            "visually_reviewed_pages": [
+              95
+            ],
+            "reason": "Own DFP 2021 current holder table explicitly labels share quantities in units: 141800000 gross ON including 2022008 treasury. Correct both composition units by 1000. Monetary capital, free float and the authorization are separate.",
+            "result": {
+              "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\documents\\112822\\result.json",
+              "sha256": "f4abd6303e8c10c1bebb29a376218396c1f3584fc9082f24e6e62075017a126b"
+            }
+          },
+          {
+            "id": "122163",
+            "reference": "2022-09-30",
+            "version": 1,
+            "paid_in_shares": {
+              "ON": 87179913,
+              "PN": 0
+            },
+            "treasury_shares": {
+              "ON": 0,
+              "PN": 0
+            },
+            "visually_reviewed_pages": [
+              54,
+              55
+            ],
+            "reason": "Own 30 September 2022 note explicitly labels the fully paid rollforward in thousands of shares: 86992 opening plus 188 issued, ending 87180 thousand. This establishes the unit of the current capital; retain the original composition count precision of 87179913 and its zero treasury after correcting the shared 1000fold heading. The rounded note does not independently establish the unrounded 87179913 count. Inconsistent earlier IPO narrative quantities on the next page are not used.",
+            "result": {
+              "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\documents\\122163\\result.json",
+              "sha256": "685b77af3c884be22cb63f114d2b2db818a6d68d0ffb4cb1bcc17e7483277582"
+            }
+          },
+          {
+            "id": "134629",
+            "reference": "2023-12-31",
+            "version": 1,
+            "paid_in_shares": {
+              "ON": 1068095319,
+              "PN": 0
+            },
+            "treasury_shares": {
+              "ON": 10530456,
+              "PN": 0
+            },
+            "visually_reviewed_pages": [
+              122,
+              123,
+              124
+            ],
+            "reason": "Own DFP 2023 version 1 capital note gives 1068095319 ON. Its current treasury quantity rollforward gives 5597184 - 465042 + 5398314 = 10530456. Correct both composition units by 1000 using this exact version; authorization limits, monetary carrying amounts and version 3 are not its quantity evidence.",
+            "result": {
+              "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\documents\\134629\\result.json",
+              "sha256": "bdde0d0787f0dd96dd7a0d843beb1f937494b15d7e8f2302e22b1d65c9d74970"
+            }
+          },
+          {
+            "id": "134662",
+            "reference": "2023-12-31",
+            "version": 3,
+            "paid_in_shares": {
+              "ON": 1068095319,
+              "PN": 0
+            },
+            "treasury_shares": {
+              "ON": 10530456,
+              "PN": 0
+            },
+            "visually_reviewed_pages": [
+              122,
+              123
+            ],
+            "reason": "Own DFP 2023 version 3 capital note gives 1068095319 ON. Its own current treasury quantity rollforward gives 5597184 - 465042 + 5398314 = 10530456. Correct both composition units by 1000; version 1 is not substituted for this version. Receipt and reference remain those of version 3.",
+            "result": {
+              "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\documents\\134662\\result.json",
+              "sha256": "1877b7d0212eb228ab2f000eb07487941d8d1f70dd57f7003d700b07b04667cc"
+            }
+          },
+          {
+            "id": "102061",
+            "reference": "2020-12-31",
+            "version": 1,
+            "paid_in_shares": {
+              "ON": 207969341,
+              "PN": 0
+            },
+            "treasury_shares": {
+              "ON": 0,
+              "PN": 0
+            },
+            "visually_reviewed_pages": [
+              77
+            ],
+            "reason": "Own DFP 2020 note explicitly states paid-in capital represented by 207969341 ON. Correct the composition unit by 1000 and preserve its reported zero treasury. Prior-year shares and the monetary paid-in balance are separate.",
+            "result": {
+              "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\documents\\102061\\result.json",
+              "sha256": "f8c65863eac90f19cabf7f16b7e5f31e50ec9a91c7233febed2d23e3483797a9"
+            }
+          },
+          {
+            "id": "86632",
+            "reference": "2019-06-30",
+            "version": 2,
+            "paid_in_shares": {
+              "ON": 210140608,
+              "PN": 0
+            },
+            "treasury_shares": {
+              "ON": 0,
+              "PN": 0
+            },
+            "visually_reviewed_pages": [
+              66,
+              67
+            ],
+            "reason": "Own 30 June 2019 version 2 capital note and current 100% holder table give 210140608 ON. Correct the composition unit by 1000 and preserve zero treasury. Authorized capital of 300 million and weighted EPS quantities are excluded; no other filing version supplies the count.",
+            "result": {
+              "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\documents\\86632\\result.json",
+              "sha256": "ee786416e1deeeb3c02d46fcc03b823518b4f4db0172378a888d52366b6ac797"
+            }
+          }
+        ]
+      }
     }
   ],
   "review_priority": {
@@ -2803,12 +3076,12 @@
       "sha256": "2188a341a2698e3225f100960d7285429abe008f7bd07ccdb6221e5fb230aa2f"
     },
     "selection_preservation": {
-      "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\accepted_scale_eight_20260911T005000Z\\selection_preservation.json",
-      "sha256": "12095f9fa4f860a179676d487c48c81c68e8112f8b3d0b280083b8f30e1a579f"
+      "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\accepted_material_twelve_20260911T005500Z\\selection_preservation.json",
+      "sha256": "a1b4eaa8082ad1584d875b5480290490a35719e7c40fd2acce6e312d00f9aa3a"
     },
-    "status": "Corrected59ba9ab source and valuation traces complete; all29 new quantity-only reviews preserve selection and availability. No re-scan required.",
-    "pending_valued": 185,
-    "pending_selected": 404,
+    "status": "Corrected source and valuation traces complete. Twelve further quantity corrections preserve selection and availability; reuse completed scans.",
+    "pending_valued": 173,
+    "pending_selected": 392,
     "source_snapshot_resolution": {
       "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\source_preflight_59ba9ab_20260911T000951Z\\source_snapshot_resolution.json",
       "sha256": "73250426e1ea6eebe602ab72972cc8987d51912a1661878e33c31dbecc681f5f"
@@ -2839,5 +3112,42 @@
     "partial_review": {
       "126843": "Viewed own note pages 24-25: no current total/treasury quantity independent of the composition table. Authorized repurchases, monetary capital, partially unpaid new issuance and EPS weighted average cannot replace those counts. No disposition yet."
     }
+  },
+  "remaining_material_source_cases": {
+    "scope": "Three individually inspected cases remain unadmitted and unchanged. This record does not rescale or mask any source. Resolve the disclosed timing/unit issues before final admission.",
+    "cases": [
+      {
+        "id": "91963",
+        "visually_reviewed_pages": [
+          79,
+          94
+        ],
+        "finding": "Own DFP 2019 note states 401377204 fully paid ON at 31 December 2019, then a 15:1 consolidation on 17 January 2020. Its 26758480 EPS/composition figure is post-consolidation. Current valuation trace still uses this filing on seven March/April 2020 decisions. Correcting only the reference-date count would pair pre-consolidation capital with post-consolidation prices. The disclosed own-filing event must be represented in the causal event barrier, or a properly dated post-event count established; no later version supplies this decision.",
+        "result": {
+          "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\documents\\91963\\result.json",
+          "sha256": "92047a3f3e8f68a24fa804cfb899461bbae8a6150e05f67c2ee3acc34ea9eb67"
+        }
+      },
+      {
+        "id": "114129",
+        "visually_reviewed_pages": [
+          51
+        ],
+        "finding": "Own 2022 Q1 note states 379181430 paid ON, matching the composition numeral, while the composition also gives 1071639 treasury under the common Mil heading. Full note text does not independently repeat that treasury quantity; its EPS denominator excludes treasury and is also 379181 thousand. Gross/net meaning remains unresolved. One decision currently uses this filing; no correction is admitted.",
+        "result": {
+          "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\transport_retry_20260910T200700Z\\documents\\114129\\result.json",
+          "sha256": "39fb9d50ca3645f33982f03584c6cc1c33a3cddd77ab531a028b89870926d55b"
+        }
+      },
+      {
+        "id": "37068",
+        "visually_reviewed_pages": [],
+        "finding": "The local original PDF text has no independent current paid-capital quantity. Its equity note on physical page 37 only gives dividends/JCP; pages 38-39 give options, and page 35 concerns a subsidiary. Those quantities cannot replace the capital composition. One decision currently uses this filing. Pages 36-39 were rendered but not visually reviewed; no correction is admitted.",
+        "result": {
+          "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\capital_unit_audit_20260910T181900Z\\documents\\37068\\result.json",
+          "sha256": "b0f41ef2733cce6a7559a9cd352870b531827daa936c413a064a1ee139fdd818"
+        }
+      }
+    ]
   }
 }
