@@ -152,10 +152,37 @@ pair correctly on the same D3/D5/D10 population.
 
 ## Diagnostics and remaining experiment stages
 
-The archived S0/fundamentals diagnostics compare clean fit/selection/evaluation
-IC, paired raw-versus-EMA uncertainty, fixed-batch head gradients and SAM gaps,
-and actual sidecar Jacobian sensitivity. Original per-epoch weights were not
-saved and cannot be reconstructed. Their full report follows all 84 fits.
+All **84 archived diagnostics are complete**. The [full per-fit report](v2_round7_archived_diagnostics.json)
+binds the saved weights and daily series. Both checkpoints use CPU FP32 and the
+same D3/D5/D10 population. These are means of seed ICs, not rank-ensemble ICs.
+
+| Diagnostic | S0 | Fundamentals |
+| --- | ---: | ---: |
+| Mean clean fit raw IC | 0.04431 | 0.04897 |
+| Mean selection raw IC | 0.03843 | 0.04816 |
+| Evaluation mean-seed raw IC | 0.02552 | 0.02764 |
+| Evaluation mean-seed EMA IC | 0.02717 | 0.02759 |
+| Paired evaluation EMA minus raw | +0.00165 | −0.00005 |
+| Newey–West mean SE of that difference | 0.00075 | 0.00117 |
+| Median selection paired mean SE | 0.00141 | 0.00261 |
+| Mean shared D1/D2 versus D3/D5/D10 gradient cosine | 0.505 | 0.440 |
+| Fits with negative combined gradient cosine | 0 / 42 | 0 / 42 |
+| Median fixed-batch SAM loss gap, rho 0.125 | 0.03637 | 0.03348 |
+
+The clean fit/selection gaps do not show severe fitting of the training set in
+these two saved states, but cannot establish underfitting: selection chose the
+raw checkpoint, and the windows cover different dates. Old per-epoch weights
+are unavailable. Forty-five common-label dates remain in each nominal 55-session
+selection window after the D10 boundary rule. Paired checkpoint uncertainty is
+material relative to the incremental gains under investigation.
+
+EMA helps the archived S0 comparison but not the fundamentals comparison. Its
+checkpoint time and retained initialization weight differ, so this is not a
+causal estimate of averaging alone. The fixed-batch head gradients are positively
+aligned in every fit; that does not establish that shorter-horizon heads help
+out-of-sample. Actual fundamentals sensitivity is retained per fit alongside
+the gradient matrices. These diagnostics inform interpretation and do not alter
+the registered factorial or select a new checkpoint.
 
 The fixed chronological residual-tree control is complete on thirteen folds and
 1,485 scored dates. Its composite IC is **0.03052 for S0**, **0.01413 for the

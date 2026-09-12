@@ -1,29 +1,32 @@
 {
+  "archived_diagnostics": {
+    "path": "docs/v2_round7_archived_diagnostics.json",
+    "sha256": "992b3ae465bd7f08af669dd0152526e8ce9708d6a9db898685a76fabd131815b"
+  },
   "completed": [
     "repaired store and protected-array/target acceptance",
     "all 14 before/after S0 ledgers; original reference exact",
     "native and all-family support audits including oddlot",
     "C1 and R training/scoring/resume implementation",
     "CPU fullgraph and nonlinear family-interaction acceptance",
-    "chronological residual-tree control"
+    "chronological residual-tree control",
+    "all 84 archived diagnostics and published statistical report"
   ],
   "experiment_scores_started": false,
   "gpu_launched": false,
-  "local_processes": {
-    "S0_archived_session": 62582,
-    "delta_pack_session": 39940,
-    "fundamentals_archived_session": 54301
-  },
+  "local_processes": {},
   "pending": [
-    "finish 84 archived diagnostics and publish report",
-    "finish compute/readout freeze and publish GitHub",
-    "GH200 engineering throughput and repaired S0 anchor",
-    "calibration screening confirmation and six-seed decision",
+    "GH200 engineering and complete concurrency measurement",
+    "repaired S0 anchor and its CPU diagnostics",
+    "pretraining and calibration; freeze B before screen scores",
+    "screen confirmation and six-seed decision",
     "economic reports artifact recovery and exact-ID shutdown"
   ],
-  "phase": "cpu_accepted_training_integration",
+  "phase": "cpu_reported_ready_for_gpu",
+  "run_root": "D:/quant-data/b3/processed/model_runs/v2_round7_20260912T231721Z",
   "source_audit_manifest_sha256": "38fb8988213c7361ec9b86a9edba05570b778fdebf197d2d7da6e99271effa12",
   "source_audit_root": "D:\\quant-data\\b3\\interim\\round7_20260912T214606Z",
   "source_coverage": "D:\\quant-data\\b3\\interim\\round7_20260912T214606Z\\family_coverage.json",
-  "source_store_acceptance": "docs/v2_round7_inputs.json"
+  "source_store_acceptance": "docs/v2_round7_inputs.json",
+  "targeted_integration_tests": "17 passed; prior source/model acceptance retained"
 }
