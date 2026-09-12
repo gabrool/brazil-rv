@@ -1,0 +1,567 @@
+{
+  "status": "complete_instance_terminated",
+  "at_utc": "2026-09-12T20:15:49.256892+00:00",
+  "frozen_training_commit": "0bf8130b73fe6b207c6b6f62603bf383b8f82e1f",
+  "frozen_design_sha256": "954b48eb3c8c3ddf730b9af1853c789a3762fb3a06c048cb46483b624a28ca0f",
+  "accepted_store": {
+    "manifest_sha256": "968df3947b68ec68d62638ee53402c908b9ea2e24dfd27291e156e17d31a31c1",
+    "root": "D:\\quant-data\\b3\\processed\\v2_round6_store_b72950b_20260911T145000Z"
+  },
+  "main_F_fits": 714,
+  "fresh_P_fits": 6,
+  "reused_P": "Three sealed parent and three completed MLP architecture-matched pretraining checkpoints; see compute validation.",
+  "complete_arm_recoveries": {
+    "S0": {
+      "directory": "D:\\quant-data\\b3\\interim\\round6_20260911T111805Z\\recovery_S0_20260912T010615Z",
+      "status": "verified",
+      "arm": "S0",
+      "files": 672,
+      "completed_fits": 42,
+      "local_root": "D:\\quant-data\\b3\\processed\\model_runs\\v2_round6_0bf8130_20260911T233404Z",
+      "remote_snapshot": "/lambda/nfs/brazil-rv-east3/quant-data/b3/interim/round6_20260911T111805Z/transfer_6f451f/recovery_S0_20260912T010615Z",
+      "archive_bytes": 54496323,
+      "archive_sha256": "80489c6ccdac53a10509beb41d3688dd44ca4c575800a2ea2a97bece91494008",
+      "inventory_sha256": "6eef9546492b6ea73a7cf3f7b026b05f5bfc8420624de8db3098cef29590db41",
+      "at_utc": "2026-09-11T22:06:39.964321-03:00"
+    },
+    "magnitudes": {
+      "directory": "D:\\quant-data\\b3\\interim\\round6_20260911T111805Z\\recovery_magnitudes_20260912T021357Z",
+      "status": "verified",
+      "arm": "magnitudes",
+      "files": 924,
+      "completed_fits": 42,
+      "local_root": "D:\\quant-data\\b3\\processed\\model_runs\\v2_round6_0bf8130_20260911T233404Z",
+      "remote_snapshot": "/lambda/nfs/brazil-rv-east3/quant-data/b3/interim/round6_20260911T111805Z/transfer_6f451f/recovery_magnitudes_20260912T021357Z",
+      "archive_bytes": 70822357,
+      "archive_sha256": "2e6509503cf128d1955cc33fb256812609cef206bac6c97f9c166087f5c01bfc",
+      "inventory_sha256": "e079dc398791cca24d28ce3e6d56228226e14034e357cfdc72a013f36685e44d",
+      "at_utc": "2026-09-11T23:14:24.546751-03:00"
+    },
+    "oddlot": {
+      "directory": "D:\\quant-data\\b3\\interim\\round6_20260911T111805Z\\recovery_oddlot_20260912T030935Z",
+      "status": "verified",
+      "arm": "oddlot",
+      "files": 924,
+      "completed_fits": 42,
+      "local_root": "D:\\quant-data\\b3\\processed\\model_runs\\v2_round6_0bf8130_20260911T233404Z",
+      "remote_snapshot": "/lambda/nfs/brazil-rv-east3/quant-data/b3/interim/round6_20260911T111805Z/transfer_6f451f/recovery_oddlot_20260912T030935Z",
+      "archive_bytes": 69531104,
+      "archive_sha256": "664cf2b5ac64ac8e9db1434a629488753c8f3cce5d53431783830942a14378ca",
+      "inventory_sha256": "f4393fc59ecfc1a4e96ddb63a4000094d65a31a45d821bd4cdef9f36c0c43d0f",
+      "at_utc": "2026-09-12T03:10:03.829421+00:00"
+    },
+    "options": {
+      "directory": "D:\\quant-data\\b3\\interim\\round6_20260911T111805Z\\recovery_options_20260912T041108Z",
+      "status": "verified",
+      "arm": "options",
+      "files": 924,
+      "completed_fits": 42,
+      "local_root": "D:\\quant-data\\b3\\processed\\model_runs\\v2_round6_0bf8130_20260911T233404Z",
+      "remote_snapshot": "/lambda/nfs/brazil-rv-east3/quant-data/b3/interim/round6_20260911T111805Z/transfer_6f451f/recovery_options_20260912T041108Z",
+      "archive_bytes": 69631131,
+      "archive_sha256": "19dc5c068d493c60e8055c64e04097e80e00af7c36ae7fc94453617cbf57bb7f",
+      "inventory_sha256": "5e3c3ee492b94743f6d7246580d5a438c027611aeea39c6fa7b2d61f67746dec",
+      "at_utc": "2026-09-12T04:11:36.607192+00:00"
+    },
+    "events": {
+      "directory": "D:\\quant-data\\b3\\interim\\round6_20260911T111805Z\\recovery_events_20260912T052908Z",
+      "status": "verified",
+      "arm": "events",
+      "files": 924,
+      "completed_fits": 42,
+      "local_root": "D:\\quant-data\\b3\\processed\\model_runs\\v2_round6_0bf8130_20260911T233404Z",
+      "remote_snapshot": "/lambda/nfs/brazil-rv-east3/quant-data/b3/interim/round6_20260911T111805Z/transfer_6f451f/recovery_events_20260912T052908Z",
+      "archive_bytes": 69010722,
+      "archive_sha256": "7e6a22cedbedcf24dbb909e4df47e8a887e36c6a8c8c4d78ab677ce0aa8111e2",
+      "inventory_sha256": "15bceeac1b004b1f5185d3f0b6e24217afd03cd05e573247bf623f9b029399b7",
+      "at_utc": "2026-09-12T05:29:36.678501+00:00"
+    },
+    "fundamentals": {
+      "directory": "D:\\quant-data\\b3\\interim\\round6_20260911T111805Z\\recovery_fundamentals_20260912T060907Z",
+      "status": "verified",
+      "arm": "fundamentals",
+      "files": 924,
+      "completed_fits": 42,
+      "local_root": "D:\\quant-data\\b3\\processed\\model_runs\\v2_round6_0bf8130_20260911T233404Z",
+      "remote_snapshot": "/lambda/nfs/brazil-rv-east3/quant-data/b3/interim/round6_20260911T111805Z/transfer_6f451f/recovery_fundamentals_20260912T060907Z",
+      "archive_bytes": 70330269,
+      "archive_sha256": "2854f8f286c2f59f5ead8699211d30d96a6bbe32294b2a0f5cd3d9a3ec89483b",
+      "inventory_sha256": "245c2a91fb3dcacaa48c27e42ed2e6f08d849766e14bf5f52ccc07a269c0cdae",
+      "at_utc": "2026-09-12T06:09:35.052682+00:00"
+    },
+    "lending": {
+      "directory": "D:\\quant-data\\b3\\interim\\round6_20260911T111805Z\\recovery_lending_20260912T070510Z",
+      "status": "verified",
+      "arm": "lending",
+      "files": 924,
+      "completed_fits": 42,
+      "local_root": "D:\\quant-data\\b3\\processed\\model_runs\\v2_round6_0bf8130_20260911T233404Z",
+      "remote_snapshot": "/lambda/nfs/brazil-rv-east3/quant-data/b3/interim/round6_20260911T111805Z/transfer_6f451f/recovery_lending_20260912T070510Z",
+      "archive_bytes": 69751479,
+      "archive_sha256": "d126116ea5bc53d1a7f97d5382c3f4c0094203fba66fdb93bbc09d01048b8619",
+      "inventory_sha256": "9fe3bda7a34e2ec352e69276eed73af06ee82e5a866bf1ce70d8c497d7aa3f47",
+      "at_utc": "2026-09-12T07:05:39.560205+00:00"
+    },
+    "finetune_lr_1": {
+      "directory": "D:\\quant-data\\b3\\interim\\round6_20260911T111805Z\\recovery_finetune_lr_1_20260912T075642Z",
+      "status": "verified",
+      "arm": "finetune_lr_1",
+      "files": 672,
+      "completed_fits": 42,
+      "local_root": "D:\\quant-data\\b3\\processed\\model_runs\\v2_round6_0bf8130_20260911T233404Z",
+      "remote_snapshot": "/lambda/nfs/brazil-rv-east3/quant-data/b3/interim/round6_20260911T111805Z/transfer_6f451f/recovery_finetune_lr_1_20260912T075642Z",
+      "archive_bytes": 54309319,
+      "archive_sha256": "49c0030b12c79464182be17742952fbd1e2e78ec215f83217b5c95cb317d3295",
+      "inventory_sha256": "522b0db139bd232ed64b4b7c235195876ee4a5ac21161913cef6f6b28e74733b",
+      "at_utc": "2026-09-12T07:57:05.364149+00:00"
+    },
+    "time_decay_756": {
+      "directory": "D:\\quant-data\\b3\\interim\\round6_20260911T111805Z\\recovery_time_decay_756_20260912T084142Z",
+      "status": "verified",
+      "arm": "time_decay_756",
+      "files": 672,
+      "completed_fits": 42,
+      "local_root": "D:\\quant-data\\b3\\processed\\model_runs\\v2_round6_0bf8130_20260911T233404Z",
+      "remote_snapshot": "/lambda/nfs/brazil-rv-east3/quant-data/b3/interim/round6_20260911T111805Z/transfer_6f451f/recovery_time_decay_756_20260912T084142Z",
+      "archive_bytes": 54413161,
+      "archive_sha256": "5d95f017222de8fe5d2d4cbf348b3dfce65cc0f79b4b76c538b775bedc1ea94b",
+      "inventory_sha256": "4c358cb5ab0de7ab276940ae1f4758438979bb12c0aa39460900119cee896c83",
+      "at_utc": "2026-09-12T08:42:04.163842+00:00"
+    },
+    "mlp": {
+      "directory": "D:\\quant-data\\b3\\interim\\round6_20260911T111805Z\\recovery_mlp_20260912T092644Z",
+      "status": "verified",
+      "arm": "mlp",
+      "files": 672,
+      "completed_fits": 42,
+      "local_root": "D:\\quant-data\\b3\\processed\\model_runs\\v2_round6_0bf8130_20260911T233404Z",
+      "remote_snapshot": "/lambda/nfs/brazil-rv-east3/quant-data/b3/interim/round6_20260911T111805Z/transfer_6f451f/recovery_mlp_20260912T092644Z",
+      "archive_bytes": 53020506,
+      "archive_sha256": "50829ce4df5d3a1719232657e3c161929ae667e54d9acc7f2c4787fb1a7777a1",
+      "inventory_sha256": "15f0e3e4e3369766ce35176f9dd264415c1942c3d7d460305c8836d6c49e7b81",
+      "at_utc": "2026-09-12T09:27:05.898112+00:00"
+    },
+    "cross_market": {
+      "directory": "D:\\quant-data\\b3\\interim\\round6_20260911T111805Z\\recovery_cross_market_20260912T112524Z",
+      "status": "verified",
+      "arm": "cross_market",
+      "files": 924,
+      "completed_fits": 42,
+      "local_root": "D:\\quant-data\\b3\\processed\\model_runs\\v2_round6_0bf8130_20260911T233404Z",
+      "remote_snapshot": "/lambda/nfs/brazil-rv-east3/quant-data/b3/interim/round6_20260911T111805Z/transfer_6f451f/recovery_cross_market_20260912T112524Z",
+      "archive_bytes": 73812470,
+      "archive_sha256": "fe93b13b1d2fc2b3e237d64fc93251d7c401f89dadbb004ca387649b1fefe880",
+      "inventory_sha256": "261ebecb4a6277b884901752b9c402240bdd624433b42fa7e4915efaf0ebc70e",
+      "at_utc": "2026-09-12T11:25:53.480764+00:00"
+    },
+    "sector": {
+      "directory": "D:\\quant-data\\b3\\interim\\round6_20260911T111805Z\\recovery_sector_20260912T121320Z",
+      "status": "verified",
+      "arm": "sector",
+      "files": 924,
+      "completed_fits": 42,
+      "completed_P": 0,
+      "local_root": "D:\\quant-data\\b3\\processed\\model_runs\\v2_round6_0bf8130_20260911T233404Z",
+      "remote_snapshot": "/lambda/nfs/brazil-rv-east3/quant-data/b3/interim/round6_20260911T111805Z/transfer_6f451f/recovery_sector_20260912T121320Z",
+      "archive_bytes": 69573453,
+      "archive_sha256": "dd7922dddc5f00c867c908e2a70769b13ed1a95f17947be87f56b6a8202ba370",
+      "inventory_sha256": "336828d9d0bc4c5e41cc26d7f37f27583ee8e68199b6069eee85d7cf14c061e1",
+      "at_utc": "2026-09-12T12:13:51.421527+00:00"
+    },
+    "microstructure": {
+      "directory": "D:\\quant-data\\b3\\interim\\round6_20260911T111805Z\\recovery_microstructure_20260912T130849Z",
+      "status": "verified",
+      "arm": "microstructure",
+      "files": 924,
+      "completed_fits": 42,
+      "completed_P": 0,
+      "local_root": "D:\\quant-data\\b3\\processed\\model_runs\\v2_round6_0bf8130_20260911T233404Z",
+      "remote_snapshot": "/lambda/nfs/brazil-rv-east3/quant-data/b3/interim/round6_20260911T111805Z/transfer_6f451f/recovery_microstructure_20260912T130849Z",
+      "archive_bytes": 69459656,
+      "archive_sha256": "e3d2e61792206c191a2a3b9876802a2743055ac5f9e6cf62d62caf7ba7be6155",
+      "inventory_sha256": "8d4aed30db377bd357cec8713f922980ff56b7d44521b670505a5e6611dc6e99",
+      "at_utc": "2026-09-12T13:09:18.660387+00:00"
+    },
+    "rebalance": {
+      "directory": "D:\\quant-data\\b3\\interim\\round6_20260911T111805Z\\recovery_rebalance_20260912T141920Z",
+      "status": "verified",
+      "arm": "rebalance",
+      "files": 924,
+      "completed_fits": 42,
+      "completed_P": 0,
+      "local_root": "D:\\quant-data\\b3\\processed\\model_runs\\v2_round6_0bf8130_20260911T233404Z",
+      "remote_snapshot": "/lambda/nfs/brazil-rv-east3/quant-data/b3/interim/round6_20260911T111805Z/transfer_6f451f/recovery_rebalance_20260912T141920Z",
+      "archive_bytes": 69493918,
+      "archive_sha256": "acebb1ebb8cc4dc8983bae4bb0d48ca4e670d49a35c5972917cd7aea38f45f49",
+      "inventory_sha256": "dd22cef0fed31274a3607439f0b2d2d634ee50dd632c5a5e6120cef397da225d",
+      "at_utc": "2026-09-12T14:19:49.801192+00:00"
+    },
+    "best_single_fresh_p": {
+      "directory": "D:\\quant-data\\b3\\interim\\round6_20260911T111805Z\\recovery_best_single_fresh_p_20260912T150918Z",
+      "status": "verified",
+      "arm": "best_single_fresh_p",
+      "files": 948,
+      "completed_fits": 42,
+      "completed_P": 3,
+      "local_root": "D:\\quant-data\\b3\\processed\\model_runs\\v2_round6_0bf8130_20260911T233404Z",
+      "remote_snapshot": "/lambda/nfs/brazil-rv-east3/quant-data/b3/interim/round6_20260911T111805Z/transfer_6f451f/recovery_best_single_fresh_p_20260912T150918Z",
+      "archive_bytes": 73283862,
+      "archive_sha256": "5068cb66701ae5da9e5f8e30b1c3d882296498e76d7e11acb3147362e317b696",
+      "inventory_sha256": "0d88c74a1a5450190c8441bfb3aa96e67000a8a143e2512280729aeeed157259",
+      "at_utc": "2026-09-12T15:09:52.596429+00:00"
+    },
+    "C6": {
+      "directory": "D:\\quant-data\\b3\\interim\\round6_20260911T111805Z\\recovery_C6_20260912T155122Z",
+      "status": "verified",
+      "arm": "C6",
+      "files": 1428,
+      "completed_fits": 42,
+      "completed_P": 0,
+      "local_root": "D:\\quant-data\\b3\\processed\\model_runs\\v2_round6_0bf8130_20260911T233404Z",
+      "remote_snapshot": "/lambda/nfs/brazil-rv-east3/quant-data/b3/interim/round6_20260911T111805Z/transfer_6f451f/recovery_C6_20260912T155122Z",
+      "archive_bytes": 101084301,
+      "archive_sha256": "3848522da59531b318ce1c8b7801c057affa101240ea39486f3aac95563ca64d",
+      "inventory_sha256": "1a3bf58d055e41d8199ea31452d47fa865c1eb48877e693e76b624e78c630fd8",
+      "at_utc": "2026-09-12T15:52:02.217288+00:00"
+    },
+    "C6_fresh_p": {
+      "directory": "D:\\quant-data\\b3\\interim\\round6_20260911T111805Z\\recovery_C6_fresh_p_20260912T165054Z",
+      "status": "verified",
+      "arm": "C6_fresh_p",
+      "files": 1452,
+      "completed_fits": 42,
+      "completed_P": 3,
+      "local_root": "D:\\quant-data\\b3\\processed\\model_runs\\v2_round6_0bf8130_20260911T233404Z",
+      "remote_snapshot": "/lambda/nfs/brazil-rv-east3/quant-data/b3/interim/round6_20260911T111805Z/transfer_6f451f/recovery_C6_fresh_p_20260912T165054Z",
+      "archive_bytes": 105393513,
+      "archive_sha256": "d4f322fca80c68db2d43172b24b3201b82e385dceca933836ee211b2fa7aa318",
+      "inventory_sha256": "f1cd8a83a1a3125743a3be8bcbd624a3f82f62a0e26ce4129a17331d0392dd99",
+      "at_utc": "2026-09-12T16:51:35.645260+00:00"
+    },
+    "controls_and_smokes": {
+      "directory": "D:\\quant-data\\b3\\interim\\round6_20260911T111805Z\\recovery_controls_and_smokes_20260912T184028Z",
+      "status": "verified",
+      "arm": "controls_and_smokes",
+      "files": 220,
+      "completed_fits": 0,
+      "completed_P": 0,
+      "local_root": "D:\\quant-data\\b3\\interim\\round6_20260911T111805Z\\recovery_controls_and_smokes_20260912T184028Z\\remote_root_snapshot",
+      "remote_snapshot": "/lambda/nfs/brazil-rv-east3/quant-data/b3/interim/round6_20260911T111805Z/transfer_6f451f/recovery_controls_and_smokes_20260912T184028Z",
+      "archive_bytes": 33561595,
+      "archive_sha256": "57d31b43a3e26d5bd7d9e37e8f22568168236860d6c450b7e9d88e92db565718",
+      "inventory_sha256": "dee7f6160612d1ccbc4b121309860728914fd734401709804b2a7ff6d71b3413",
+      "at_utc": "2026-09-12T18:40:44.296556+00:00"
+    }
+  },
+  "complete_CPU_mirrors": {
+    "session1/S0": {
+      "directory": "D:\\quant-data\\b3\\interim\\round6_20260911T111805Z\\cpu_recovery_session1_S0_20260912T011854Z",
+      "status": "verified",
+      "files": 171,
+      "inventory_sha256": "2a630fdd1e034bce3ba6b902148b21834c66517dc0e783a86fb38345b6134212",
+      "archive_sha256": "f3e6ae10c3394b14020e24ac48fb50efcfa4535e5c84066edcc0404f326f13c9",
+      "frozen_design_sha256": "954b48eb3c8c3ddf730b9af1853c789a3762fb3a06c048cb46483b624a28ca0f",
+      "remote_root": "/lambda/nfs/brazil-rv-east3/quant-data/b3/processed/model_runs/v2_round6_0bf8130_20260911T233404Z",
+      "at_utc": "2026-09-11T22:19:18.342784-03:00"
+    },
+    "session1/magnitudes": {
+      "directory": "D:\\quant-data\\b3\\interim\\round6_20260911T111805Z\\cpu_recovery_session1_magnitudes_20260912T021751Z",
+      "status": "verified",
+      "files": 201,
+      "inventory_sha256": "a25481b61036ccfa65f46940622ce95d1380b2d304f6de0268d3fc05e6864333",
+      "archive_sha256": "5fcce9c8dc28e9704da92dc02f0e4523fe136fd13c0483999684d5a7b2630c0a",
+      "frozen_design_sha256": "954b48eb3c8c3ddf730b9af1853c789a3762fb3a06c048cb46483b624a28ca0f",
+      "remote_root": "/lambda/nfs/brazil-rv-east3/quant-data/b3/processed/model_runs/v2_round6_0bf8130_20260911T233404Z",
+      "at_utc": "2026-09-11T23:18:12.021188-03:00"
+    },
+    "session1/oddlot": {
+      "directory": "D:\\quant-data\\b3\\interim\\round6_20260911T111805Z\\cpu_recovery_session1_oddlot_20260912T031312Z",
+      "status": "verified",
+      "files": 201,
+      "inventory_sha256": "3bbbc7fb8da7fc81dd549a0d98c8dbd099ca045c1f0ed82ff0da76cd1fce1a8c",
+      "archive_sha256": "419c026f08c7a11eeaac3a1123a8b7d4bd63fc795d4f7bd3f33882f066e4a18f",
+      "frozen_design_sha256": "954b48eb3c8c3ddf730b9af1853c789a3762fb3a06c048cb46483b624a28ca0f",
+      "remote_root": "/lambda/nfs/brazil-rv-east3/quant-data/b3/processed/model_runs/v2_round6_0bf8130_20260911T233404Z",
+      "at_utc": "2026-09-12T03:13:34.928878+00:00"
+    },
+    "session1/options": {
+      "directory": "D:\\quant-data\\b3\\interim\\round6_20260911T111805Z\\cpu_recovery_session1_options_20260912T041444Z",
+      "status": "verified",
+      "files": 201,
+      "inventory_sha256": "3a8a20896fc03f6d71369ee36adcafd9f0fa1143f7636400fe5e6e52b7fcc5d5",
+      "archive_sha256": "c11bb8c0d467bf0a91ed77915709d654b072d45526580c531732aa9f7efa1e65",
+      "frozen_design_sha256": "954b48eb3c8c3ddf730b9af1853c789a3762fb3a06c048cb46483b624a28ca0f",
+      "remote_root": "/lambda/nfs/brazil-rv-east3/quant-data/b3/processed/model_runs/v2_round6_0bf8130_20260911T233404Z",
+      "at_utc": "2026-09-12T04:15:07.738317+00:00"
+    },
+    "session1/events": {
+      "directory": "D:\\quant-data\\b3\\interim\\round6_20260911T111805Z\\cpu_recovery_session1_events_20260912T053244Z",
+      "status": "verified",
+      "files": 201,
+      "inventory_sha256": "6c10c45fa0a7fd86f0e573d99662ad40916f5b4d64b6efcb8f928b14649678ff",
+      "archive_sha256": "0455fee101259010d2989f150d2d9d81347a9e8c12bceaab19685d51b0c03001",
+      "frozen_design_sha256": "954b48eb3c8c3ddf730b9af1853c789a3762fb3a06c048cb46483b624a28ca0f",
+      "remote_root": "/lambda/nfs/brazil-rv-east3/quant-data/b3/processed/model_runs/v2_round6_0bf8130_20260911T233404Z",
+      "at_utc": "2026-09-12T05:33:06.255742+00:00"
+    },
+    "session1/fundamentals": {
+      "directory": "D:\\quant-data\\b3\\interim\\round6_20260911T111805Z\\cpu_recovery_session1_fundamentals_20260912T061242Z",
+      "status": "verified",
+      "files": 201,
+      "inventory_sha256": "5c37313b04cedbae9f2c8fbd517aee282515af2d1728aa8f0425283a4bcd5d38",
+      "archive_sha256": "92c3265bbd4057400156a8f350c754c657d613587e3baf2e36bb98d99a96d2c8",
+      "frozen_design_sha256": "954b48eb3c8c3ddf730b9af1853c789a3762fb3a06c048cb46483b624a28ca0f",
+      "remote_root": "/lambda/nfs/brazil-rv-east3/quant-data/b3/processed/model_runs/v2_round6_0bf8130_20260911T233404Z",
+      "at_utc": "2026-09-12T06:13:03.521391+00:00"
+    },
+    "session1/lending": {
+      "directory": "D:\\quant-data\\b3\\interim\\round6_20260911T111805Z\\cpu_recovery_session1_lending_20260912T070846Z",
+      "status": "verified",
+      "files": 201,
+      "inventory_sha256": "ca23b6f49fa8201f168c4eea63cc472090c51ada1a8f149f623f9dbb6e8d1689",
+      "archive_sha256": "fdd00faab811dd90d6622a0b393d9805e641568d833b6b189774a28830677367",
+      "frozen_design_sha256": "954b48eb3c8c3ddf730b9af1853c789a3762fb3a06c048cb46483b624a28ca0f",
+      "remote_root": "/lambda/nfs/brazil-rv-east3/quant-data/b3/processed/model_runs/v2_round6_0bf8130_20260911T233404Z",
+      "at_utc": "2026-09-12T07:09:09.824166+00:00"
+    },
+    "session1/finetune_lr_1": {
+      "directory": "D:\\quant-data\\b3\\interim\\round6_20260911T111805Z\\cpu_recovery_session1_finetune_lr_1_20260912T075944Z",
+      "status": "verified",
+      "files": 171,
+      "inventory_sha256": "fc18869f132f791eb6c038a2af80d2d402d021255f284271427e187c93b29adc",
+      "archive_sha256": "da7d0e990c60a573a286757d18e73f7649479e136a0bf7c8ed93b40a9e2ab5f8",
+      "frozen_design_sha256": "954b48eb3c8c3ddf730b9af1853c789a3762fb3a06c048cb46483b624a28ca0f",
+      "remote_root": "/lambda/nfs/brazil-rv-east3/quant-data/b3/processed/model_runs/v2_round6_0bf8130_20260911T233404Z",
+      "at_utc": "2026-09-12T08:00:04.202110+00:00"
+    },
+    "session1/time_decay_756": {
+      "directory": "D:\\quant-data\\b3\\interim\\round6_20260911T111805Z\\cpu_recovery_session1_time_decay_756_20260912T084447Z",
+      "status": "verified",
+      "files": 171,
+      "inventory_sha256": "641951c5c13d7f2548114dff926af693ca914e00b69849c8ed90125e6401d77f",
+      "archive_sha256": "ad62df1f3772e558ba30b6d4fdc5014f93af4f001e6f2e3cf7b338f63c427f38",
+      "frozen_design_sha256": "954b48eb3c8c3ddf730b9af1853c789a3762fb3a06c048cb46483b624a28ca0f",
+      "remote_root": "/lambda/nfs/brazil-rv-east3/quant-data/b3/processed/model_runs/v2_round6_0bf8130_20260911T233404Z",
+      "at_utc": "2026-09-12T08:45:07.273887+00:00"
+    },
+    "session1/mlp": {
+      "directory": "D:\\quant-data\\b3\\interim\\round6_20260911T111805Z\\cpu_recovery_session1_mlp_20260912T092949Z",
+      "status": "verified",
+      "files": 171,
+      "inventory_sha256": "e5edb7c5f62fc91ab7486a8fc37e202f4e2182788ed777d31187a2b805dc7fc9",
+      "archive_sha256": "165da30ea17e20bb93dca2a8edd7d0bf1236f6d825f948842b1be5bc17304d6e",
+      "frozen_design_sha256": "954b48eb3c8c3ddf730b9af1853c789a3762fb3a06c048cb46483b624a28ca0f",
+      "remote_root": "/lambda/nfs/brazil-rv-east3/quant-data/b3/processed/model_runs/v2_round6_0bf8130_20260911T233404Z",
+      "at_utc": "2026-09-12T09:30:14.418544+00:00"
+    },
+    "session2/cross_market": {
+      "directory": "D:\\quant-data\\b3\\interim\\round6_20260911T111805Z\\cpu_recovery_session2_cross_market_20260912T120714Z",
+      "status": "verified",
+      "files": 201,
+      "inventory_sha256": "2e9ecc18c40ace425b01f81ed6ab6fc9e847edbb0655c85934d1e66bc3526057",
+      "archive_sha256": "d6dbf68c5b2ae9dd99601988b21b67d20c91ac5e2cc672da9c1fd6cfb4189949",
+      "frozen_design_sha256": "954b48eb3c8c3ddf730b9af1853c789a3762fb3a06c048cb46483b624a28ca0f",
+      "remote_root": "/lambda/nfs/brazil-rv-east3/quant-data/b3/processed/model_runs/v2_round6_0bf8130_20260911T233404Z",
+      "at_utc": "2026-09-12T12:07:34.497239+00:00"
+    },
+    "session1/None": {
+      "directory": "D:\\quant-data\\b3\\interim\\round6_20260911T111805Z\\cpu_recovery_session1_None_20260912T114125Z",
+      "status": "verified",
+      "files": 254,
+      "inventory_sha256": "2222c1a96f58da236716c1c5c8318baedda84648ac8dbf849f0d2190c59117c3",
+      "archive_sha256": "89ed9107663d567d1f7901e7333ce393e9ab501a3251ed469c3a6f4f82e4f339",
+      "frozen_design_sha256": "954b48eb3c8c3ddf730b9af1853c789a3762fb3a06c048cb46483b624a28ca0f",
+      "remote_root": "/lambda/nfs/brazil-rv-east3/quant-data/b3/processed/model_runs/v2_round6_0bf8130_20260911T233404Z",
+      "at_utc": "2026-09-12T11:41:40.550391+00:00"
+    },
+    "session2/sector": {
+      "directory": "D:\\quant-data\\b3\\interim\\round6_20260911T111805Z\\cpu_recovery_session2_sector_20260912T121902Z",
+      "status": "verified",
+      "files": 201,
+      "inventory_sha256": "ed76bd1278146c16884fa4625c36eda9695bfe78ab1b104901629cd8a4be2687",
+      "archive_sha256": "8eb734f8f13b8e9b4d69852792f393aa047579777c9e27c3872348e48b7837af",
+      "frozen_design_sha256": "954b48eb3c8c3ddf730b9af1853c789a3762fb3a06c048cb46483b624a28ca0f",
+      "remote_root": "/lambda/nfs/brazil-rv-east3/quant-data/b3/processed/model_runs/v2_round6_0bf8130_20260911T233404Z",
+      "at_utc": "2026-09-12T12:19:23.882113+00:00"
+    },
+    "session2/microstructure": {
+      "directory": "D:\\quant-data\\b3\\interim\\round6_20260911T111805Z\\cpu_recovery_session2_microstructure_20260912T131256Z",
+      "status": "verified",
+      "files": 201,
+      "inventory_sha256": "696951a08908edbf2f1a250869d4763253f2bee17783ed752d4dd5dd38d2ac68",
+      "archive_sha256": "3de0a9c561fd4ec738fe1d86e4f269e9096b02cfb1642dbd01d63cf3a95fa8cb",
+      "frozen_design_sha256": "954b48eb3c8c3ddf730b9af1853c789a3762fb3a06c048cb46483b624a28ca0f",
+      "remote_root": "/lambda/nfs/brazil-rv-east3/quant-data/b3/processed/model_runs/v2_round6_0bf8130_20260911T233404Z",
+      "at_utc": "2026-09-12T13:13:17.401485+00:00"
+    },
+    "session2/rebalance": {
+      "directory": "D:\\quant-data\\b3\\interim\\round6_20260911T111805Z\\cpu_recovery_session2_rebalance_20260912T142311Z",
+      "status": "verified",
+      "files": 201,
+      "inventory_sha256": "e2d4cfd7cf358a8c04c7d1de0658e41037dab33553380b9afb34ff095d48468d",
+      "archive_sha256": "e99c4a9d909ad8b5e4e5f0f64c9d7728345619fe27a3dbc7f18bccb67f29d5b5",
+      "frozen_design_sha256": "954b48eb3c8c3ddf730b9af1853c789a3762fb3a06c048cb46483b624a28ca0f",
+      "remote_root": "/lambda/nfs/brazil-rv-east3/quant-data/b3/processed/model_runs/v2_round6_0bf8130_20260911T233404Z",
+      "at_utc": "2026-09-12T14:23:37.665879+00:00"
+    },
+    "session2/best_single_fresh_p": {
+      "directory": "D:\\quant-data\\b3\\interim\\round6_20260911T111805Z\\cpu_recovery_session2_best_single_fresh_p_20260912T151240Z",
+      "status": "verified",
+      "files": 171,
+      "inventory_sha256": "5a16d164a5abed83ff2c81f0110bfce3351c9810079cede5545b7d9ed60cb690",
+      "archive_sha256": "bab6fe38a79b79f840a5c5057a7a807b569008083e49d25142551d560165d365",
+      "frozen_design_sha256": "954b48eb3c8c3ddf730b9af1853c789a3762fb3a06c048cb46483b624a28ca0f",
+      "remote_root": "/lambda/nfs/brazil-rv-east3/quant-data/b3/processed/model_runs/v2_round6_0bf8130_20260911T233404Z",
+      "at_utc": "2026-09-12T15:13:02.778979+00:00"
+    },
+    "session2/C6": {
+      "directory": "D:\\quant-data\\b3\\interim\\round6_20260911T111805Z\\cpu_recovery_session2_C6_20260912T155523Z",
+      "status": "verified",
+      "files": 171,
+      "inventory_sha256": "013d9661721395add98172529db5d11a044e53a9256c85a50bf585b7465121d7",
+      "archive_sha256": "e0f18310c5e729ae7879ffd1b2c06b0e8664dda2776c35cd8a36a67187d3a4fd",
+      "frozen_design_sha256": "954b48eb3c8c3ddf730b9af1853c789a3762fb3a06c048cb46483b624a28ca0f",
+      "remote_root": "/lambda/nfs/brazil-rv-east3/quant-data/b3/processed/model_runs/v2_round6_0bf8130_20260911T233404Z",
+      "at_utc": "2026-09-12T15:55:46.026155+00:00"
+    },
+    "session2/C6_fresh_p": {
+      "directory": "D:\\quant-data\\b3\\interim\\round6_20260911T111805Z\\cpu_recovery_session2_C6_fresh_p_20260912T165458Z",
+      "status": "verified",
+      "files": 171,
+      "inventory_sha256": "f09966626efaf62ef617ad687882e6653dad9a9d90bc470193e8581dacab4b11",
+      "archive_sha256": "4ce905026d3951863ff5e713cbda5e4918d8fa38fe9b4eea5f9af82e3d3cea9e",
+      "frozen_design_sha256": "954b48eb3c8c3ddf730b9af1853c789a3762fb3a06c048cb46483b624a28ca0f",
+      "remote_root": "/lambda/nfs/brazil-rv-east3/quant-data/b3/processed/model_runs/v2_round6_0bf8130_20260911T233404Z",
+      "at_utc": "2026-09-12T16:55:21.409833+00:00"
+    },
+    "session2/None": {
+      "directory": "D:\\quant-data\\b3\\interim\\round6_20260911T111805Z\\cpu_recovery_session2_None_20260912T172307Z",
+      "status": "verified",
+      "files": 660,
+      "inventory_sha256": "c83ac6849c078f28d93da6560c24a3d7861638f60bb33b19a7f600dc6d35dfce",
+      "archive_sha256": "99362bc84af4b32bac612bae92c989f9dd7ece086b3bc406b1807809c01c6040",
+      "frozen_design_sha256": "954b48eb3c8c3ddf730b9af1853c789a3762fb3a06c048cb46483b624a28ca0f",
+      "remote_root": "/lambda/nfs/brazil-rv-east3/quant-data/b3/processed/model_runs/v2_round6_0bf8130_20260911T233404Z",
+      "at_utc": "2026-09-12T17:23:36.728427+00:00"
+    },
+    "final/None": {
+      "directory": "D:\\quant-data\\b3\\interim\\round6_20260911T111805Z\\cpu_recovery_final_None_20260912T195342Z",
+      "status": "verified",
+      "files": 12968,
+      "inventory_sha256": "5c305468e8c552ecaa64260e6a49b9e394f38f8ae6374d56d8019bb6965c8f9b",
+      "archive_sha256": "55325268e05b902cd8c75016889ea53abcd92bfed1910f5024eeb7790383e6e5",
+      "frozen_design_sha256": "954b48eb3c8c3ddf730b9af1853c789a3762fb3a06c048cb46483b624a28ca0f",
+      "remote_root": "/lambda/nfs/brazil-rv-east3/quant-data/b3/processed/model_runs/v2_round6_0bf8130_20260911T233404Z",
+      "at_utc": "2026-09-12T20:03:18.462948+00:00",
+      "transport_note": "SSH caller timed out after proof was written; recovered existing proof without repeating verification."
+    }
+  },
+  "final_seed_decision": {
+    "sha256": "5fa40a7c056f4b24802755a76eeba461501dba9b4be4dc4374949e5aa9108176",
+    "research_designation": null,
+    "working_research_comparator": "S0",
+    "parent_inconclusive": true,
+    "choices": [
+      "fundamentals",
+      "fundamentals",
+      "fundamentals",
+      "C6"
+    ],
+    "confirmation_triggered": false
+  },
+  "continuous_result_sha256": "44a939b9fd25d432575606f4283b0238cb34fc26cd431779e105e8206d7fbb35",
+  "training_finished_at_utc": "2026-09-12T16:49:14Z",
+  "paid_instance_id": "6f451f4422c447fa88d24eeefff927fe",
+  "no_additional_confirmation_triggered": true,
+  "forward_capture": false,
+  "official_validation_accessed": false,
+  "test_accessed": false,
+  "deployment_changed": false,
+  "continuous_validation": "Seven targeted existing continuous/readout tests plus actual fourteen-fold integration; thirteen carry boundaries pass, D1-D5 zero, no engineering gate failures.",
+  "pretermination_commit_parity": {
+    "status": "verified",
+    "commit": "cf391e414fe7c89531590f9208dcb73190f6f7c4",
+    "remote_bundle": "/lambda/nfs/brazil-rv-east3/quant-data/b3/interim/round6_20260911T111805Z/round6_completed_cf391e4.bundle",
+    "bundle_sha256": "d9c7fa9a4f1903f49fe525ef5506cfea515fcda69df81a5743ce1163bfa12a69",
+    "github_main_commit": "cf391e414fe7c89531590f9208dcb73190f6f7c4",
+    "local_main_commit": "cf391e414fe7c89531590f9208dcb73190f6f7c4",
+    "at_utc": "2026-09-12T20:02:29.483613+00:00"
+  },
+  "paid_instance_closure": {
+    "status": "terminated_confirmed_absent_twice",
+    "instance_id": "6f451f4422c447fa88d24eeefff927fe",
+    "at_utc": "2026-09-12T20:15:28.3538822Z"
+  },
+  "provider_absence_checks": [
+    {
+      "observed_at_utc": "2026-09-12T20:14:16.3326359Z",
+      "instance_id": "6f451f4422c447fa88d24eeefff927fe",
+      "matching_instances": [
+        {
+          "id": "6f451f4422c447fa88d24eeefff927fe",
+          "status": "terminating"
+        }
+      ]
+    },
+    {
+      "observed_at_utc": "2026-09-12T20:14:26.6463072Z",
+      "instance_id": "6f451f4422c447fa88d24eeefff927fe",
+      "matching_instances": [
+        {
+          "id": "6f451f4422c447fa88d24eeefff927fe",
+          "status": "terminating"
+        }
+      ]
+    },
+    {
+      "observed_at_utc": "2026-09-12T20:14:36.9356638Z",
+      "instance_id": "6f451f4422c447fa88d24eeefff927fe",
+      "matching_instances": [
+        {
+          "id": "6f451f4422c447fa88d24eeefff927fe",
+          "status": "terminating"
+        }
+      ]
+    },
+    {
+      "observed_at_utc": "2026-09-12T20:14:47.2155520Z",
+      "instance_id": "6f451f4422c447fa88d24eeefff927fe",
+      "matching_instances": [
+        {
+          "id": "6f451f4422c447fa88d24eeefff927fe",
+          "status": "terminating"
+        }
+      ]
+    },
+    {
+      "observed_at_utc": "2026-09-12T20:14:57.5085806Z",
+      "instance_id": "6f451f4422c447fa88d24eeefff927fe",
+      "matching_instances": [
+        {
+          "id": "6f451f4422c447fa88d24eeefff927fe",
+          "status": "terminating"
+        }
+      ]
+    },
+    {
+      "observed_at_utc": "2026-09-12T20:15:07.8016276Z",
+      "instance_id": "6f451f4422c447fa88d24eeefff927fe",
+      "matching_instances": [
+        {
+          "id": "6f451f4422c447fa88d24eeefff927fe",
+          "status": "terminating"
+        }
+      ]
+    },
+    {
+      "observed_at_utc": "2026-09-12T20:15:18.0780321Z",
+      "instance_id": "6f451f4422c447fa88d24eeefff927fe",
+      "matching_instances": []
+    },
+    {
+      "observed_at_utc": "2026-09-12T20:15:28.3509990Z",
+      "instance_id": "6f451f4422c447fa88d24eeefff927fe",
+      "matching_instances": []
+    }
+  ]
+}

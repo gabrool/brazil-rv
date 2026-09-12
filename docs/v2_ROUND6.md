@@ -5,8 +5,8 @@ Brazil-RV research program. **Research decision, 2026-09-12: retain S0 as the
 working comparator; the new parent choice is inconclusive.** Fundamentals leads
 the full three-seed panel and two omissions, but C6 leads the remaining omission.
 Neither a candidate gain over S0 nor a seed-stable replacement is established.
-The continuous-book readout is complete. Operational closure evidence is recorded
-below once final recovery and provider shutdown are verified.
+The continuous-book readout is complete. All required research artifacts are
+recovered and verified locally and on persistent storage.
 
 ## Research question and frozen contract
 
@@ -262,6 +262,27 @@ feature experiment requires the next registration; none was started here.
 * Session-1 result: `a67c1e891e1ef5fbfe0c8b7863babe418e21f67890ed28a7ba35b5d9fc508b7b`.
 * Session-2 result: `734f7a5c62c9c7aad5fa878117f01066cc3d893659edcc2c333991a52af49500`.
 * Screening review: `002b7c83eb89979cffeb2925107451b8467456953352852e8b9e3d1d5d1eb146`.
+
+The complete research implementation and report were merged into GitHub main at
+`cf391e414fe7c89531590f9208dcb73190f6f7c4`, including the prior cleanup. The
+identical commit is retained in a verified persistent Git bundle, SHA-256
+`d9c7fa9a4f1903f49fe525ef5506cfea515fcda69df81a5743ce1163bfa12a69`.
+Subsequent closure commits add documentation only. The final analysis mirror
+contains 12,968 files; its inventory SHA-256 is
+`5c305468e8c552ecaa64260e6a49b9e394f38f8ae6374d56d8019bb6965c8f9b`.
+This is in addition to the previously verified training and per-arm readouts.
+The final SSH caller timed out after the remote verifier had successfully
+written its proof; that existing proof was recovered and matched to the local
+inventory without rerunning experiments or repeating the transfer.
+
+The healthy instance ran approximately 27.1 hours through its termination request
+at 2026-09-12 20:14 UTC. At its provider-reported US$2.29/hour, that is approximately
+US$62 for this host, including engineering, evaluation and recovery time. This
+is not an invoice and excludes earlier failed hosts, storage, taxes and billing
+rounding. Main training ended at 16:49 UTC; the remaining host time covered the
+decision-dependent readouts and verified recovery. Exact provider shutdown and
+two absence checks are recorded in
+[v2_round6_operations.json](v2_round6_operations.json).
 
 Local run artifacts reside under `D:/quant-data/b3/processed/model_runs/` and
 their persistent copies under `/lambda/nfs/brazil-rv-east3/quant-data/b3/processed/model_runs/`.

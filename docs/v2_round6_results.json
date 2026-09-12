@@ -1,5 +1,5 @@
 {
-  "status": "research_complete_operational_closure_pending",
+  "status": "complete",
   "run_root_name": "v2_round6_0bf8130_20260911T233404Z",
   "readouts": {
     "C6": {
@@ -46383,5 +46383,6 @@
     "block_length_sessions": 20,
     "replications": 10000,
     "fold_boundary_preserved": true
-  }
+  },
+  "operational_evidence": "v2_round6_operations.json"
 }
