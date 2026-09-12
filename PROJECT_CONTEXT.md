@@ -1,14 +1,24 @@
 # Brazil-RV project context
 
-Last verified: 2026-09-11.
+Last verified: 2026-09-12.
+
+Round 6's 714 matched F fits and six fresh P fits are complete. The fixed
+three-seed decision audit retains **S0 as the working research comparator**:
+fundamentals wins the full panel and omissions 11/29, while C6 wins omission 47.
+The replacement-parent choice is inconclusive, with no seed-stable research
+designation and no triggered confirmation fits. All candidate all-fold paired IC
+and paired net intervals against S0 span zero. C6's fixed roster is fundamentals
+plus magnitudes; omission sensitivity does not change that roster. See
+[the complete experiment review](docs/v2_ROUND6.md). This does not authorize
+Round 7, a 2025/2026 consumer read, forward capture or deployment.
 
 Round 6's user-authorized compute amendment is recorded in
 [the registered contract](research/preregistrations/v2_round6_compute_amendment.md).
 The revised comparison uses every PIT-active name on a stage-fixed compact axis,
 BF16 autocast with FP32 loss/moments, and unique-date batches. Its 60-epoch ceiling
 and two-epoch validation cadence account for the old duplicated-date visits and
-improving validation curves at the prior cap. A bounded engineering bridge must
-pass before full dispatch. S0 and candidate F panels are refit together in a new
+improving validation curves at the prior cap. The bounded engineering bridge
+passed before full dispatch. S0 and candidate F panels were refit together in a new
 frozen root; prior completed runs remain historical references. Sealed compatible
 P weights and accepted data are reusable. The fourteen-fold development boundary,
 original research decisions, economic contract and ban on forward capture remain.
