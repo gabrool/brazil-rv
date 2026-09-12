@@ -11,8 +11,56 @@ import polars as pl
 
 from .artifacts import sha256_file, write_json_atomic
 from .round5_store import align_family
-from .round7_data import registered_sources
+from .round7_data import PROJECT, registered_sources
 from .store import peak_rss_bytes
+
+
+def audit_oddlot(output):
+    """The original odd-lot archive predates the Round-5 extension ancestry."""
+    from .build_store import _parse_sidecars
+
+    root, manifest, _, accepted = registered_sources()
+    evidence = json.loads(
+        (PROJECT / "docs/v2_rebuilt_store_evidence.json").read_text(encoding="utf-8")
+    )
+    source = next(
+        r
+        for r in evidence["manifest"]["sources"]
+        if Path(r["path"]).name == "odd_lot_activity.parquet"
+    )
+    if sha256_file(Path(source["path"])) != source["sha256"]:
+        raise ValueError("original odd-lot source differs")
+    dates = np.load(root / "date_index.npy").astype(object).tolist()
+    isins = tuple(np.load(root / "isin_index.npy").tolist())
+    # The parser pushes the <=2024 availability filter into the parquet scan.
+    raw = _parse_sidecars(["oddlot=" + source["path"]], dates, isins, None)["oddlot"]
+    active = np.load(root / manifest["arrays"]["active"]["path"])
+    stored = np.load(root / manifest["arrays"]["sidecar_oddlot_valid"]["path"])
+    fields = []
+    for index, name in enumerate(raw.feature_names):
+        physical = raw.valid[..., index] & active
+        lost = physical & ~stored[..., index]
+        sparse = physical.sum(axis=1) < 20
+        fields.append(
+            {
+                "family": "oddlot",
+                "field": name,
+                "physical_active_name_days": int(physical.sum()),
+                "lost_name_days": int(lost.sum()),
+                "lost_on_sparse_dates": int((lost & sparse[:, None]).sum()),
+                "lost_on_supported_dates": int((lost & ~sparse[:, None]).sum()),
+            }
+        )
+    result = {
+        "base_store": accepted["store"],
+        "source": source,
+        "fields": fields,
+        "publication_lag_reproduced": raw.publication_lag_reproduced,
+        "scores_or_labels_read": False,
+        "peak_rss_bytes": peak_rss_bytes(),
+    }
+    write_json_atomic(output, result)
+    return result
 
 
 def audit(output: Path):
@@ -94,7 +142,12 @@ def audit(output: Path):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--output", type=Path, required=True)
-    result = audit(parser.parse_args().output)
+    parser.add_argument("--oddlot-only", action="store_true")
+    args = parser.parse_args()
+    if args.oddlot_only:
+        print(json.dumps(audit_oddlot(args.output)))
+        return
+    result = audit(args.output)
     summary = (
         pl.DataFrame(result["fields"])
         .group_by("family")

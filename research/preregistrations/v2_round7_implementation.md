@@ -86,6 +86,12 @@ Its additional diagnostics are reported before screening. No forward capture,
   matching masks. Reordered reductions need not be bitwise identical. Full-graph
   training and evaluation must each remain bounded to one static graph for a
   configuration; compilation time and peak memory are included in smoke evidence.
+- CUDA engineering uses sixteen distinct F14 fit dates, the full sixty-session
+  histories and the complete active cross-sections. Before optimization, compare
+  FP32 and BF16 evaluation-mode loss/gradients at identical weights: gradient
+  cosine at least .99 and absolute loss difference at most .01. This numerical
+  bridge and the synthetic learning check precede real fits. They do not substitute
+  for measured complete concurrent fit throughput.
 
 ## Budget, comparisons and decisions
 
@@ -130,6 +136,11 @@ Its additional diagnostics are reported before screening. No forward capture,
   eligible C1 clears that rule, choose the eligible recipe-only comparator when
   it improves A0; otherwise retain A0 and report failure to improve. An adverse
   A1 is not automatically promoted merely because no other model beats it.
+- The three-seed fourteen-fold IC-first decision, including an applicable
+  economics override, freezes the candidate extended with A0 to six seeds.
+  Six-seed results validate that comparison; they do not silently rerank it
+  against candidates left at three seeds. B11 may be designated only when it
+  strictly leads the eligible matched panel by IC, never via an economics override.
 - CPU/source audits and implementation proceed together where independent.
   Paid-session throughput estimates come from measured complete concurrent
   smokes, not multiplication by an old early-stopped S0 fit average. Recover and

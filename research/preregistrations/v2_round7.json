@@ -982,7 +982,7 @@
   "heldout_access": false,
   "implementation_resolutions": {
     "path": "C:\\quant\\b3-quant\\research\\preregistrations\\v2_round7_implementation.md",
-    "sha256": "ad0a2c6d7c62430439a5760b76a39992d6e54b4d97ca6d628603b5553f7c7707"
+    "sha256": "e50be4ff06e59789c475305593a8e0fabe746c3eb6ef04b85a22b134eb63a34f"
   },
   "per_name_cross_market_fields": [
     "exposure_fx",
@@ -1036,7 +1036,10 @@
     "warmup_fraction": 0.05,
     "weight_decay": 0.01
   },
-  "repaired_store": null,
+  "repaired_store": {
+    "manifest_sha256": "1db29cbf7b30244b2327ab7e0c212a796fd25280141a45e4ee28213b2644aa65",
+    "root": "D:\\quant-data\\b3\\processed\\v2_round7_store_de6476b_20260912T232200Z"
+  },
   "reuse": "A0 screen subset from anchor; advanced cells reuse exact screen fits; calibration reused as B4 only for B=60 and exact full contract identity",
   "schema": "BRAZIL_RV_ROUND7_PROTOCOL_V1",
   "screen_folds": [

@@ -13,6 +13,12 @@ plus magnitudes; omission sensitivity does not change that roster. See
 Round 7 under [its registration](research/preregistrations/v2_round7.md) and
 [implementation resolutions](research/preregistrations/v2_round7_implementation.md).
 Round 7 does not authorize a 2025/2026 consumer read, forward capture or deployment.
+Its [CPU input acceptance](docs/v2_round7_inputs.json) binds the repaired store
+`v2_round7_store_de6476b_20260912T232200Z`, manifest
+`1db29cbf7b30244b2327ab7e0c212a796fd25280141a45e4ee28213b2644aa65`.
+This repairs retrospective U2 accounting and continued quotes, preserves historical
+decision inputs, and adds fit-scaled native fundamentals without a rank-support gate.
+All new Round-7 fits use this same store; sealed earlier results remain unchanged.
 
 Round 6's user-authorized compute amendment is recorded in
 [the registered contract](research/preregistrations/v2_round6_compute_amendment.md).
@@ -244,7 +250,8 @@ EMBR3's 2020-03-12 large price falls. This does not repair or change S0,
 targets or the accepted inferred-action economics. Round-6 comparisons remain
 conditional on that development-grade contract; contractual action rebuilding
 and a separately registered rebaseline precede exact wealth or implementability
-claims. No Round-7 fit or 2025 consumer read is authorized.
+claims. Round 7 now authorizes that repaired development-store rebaseline under
+its own registration; 2025 consumer access remains forbidden.
 
 Its neural input contract changes enabled
 sidecars to separate decision-row, zero-initialized residual projections, gated

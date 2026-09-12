@@ -157,7 +157,11 @@ def register():
             PROJECT / "research/preregistrations/v2_round7_implementation.md"
         ),
         "base_store": accepted["store"],
-        "repaired_store": None,
+        "repaired_store": json.loads(
+            (PROJECT / "docs/v2_round7_inputs.json").read_text(encoding="utf-8")
+        )["store"]
+        if (PROJECT / "docs/v2_round7_inputs.json").exists()
+        else None,
         "screen_folds": SCREEN_FOLDS,
         "seeds": SEEDS,
         "confirmation_seeds": [61, 79, 97],

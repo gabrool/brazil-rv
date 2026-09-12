@@ -1,22 +1,29 @@
 {
   "completed": [
-    "source U2 and continuation audits",
-    "foreign-flow historical publication audit",
-    "physical-family support audit",
-    "C1 modules and masking tests"
+    "repaired store and protected-array/target acceptance",
+    "all 14 before/after S0 ledgers; original reference exact",
+    "native and all-family support audits including oddlot",
+    "C1 and R training/scoring/resume implementation",
+    "CPU fullgraph and nonlinear family-interaction acceptance",
+    "chronological residual-tree control"
   ],
   "experiment_scores_started": false,
   "gpu_launched": false,
+  "local_processes": {
+    "S0_archived_session": 62582,
+    "delta_pack_session": 39940,
+    "fundamentals_archived_session": 54301
+  },
   "pending": [
-    "repaired store build and acceptance",
-    "R training and scoring integration",
-    "archived diagnostics",
-    "engineering learning and fullgraph smokes",
-    "GPU calibration screening confirmation",
-    "economic reports artifact recovery and shutdown"
+    "finish 84 archived diagnostics and publish report",
+    "finish compute/readout freeze and publish GitHub",
+    "GH200 engineering throughput and repaired S0 anchor",
+    "calibration screening confirmation and six-seed decision",
+    "economic reports artifact recovery and exact-ID shutdown"
   ],
-  "phase": "implementation_and_store_repair",
+  "phase": "cpu_accepted_training_integration",
   "source_audit_manifest_sha256": "38fb8988213c7361ec9b86a9edba05570b778fdebf197d2d7da6e99271effa12",
   "source_audit_root": "D:\\quant-data\\b3\\interim\\round7_20260912T214606Z",
-  "source_coverage": "D:\\quant-data\\b3\\interim\\round7_20260912T214606Z\\family_coverage.json"
+  "source_coverage": "D:\\quant-data\\b3\\interim\\round7_20260912T214606Z\\family_coverage.json",
+  "source_store_acceptance": "docs/v2_round7_inputs.json"
 }
