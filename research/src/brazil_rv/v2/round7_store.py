@@ -14,10 +14,11 @@ import polars as pl
 from .artifacts import sha256_file, write_json_atomic
 from .build_store import _eventual_survival_groups
 from .corporate_actions import (
-    AlignedActionTerms,
+    align_verified_action_terms,
     detect_distribution_changes,
     infer_cotahist_action_terms,
     verified_action_terms_to_table,
+    verified_action_terms_from_table,
 )
 from .feature_spec import FeatureSpec, feature_schema_sha256, feature_specs
 from .data_foundation import continuation_identity_axis
@@ -109,19 +110,31 @@ def build(audit_root: Path, output: Path):
         return mapped[name]
 
     try:
+
+        def table(name):
+            return pl.read_parquet(source / original["tables"][name]["path"])
+
+        original_terms = table("corporate_actions_verified_terms")
+        # The source builder used decimal-cent quotes and full-precision terms.
+        # Store float32 copies are sufficient for inference but can break exact
+        # ties if used to reconstruct labels. All source quotes have cent spacing
+        # coarser than the stored float32 ULP (largest source close is R$9,200).
+        precision = np.spacing(old("raw_close")[old("observed")])
+        if np.any(precision >= 0.01):
+            raise ValueError("source cent values require original archive precision")
+        original_actions = align_verified_action_terms(
+            verified_action_terms_from_table(original_terms),
+            dates,
+            isins,
+            coverage_resolved=old("action_session_resolved"),
+        )
         check_rows = np.unique(np.linspace(0, len(dates) - 1, 24, dtype=np.int64))
         baseline = build_economic_multi_day_targets(
-            old("raw_close"),
+            np.round(old("raw_close").astype(np.float64), 2),
             old("observed"),
             old("active"),
             old("target_scale_sigma"),
-            AlignedActionTerms(
-                old("action_shares_per_prior_share"),
-                old("action_cash_per_prior_share"),
-                old("action_session_resolved"),
-                old("action_has_action"),
-                old("action_successor_index"),
-            ),
+            original_actions,
             source_rows=check_rows,
         )
         for name, attr in TARGET_FIELDS.items():
@@ -169,10 +182,6 @@ def build(audit_root: Path, output: Path):
             updates["distribution_number"], updates["observed"]
         )
 
-        def table(name):
-            return pl.read_parquet(source / original["tables"][name]["path"])
-
-        original_terms = table("corporate_actions_verified_terms")
         records = json.loads(
             (audit_root / "u2_events.json").read_text(encoding="utf-8")
         )
@@ -217,13 +226,19 @@ def build(audit_root: Path, output: Path):
             )
         # Fixed corrected factors keep rejected old crashes out of the running
         # unit history. Newly recovered prints infer only corroborated U2 terms.
+        retained_actions = align_verified_action_terms(
+            verified_action_terms_from_table(retained),
+            dates,
+            isins,
+            coverage_resolved=updates["action_session_resolved"],
+        )
         fixed_factors = np.where(
-            recovered, np.nan, updates["action_shares_per_prior_share"]
+            recovered, np.nan, retained_actions.shares_per_prior_share
         )
         inferred = infer_cotahist_action_terms(
             dates,
             isins,
-            updates["raw_close"],
+            np.round(updates["raw_close"].astype(np.float64), 2),
             updates["quantity"],
             updates["trade_count"],
             updates["distribution_number"],
@@ -273,12 +288,11 @@ def build(audit_root: Path, output: Path):
             .equals(original_c1)
         ):
             raise ValueError("repair changed an existing C1 cash term")
-        actions = AlignedActionTerms(
-            updates["action_shares_per_prior_share"],
-            updates["action_cash_per_prior_share"],
-            updates["action_session_resolved"],
-            updates["action_has_action"],
-            old("action_successor_index"),
+        actions = align_verified_action_terms(
+            verified_action_terms_from_table(final_terms),
+            dates,
+            isins,
+            coverage_resolved=updates["action_session_resolved"],
         )
         identities = continuation_identity_axis(isins, table("isin_succession_links"))
         survival = _eventual_survival_groups(dates, updates["observed"], identities)
@@ -296,7 +310,7 @@ def build(audit_root: Path, output: Path):
             flush=True,
         )
         targets = build_economic_multi_day_targets(
-            updates["raw_close"],
+            np.round(updates["raw_close"].astype(np.float64), 2),
             updates["observed"],
             old("active"),
             old("target_scale_sigma"),
