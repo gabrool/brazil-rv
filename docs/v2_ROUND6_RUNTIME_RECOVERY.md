@@ -37,3 +37,18 @@ three borrow scenarios without gate failures, and exact reproduction of the
 original-cost headline. Cost summary SHA-256:
 `22c7e4965ea8081719167021a08bfaccefe25ede42c632703772544c8b9488b8`.
 These results do not select a candidate before the registered comparisons finish.
+# Session 2 planner correction
+
+All nine Session 2 smoke processes completed on 2026-09-12. Before any full
+Session 2 pretraining or fine-tuning, the planner rejected `C6_fresh_p_P` because
+the expected sidecar counts used roster order (magnitudes, fundamentals), while
+training records them alphabetically (fundamentals, magnitudes). Every other
+model-config field matched. The registered roster and the trained graph agree.
+
+`arm_config` now sorts sidecar families to match training. P and F regression
+tests cover the two-family roster and reversed input order. This is a planning
+contract correction, with no data, objective, model, seed, budget or outcome
+change. Existing smoke results are retained. The historical frozen training
+checkout remains at `0bf8130`; its resume planner applies only this sorting
+correction in memory. Child training processes continue to use the unchanged
+frozen checkout and the previously documented graph-partition override.

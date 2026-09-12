@@ -30,6 +30,27 @@ def test_round6_arms_change_only_registered_graph_components():
     )
 
 
+@pytest.mark.parametrize("stage", ["P", "F"])
+def test_combined_contract_uses_training_sidecar_order(stage):
+    names = {
+        "slow": ["a"],
+        "sidecar_magnitudes": ["x"] * 4,
+        "sidecar_fundamentals": ["x"] * 12,
+    }
+    roster = {"c6_families": ["magnitudes", "fundamentals"]}
+    config = arm_config(names, "C6_fresh_p", stage=stage, roster=roster)
+    assert config.sidecar_feature_counts == (("fundamentals", 12), ("magnitudes", 4))
+    assert (
+        arm_config(
+            names,
+            "C6_fresh_p",
+            stage=stage,
+            roster={"c6_families": list(reversed(roster["c6_families"]))},
+        )
+        == config
+    )
+
+
 def test_c6_excludes_zero_and_negative_points_and_resolves_ties_in_registered_order():
     points = dict(
         zip(SESSION1_FAMILIES, (0.01, 0.01, 0, -0.01, 0.005, -0.005), strict=True)

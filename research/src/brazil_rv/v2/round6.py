@@ -112,7 +112,8 @@ def arm_config(feature_names: dict, arm: str, *, stage="F", roster=None) -> Mode
         if arm == "time_decay_756" and stage != "P"
         else None,
         sidecar_feature_counts=tuple(
-            (f, len(feature_names[f"sidecar_{f}"])) for f in families_for(arm, roster)
+            (f, len(feature_names[f"sidecar_{f}"]))
+            for f in sorted(families_for(arm, roster))
         ),
     )
     return stage_p_model_config(config) if stage == "P" else config
