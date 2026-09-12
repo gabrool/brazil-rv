@@ -50,7 +50,11 @@ def ensemble(root, design, cell, fold, seeds, dates, isins):
     for seed in seeds:
         directory = trajectory(root, cell, fold, seed)
         manifest = read(directory / "run_manifest.json")
-        if manifest["status"] != "completed":
+        if (
+            manifest["status"] != "completed"
+            or manifest["seed"] != seed
+            or manifest["fold"] != fold
+        ):
             raise ValueError("cannot read an incomplete trajectory")
         scores, valid = rr._score_artifact(
             directory / "scores",

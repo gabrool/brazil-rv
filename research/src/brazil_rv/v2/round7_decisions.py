@@ -87,12 +87,89 @@ def select(result):
     }
 
 
+def finalize(three, six, omissions, candidate):
+    """Validate the frozen candidate on six matched seeds; retain the registered fallback."""
+    if (
+        tuple(six["seeds"]) != (11, 29, 47, 61, 79, 97)
+        or omissions["candidate"] != candidate
+    ):
+        raise ValueError(
+            "final comparison and omission audit must bind the same six-seed candidate"
+        )
+    designation, reason = "A0", "no eligible confirmed improvement"
+    if candidate != "A0":
+        delta = six["paired"][f"{candidate}_minus_A0"]["pooled"][IC]["estimate"]
+        net = six["readouts"][candidate]["pooled"][NET]["estimate"]
+        if (
+            delta is not None
+            and delta > 0
+            and net is not None
+            and net >= 0
+            and (not candidate.startswith("B") or omissions["all_omissions_positive"])
+        ):
+            designation, reason = (
+                candidate,
+                "positive confirmed IC gain with eligible economics and required omission agreement",
+            )
+        else:
+            recipe_delta = three["paired"]["A1_minus_A0"]["pooled"][IC]["estimate"]
+            recipe_net = three["readouts"]["A1"]["pooled"][NET]["estimate"]
+            if (
+                candidate != "A1"
+                and recipe_delta is not None
+                and recipe_delta > 0
+                and recipe_net is not None
+                and recipe_net >= 0
+            ):
+                designation, reason = (
+                    "A1",
+                    "registered recipe-only fallback; assessed on its matched three-seed confirmation",
+                )
+    return {
+        "status": "complete",
+        "designation": designation,
+        "reason": reason,
+        "seeds": list(six["seeds"] if designation in {"A0", candidate} else SEEDS),
+        "confirmed_candidate": candidate,
+        "omission_agreement": omissions["all_omissions_positive"],
+        "selection_label": "screened_on_F2_F6_F10_F14",
+        "promotion_claim": "development research designation; significance is reported separately",
+        "read_2025_authorized": False,
+        "deployment_authorized": False,
+    }
+
+
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("action", choices=("advance", "select"))
+    parser.add_argument("action", choices=("advance", "select", "finalize"))
     parser.add_argument("--root", type=Path, required=True)
     parser.add_argument("--maximum-candidates", type=int, choices=(3, 5), default=5)
     args = parser.parse_args()
+    if args.action == "finalize":
+        paths = {
+            name: args.root / name
+            for name in (
+                "confirmation_result.json",
+                "six_seed_result.json",
+                "six_seed_loso.json",
+                "confirmation_leader.json",
+            )
+        }
+        output = args.root / "decision.json"
+        if output.exists():
+            raise FileExistsError(output)
+        result = finalize(
+            read(paths["confirmation_result.json"]),
+            read(paths["six_seed_result.json"]),
+            read(paths["six_seed_loso.json"]),
+            read(paths["confirmation_leader.json"])["cell"],
+        )
+        result["source_hashes"] = {
+            name: sha256_file(path) for name, path in paths.items()
+        }
+        write_json_atomic(output, result)
+        print(result)
+        return
     source = args.root / (
         "screen_result.json" if args.action == "advance" else "confirmation_result.json"
     )

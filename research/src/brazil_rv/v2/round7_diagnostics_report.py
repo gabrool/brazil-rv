@@ -54,11 +54,14 @@ def corrector_report(path):
     }
 
 
-def report(audit_root):
+def report(audit_root, *, anchor=False):
     arms, all_fits = {}, []
-    for arm in ("S0", "fundamentals"):
+    directory = audit_root / (
+        "anchor_diagnostics" if anchor else "archived_diagnostics"
+    )
+    for arm in ("A0",) if anchor else ("S0", "fundamentals"):
         fits = [
-            read(audit_root / "archived_diagnostics" / f"{arm}_F{f}_{s}.json")
+            read(directory / f"{arm}_F{f}_{s}.json")
             for f in range(1, 15)
             for s in (11, 29, 47)
         ]
@@ -129,13 +132,34 @@ def report(audit_root):
         "archived_fit_count": len(all_fits),
         "arms": arms,
         "corrector": corrector_report(
-            audit_root / "residual_corrector_mature/result.json"
+            audit_root
+            / (
+                "anchor_corrector/result.json"
+                if anchor
+                else "residual_corrector_mature/result.json"
+            )
         ),
-        "per_fit": all_fits,
-        "source_files": [
-            bind(p)
-            for p in sorted((audit_root / "archived_diagnostics").glob("*.json"))
+        "per_fit": [
+            {
+                **fit,
+                "panels": {
+                    stage: {
+                        k: v
+                        for k, v in panel.items()
+                        if k
+                        not in {
+                            "date_indices",
+                            "raw_patience_daily_ic",
+                            "final_ema_daily_ic",
+                        }
+                    }
+                    for stage, panel in fit["panels"].items()
+                },
+            }
+            for fit in all_fits
         ],
+        "daily_series_location": "complete per-fit vectors retained in the bound source files; this Git-reviewed report keeps per-fit statistics",
+        "source_files": [bind(p) for p in sorted(directory.glob("*_F*.json"))],
         "method_code": [
             bind(PROJECT / "research/src/brazil_rv/v2" / n)
             for n in (
@@ -152,20 +176,29 @@ def report(audit_root):
             "mean-seed IC is not the IC of a rank-ensembled score panel",
             "CPU FP32 compares both checkpoints equally; it need not exactly match archived BF16 score exports",
             "gradient/SAM and Jacobian diagnostics use the fixed final fit-date cross-section in evaluation mode",
-            "repaired-store S0 diagnostics follow the authorized GPU anchor before screening",
+            "same-store repaired S0 anchor"
+            if anchor
+            else "repaired-store S0 diagnostics follow the authorized GPU anchor before screening",
         ],
         "new_neural_fits": False,
         "forward_capture": False,
         "heldout_access": False,
     }
-    write_json_atomic(PROJECT / "docs/v2_round7_archived_diagnostics.json", result)
+    write_json_atomic(
+        directory / "summary.json"
+        if anchor
+        else PROJECT / "docs/v2_round7_archived_diagnostics.json",
+        result,
+    )
     return result
 
 
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--audit-root", type=Path, required=True)
-    result = report(parser.parse_args().audit_root)
+    parser.add_argument("--anchor", action="store_true")
+    args = parser.parse_args()
+    result = report(args.audit_root, anchor=args.anchor)
     print(
         json.dumps(
             {

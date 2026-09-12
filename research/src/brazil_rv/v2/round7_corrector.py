@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 from pathlib import Path
 
 import numpy as np
@@ -41,10 +42,20 @@ def mature_before(sample_indices, decision_index, maximum_horizon=10):
     return np.asarray(sample_indices) + maximum_horizon < decision_index
 
 
-def run(output):
+def run(output, *, source_root=None, store_root=None, arm="S0"):
     lgb = require_lightgbm()
-    root, manifest, _, accepted = registered_sources()
-    archived = source_run_root()
+    if store_root is None:
+        root, manifest, _, accepted = registered_sources()
+    else:
+        root = store_root
+        manifest = json.loads((root / "manifest.json").read_text(encoding="utf-8"))
+        accepted = {
+            "store": {
+                "root": str(root),
+                "manifest_sha256": sha256_file(root / "manifest.json"),
+            }
+        }
+    archived = source_root or source_run_root()
     folds = [(f"F{i}", _cli_stage_indices(root, "F", f"F{i}")[2]) for i in range(1, 15)]
     rows = np.concatenate([r for _, r in folds])
     families = sorted(k for k in manifest["feature_names"] if k.startswith("sidecar_"))
@@ -86,7 +97,7 @@ def run(output):
             members, mask = [], None
             for seed in (11, 29, 47):
                 directory = (
-                    archived / "trajectories/S0" / f"{fold}_seed_{seed}" / "scores"
+                    archived / "trajectories" / arm / f"{fold}_seed_{seed}" / "scores"
                 )
                 score, valid = rr._score_artifact(
                     directory,
@@ -225,7 +236,11 @@ def run(output):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--output", type=Path, required=True)
-    run(parser.parse_args().output)
+    parser.add_argument("--source-root", type=Path)
+    parser.add_argument("--store", type=Path)
+    parser.add_argument("--arm", default="S0", choices=("S0", "A0"))
+    args = parser.parse_args()
+    run(args.output, source_root=args.source_root, store_root=args.store, arm=args.arm)
 
 
 if __name__ == "__main__":

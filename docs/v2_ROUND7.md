@@ -152,11 +152,21 @@ pair correctly on the same D3/D5/D10 population.
 
 ## Diagnostics and remaining experiment stages
 
-The 84 archived S0/fundamentals diagnostics are running on CPU. They compare clean
-fit/selection/evaluation IC, paired raw-versus-EMA uncertainty, fixed-batch head
-gradients and SAM gaps, and actual sidecar Jacobian sensitivity. Original per-epoch
-weights were not saved and cannot be reconstructed. The chronological residual-tree
-control is complete; the full statistical report will be added with the archive audit.
+The archived S0/fundamentals diagnostics compare clean fit/selection/evaluation
+IC, paired raw-versus-EMA uncertainty, fixed-batch head gradients and SAM gaps,
+and actual sidecar Jacobian sensitivity. Original per-epoch weights were not
+saved and cannot be reconstructed. Their full report follows all 84 fits.
+
+The fixed chronological residual-tree control is complete on thirteen folds and
+1,485 scored dates. Its composite IC is **0.03052 for S0**, **0.01413 for the
+score-only corrector**, and **0.01857 for the all-family corrector**. The all-family
+corrector minus S0 is **−0.01195**, Newey–West mean SE **0.00577**. Its gain over
+the matched score-only tree is **+0.00443**, SE **0.00441**. This control does not
+improve S0. The modest, uncertain gain over its own tree control neither establishes
+an architectural bottleneck nor proves that the families contain no useful signal.
+No hyperparameter or checkpoint was selected from these evaluation results.
+This diagnostic ranks the composite against mean traded-horizon rank; it is not
+the headline mean of separate D3/D5/D10 ICs and has zero promotion weight.
 
 There are **24 initial Stage-P fits**, not the draft's approximate fifteen: graph,
 input roster and head count must match. S0 slow uses its three old-recipe parents;
@@ -170,3 +180,9 @@ GPU launch, measured concurrency, calibration B, screen/confirmation outcomes,
 three-borrow economics, the continuous book, final designation and verified
 artifact recovery/instance shutdown are pending. No improvement or promotion is
 claimed from the implementation and preflight work alone.
+
+The readout path preserves original-rate economics for model selection and reuses
+that accepted ledger for two rate-only sensitivity comparisons. Leave-one-seed-out
+forecast stability uses the completed six-seed scores; it does not rerun identical
+economic books for a forecast-only gate. The final continuous book carries positions
+across model switches and has no influence on the completed designation.

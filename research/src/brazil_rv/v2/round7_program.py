@@ -316,9 +316,32 @@ def freeze_budget(root):
     return result
 
 
+def export_calibration_scores(root):
+    """Only a 60-epoch budget makes the calibration fits exact B4 screen fits."""
+    from .round7_score import score
+
+    design = design_at(root)
+    if read(root / "budget.json")["B"] != 60:
+        return {"reused_calibration_fits": 0}
+    for fold in SCREEN_FOLDS:
+        for seed in SEEDS:
+            directory = root / "calibration" / f"{fold}_seed_{seed}"
+            manifest = read(directory / "run_manifest.json")
+            score(
+                Path(design["store"]["root"]),
+                directory / "tail_average.pt",
+                directory / "scores",
+                expected_sha256=manifest["artifacts"]["tail_average.pt"],
+            )
+            print(f"reused calibration scores {fold}/{seed}", flush=True)
+    return {"reused_calibration_fits": 12}
+
+
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("action", choices=("freeze", "plan", "budget"))
+    parser.add_argument(
+        "action", choices=("freeze", "plan", "budget", "calibration_scores")
+    )
     parser.add_argument("--root", type=Path, required=True)
     parser.add_argument("--phase")
     parser.add_argument("--parallel", type=int, default=6)
@@ -327,6 +350,8 @@ def main():
         result = freeze(args.root)
     elif args.action == "budget":
         result = freeze_budget(args.root)
+    elif args.action == "calibration_scores":
+        result = export_calibration_scores(args.root)
     else:
         result = plan(args.root, args.phase, args.parallel)
     print(json.dumps(result))
