@@ -1588,6 +1588,8 @@ def infer_cotahist_action_terms(
     active: NDArray[np.bool_],
     *,
     source: str = "inferred_cotahist_dismes_v1",
+    fixed_share_factors: NDArray[np.floating] | None = None,
+    u2_corroborated: NDArray[np.bool_] | None = None,
 ) -> InferredActionResult:
     """Infer one explicitly labelled development-grade action ledger.
 
@@ -1595,8 +1597,11 @@ def infer_cotahist_action_terms(
     Price and activity histories are maintained in running pre-action units so
     an undocumented unit change cannot create a second artificial event when
     ``DISMES`` changes one or two sessions later. Provider observations are not
-    accepted by this function and therefore cannot affect any returned term or
-    mask.
+    accepted by this function. A retrospective repair may supply externally
+    corroborated U2 eligibility and fixed factors for already audited prints.
+    Finite fixed factors update the running unit history without re-inferring
+    those sessions; NaN entries request inference. Such repaired terms must not
+    replace the decision-causal feature history.
     """
 
     if source != "inferred_cotahist_dismes_v1":
@@ -1614,6 +1619,11 @@ def infer_cotahist_action_terms(
     seen = np.asarray(observed, dtype=np.bool_)
     membership = np.asarray(active, dtype=np.bool_)
     shape = (len(calendar), len(isins))
+    if any(
+        value is not None and value.shape != shape
+        for value in (fixed_share_factors, u2_corroborated)
+    ):
+        raise ValueError("action repair panels must align [date, name]")
     if (
         close.shape != shape
         or qty.shape != shape
@@ -1682,9 +1692,14 @@ def infer_cotahist_action_terms(
                 continue
             prior_prices = adjusted_close_history[name]
             current_q = 1.0
+            fixed = (
+                float(fixed_share_factors[day, name])
+                if fixed_share_factors is not None
+                else np.nan
+            )
             rule: str | None = None
             evidence_numbers: dict[str, object] = {}
-            if prior_prices:
+            if prior_prices and not np.isfinite(fixed):
                 reference = float(np.median(prior_prices[-3:]))
                 previous_adjusted = float(prior_prices[-1])
                 lp = float(np.log(current_adjusted[name] / reference))
@@ -1772,7 +1787,9 @@ def infer_cotahist_action_terms(
                     )
                     if per_trade_available:
                         u2_per_trade_candidate[day, name] = consistent
-                    if consistent:
+                    if consistent and (
+                        u2_corroborated is None or u2_corroborated[day, name]
+                    ):
                         rule = "U2"
                         u2[day, name] = True
                         if activity_method == "per_trade":
@@ -1837,6 +1854,8 @@ def infer_cotahist_action_terms(
                         resolved=True,
                     )
                 )
+            if np.isfinite(fixed):
+                current_q = fixed
             if current_q != 1.0:
                 cumulative_q[name] *= current_q
             adjusted_close_history[name].append(

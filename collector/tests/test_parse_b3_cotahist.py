@@ -90,6 +90,19 @@ def test_equivalent_quote_units_have_identical_per_share_prices() -> None:
         assert ten_unit_quote[field] == pytest.approx(unit_quote[field])
 
 
+@pytest.mark.parametrize("bdi", ["06", "07", "08"])
+def test_special_cash_categories_preserve_actual_prices_and_identity(bdi: str) -> None:
+    line = bytearray(_quote_line())
+    _field(line, 10, 12, bdi)
+    parsed = parse_quote_line(bytes(line))
+    assert parsed is not None
+    assert parsed["bdi_code"] == bdi
+    assert parsed["isin"] == "BRTESTACNOR1"
+    assert parsed["close_brl"] == pytest.approx(10.5)
+    _field(line, 24, 27, "020")
+    assert parse_quote_line(bytes(line)) is None
+
+
 def test_malformed_record_length_prevents_archive_promotion(tmp_path: Path) -> None:
     trailer = bytearray(b" " * RECORD_LENGTH)
     _field(trailer, 0, 2, "99")

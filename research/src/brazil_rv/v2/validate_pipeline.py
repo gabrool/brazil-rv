@@ -817,6 +817,11 @@ def _evaluation_inputs(
         price_midrank_targets=price_targets,
         price_target_mask=price_target_mask,
         active=np.asarray(store.read("active", indices), dtype=np.bool_),
+        entry_fill_allowed=(
+            store.read("entry_fill_allowed", indices)
+            if "entry_fill_allowed" in store.manifest["arrays"]
+            else None
+        ),
         raw_close=store.read("raw_close", indices),
         action_shares_per_prior_share=store.read(
             "action_shares_per_prior_share", indices

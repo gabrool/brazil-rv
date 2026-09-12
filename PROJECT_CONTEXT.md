@@ -9,8 +9,10 @@ The replacement-parent choice is inconclusive, with no seed-stable research
 designation and no triggered confirmation fits. All candidate all-fold paired IC
 and paired net intervals against S0 span zero. C6's fixed roster is fundamentals
 plus magnitudes; omission sensitivity does not change that roster. See
-[the complete experiment review](docs/v2_ROUND6.md). This does not authorize
-Round 7, a 2025/2026 consumer read, forward capture or deployment.
+[the complete experiment review](docs/v2_ROUND6.md). The user has now authorized
+Round 7 under [its registration](research/preregistrations/v2_round7.md) and
+[implementation resolutions](research/preregistrations/v2_round7_implementation.md).
+Round 7 does not authorize a 2025/2026 consumer read, forward capture or deployment.
 
 Round 6's user-authorized compute amendment is recorded in
 [the registered contract](research/preregistrations/v2_round6_compute_amendment.md).

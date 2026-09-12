@@ -661,6 +661,8 @@ for _factor, _series in {
 
 
 def _semantic_definition(family: str, name: str) -> tuple[str, str]:
+    if family == "sidecar_fundamentals_native" and name == "earnings_negative_flag":
+        return "flag", "one when receipt-known earnings are negative"
     if family.startswith("sidecar_") and name in _ROUND5_FORMULAS:
         return _ROUND5_FORMULAS[name][:2]
     if family == "slow":
@@ -710,7 +712,21 @@ def feature_specs(
         units, formula = _semantic_definition(family, name)
         suffix = name.split("_", 1)[1] if family == "sidecar_rebalance" else name
         round5 = _ROUND5_FORMULAS.get(name) if family.startswith("sidecar_") else None
-        if round5 is not None:
+        if family == "sidecar_fundamentals_native":
+            transform = "precomputed_native"
+            clip = None
+            if name == "book_to_market":
+                units, formula = (
+                    "log_ratio",
+                    "natural log of positive receipt-known book equity / PIT market capitalization",
+                )
+            elif name == "earnings_negative_flag":
+                units, formula = (
+                    "flag",
+                    "one when valid signed earnings_yield_ttm is negative; zero otherwise",
+                )
+            formula += "; physical store value; median/IQR scaling and +/-5 clipping fitted only on each training window"
+        elif round5 is not None:
             transform = round5[2]
             clip = None
         elif suffix in _BINARY:

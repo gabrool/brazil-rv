@@ -57,6 +57,7 @@ def _run(
     initial_hedge_reference_price: float = 100.0,
     hedge_close: np.ndarray | None = None,
     hedge_annual_borrow_rate: np.ndarray | None = None,
+    entry_fill_allowed: np.ndarray | None = None,
 ) -> StatefulLedgerResult:
     days, names = close.shape
     dates = tuple(date(2024, 1, 2) + timedelta(days=index) for index in range(days))
@@ -78,6 +79,7 @@ def _run(
         raw_close=close,
         cdi_returns=np.zeros(days) if cdi is None else cdi,
         fill_fraction=fill_fraction,
+        entry_fill_allowed=entry_fill_allowed,
         action_terms=no_actions if actions is None else actions,
         action_payment_session=(
             np.full(close.shape, -1, dtype=np.int64)
@@ -2290,3 +2292,27 @@ def test_rev4_uniform_comparator_is_exact_legacy_ledger() -> None:
     np.testing.assert_array_equal(comparator.daily_net_return, legacy.daily_net_return)
     assert comparator.intended_orders == legacy.intended_orders
     assert comparator.fills == legacy.fills
+
+
+def test_execution_entry_restriction_preserves_orders_and_printed_exits():
+    close = np.asarray([[100.0, 100.0, 100.0, 100.0], [110.0, 90.0, 100.0, 100.0]])
+    scores = np.asarray([[4.0, 1.0, 2.0, 3.0], [1.0, 4.0, 2.0, 3.0]])
+    reference = np.full(4, 100.0)
+    ordinary = _run(close, scores, initial_reference_price=reference)
+    blocked = _run(
+        close,
+        scores,
+        initial_reference_price=reference,
+        entry_fill_allowed=np.zeros_like(close, dtype=bool),
+    )
+    assert ordinary.intended_orders[0] == blocked.intended_orders[0]
+    assert ordinary.intended_orders[1] == blocked.intended_orders[1]
+    assert ordinary.fills and not blocked.fills
+    # Once held, a restriction on opening risk must not obstruct liquidation.
+    allowed = np.ones_like(close, dtype=bool)
+    allowed[1] = False
+    held = _run(
+        close, scores, initial_reference_price=reference, entry_fill_allowed=allowed
+    )
+    np.testing.assert_array_equal(held.nav, ordinary.nav)
+    assert held.fills == ordinary.fills

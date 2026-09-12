@@ -1,0 +1,22 @@
+{
+  "completed": [
+    "source U2 and continuation audits",
+    "foreign-flow historical publication audit",
+    "physical-family support audit",
+    "C1 modules and masking tests"
+  ],
+  "experiment_scores_started": false,
+  "gpu_launched": false,
+  "pending": [
+    "repaired store build and acceptance",
+    "R training and scoring integration",
+    "archived diagnostics",
+    "engineering learning and fullgraph smokes",
+    "GPU calibration screening confirmation",
+    "economic reports artifact recovery and shutdown"
+  ],
+  "phase": "implementation_and_store_repair",
+  "source_audit_manifest_sha256": "38fb8988213c7361ec9b86a9edba05570b778fdebf197d2d7da6e99271effa12",
+  "source_audit_root": "D:\\quant-data\\b3\\interim\\round7_20260912T214606Z",
+  "source_coverage": "D:\\quant-data\\b3\\interim\\round7_20260912T214606Z\\family_coverage.json"
+}

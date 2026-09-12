@@ -1212,6 +1212,7 @@ def simulate_stateful_ledger(
     hedge_annual_borrow_rate: NDArray[np.floating] | None = None,
     entry_sizing_volatility: NDArray[np.floating] | None = None,
     capacity_buffer_per_side: int | None = None,
+    entry_fill_allowed: NDArray[np.bool_] | None = None,
 ) -> StatefulLedgerResult:
     """Run causal close-proxy orders, fills, and a raw signed-share ledger.
 
@@ -1219,6 +1220,8 @@ def simulate_stateful_ledger(
     new-entry cohort; existing inventory is not rebalanced. It must already be
     available at the decision. Capacity can be bound to a reference buffer for
     a retention-only ablation without changing entry quotas.
+    An execution-time entry-fill mask can suppress opening fills without changing
+    earlier orders, printed exits, or inventory valuation.
     """
 
     inputs = _validate_inputs(
@@ -1248,6 +1251,10 @@ def simulate_stateful_ledger(
         beta_hedge=config.beta_hedge,
     )
     day_count, name_count = inputs.score.shape
+    if entry_fill_allowed is not None:
+        entry_fill_allowed = np.asarray(entry_fill_allowed, dtype=np.bool_)
+        if entry_fill_allowed.shape != inputs.score.shape:
+            raise ValueError("entry-fill availability must align with ledger panels")
     sizing_volatility = (
         None
         if entry_sizing_volatility is None
@@ -2690,6 +2697,12 @@ def simulate_stateful_ledger(
                     del pending_map[name]
                     continue
                 if not printed[name]:
+                    continue
+                if (
+                    entries
+                    and entry_fill_allowed is not None
+                    and not entry_fill_allowed[day, name]
+                ):
                     continue
                 fraction = float(inputs.fill_fraction[day, name])
                 remaining_before_fill = pending.remaining_size

@@ -140,6 +140,7 @@ class EvaluationInputs:
     initial_hedge_reference_price: float = np.nan
     neutral_target_fallback_flags: NDArray[np.bool_] | None = None
     execution_policy: ExecutionPolicy | None = None
+    entry_fill_allowed: NDArray[np.bool_] | None = None
 
 
 @dataclass(frozen=True)
@@ -857,6 +858,7 @@ def _ledger_inputs(
         "borrow_rate_imputed": inputs.borrow_rate_imputed,
         "borrow_rate_placeholder": inputs.borrow_rate_placeholder,
         "selection_volatility": inputs.prior_feature_values["yang_zhang_vol_20"],
+        "entry_fill_allowed": inputs.entry_fill_allowed,
         "hedge_beta": inputs.hedge_beta,
         "hedge_beta_valid": inputs.hedge_beta_valid,
         "hedge_beta_history": inputs.hedge_beta_history,
@@ -1592,6 +1594,11 @@ def _input_hashes(inputs: EvaluationInputs) -> dict[str, str]:
         ),
         "price_target_mask": _array_sha256(np.asarray(inputs.price_target_mask)),
         "active": _array_sha256(np.asarray(inputs.active)),
+        "entry_fill_allowed": _array_sha256(
+            np.ones_like(inputs.active, dtype=np.bool_)
+            if inputs.entry_fill_allowed is None
+            else np.asarray(inputs.entry_fill_allowed, dtype=np.bool_)
+        ),
         "raw_close": _array_sha256(np.asarray(inputs.raw_close)),
         "action_shares_per_prior_share": _array_sha256(
             np.asarray(inputs.action_shares_per_prior_share)
@@ -2994,6 +3001,10 @@ def _validate_paired_identity(
             "mismatched identities: "
             f"{mismatched}"
         )
+    if candidate_inputs.get("entry_fill_allowed") != baseline_inputs.get(
+        "entry_fill_allowed"
+    ):
+        raise ValueError("paired comparison requires identical entry-fill availability")
     if (
         candidate_report["source_artifact_hashes"]
         != baseline_report["source_artifact_hashes"]

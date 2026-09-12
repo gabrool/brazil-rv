@@ -228,6 +228,101 @@ class VectorSwiGLUResidualBlock(nn.Module):
         return inputs + self.dropout(self.swiglu(self.norm(inputs)))
 
 
+def encode_slow_history(
+    slow_features: torch.Tensor,
+    slow_feature_mask: torch.Tensor,
+    slow_history_mask: torch.Tensor,
+    slow_feature_age_sessions: torch.Tensor,
+    *,
+    config: ModelConfig,
+    input_projection: nn.Module,
+    input_norm: nn.Module,
+    encoder: nn.Module,
+) -> torch.Tensor:
+    """Shared exact calendar-window encoder for S0 and the characteristic model."""
+    if slow_features.ndim != 4:
+        raise ValueError("slow_features must have shape [batch, name, date, field]")
+    if slow_history_mask.shape != slow_features.shape[:-1]:
+        raise ValueError("slow_history_mask is misaligned with slow_features")
+    if slow_feature_mask.shape != slow_features.shape:
+        raise ValueError("slow_feature_mask is misaligned with slow_features")
+    if slow_feature_age_sessions.shape != slow_features.shape:
+        raise ValueError("slow feature ages are misaligned with slow_features")
+    if slow_features.shape[-1] != config.slow_feature_count:
+        raise ValueError("slow feature width differs from the model configuration")
+    batch_size, name_count, lookback, _ = slow_features.shape
+    if lookback != config.slow_lookback:
+        raise ValueError("slow lookback differs from the model configuration")
+    feature_valid = slow_feature_mask.bool()
+    valid = slow_history_mask.bool()
+    torch._assert_async(
+        torch.all(~feature_valid | valid[..., None]),
+        "slow features cannot be valid in left-padding rows",
+    )
+    torch._assert_async(
+        torch.all(~valid[..., :-1] | valid[..., 1:]),
+        "slow history must be a left-padded calendar suffix",
+    )
+    if config.slow_encoder_kind == "mlp":
+        # E8 sees only the final permitted slow row (t-1), including that
+        # row's masks and ages. Never substitute an older observed row.
+        slow_features = slow_features[..., -1:, :]
+        feature_valid = feature_valid[..., -1:, :]
+        slow_feature_age_sessions = slow_feature_age_sessions[..., -1:, :]
+        valid = valid[..., -1:]
+    clean = torch.where(feature_valid, slow_features, torch.zeros_like(slow_features))
+    bounded_age, age_known = _bounded_feature_age(
+        slow_feature_age_sessions.to(dtype=clean.dtype), feature_valid
+    )
+    projected = input_norm(
+        input_projection(
+            torch.cat(
+                (
+                    clean,
+                    feature_valid.to(clean.dtype),
+                    bounded_age,
+                    age_known.to(clean.dtype),
+                ),
+                dim=-1,
+            )
+        )
+    )
+    projected = torch.where(valid[..., None], projected, torch.zeros_like(projected))
+    if config.slow_encoder_kind == "mlp":
+        state = encoder(projected[..., 0, :])
+        return torch.where(valid[..., -1, None], state, torch.zeros_like(state))
+    flat = projected.reshape(batch_size * name_count, lookback, -1)
+    lengths = valid.reshape(batch_size * name_count, lookback).sum(dim=1)
+    has_history = lengths > 0
+    # Move each real calendar suffix to the front without compressing
+    # missing sessions inside it.
+    positions = torch.arange(lookback, device=slow_features.device)[None, :]
+    source = lookback - lengths[:, None] + positions
+    source = source.clamp(min=0, max=lookback - 1)
+    packed_inputs = flat.gather(1, source[..., None].expand(-1, -1, flat.shape[-1]))
+    packed_inputs = torch.where(
+        positions[..., None] < lengths[:, None, None],
+        packed_inputs,
+        torch.zeros_like(packed_inputs),
+    )
+    # The real suffix is now right-padded.  Gather the output at its final
+    # real calendar step, before any padded zero can advance the recurrent
+    # state.  This is equivalent to a packed GRU while remaining friendly
+    # to full-graph compilation.
+    sequence, _ = encoder(packed_inputs)
+    last = (lengths - 1).clamp_min(0)
+    state = sequence.gather(
+        1,
+        last[:, None, None].expand(-1, 1, sequence.shape[-1]),
+    )[:, 0].reshape(batch_size, name_count, config.hidden_width)
+    has_history = has_history.reshape(batch_size, name_count)
+    # A name can enter today's strictly prior-session universe before it
+    # has a rank-normalized row in the t-1 slow window.  The GRU state of
+    # that genuinely empty sequence is its fixed zero initial state.  The
+    # learned absent_state remains reserved for the optional fast stream.
+    return torch.where(has_history[..., None], state, torch.zeros_like(state))
+
+
 class DailyMultiHorizonModel(nn.Module):
     """Shared, embedding-free daily model for five horizons and to-close."""
 
@@ -340,91 +435,16 @@ class DailyMultiHorizonModel(nn.Module):
         slow_history_mask: torch.Tensor,
         slow_feature_age_sessions: torch.Tensor,
     ) -> torch.Tensor:
-        if slow_features.ndim != 4:
-            raise ValueError("slow_features must have shape [batch, name, date, field]")
-        if slow_history_mask.shape != slow_features.shape[:-1]:
-            raise ValueError("slow_history_mask is misaligned with slow_features")
-        if slow_feature_mask.shape != slow_features.shape:
-            raise ValueError("slow_feature_mask is misaligned with slow_features")
-        if slow_feature_age_sessions.shape != slow_features.shape:
-            raise ValueError("slow feature ages are misaligned with slow_features")
-        if slow_features.shape[-1] != self.config.slow_feature_count:
-            raise ValueError("slow feature width differs from the model configuration")
-        batch_size, name_count, lookback, _ = slow_features.shape
-        if lookback != self.config.slow_lookback:
-            raise ValueError("slow lookback differs from the model configuration")
-        feature_valid = slow_feature_mask.bool()
-        valid = slow_history_mask.bool()
-        torch._assert_async(
-            torch.all(~feature_valid | valid[..., None]),
-            "slow features cannot be valid in left-padding rows",
+        return encode_slow_history(
+            slow_features,
+            slow_feature_mask,
+            slow_history_mask,
+            slow_feature_age_sessions,
+            config=self.config,
+            input_projection=self.slow_input_projection,
+            input_norm=self.slow_input_norm,
+            encoder=self.slow_encoder,
         )
-        torch._assert_async(
-            torch.all(~valid[..., :-1] | valid[..., 1:]),
-            "slow history must be a left-padded calendar suffix",
-        )
-        if self.config.slow_encoder_kind == "mlp":
-            # E8 sees only the final permitted slow row (t-1), including that
-            # row's masks and ages. Never substitute an older observed row.
-            slow_features = slow_features[..., -1:, :]
-            feature_valid = feature_valid[..., -1:, :]
-            slow_feature_age_sessions = slow_feature_age_sessions[..., -1:, :]
-            valid = valid[..., -1:]
-        clean = torch.where(
-            feature_valid, slow_features, torch.zeros_like(slow_features)
-        )
-        bounded_age, age_known = _bounded_feature_age(
-            slow_feature_age_sessions.to(dtype=clean.dtype), feature_valid
-        )
-        projected = self.slow_input_norm(
-            self.slow_input_projection(
-                torch.cat(
-                    (
-                        clean,
-                        feature_valid.to(clean.dtype),
-                        bounded_age,
-                        age_known.to(clean.dtype),
-                    ),
-                    dim=-1,
-                )
-            )
-        )
-        projected = torch.where(
-            valid[..., None], projected, torch.zeros_like(projected)
-        )
-        if self.config.slow_encoder_kind == "mlp":
-            state = self.slow_encoder(projected[..., 0, :])
-            return torch.where(valid[..., -1, None], state, torch.zeros_like(state))
-        flat = projected.reshape(batch_size * name_count, lookback, -1)
-        lengths = valid.reshape(batch_size * name_count, lookback).sum(dim=1)
-        has_history = lengths > 0
-        # Move each real calendar suffix to the front without compressing
-        # missing sessions inside it.
-        positions = torch.arange(lookback, device=slow_features.device)[None, :]
-        source = lookback - lengths[:, None] + positions
-        source = source.clamp(min=0, max=lookback - 1)
-        packed_inputs = flat.gather(1, source[..., None].expand(-1, -1, flat.shape[-1]))
-        packed_inputs = torch.where(
-            positions[..., None] < lengths[:, None, None],
-            packed_inputs,
-            torch.zeros_like(packed_inputs),
-        )
-        # The real suffix is now right-padded.  Gather the output at its final
-        # real calendar step, before any padded zero can advance the recurrent
-        # state.  This is equivalent to a packed GRU while remaining friendly
-        # to full-graph compilation.
-        sequence, _ = self.slow_encoder(packed_inputs)
-        last = (lengths - 1).clamp_min(0)
-        state = sequence.gather(
-            1,
-            last[:, None, None].expand(-1, 1, sequence.shape[-1]),
-        )[:, 0].reshape(batch_size, name_count, self.config.hidden_width)
-        has_history = has_history.reshape(batch_size, name_count)
-        # A name can enter today's strictly prior-session universe before it
-        # has a rank-normalized row in the t-1 slow window.  The GRU state of
-        # that genuinely empty sequence is its fixed zero initial state.  The
-        # learned absent_state remains reserved for the optional fast stream.
-        return torch.where(has_history[..., None], state, torch.zeros_like(state))
 
     def _current_states(
         self,

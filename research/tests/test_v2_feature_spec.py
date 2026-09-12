@@ -9,7 +9,11 @@ from brazil_rv.v2.feature_spec import (
     observation_age_sessions_into,
     transform_feature_panel_into,
 )
-from brazil_rv.v2.contract import INTRADAY_DAILY_FEATURES, SIDECAR_FEATURES, SLOW_FEATURES
+from brazil_rv.v2.contract import (
+    INTRADAY_DAILY_FEATURES,
+    SIDECAR_FEATURES,
+    SLOW_FEATURES,
+)
 from brazil_rv.v2.intraday_features import NATIVE_FAST_FEATURES
 
 
@@ -46,11 +50,7 @@ def test_typed_transforms_keep_zero_distinct_from_missing() -> None:
 
 
 def test_rank_transform_requires_declared_cross_section_support() -> None:
-    spec = (
-        FeatureSpec(
-            "return", "slow", "rank_gauss", "decimal", minimum_support=4
-        ),
-    )
+    spec = (FeatureSpec("return", "slow", "rank_gauss", "decimal", minimum_support=4),)
     values = np.asarray([[[1.0], [2.0], [3.0]]])
     valid = np.ones_like(values, dtype=bool)
     output = np.empty_like(values, dtype=np.float32)
@@ -79,9 +79,7 @@ def test_decision_snapshot_applies_daily_lag_once_with_current_membership() -> N
         dtype=np.float64,
     )
     valid = np.ones_like(values, dtype=np.bool_)
-    active = np.asarray(
-        [[True, False], [False, True], [True, True]], dtype=np.bool_
-    )
+    active = np.asarray([[True, False], [False, True], [True, True]], dtype=np.bool_)
     output = np.empty_like(values, dtype=np.float32)
     output_valid = np.empty_like(valid)
 
@@ -107,12 +105,17 @@ def test_decision_snapshot_applies_daily_lag_once_with_current_membership() -> N
     assert output_valid[2].all()
 
 
-def test_estimator_age_tracks_underlying_observation_and_preserves_known_staleness() -> None:
+def test_estimator_age_tracks_underlying_observation_and_preserves_known_staleness() -> (
+    None
+):
     valid = np.asarray([False, False, True, False, True])[:, None, None]
     source_age = np.asarray([-1, -1, 1, -1, 0], dtype=np.float32)[:, None, None]
     output = np.empty(source_age.shape, dtype=np.float32)
     observation_age_sessions_into(
-        valid, np.ones((5, 1), dtype=bool), output, source_age_sessions=source_age,
+        valid,
+        np.ones((5, 1), dtype=bool),
+        output,
+        source_age_sessions=source_age,
     )
     np.testing.assert_array_equal(output[:, 0, 0], [-1, -1, 1, 2, 0])
 
@@ -148,9 +151,7 @@ def test_observation_age_uses_exchange_rows_and_preserves_known_staleness() -> N
 
 
 def test_source_age_uses_raw_observations_before_output_and_not_rank_support() -> None:
-    raw_valid = np.asarray(
-        [[[True]], [[False]], [[False]], [[True]]], dtype=np.bool_
-    )
+    raw_valid = np.asarray([[[True]], [[False]], [[False]], [[True]]], dtype=np.bool_)
     active = np.asarray([[True], [False], [True], [True]], dtype=np.bool_)
     output = np.empty((2, 1, 1), dtype=np.float32)
 
@@ -190,9 +191,10 @@ def test_activity_feature_specs_bind_inclusive_exact_session_windows() -> None:
             ),
         )
     }
-    assert "complete-source no-trade sessions are exact zero" in specs[
-        "log_volume_mean_20"
-    ].formula
+    assert (
+        "complete-source no-trade sessions are exact zero"
+        in specs["log_volume_mean_20"].formula
+    )
     for name in (
         "log_volume_mean_20",
         "volume_zscore_20",
@@ -269,3 +271,21 @@ def test_native_fast_registry_binds_order_formulas_and_identity_transform() -> N
     assert feature_schema_sha256(specs) != feature_schema_sha256(
         (replace(specs[0], formula="different"), *specs[1:])
     )
+
+
+def test_native_fundamentals_preserve_sparse_signed_observations():
+    from brazil_rv.v2.round7_data import NATIVE_FIELDS
+
+    specs = feature_specs("sidecar_fundamentals_native", NATIVE_FIELDS)
+    assert all(
+        s.transform == "precomputed_native" and s.minimum_support == 1 for s in specs
+    )
+    values = np.asarray([[[-0.03, -2.0, 0.2, 1.2, -0.1, -0.4, -2.0, 16.0, 1.0]]])
+    valid = np.ones_like(values, dtype=bool)
+    output = np.zeros_like(values, dtype=np.float32)
+    output_valid = np.zeros_like(valid)
+    transform_feature_panel_into(
+        values, valid, np.ones((1, 1), bool), specs, output, output_valid
+    )
+    np.testing.assert_allclose(output, values)
+    assert output_valid.all()

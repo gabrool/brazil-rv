@@ -13,10 +13,11 @@ from pathlib import Path
 
 import polars as pl
 
-SCRIPT_VERSION = "2"
+SCRIPT_VERSION = "3"
 RECORD_LENGTH = 245
 VALID_EQUITY_BASE_SPECS = {"ON", "OR", "PN", "PNA", "PNB", "PNC", "PND", "PNE", "PNF", "UNT"}
 VALID_ISIN = re.compile(r"^[A-Z]{2}[A-Z0-9]{9}[0-9]$")
+CONTINUATION_BDI_CODES = frozenset({"06", "07", "08"})
 
 
 @dataclass
@@ -103,7 +104,9 @@ def parse_trailer(line: bytes) -> int:
 
 
 def is_equity_candidate(cod_bdi: str, market_type: int, spec: str) -> bool:
-    if cod_bdi != "02" or market_type != 10:
+    # Special cash categories still contain real prints for an existing claim.
+    # Eligibility is a research-universe decision, not a raw parsing decision.
+    if cod_bdi not in {"02", *CONTINUATION_BDI_CODES} or market_type != 10:
         return False
     base_spec = spec.split()[0] if spec else ""
     return base_spec in VALID_EQUITY_BASE_SPECS and "REC" not in spec

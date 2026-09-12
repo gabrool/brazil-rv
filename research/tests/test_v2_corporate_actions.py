@@ -1070,3 +1070,43 @@ def test_action_coverage_requires_explicit_completeness_and_rejects_overlap() ->
     assert not action_coverage_resolved_mask(
         provider_only, dates, ["BRTESTACNOR1", "BRTESTACNPR0"]
     ).any()
+
+
+def test_repaired_unit_history_does_not_reapply_an_uncorroborated_crash():
+    dates = np.arange("2024-01-02", "2024-01-08", dtype="datetime64[D]")
+    close = np.asarray([[100.0], [100.0], [50.0], [50.0], [50.0], [25.0]])
+    quantity = np.asarray([[100.0], [100.0], [200.0], [200.0], [200.0], [400.0]])
+    observed = np.ones_like(close, dtype=bool)
+    fixed = np.ones_like(close)
+    fixed[3:] = np.nan
+    corroborated = np.zeros_like(observed)
+    corroborated[-1] = True
+    result = infer_cotahist_action_terms(
+        dates,
+        ("BRTESTACNOR1",),
+        close,
+        quantity,
+        np.full_like(close, 10.0),
+        np.ones_like(close),
+        observed,
+        observed,
+        fixed_share_factors=fixed,
+        u2_corroborated=corroborated,
+    )
+    assert len(result.terms) == 1
+    assert result.terms[0].shares_per_prior_share == 2.0
+    assert result.u2_event[-1, 0]
+    rejected = infer_cotahist_action_terms(
+        dates,
+        ("BRTESTACNOR1",),
+        close,
+        quantity,
+        np.full_like(close, 10.0),
+        np.ones_like(close),
+        observed,
+        observed,
+        fixed_share_factors=fixed,
+        u2_corroborated=np.zeros_like(observed),
+    )
+    assert not rejected.terms
+    assert rejected.large_move_no_action[-1, 0]

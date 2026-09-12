@@ -1,0 +1,1057 @@
+{
+  "advancement": "A1 plus up to four non-anchor candidates, ranked by paired IC against A0 and within .002 of the leader; ties by cell order",
+  "base_store": {
+    "manifest_sha256": "968df3947b68ec68d62638ee53402c908b9ea2e24dfd27291e156e17d31a31c1",
+    "root": "D:\\quant-data\\b3\\processed\\v2_round6_store_b72950b_20260911T145000Z"
+  },
+  "cells": [
+    {
+      "cell": "A0",
+      "config": {
+        "allow_contaminated_v1_initialization": false,
+        "common_state_feature_count": 0,
+        "compile_forward": true,
+        "current_feature_count": 0,
+        "disable_fast_stream": true,
+        "dropout": 0.1,
+        "fast_encoder_mode": "native",
+        "fast_pretrained": false,
+        "fast_pretrained_checkpoint": null,
+        "fast_pretrained_sha256": null,
+        "fusion_width": 128,
+        "gru_layers": 1,
+        "hidden_width": 64,
+        "horizon_loss_weights": [
+          0.2,
+          0.2,
+          0.2,
+          0.2,
+          0.2
+        ],
+        "lambda_persistence": 0.0,
+        "selection_horizons": [
+          3,
+          5,
+          10
+        ],
+        "sidecar_feature_counts": [],
+        "slow_encoder_kind": "gru",
+        "slow_feature_count": 32,
+        "slow_lookback": 60,
+        "soft_rank_temperature": 0.5,
+        "time_decay_half_life_sessions": null,
+        "to_close_weight": 0.0,
+        "trunk_blocks": 2,
+        "trunk_swiglu_hidden": 48,
+        "use_bf16": true
+      },
+      "graph": "s0",
+      "inputs": "slow",
+      "loss": "soft_spearman",
+      "parameters": 120902,
+      "pretrain_key": "s0_slow",
+      "recipe": "old",
+      "rho": 0.125
+    },
+    {
+      "cell": "A1",
+      "config": {
+        "allow_contaminated_v1_initialization": false,
+        "common_state_feature_count": 0,
+        "compile_forward": true,
+        "current_feature_count": 0,
+        "disable_fast_stream": true,
+        "dropout": 0.1,
+        "fast_encoder_mode": "native",
+        "fast_pretrained": false,
+        "fast_pretrained_checkpoint": null,
+        "fast_pretrained_sha256": null,
+        "fusion_width": 128,
+        "gru_layers": 1,
+        "hidden_width": 64,
+        "horizon_loss_weights": [
+          0.2,
+          0.2,
+          0.2,
+          0.2,
+          0.2
+        ],
+        "lambda_persistence": 0.0,
+        "selection_horizons": [
+          3,
+          5,
+          10
+        ],
+        "sidecar_feature_counts": [],
+        "slow_encoder_kind": "gru",
+        "slow_feature_count": 32,
+        "slow_lookback": 60,
+        "soft_rank_temperature": 0.5,
+        "time_decay_half_life_sessions": null,
+        "to_close_weight": 0.0,
+        "trunk_blocks": 2,
+        "trunk_swiglu_hidden": 48,
+        "use_bf16": true
+      },
+      "graph": "s0",
+      "inputs": "slow",
+      "loss": "soft_spearman",
+      "parameters": 120902,
+      "pretrain_key": "s0_slow",
+      "recipe": "R",
+      "rho": 0.125
+    },
+    {
+      "cell": "A2",
+      "config": {
+        "allow_contaminated_v1_initialization": false,
+        "common_state_feature_count": 0,
+        "compile_forward": true,
+        "current_feature_count": 0,
+        "disable_fast_stream": true,
+        "dropout": 0.1,
+        "fast_encoder_mode": "native",
+        "fast_pretrained": false,
+        "fast_pretrained_checkpoint": null,
+        "fast_pretrained_sha256": null,
+        "fusion_width": 128,
+        "gru_layers": 1,
+        "hidden_width": 64,
+        "horizon_loss_weights": [
+          0.2,
+          0.2,
+          0.2,
+          0.2,
+          0.2
+        ],
+        "lambda_persistence": 0.0,
+        "selection_horizons": [
+          3,
+          5,
+          10
+        ],
+        "sidecar_feature_counts": [],
+        "slow_encoder_kind": "gru",
+        "slow_feature_count": 32,
+        "slow_lookback": 60,
+        "soft_rank_temperature": 0.5,
+        "time_decay_half_life_sessions": null,
+        "to_close_weight": 0.0,
+        "trunk_blocks": 2,
+        "trunk_swiglu_hidden": 48,
+        "use_bf16": true
+      },
+      "graph": "s0",
+      "inputs": "slow",
+      "loss": "soft_spearman",
+      "parameters": 120902,
+      "pretrain_key": "s0_slow",
+      "recipe": "R",
+      "rho": 0.05
+    },
+    {
+      "cell": "A3",
+      "config": {
+        "allow_contaminated_v1_initialization": false,
+        "common_state_feature_count": 0,
+        "compile_forward": true,
+        "current_feature_count": 0,
+        "disable_fast_stream": true,
+        "dropout": 0.1,
+        "fast_encoder_mode": "native",
+        "fast_pretrained": false,
+        "fast_pretrained_checkpoint": null,
+        "fast_pretrained_sha256": null,
+        "fusion_width": 128,
+        "gru_layers": 1,
+        "hidden_width": 64,
+        "horizon_loss_weights": [
+          0.2,
+          0.2,
+          0.2,
+          0.2,
+          0.2
+        ],
+        "lambda_persistence": 0.0,
+        "selection_horizons": [
+          3,
+          5,
+          10
+        ],
+        "sidecar_feature_counts": [
+          [
+            "cross_market",
+            65
+          ],
+          [
+            "events",
+            7
+          ],
+          [
+            "fundamentals",
+            12
+          ],
+          [
+            "fundamentals_native",
+            9
+          ],
+          [
+            "lending",
+            7
+          ],
+          [
+            "magnitudes",
+            4
+          ],
+          [
+            "microstructure",
+            2
+          ],
+          [
+            "oddlot",
+            2
+          ],
+          [
+            "options",
+            7
+          ],
+          [
+            "rebalance",
+            2
+          ],
+          [
+            "sector",
+            3
+          ]
+        ],
+        "slow_encoder_kind": "gru",
+        "slow_feature_count": 32,
+        "slow_lookback": 60,
+        "soft_rank_temperature": 0.5,
+        "time_decay_half_life_sessions": null,
+        "to_close_weight": 0.0,
+        "trunk_blocks": 2,
+        "trunk_swiglu_hidden": 48,
+        "use_bf16": true
+      },
+      "graph": "s0",
+      "inputs": "all",
+      "loss": "soft_spearman",
+      "parameters": 166982,
+      "pretrain_key": "s0_all",
+      "recipe": "R",
+      "rho": 0.05
+    },
+    {
+      "cell": "B1",
+      "config": {
+        "blocks": 3,
+        "common_field_count": 0,
+        "context": "pool",
+        "dropout": 0.1,
+        "family_counts": [],
+        "hidden_width": 64,
+        "horizons": [
+          3,
+          5,
+          10
+        ],
+        "inner_width": 256,
+        "lookback": 60,
+        "members": 1,
+        "slow_feature_count": 32,
+        "temporal": true,
+        "width": 256
+      },
+      "graph": "c1",
+      "inputs": "slow",
+      "loss": "soft_spearman",
+      "parameters": 1297475,
+      "pretrain_key": "c1_slow",
+      "recipe": "R",
+      "rho": 0.125
+    },
+    {
+      "cell": "B2",
+      "config": {
+        "blocks": 3,
+        "common_field_count": 0,
+        "context": "pool",
+        "dropout": 0.1,
+        "family_counts": [],
+        "hidden_width": 64,
+        "horizons": [
+          3,
+          5,
+          10
+        ],
+        "inner_width": 256,
+        "lookback": 60,
+        "members": 1,
+        "slow_feature_count": 32,
+        "temporal": true,
+        "width": 256
+      },
+      "graph": "c1",
+      "inputs": "slow",
+      "loss": "soft_spearman",
+      "parameters": 1297475,
+      "pretrain_key": "c1_slow",
+      "recipe": "R",
+      "rho": 0.1
+    },
+    {
+      "cell": "B3",
+      "config": {
+        "blocks": 3,
+        "common_field_count": 0,
+        "context": "pool",
+        "dropout": 0.1,
+        "family_counts": [],
+        "hidden_width": 64,
+        "horizons": [
+          3,
+          5,
+          10
+        ],
+        "inner_width": 256,
+        "lookback": 60,
+        "members": 1,
+        "slow_feature_count": 32,
+        "temporal": true,
+        "width": 256
+      },
+      "graph": "c1",
+      "inputs": "slow",
+      "loss": "soft_spearman",
+      "parameters": 1297475,
+      "pretrain_key": "c1_slow",
+      "recipe": "R",
+      "rho": 0.05
+    },
+    {
+      "cell": "B4",
+      "config": {
+        "blocks": 3,
+        "common_field_count": 44,
+        "context": "pool",
+        "dropout": 0.1,
+        "family_counts": [
+          [
+            "cross_market",
+            24
+          ],
+          [
+            "events",
+            7
+          ],
+          [
+            "fundamentals",
+            12
+          ],
+          [
+            "fundamentals_native",
+            9
+          ],
+          [
+            "lending",
+            7
+          ],
+          [
+            "magnitudes",
+            4
+          ],
+          [
+            "microstructure",
+            2
+          ],
+          [
+            "oddlot",
+            2
+          ],
+          [
+            "options",
+            7
+          ],
+          [
+            "rebalance",
+            2
+          ],
+          [
+            "sector",
+            3
+          ]
+        ],
+        "hidden_width": 64,
+        "horizons": [
+          3,
+          5,
+          10
+        ],
+        "inner_width": 256,
+        "lookback": 60,
+        "members": 1,
+        "slow_feature_count": 32,
+        "temporal": true,
+        "width": 256
+      },
+      "graph": "c1",
+      "inputs": "all",
+      "loss": "soft_spearman",
+      "parameters": 1471651,
+      "pretrain_key": "c1_all",
+      "recipe": "R",
+      "rho": 0.05
+    },
+    {
+      "cell": "B5",
+      "config": {
+        "blocks": 3,
+        "common_field_count": 44,
+        "context": "pool",
+        "dropout": 0.1,
+        "family_counts": [
+          [
+            "cross_market",
+            24
+          ],
+          [
+            "events",
+            7
+          ],
+          [
+            "fundamentals",
+            12
+          ],
+          [
+            "fundamentals_native",
+            9
+          ],
+          [
+            "lending",
+            7
+          ],
+          [
+            "magnitudes",
+            4
+          ],
+          [
+            "microstructure",
+            2
+          ],
+          [
+            "oddlot",
+            2
+          ],
+          [
+            "options",
+            7
+          ],
+          [
+            "rebalance",
+            2
+          ],
+          [
+            "sector",
+            3
+          ]
+        ],
+        "hidden_width": 64,
+        "horizons": [
+          3,
+          5,
+          10
+        ],
+        "inner_width": 256,
+        "lookback": 60,
+        "members": 1,
+        "slow_feature_count": 32,
+        "temporal": true,
+        "width": 256
+      },
+      "graph": "c1",
+      "inputs": "all",
+      "loss": "soft_spearman",
+      "parameters": 1471651,
+      "pretrain_key": "c1_all",
+      "recipe": "R",
+      "rho": 0.125
+    },
+    {
+      "cell": "B6",
+      "config": {
+        "blocks": 3,
+        "common_field_count": 44,
+        "context": "pool",
+        "dropout": 0.1,
+        "family_counts": [
+          [
+            "cross_market",
+            24
+          ],
+          [
+            "events",
+            7
+          ],
+          [
+            "fundamentals",
+            12
+          ],
+          [
+            "fundamentals_native",
+            9
+          ],
+          [
+            "lending",
+            7
+          ],
+          [
+            "magnitudes",
+            4
+          ],
+          [
+            "microstructure",
+            2
+          ],
+          [
+            "oddlot",
+            2
+          ],
+          [
+            "options",
+            7
+          ],
+          [
+            "rebalance",
+            2
+          ],
+          [
+            "sector",
+            3
+          ]
+        ],
+        "hidden_width": 64,
+        "horizons": [
+          3,
+          5,
+          10
+        ],
+        "inner_width": 256,
+        "lookback": 60,
+        "members": 1,
+        "slow_feature_count": 32,
+        "temporal": false,
+        "width": 256
+      },
+      "graph": "c1_no_gru",
+      "inputs": "all",
+      "loss": "soft_spearman",
+      "parameters": 1421923,
+      "pretrain_key": "c1_no_gru_all",
+      "recipe": "R",
+      "rho": 0.05
+    },
+    {
+      "cell": "B7",
+      "config": {
+        "blocks": 3,
+        "common_field_count": 44,
+        "context": "pool",
+        "dropout": 0.1,
+        "family_counts": [
+          [
+            "cross_market",
+            24
+          ],
+          [
+            "events",
+            7
+          ],
+          [
+            "fundamentals",
+            12
+          ],
+          [
+            "fundamentals_native",
+            9
+          ],
+          [
+            "lending",
+            7
+          ],
+          [
+            "magnitudes",
+            4
+          ],
+          [
+            "microstructure",
+            2
+          ],
+          [
+            "oddlot",
+            2
+          ],
+          [
+            "options",
+            7
+          ],
+          [
+            "rebalance",
+            2
+          ],
+          [
+            "sector",
+            3
+          ]
+        ],
+        "hidden_width": 64,
+        "horizons": [
+          1,
+          2,
+          3,
+          5,
+          10
+        ],
+        "inner_width": 256,
+        "lookback": 60,
+        "members": 1,
+        "slow_feature_count": 32,
+        "temporal": true,
+        "width": 256
+      },
+      "graph": "c1_five_heads",
+      "inputs": "all",
+      "loss": "soft_spearman",
+      "parameters": 1472165,
+      "pretrain_key": "c1_five_heads_all",
+      "recipe": "R",
+      "rho": 0.05
+    },
+    {
+      "cell": "B8",
+      "config": {
+        "blocks": 3,
+        "common_field_count": 44,
+        "context": "pool",
+        "dropout": 0.1,
+        "family_counts": [
+          [
+            "cross_market",
+            24
+          ],
+          [
+            "events",
+            7
+          ],
+          [
+            "fundamentals",
+            12
+          ],
+          [
+            "fundamentals_native",
+            9
+          ],
+          [
+            "lending",
+            7
+          ],
+          [
+            "magnitudes",
+            4
+          ],
+          [
+            "microstructure",
+            2
+          ],
+          [
+            "oddlot",
+            2
+          ],
+          [
+            "options",
+            7
+          ],
+          [
+            "rebalance",
+            2
+          ],
+          [
+            "sector",
+            3
+          ]
+        ],
+        "hidden_width": 64,
+        "horizons": [
+          3,
+          5,
+          10
+        ],
+        "inner_width": 256,
+        "lookback": 60,
+        "members": 1,
+        "slow_feature_count": 32,
+        "temporal": true,
+        "width": 256
+      },
+      "graph": "c1",
+      "inputs": "all",
+      "loss": "pearson_on_ranks",
+      "parameters": 1471651,
+      "pretrain_key": "c1_all",
+      "recipe": "R",
+      "rho": 0.05
+    },
+    {
+      "cell": "B9",
+      "config": {
+        "blocks": 3,
+        "common_field_count": 44,
+        "context": "attention",
+        "dropout": 0.1,
+        "family_counts": [
+          [
+            "cross_market",
+            24
+          ],
+          [
+            "events",
+            7
+          ],
+          [
+            "fundamentals",
+            12
+          ],
+          [
+            "fundamentals_native",
+            9
+          ],
+          [
+            "lending",
+            7
+          ],
+          [
+            "magnitudes",
+            4
+          ],
+          [
+            "microstructure",
+            2
+          ],
+          [
+            "oddlot",
+            2
+          ],
+          [
+            "options",
+            7
+          ],
+          [
+            "rebalance",
+            2
+          ],
+          [
+            "sector",
+            3
+          ]
+        ],
+        "hidden_width": 64,
+        "horizons": [
+          3,
+          5,
+          10
+        ],
+        "inner_width": 256,
+        "lookback": 60,
+        "members": 1,
+        "slow_feature_count": 32,
+        "temporal": true,
+        "width": 256
+      },
+      "graph": "c1_attention",
+      "inputs": "all",
+      "loss": "soft_spearman",
+      "parameters": 1013283,
+      "pretrain_key": "c1_attention_all",
+      "recipe": "R",
+      "rho": 0.05
+    },
+    {
+      "cell": "B10",
+      "config": {
+        "blocks": 3,
+        "common_field_count": 44,
+        "context": "pool",
+        "dropout": 0.1,
+        "family_counts": [
+          [
+            "cross_market",
+            24
+          ],
+          [
+            "events",
+            7
+          ],
+          [
+            "fundamentals",
+            12
+          ],
+          [
+            "fundamentals_native",
+            9
+          ],
+          [
+            "lending",
+            7
+          ],
+          [
+            "magnitudes",
+            4
+          ],
+          [
+            "microstructure",
+            2
+          ],
+          [
+            "oddlot",
+            2
+          ],
+          [
+            "options",
+            7
+          ],
+          [
+            "rebalance",
+            2
+          ],
+          [
+            "sector",
+            3
+          ]
+        ],
+        "hidden_width": 64,
+        "horizons": [
+          3,
+          5,
+          10
+        ],
+        "inner_width": 256,
+        "lookback": 60,
+        "members": 8,
+        "slow_feature_count": 32,
+        "temporal": true,
+        "width": 256
+      },
+      "graph": "c1_tabm",
+      "inputs": "all",
+      "loss": "soft_spearman",
+      "parameters": 1502371,
+      "pretrain_key": "c1_tabm_all",
+      "recipe": "R",
+      "rho": 0.05
+    },
+    {
+      "cell": "B11",
+      "config": {
+        "blocks": 3,
+        "common_field_count": 44,
+        "context": "pool",
+        "dropout": 0.1,
+        "family_counts": [
+          [
+            "cross_market",
+            24
+          ],
+          [
+            "events",
+            7
+          ],
+          [
+            "fundamentals",
+            12
+          ],
+          [
+            "fundamentals_native",
+            9
+          ],
+          [
+            "lending",
+            7
+          ],
+          [
+            "magnitudes",
+            4
+          ],
+          [
+            "microstructure",
+            2
+          ],
+          [
+            "oddlot",
+            2
+          ],
+          [
+            "options",
+            7
+          ],
+          [
+            "rebalance",
+            2
+          ],
+          [
+            "sector",
+            3
+          ]
+        ],
+        "hidden_width": 64,
+        "horizons": [
+          3,
+          5,
+          10
+        ],
+        "inner_width": 256,
+        "lookback": 60,
+        "members": 1,
+        "slow_feature_count": 32,
+        "temporal": true,
+        "width": 256
+      },
+      "graph": "c1",
+      "inputs": "all",
+      "loss": "soft_spearman",
+      "parameters": 1471651,
+      "pretrain_key": "c1_all",
+      "recipe": "R",
+      "rho": null
+    }
+  ],
+  "common_cross_market_fields": [
+    "shock_fx_1",
+    "shock_fx_5",
+    "shock_rates_br_30_1",
+    "shock_rates_br_30_5",
+    "shock_rates_br_90_1",
+    "shock_rates_br_90_5",
+    "shock_rates_br_180_1",
+    "shock_rates_br_180_5",
+    "shock_rates_br_360_1",
+    "shock_rates_br_360_5",
+    "shock_rates_br_720_1",
+    "shock_rates_br_720_5",
+    "shock_rates_br_1080_1",
+    "shock_rates_br_1080_5",
+    "shock_rates_us_3m_1",
+    "shock_rates_us_3m_5",
+    "shock_rates_us_2y_1",
+    "shock_rates_us_2y_5",
+    "shock_rates_us_5y_1",
+    "shock_rates_us_5y_5",
+    "shock_rates_us_10y_1",
+    "shock_rates_us_10y_5",
+    "shock_oil_1",
+    "shock_oil_5",
+    "shock_vix_1",
+    "shock_vix_5",
+    "shock_iron_1",
+    "shock_iron_5",
+    "shock_rebar_1",
+    "shock_rebar_5",
+    "shock_hrc_1",
+    "shock_hrc_5",
+    "shock_pulp_1",
+    "shock_pulp_5",
+    "shock_ewz_1",
+    "shock_ewz_5",
+    "ewz_minus_bova11_1",
+    "foreign_flow_1",
+    "foreign_flow_5",
+    "foreign_flow_month_reset",
+    "foreign_flow_methodology_change"
+  ],
+  "common_diagnostic_fields": [
+    "recent_market_log_return",
+    "median_raw_daily_volatility",
+    "raw_cross_sectional_return_dispersion"
+  ],
+  "confirmation_seeds": [
+    61,
+    79,
+    97
+  ],
+  "experiment_scores_started": false,
+  "forward_capture": false,
+  "heldout_access": false,
+  "implementation_resolutions": {
+    "path": "C:\\quant\\b3-quant\\research\\preregistrations\\v2_round7_implementation.md",
+    "sha256": "ad0a2c6d7c62430439a5760b76a39992d6e54b4d97ca6d628603b5553f7c7707"
+  },
+  "per_name_cross_market_fields": [
+    "exposure_fx",
+    "exposure_rates_br",
+    "exposure_rates_us",
+    "exposure_oil",
+    "exposure_iron",
+    "exposure_vix",
+    "exposure_fx_times_shock_1",
+    "exposure_fx_times_shock_5",
+    "exposure_rates_br_times_shock_1",
+    "exposure_rates_br_times_shock_5",
+    "exposure_rates_us_times_shock_1",
+    "exposure_rates_us_times_shock_5",
+    "exposure_oil_times_shock_1",
+    "exposure_oil_times_shock_5",
+    "exposure_iron_times_shock_1",
+    "exposure_iron_times_shock_5",
+    "exposure_vix_times_shock_1",
+    "exposure_vix_times_shock_5",
+    "adr_return_gap_1",
+    "adr_listed_flag",
+    "foreign_flow_1_times_log_volume_mean_20",
+    "foreign_flow_1_times_adr_listed_flag",
+    "foreign_flow_5_times_log_volume_mean_20",
+    "foreign_flow_5_times_adr_listed_flag"
+  ],
+  "pretraining_keys": [
+    "c1_all",
+    "c1_attention_all",
+    "c1_five_heads_all",
+    "c1_no_gru_all",
+    "c1_slow",
+    "c1_tabm_all",
+    "s0_all",
+    "s0_slow"
+  ],
+  "pretraining_main_fits": 24,
+  "recipe": {
+    "budget_epochs": null,
+    "calibration_epochs": 60,
+    "calibration_rule": "earliest multiple of five >=20 whose equal-fit trailing-five-epoch mean selection IC is within .001 of its maximum over epochs 20--60; otherwise 60",
+    "dropout": 0.1,
+    "final_lr_fraction": 0.05,
+    "learning_rate": 0.0003,
+    "lookback": 60,
+    "norm_bias_weight_decay": 0.0,
+    "precision": "BF16 forward/backward autocast; FP32 parameters, optimizer, losses and moments",
+    "tail_average": "last ceil(B/4) epoch-end states, uniform",
+    "unique_dates_per_batch": 16,
+    "warmup_fraction": 0.05,
+    "weight_decay": 0.01
+  },
+  "repaired_store": null,
+  "reuse": "A0 screen subset from anchor; advanced cells reuse exact screen fits; calibration reused as B4 only for B=60 and exact full contract identity",
+  "schema": "BRAZIL_RV_ROUND7_PROTOCOL_V1",
+  "screen_folds": [
+    "F2",
+    "F6",
+    "F10",
+    "F14"
+  ],
+  "seeds": [
+    11,
+    29,
+    47
+  ],
+  "source_registration": {
+    "path": "C:\\quant\\b3-quant\\research\\preregistrations\\v2_round7.md",
+    "sha256": "ab69fe4031df72b716db0d3220a8b15cb2127a30c2a1ad46646ff94e4190ff13"
+  }
+}
