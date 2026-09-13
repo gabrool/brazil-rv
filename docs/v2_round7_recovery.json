@@ -1,0 +1,151 @@
+{
+  "supplemental": {
+    "runtime": [
+      {
+        "name": "checkpoint_readouts.py",
+        "sha256": "fbe24b8b424082a253e1d463a0983a1f9943fdccfe766d0ac4025873799165f4"
+      },
+      {
+        "name": "round7-pathway-screen.sh",
+        "sha256": "38d6f3c81ec2015a2868cc58b81199b9b2f64fb7ecf19a2f4b25d0d12f74d03d"
+      },
+      {
+        "name": "round7-screen.sh",
+        "sha256": "b512f7c0aadf380fbb99cfa82a935e4fa1a659b51731f941d5430ee36da6d770"
+      },
+      {
+        "name": "round7_anchor_f.sh",
+        "sha256": "9add34a53ff824beeedc4082b3aefa12601fad877110090116a0dfa7ff4fbe25"
+      },
+      {
+        "name": "round7_anchor_p.sh",
+        "sha256": "2ec45aca28a69ddec99db7d9f1e9a6d35f7b7003fddad55b0a4773ec6c6f26a7"
+      },
+      {
+        "name": "round7_calibration.sh",
+        "sha256": "cfb840a8b67c5cc22530ccc7110a67b11d113286577bacbce298bc81031cd3ae"
+      },
+      {
+        "name": "round7_confirmation.sh",
+        "sha256": "b0130f401c72d495fd033c2ad530f5a404efc59f7db7c81311611d89babfb125"
+      },
+      {
+        "name": "round7_confirmation_readout.sh",
+        "sha256": "de0875cabb0953617dee0e50723be45a3810d99a0ef116a5a6cdd53f0a92e81a"
+      },
+      {
+        "name": "round7_continuous_corrected.py",
+        "sha256": "73186a7d55955492ac15862bd3f0c9da3f70cd6cd1dca9626a64a287ece45343"
+      },
+      {
+        "name": "round7_crossroot_readout.py",
+        "sha256": "e30d8e9c774e7d70ed6ec29703949dd5e69e6f6ce5f19d62a580524c5718da34"
+      },
+      {
+        "name": "round7_d1_corrected_ledger.py",
+        "sha256": "dbc9c4b4df21d604aad78bd21b934b7ac0053a57c9d163bd58a21908dcee9ef5"
+      },
+      {
+        "name": "round7_d1_replay.py",
+        "sha256": "bffe1fe70e189df26e725b7395ea5a1e6af07886aa217c2c400977d05c7da946"
+      },
+      {
+        "name": "round7_engineering.sh",
+        "sha256": "6c9f77227ade0c08ce504f4e4f7902b9fdbac764adf1a379312ddb2c1e14da26"
+      },
+      {
+        "name": "round7_pack_extension.sh",
+        "sha256": "b3e4f21ed2a91a2c1920215c77d5cb39d79c6eb948b57d4deefa5bd1236d81ae"
+      },
+      {
+        "name": "round7_pack_original.sh",
+        "sha256": "a75c043aee5a1272a8d4d53013a067d7f09a7846591d855b4008871778e8cf46"
+      },
+      {
+        "name": "round7_pathway_confirmation.sh",
+        "sha256": "08b8e20abd1a4ee7ab50f03469a68652009ec8055da77cd46cde6abe3c5b7f77"
+      },
+      {
+        "name": "round7_pathway_confirmation_readout.sh",
+        "sha256": "4925b98bca2dc101da4813620a0baa487a79aca6f4943b7119a58c7b82fd5b24"
+      },
+      {
+        "name": "round7_pathway_screen_readout.sh",
+        "sha256": "b933b460180f0b352a7fb6ed8e3e9c94e559edd5df5197ca295e8eb9e70067fc"
+      },
+      {
+        "name": "round7_pretrain_r.sh",
+        "sha256": "849fc5a7ee19039e598e6cff0eb0cec543393380dcaa81e7eb97e58a2121d037"
+      },
+      {
+        "name": "round7_readout_corrected.py",
+        "sha256": "86259d79d92664c4d26c8891d4706e9c646f5f8b3b7baf7dbec693863285ed35"
+      },
+      {
+        "name": "round7_readouts.py",
+        "sha256": "4a65efe03a9068e67246565bf3eb9a9b67b37df2d34d7b0dbe84f191458134cb"
+      },
+      {
+        "name": "round7_screen_readout.sh",
+        "sha256": "69589af5576bb1040b2c7f18734cf2201e2667472ff1c78a3cbfd44f25e05033"
+      },
+      {
+        "name": "round7_six_seed.sh",
+        "sha256": "8ceff861c68953ca44cac22a25c44a48de5a72a2cb16d392071a740671db470b"
+      },
+      {
+        "name": "round7_six_seed_readout.sh",
+        "sha256": "725da630f441a334da1e03c0669bb7da60a43d742647830a521714b0fb0709a0"
+      }
+    ],
+    "continuous": [
+      {
+        "path": "A0/economics.json",
+        "sha256": "d11fa4602efe2f4899247605b1a2e1125018de836cad61415fb4f93ebe3a5be5"
+      },
+      {
+        "path": "A0/economics.json.sha256",
+        "sha256": "8260e9a3918608867b5e1a31e1a614cf53a44e58c61a6c1dfbf771f55c0eb40f"
+      },
+      {
+        "path": "A0/fold_reset_comparator.json",
+        "sha256": "b093bc637071cc7141e1965209c548eaddd14533195882de9ec6853ff3ebaa5e"
+      },
+      {
+        "path": "A0/fold_reset_comparator.json.sha256",
+        "sha256": "dc4c2f68ffa6d9b66b52d79c66c94ac11272d251e77be45d388484981b4654fc"
+      },
+      {
+        "path": "A0/result.json",
+        "sha256": "bd52d3c2db9e507ae1e4d01407835efe67453a98cb55fe8390bbecbbd40f1ee3"
+      },
+      {
+        "path": "A0/result.json.sha256",
+        "sha256": "5cdb4d78ade3155622aa22ac3ab5ca78c0c42dbf85f602e9857ece9545317703"
+      },
+      {
+        "path": "A0/source.json",
+        "sha256": "af1a111293864197adb655053d10836b058610c4be0d0b610295e5110c5edd7b"
+      },
+      {
+        "path": "A0/source.json.sha256",
+        "sha256": "bb50d3fb86f8eb96cd7a46b44fb06dc60ab651e49be87cdaf83f8626dbb7013e"
+      }
+    ]
+  },
+  "status": "verified",
+  "local_root": "D:/quant-data/b3/processed/model_runs",
+  "persistent_root": "/lambda/nfs/brazil-rv-east3/quant-data/b3/processed/model_runs",
+  "original": {
+    "archive_sha256": "88a5bd876ba29eff61bf8ffefd1af8b30fd5cd80c18b2049a6841f58e734d6fb",
+    "root": "v2_round7_20260913T012300Z",
+    "frozen_commit": "8e00a2aa2edc9536e3472f82dbcf0073155387c2",
+    "files": 12771
+  },
+  "extension": {
+    "archive_sha256": "67fdc5d9e4366e37b8d72e4b59be599cd708dde63839f596559ffbae4947f50b",
+    "root": "v2_round7_pathway_20260913T031500Z",
+    "frozen_commit": "210922773c60ed349f382d8f60726c8c3ee86575",
+    "files": 5388
+  }
+}

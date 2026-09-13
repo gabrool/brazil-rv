@@ -1,6 +1,12 @@
 # Brazil-RV project context
 
-Last verified: 2026-09-12.
+Last verified: 2026-09-13.
+
+Round 7 and its separately frozen temporal pathway extension are complete. Both
+retain A0 (repaired-store S0) as the research comparator; no new architecture
+qualified for replacement. The six-seed continuous book is descriptive and retains
+unresolved valuation labels. See [the combined review](docs/v2_ROUND7.md) and its
+source-bound results and recovery evidence. The 2025/2026 consumer ban remains.
 
 Round 6's 714 matched F fits and six fresh P fits are complete. The fixed
 three-seed decision audit retains **S0 as the working research comparator**:

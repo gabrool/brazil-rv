@@ -1,215 +1,324 @@
-# Round 7 — implementation, data repairs and experiment results
+# Round 7 and temporal pathway extension: combined research review
 
-Status: CPU preflight accepted; new neural experiments have not started. This
-document will retain the calibration, all screening cells, confirmation and final
-decision when those stages finish. The registered development boundary remains
-2024-12-30. No forward capture or 2025/2026 consumer read has occurred.
+Status: both research programs complete; artifacts recovered and verified.
 
-## Research question and attribution
+## Decision and interpretation
 
-Round 7 tests whether a joint characteristic model and a better training recipe
-can use the available information more effectively. Weak incremental Round-6
-results do not prove that architecture was the only limitation. In particular,
-univariate relevance and a tree's feature gain do not guarantee stable incremental
-portfolio alpha after existing signals, sampling error and costs.
+Both registered programs retain **A0**, the repaired-store S0 comparator. Original
+Round 7 found no eligible confirmed improvement. The separately frozen pathway
+extension found no qualifying stable extension gain. There was no access to the
+2025/2026 consumer period, forward capture, or deployment.
 
-The exact supplied registration is [v2_round7.md](../research/preregistrations/v2_round7.md).
-[Implementation resolutions](../research/preregistrations/v2_round7_implementation.md)
-make ambiguous counts, clocks, input sharing and calibration choices explicit.
-The [machine protocol](../research/preregistrations/v2_round7.json) enumerates the
-15 cells and their parameter counts. A0 is a fresh repaired-store S0 under the old
-recipe. A1 tests the new recipe on S0. A3 and B4 compare joint inputs through old
-linear sidecars and the new characteristic graph. B1 versus A1 also changes five
-training heads to three; B7 measures that component within C1.
+This is evidence about the tested architectures, input representations, optimizer,
+budgets and historical panels. It is not proof that richer data lack alpha, that
+attention is intrinsically unsuitable, or that the old architecture is universally
+optimal. In particular, the pathway engineering diagnostics exposed optimizer
+sensitivity, which limits a capacity-only interpretation of the financial result.
 
-## Accepted data repairs
+## What was compared
 
-[Input acceptance and exact evidence](v2_round7_inputs.json) binds the store
-`v2_round7_store_de6476b_20260912T232200Z`, manifest
-`1db29cbf7b30244b2327ab7e0c212a796fd25280141a45e4ee28213b2644aa65`.
-The build used commit `e609c9f`; the directory label is not the build-code identity.
-Peak resident memory was 6.413 GiB, below the 8-GiB build invariant.
+Original Round 7 separated recipe changes, input changes and architecture changes.
+A0 used the inherited S0 patience recipe, five heads and SAM radius 0.125. A1 used
+the new fixed-budget recipe on S0 at the same radius; A2 reduced the radius to 0.05;
+A3 added all families through the old linear sidecars. B1–B3 used the new
+characteristic architecture with slow inputs at radii 0.125, 0.10 and 0.05. B4 added
+all families at 0.05; B5 used 0.125. B6 removed the temporal branch, B7 restored five
+equal heads, B8 used Pearson on rank targets, B9 used stock attention, B10 used a
+TabM trunk with eight members, and B11 used single-pass AdamW as the diagnostic
+optimizer comparison.
 
-Of 470 original U2 candidates, 438 lack the registered unit-action corroboration
-and are reclassified as large moves without an inferred conversion. Thirty-two
-retain corroboration. The complete event list preserves every accepted/rejected
-candidate and its source dates. Existing C1 cash terms remain exact. This is still
-development-grade action inference: nearby filing metadata does not establish an
-exact contractual ratio or effective date.
+The new characteristic architecture combines a 60-session width-64 GRU, a latest
+core-characteristic MLP, nonlinear family encoders, a width-256 joint state, FiLM
+market conditioning, stock context and three residual SwiGLU trunk blocks. Its
+usual heads predict D3/D5/D10. FiLM lets common market information change the
+importance of stock-specific characteristics; it is not explicit attention over
+oil/rate/security tokens. Calling this candidate "canonical" in the registration
+expresses the design motivation, not an empirical guarantee or a literature consensus.
 
-The parser recovers 32,530 BDI 06/07/08 quotes for 30 established permanent
-identities. These prints restore marks and exits. A separate execution-time fill
-mask blocks new entries on recovered prints without changing earlier intended
-orders, point-in-time membership, cross-sectional ranks or historical features.
-Only 47 recovered quote rows overlap the old active mask. Historical decision-time
-wealth, slow features, risk inputs and common features remain protected; retrospective
-outcome repair does not import later corroboration into a past decision.
+The extension kept the surrounding B4 architecture and compared:
 
-Target reconstruction restores original cent-grid prices and original-precision
-action factors before making the repair. Twenty-four evenly spaced source dates
-reproduce all twelve original target arrays exactly. Subsequent target changes
-are restricted to repair-affected date/horizon windows, including cross-sectional
-rank propagation to peers. The acceptance JSON provides all target counts by fold.
+| Cell | Temporal encoder | Peer interaction placement |
+| --- | --- | --- |
+| GL | GRU | Pool history, then mix stocks |
+| GE | GRU | Mix stocks at each dated state, then pool history |
+| TL | Temporal attention | Pool history, then mix stocks |
+| TE | Temporal attention | Mix stocks at each dated state, then pool history |
 
-All fourteen sealed three-seed S0 books were replayed before and after. Every
-before-repair daily table and summary exactly matches its sealed Round-6 reference;
-all 28 books pass the engineering gates. Mean net excess changes from **4.5082 to
-4.2910 bps/day**, a paired change of **−0.2172 bps/day**, with signals held fixed.
-This measures accounting, not retrained-model performance. The continued quotes
-touch a SEQL3 short across ten position-days in October 2024: actual marks replace
-the last pre-recovery price, and the repaired book exits earlier.
+All four use learned pooling. Temporal attention has four heads, positional
+information and a width-128 feed-forward layer. Its bidirectional attention stays
+inside the already historical decision window. Peer attention is masked, uses four
+heads of width 16, and preserves the dated states for early interaction. GL/GE have
+1,492,643 parameters; TL/TE have 1,501,283; B4 has 1,471,651.
 
-The foreign-flow audit did not establish an earlier reliable publication clock.
-PDF generation timestamps often reflect later regeneration; available historical
-capture probes did not resolve the uncertainty. The existing publication-date
-bound is retained, without an extra lag. Settlement timing and publication timing
-are different facts.
+GE versus GL is the cleanest tested placement contrast within the GRU family.
+Comparisons with B4 also change the temporal pooling/peer construction. TL and TE
+were screened but not confirmed; a full fourteen-fold temporal-encoder factorial
+cannot be inferred from the confirmed GRU pair.
 
-## Meaningful data and overly restrictive support rules
+## Compute and selection contract
 
-The new nine-field native fundamentals family retains physical values, signs,
-receipt age and validity. It is not cross-sectionally ranked. Median/IQR scaling
-and ±5 clipping use the fit window only; constant fields retain unit scale and
-missing values remain explicitly masked. No twenty-name requirement applies.
+The repaired store contains 3,717 dates through 2024, 933 historical identities and
+at most 243 active stocks. Compact date batches preserve eligible names and the
+complete 60-session history. BF16 autocast retains FP32 loss/moments, and each epoch
+uses unique dates. No security crop, lookback shortening or model-width reduction
+was used to accelerate this comparison.
 
-| Native field | Valid active stock-days | Previously lost to rank support |
+Twelve B4 calibration fits ran to 60 epochs. The registered selection-curve rule
+selected **B=20** before screening. This was not a manually shortened runtime
+budget. The recipe uses warm-up/cosine scheduling over the actual budget and uniform
+averaging over its final quarter. Calibration checkpoints were not reused as B20
+financial scores. The extension inherited this same budget and used fresh compatible
+60-epoch pretraining. A limitation is that a common B4-calibrated budget need not be
+individually optimal for every architecture; these are matched protocol comparisons.
+
+Original screening used F2/F6/F10/F14 and seeds 11/29/47. Only A1 advanced; its
+screen gain over A0 was 0.009520 primary IC, while the next cell, B1, was outside the
+registered 0.002 advancement window. A1's advantage did not persist across the full
+fourteen-fold confirmation. A0 was the confirmed leader. Three extra A0 seeds
+(61/79/97) completed the six-seed panel; because candidate and comparator were both
+A0, duplicate training was avoided. A zero self-comparison in the omission audit
+must not be interpreted as evidence that A0 itself is unstable.
+
+The extension screen advanced the GL/GE pair. Relative to B4, screen primary-IC
+deltas were GL −0.003696, GE +0.004166, TL +0.000354 and TE −0.006101. Ninety new
+confirmation fits completed GL, GE and the missing B4 control folds. There were no
+duplicated original B4 confirmation fits, because B4 did not advance there.
+
+GE was the best extension candidate but was ineligible against A0. Its confirmed
+primary-IC difference was **−0.018301**, with a paired 20-date-block 95% interval
+**[−0.031371, −0.005423]**. Its net difference was **−4.9598 bps/day**, interval
+**[−9.6292, +0.5760]**. Leave-one-seed-out gains were not all positive. No extension
+extra-seed confirmation was triggered. Improving on B4 did not mean improving on A0.
+
+## Engineering corrections and their limits
+
+The original compiler issue was resolved with dynamic compilation, float
+specialization and max-autotune without CUDA graphs. The accepted engineering
+suite passed before financial dispatch. B10's three pretraining fits subsequently
+produced two training graphs because of a compiler tensor-size guard separating
+full and remainder batches. An explicit amendment accepted exactly those three
+bounded specializations; the failed launcher and original plan were retained.
+All B10 screen fits met the original one-graph criterion. This was an engineering
+criterion amendment, not a claim that the first gate passed or an independent
+numerical-equivalence experiment. See [the amendment](v2_round7_b10_graph_amendment.md).
+
+The pathway synthetic peer task exposed a real qualification. Xavier initialization
+improved component-level learning, but full-model SAM runs remained near the
+own-stock shortcut, while full-model AdamW GL/GE learned the synthetic relation.
+The unseen-peer diagnostic was explicitly changed to mandatory supporting evidence
+with no veto before financial fitting. Financial SAM remained 0.05. A failed
+synthetic diagnostic was not relabeled successful. See
+[the engineering evidence](v2_round7_pathway_engineering.md).
+
+All four pathway GPU engineering checks passed, including masking/permutation and
+precision checks. Gradient cosine similarity was at least 0.999715 and peak memory
+was at most 2.528 GB in the engineering cases. Compile-inclusive concurrent timings
+are not isolated architecture throughput benchmarks.
+
+A readout stop identified a false-positive execution diagnostic: printed pending
+entries blocked by the existing corporate-action permission mask were counted as
+"unblocked." The correction changed the counter only. An exact GL/F14 replay changed
+15 D1 diagnostic fields from one to zero; every other report field was identical.
+Seventy-seven ledger tests passed. See [the correction](v2_round7_d1_correction.md).
+
+A second readout correction separated experiment provenance from market-data
+identity. Original and extension frozen-design hashes legitimately differ. Each
+aggregate's exact experiment hash is now verified against its bound root and
+reported separately before the unchanged strict data/label/execution comparison.
+Stored reports remain intact. Three focused tests verify permitted distinct
+experiment hashes, rejection of an incorrect experiment binding, and rejection of
+different source data; the existing 43 evaluator tests also passed. Frozen training
+checkouts were not changed; hash-bound external readout modules applied the fixes.
+
+## Supporting CPU evidence
+
+These diagnostics have no promotion weight and do not establish absence of neural
+alpha. Across 42 repaired-anchor fits, mean clean fit IC was 0.046698 and selection
+IC 0.038099. Evaluation mean seed IC was 0.026315 raw versus 0.027890 EMA; the paired
+EMA difference was +0.001576 with Newey–West lag-10 SE 0.000751. All 42 head alignment
+summaries were positive (mean 0.51587); the median SAM loss gap was 0.043708.
+
+The chronological residual-corrector control covered 13 folds and 1,485 dates.
+Composite IC was 0.031860 for S0, 0.016045 for the score-only tree and 0.020383 for
+the all-family tree. The latter improved on the score-only tree but did not beat
+S0. This is a specific corrector test, not evidence that the family information is
+unusable. These composite values are not the official primary-IC endpoint.
+
+The separate linear peer diagnostic covered F2–F14. Peer-plus-score minus score-only
+composite IC was −0.004576, block interval [−0.010773, −0.001882]. The Newey–West
+estimate gave SE 0.002429 and p=0.05958, so the uncertainty procedures disagree about
+excluding zero. The feature map and linear estimator are narrow; this cannot veto
+the neural architecture comparison or prove that cross-time peer effects are absent.
+
+## Source-derived financial tables
+
+All intervals below are paired 20-session-block 95% intervals. Net figures are bps/day under the frozen accounting conventions, including unresolved-economics labels; they are not assured realizable returns. Full metrics, seed values, momentum summaries and source hashes are in [the machine-readable results](v2_round7_results.json).
+
+### original_screen
+
+| Cell | Primary IC | Net bps/day | Unresolved folds |
+| --- | ---: | ---: | --- |
+| A0 | 0.018725 | 1.1423 |  |
+| A1 | 0.028245 | 0.6678 |  |
+| A2 | 0.023410 | 0.8063 |  |
+| A3 | 0.020522 | 0.4780 |  |
+| B1 | 0.023961 | 3.7154 |  |
+| B10 | 0.007600 | -2.5196 |  |
+| B11 | 0.004518 | -0.8754 |  |
+| B2 | 0.021587 | 1.7139 |  |
+| B3 | 0.015545 | -2.4643 |  |
+| B4 | 0.008553 | -1.0582 |  |
+| B5 | 0.005324 | -4.7988 |  |
+| B6 | -0.001686 | -2.5502 |  |
+| B7 | 0.004120 | -1.2220 |  |
+| B8 | 0.012227 | 0.9981 |  |
+| B9 | 0.002651 | 0.1839 |  |
+
+### original_confirmation
+
+| Cell | Primary IC | Net bps/day | Unresolved folds |
+| --- | ---: | ---: | --- |
+| A0 | 0.027216 | 3.9439 | F8, F9 |
+| A1 | 0.025793 | 4.4304 | F4, F7, F8, F12 |
+
+### original_six_seed
+
+| Cell | Primary IC | Net bps/day | Unresolved folds |
+| --- | ---: | ---: | --- |
+| A0 | 0.026209 | 4.7530 | F7, F8, F9, F12 |
+
+### pathway_screen
+
+| Cell | Primary IC | Net bps/day | Unresolved folds |
+| --- | ---: | ---: | --- |
+| B4 | 0.008553 | -1.0582 |  |
+| B9 | 0.002651 | 0.1839 |  |
+| GE | 0.012719 | -0.2751 |  |
+| GL | 0.004858 | -2.8203 |  |
+| TE | 0.002453 | -3.2448 |  |
+| TL | 0.008907 | 1.2147 |  |
+
+### pathway_confirmation
+
+| Cell | Primary IC | Net bps/day | Unresolved folds |
+| --- | ---: | ---: | --- |
+| A0 | 0.027216 | 3.9439 | F8, F9 |
+| B4 | 0.007525 | -0.4097 | F4 |
+| GE | 0.008915 | -1.0159 | F4, F7, F9 |
+| GL | 0.005027 | -0.7036 | F4, F7, F9 |
+
+The three-seed A1−A0 confirmation IC difference is −0.001422 [−0.006627, +0.004445]. Its screen advantage therefore did not justify replacing A0. The six-seed A0 panel is a different ensemble from the three-seed comparator used in pathway confirmation; do not subtract those unmatched headline values.
+
+## Final continuous book
+
+The designated six-seed A0 continuous development replay completed with one ledger initialization, thirteen model changes and no engineering gate failures. It reports 4.163758 net bps/day, annualized net-excess Sharpe 0.757888 and mean turnover 0.276228 NAV/day. Continuous minus fold-reset net is −0.589271 bps/day. Economics remain explicitly unresolved under the inherited valuation contract; this is a descriptive accounting scenario, not a clean executable-return claim. It has zero selection weight and does not change either decision.
+
+## Input repair and preprocessing
+
+Protected arrays were byte-identical. Retrospective labels/accounting changed only under the accepted action and continued-print repairs; historical decision-time wealth inputs stayed protected. Action metadata corroborates candidate events, not necessarily exact legal terms. Earlier foreign-flow publication could not be established, so the receipt bound was retained. No observations were invented to improve coverage.
+
+Native fundamentals remove the minimum cross-sectional rank-support rule because they use fit-window median/IQR scaling and clipping instead of daily ranks. Validity and receipt age remain explicit. This admits sparse valid observations without fitting preprocessing on future data. Other ranked families retain their registered transforms; this round does not claim that every such transform is optimal.
+
+| Native field | Valid active name-days | Previously suppressed |
 | --- | ---: | ---: |
-| Signed earnings yield | 133,703 | 17,150 |
-| Log positive book-to-market | 136,459 | 19,170 |
-| Gross profitability | 276,620 | 477 |
-| Liabilities/assets | 303,976 | 221 |
-| Accruals/assets | 263,036 | 182 |
-| Signed revenue growth | 240,758 | 702 |
-| SUE in native standardized units | 236,809 | 84 |
-| Log market capitalization | 140,339 | 19,354 |
-| Earnings-negative flag | 133,703 | 17,150 |
+| earnings_yield_ttm | 133703 | 17150 |
+| book_to_market | 136459 | 19170 |
+| gross_profitability | 276620 | 477 |
+| liabilities_to_assets | 303976 | 221 |
+| accruals_to_assets | 263036 | 182 |
+| revenue_growth_yoy | 240758 | 702 |
+| sue | 236809 | 84 |
+| log_market_cap | 140339 | 19354 |
+| earnings_negative_flag | 133703 | 17150 |
 
-Counts are field-observations; they are not additive unique stock-days. The
-negative-earnings flag inherits the earnings-yield observation population.
+The unchanged-signal accounting replay moved mean net from 4.508188 to 4.290994 bps/day (−0.217194). This isolates an accounting repair, not a new model gain. Full source limitations, coverage bindings and all target-array differences are in [input acceptance](v2_round7_inputs.json).
 
-The broader audit finds additional sparse-support losses: options 42,538;
-sector 34,417; lending 9,747; events 492 field-observations. Cross-market,
-magnitudes, microstructure and rebalance lose none at this boundary. A separate
-reconstruction of the original odd-lot archive confirms zero losses for its
-568,093 share observations and 567,460 exact-five-session changes, with the
-publication lag reproduced.
-
-These other ranked inputs retain their registered transforms in the architecture
-factorial. Their physical source observations remain available, and the losses
-are recorded for a separate representation comparison rather than being treated
-as unusable data. Rank support is distinct from source validity, identity and
-historical availability. No family is removed from a joint-input model because
-of a weak individual screening result or sparse pretraining support.
-
-## Architecture, training and efficiency
-
-C1 keeps the full 60-session, 32-field width-64 GRU; adds a latest-row core MLP,
-nonlinear family encoders, a 256-wide joint state, FiLM market conditioning,
-cross-sectional context, three residual SwiGLU blocks and D3/D5/D10 heads.
-All 44 common fields are retained, with fit-only scaling on unique dates.
-Attention uses four heads of width 32. TabM's eight members share the expensive
-history/family encoders and expand only at the residual trunk.
-
-| Graph/input example | Parameters |
-| --- | ---: |
-| S0 slow | 120,902 |
-| S0 all families | 166,982 |
-| C1 slow | 1,297,475 |
-| C1 all families | 1,471,651 |
-| C1 all, no GRU | 1,421,923 |
-| C1 all, five heads | 1,472,165 |
-| C1 attention | 1,013,283 |
-| C1 TabM | 1,502,371 |
-
-Recipe R uses fixed unique-date epochs, a schedule defined on the actual budget,
-5% warmup and cosine decay, no bias/LayerNorm decay, SAM with the registered radii,
-and uniform averaging of the last ceil(B/4) epoch-end states. The SAM second pass
-reuses dropout randomness and restores original weights exactly. TabM losses rank
-stocks separately within each date/member/head. B11 is genuinely single-pass AdamW.
-
-Training compiles the model and FP32 ranking loss together. GPU autocast is BF16;
-parameters, optimizer state, loss and relevant moments remain FP32. Compact name
-axes include every active name; there is no top-N selection or shortened history.
-Balanced batches include every date exactly once and avoid singleton tails.
-Scoring reuses the compiled evaluation model. Epoch-end weights, daily selection
-IC, optimizer state, tail weights and RNG state support exact interrupted-run recovery.
-
-CPU engineering covers ten graph/loss combinations. Each captured one full training
-graph and one evaluation graph and learned a permitted-input synthetic target to
-IC above 0.5 within 10–20 updates. The all-family cases separately learned a masked
-product of two family fields plus a native-profitability threshold. The eight
-all-family cases all passed in ten updates. These are implementation tests, not
-evidence of predictive alpha, GPU throughput or out-of-sample generalization.
-CPU uses Dynamo's eager backend; GH200 Inductor/BF16 and full-batch throughput
-acceptance remain required before experiment dispatch.
-
-Targeted tests also cover name permutation and padding, invalid-family masking,
-fit-only scaling, member-loss independence, exact SAM restore, and three-head
-scoring without fabricated D1/D2 predictions. An end-to-end synthetic-store test
-interrupts training after a durable epoch and verifies exactly identical final
-weights and score arrays after resumption. Three-head and five-head candidates
-pair correctly on the same D3/D5/D10 population.
-
-## Diagnostics and remaining experiment stages
-
-All **84 archived diagnostics are complete**. The [full per-fit report](v2_round7_archived_diagnostics.json)
-binds the saved weights and daily series. Both checkpoints use CPU FP32 and the
-same D3/D5/D10 population. These are means of seed ICs, not rank-ensemble ICs.
-
-| Diagnostic | S0 | Fundamentals |
+| Fold | Primary target cells changed | Target-validity cells changed |
 | --- | ---: | ---: |
-| Mean clean fit raw IC | 0.04431 | 0.04897 |
-| Mean selection raw IC | 0.03843 | 0.04816 |
-| Evaluation mean-seed raw IC | 0.02552 | 0.02764 |
-| Evaluation mean-seed EMA IC | 0.02717 | 0.02759 |
-| Paired evaluation EMA minus raw | +0.00165 | −0.00005 |
-| Newey–West mean SE of that difference | 0.00075 | 0.00117 |
-| Median selection paired mean SE | 0.00141 | 0.00261 |
-| Mean shared D1/D2 versus D3/D5/D10 gradient cosine | 0.505 | 0.440 |
-| Fits with negative combined gradient cosine | 0 / 42 | 0 / 42 |
-| Median fixed-batch SAM loss gap, rho 0.125 | 0.03637 | 0.03348 |
+| F1 | 963 | 0 |
+| F2 | 3106 | 0 |
+| F3 | 0 | 0 |
+| F4 | 0 | 0 |
+| F5 | 9478 | 0 |
+| F6 | 0 | 0 |
+| F7 | 483 | 0 |
+| F8 | 2297 | 0 |
+| F9 | 681 | 0 |
+| F10 | 887 | 0 |
+| F11 | 21136 | 84 |
+| F12 | 1255 | 0 |
+| F13 | 5306 | 26 |
+| F14 | 5862 | 26 |
 
-The clean fit/selection gaps do not show severe fitting of the training set in
-these two saved states, but cannot establish underfitting: selection chose the
-raw checkpoint, and the windows cover different dates. Old per-epoch weights
-are unavailable. Forty-five common-label dates remain in each nominal 55-session
-selection window after the D10 boundary rule. Paired checkpoint uncertainty is
-material relative to the incremental gains under investigation.
+## Observed fit durations
 
-EMA helps the archived S0 comparison but not the fundamentals comparison. Its
-checkpoint time and retained initialization weight differ, so this is not a
-causal estimate of averaging alone. The fixed-batch head gradients are positively
-aligned in every fit; that does not establish that shorter-horizon heads help
-out-of-sample. Actual fundamentals sensitivity is retained per fit alongside
-the gradient matrices. These diagnostics inform interpretation and do not alter
-the registered factorial or select a new checkpoint.
+These are per-process wall times at the actual shared-instance concurrency, including compilation where performed; they are not isolated hardware benchmarks. Medians are over the twelve screen fits per cell.
 
-The fixed chronological residual-tree control is complete on thirteen folds and
-1,485 scored dates. Its composite IC is **0.03052 for S0**, **0.01413 for the
-score-only corrector**, and **0.01857 for the all-family corrector**. The all-family
-corrector minus S0 is **−0.01195**, Newey–West mean SE **0.00577**. Its gain over
-the matched score-only tree is **+0.00443**, SE **0.00441**. This control does not
-improve S0. The modest, uncertain gain over its own tree control neither establishes
-an architectural bottleneck nor proves that the families contain no useful signal.
-No hyperparameter or checkpoint was selected from these evaluation results.
-This diagnostic ranks the composite against mean traded-horizon rank; it is not
-the headline mean of separate D3/D5/D10 ICs and has zero promotion weight.
+| Program | Cell | Median minutes per fit |
+| --- | --- | ---: |
+| Original | A1 | 9.03 |
+| Original | A2 | 7.16 |
+| Original | A3 | 8.45 |
+| Original | B1 | 7.69 |
+| Original | B10 | 8.58 |
+| Original | B11 | 8.24 |
+| Original | B2 | 7.87 |
+| Original | B3 | 7.21 |
+| Original | B4 | 8.89 |
+| Original | B5 | 8.99 |
+| Original | B6 | 6.71 |
+| Original | B7 | 8.45 |
+| Original | B8 | 8.16 |
+| Original | B9 | 8.57 |
+| Pathway | GE | 11.02 |
+| Pathway | GL | 9.60 |
+| Pathway | TE | 8.10 |
+| Pathway | TL | 7.79 |
 
-There are **24 initial Stage-P fits**, not the draft's approximate fifteen: graph,
-input roster and head count must match. S0 slow uses its three old-recipe parents;
-seven other compatible graph/input contracts need three each. The repaired anchor
-has 42 F fits. Twelve calibration fits choose B before any screen score. Screening
-adds 168 F fits, or 156 if B=60 allows exact calibration reuse. Confirmation reuses
-all screen fits and adds at most 150 F fits for five candidates. The six-seed stage
-adds seeds 61/79/97 for the fourteen-fold leader and A0, with compatible parents.
+## Continuous-book cost and borrow scenarios
 
-GPU launch, measured concurrency, calibration B, screen/confirmation outcomes,
-three-borrow economics, the continuous book, final designation and verified
-artifact recovery/instance shutdown are pending. No improvement or promotion is
-claimed from the implementation and preflight work alone.
+| Scenario | Net bps/day | Economics unresolved |
+| --- | ---: | --- |
+| cost_2_borrow_balance | 4.844191 | True |
+| cost_2_borrow_strict | 4.966110 | True |
+| cost_2_borrow_open | 5.050747 | True |
+| borrow_balance | 4.163758 | True |
+| borrow_strict | 4.301529 | True |
+| borrow_open | 4.482560 | True |
+| cost_7_borrow_balance | 3.855786 | True |
+| cost_7_borrow_strict | 3.930529 | True |
+| cost_7_borrow_open | 4.051877 | True |
+| sensitivity_buffer_0 | 2.122359 | True |
+| sensitivity_buffer_2k | 4.540887 | True |
+| comparator_sterile_proceeds | 1.095716 | True |
+| comparator_uniform_borrow | 4.457522 | True |
 
-The readout path preserves original-rate economics for model selection and reuses
-that accepted ledger for two rate-only sensitivity comparisons. Leave-one-seed-out
-forecast stability uses the completed six-seed scores; it does not rerun identical
-economic books for a forecast-only gate. The final continuous book carries positions
-across model switches and has no influence on the completed designation.
+
+## Provenance and review boundaries
+
+The original training freeze was `8e00a2aa2edc9536e3472f82dbcf0073155387c2`;
+the separate pathway freeze was `210922773c60ed349f382d8f60726c8c3ee86575`.
+Both run roots, checkpoints, scores, reports and failed diagnostic evidence were
+recovered from persistent NFS. Archive checksums and every extracted file were
+verified: 12,771 original files and 5,388 extension files. The subsequently completed
+continuous book and external readout harnesses were separately matched by SHA-256;
+harness copies also reside on persistent NFS. See [recovery provenance](v2_round7_recovery.json).
+The compact results retain source-report hashes; full results reside in the recovered
+run roots recorded there. Frozen fit provenance remains distinct from the final
+merged reporting and readout corrections.
+
+The strongest next research question is why the richer B4 representation loses to
+A0 under this training protocol. The GL/GE result does not justify simply promoting
+early stock mixing. Before another broad architecture search, use a tightly matched
+optimization/representation study: verify learning curves and perturbation scale,
+then test a small number of causal input/optimizer changes with chronological
+confirmation. The synthetic SAM sensitivity makes optimization a credible hypothesis,
+but the financial AdamW screen did not demonstrate a winning replacement. Neither
+fact alone settles the cause. Budget-specific undertraining, weak incremental inputs,
+regularization and unfavorable interactions remain competing explanations.
+
+This round establishes a research comparator, not production readiness. The retained
+unresolved valuation scenarios and repeated development-panel use must accompany any
+future economic or statistical claim. Original and extension screen selection are
+explicit; the full fourteen-fold panel overlaps the screen and is not an untouched
+holdout. No inference here consumes the barred 2025/2026 period.
