@@ -6,12 +6,13 @@ from dataclasses import replace
 from pathlib import Path
 
 import numpy as np
+import polars as pl
 import torch
 
 from brazil_rv.v2.artifacts import sha256_file, write_json_atomic
 from brazil_rv.v2.characteristic_model import CharacteristicModel
 from brazil_rv.v2.data import V2DailyDataset, stage_name_count
-from brazil_rv.v2.data_repair import parent_store
+from brazil_rv.v2.data_repair import PROJECT, binding, bound_json, parent_store
 from brazil_rv.v2.model import DailyMultiHorizonModel
 from brazil_rv.v2.normalization import average_ranks
 from brazil_rv.v2.contract import (
@@ -43,6 +44,89 @@ def read(name, where=root):
 
 
 active = read("active")
+old_family = json.loads(
+    (PROJECT / "docs/v2_round5_cvm_final_acceptance.json").read_text(encoding="utf-8")
+)["family_manifest"]
+old_financial = Path(old_family["path"]).parent / "fundamentals.parquet"
+financial = bound_json(report["financial_family"])
+new_financial = Path(financial["data"]["path"])
+assert binding(new_financial) == financial["data"]
+di, ni = np.nonzero(active)
+eligible = pl.DataFrame(
+    {"date": read("date_index")[di], "isin": read("isin_index")[ni]}
+).with_columns(pl.col("date").cast(pl.Date))
+old_frame = pl.read_parquet(old_financial).join(eligible, on=["date", "isin"])
+new_frame = pl.read_parquet(new_financial).join(eligible, on=["date", "isin"])
+assert not new_frame.select("date", "isin").is_duplicated().any()
+financial_fields = manifest["feature_names"]["sidecar_fundamentals"]
+comparison = old_frame.join(new_frame, on=["date", "isin"], suffix="_repaired")
+coverage = []
+for field in financial_fields:
+    if field not in old_frame.columns:
+        continue
+    old_valid = pl.col(field).is_finite().fill_null(False)
+    new_valid = pl.col(field + "_repaired").is_finite().fill_null(False)
+    changed = old_valid & new_valid & (pl.col(field) != pl.col(field + "_repaired"))
+    counts = (
+        comparison.group_by(pl.col("date").dt.year().alias("year"))
+        .agg(
+            old_valid.sum().alias("previous_valid"),
+            new_valid.sum().alias("valid"),
+            (old_valid & ~new_valid).sum().alias("lost"),
+            (~old_valid & new_valid).sum().alias("gained"),
+            changed.sum().alias("changed_values"),
+        )
+        .sort("year")
+    )
+    assert counts["lost"].sum() == 0, field
+    coverage.append(
+        {
+            "field": field,
+            "by_year": counts.to_dicts(),
+            **{
+                name: int(counts[name].sum())
+                for name in counts.columns
+                if name != "year"
+            },
+        }
+    )
+residuals = []
+for field, threshold in (
+    ("earnings_yield_ttm", 10),
+    ("book_to_market", 100),
+    ("gross_profitability", 10),
+    ("revenue_growth_yoy", 100),
+):
+    current = new_frame.filter(pl.col(field).abs() > threshold)
+    residuals.append(
+        {
+            "field": field,
+            "absolute_triage_threshold": threshold,
+            "previous_count": old_frame.filter(pl.col(field).abs() > threshold).height,
+            "repaired_count": current.height,
+            "remaining_by_isin": current.group_by("isin")
+            .agg(
+                pl.len().alias("stock_days"),
+                pl.col("date").min().cast(pl.String).alias("first"),
+                pl.col("date").max().cast(pl.String).alias("last"),
+                pl.col(field).min().alias("minimum"),
+                pl.col(field).max().alias("maximum"),
+            )
+            .sort("isin")
+            .to_dicts(),
+        }
+    )
+write_json_atomic(
+    args.repair_root / "financial_comparison.json",
+    {
+        "original": binding(old_financial),
+        "repaired": binding(new_financial),
+        "store": report["store"],
+        "fields": coverage,
+        "residual_triage": residuals,
+        "threshold_policy": "Review triggers only; never automatic correction or deletion.",
+    },
+)
 fields = []
 for family, names in manifest["feature_names"].items():
     if family != "slow" and not family.startswith("sidecar_"):
