@@ -1,0 +1,1091 @@
+{
+  "conditioning": "fit-only robust median/IQR followed by asinh; common fields once per date; established P scales inherited by F",
+  "families": [
+    {
+      "family": "cross_market",
+      "fields": [
+        {
+          "field": "shock_fx_1",
+          "gained": 0,
+          "lost": 0,
+          "previous_valid_active": 568567,
+          "source_valid_active": 568567,
+          "valid_active": 568567
+        },
+        {
+          "field": "shock_fx_5",
+          "gained": 0,
+          "lost": 0,
+          "previous_valid_active": 568064,
+          "source_valid_active": 568064,
+          "valid_active": 568064
+        },
+        {
+          "field": "shock_rates_br_30_1",
+          "gained": 0,
+          "lost": 0,
+          "previous_valid_active": 568452,
+          "source_valid_active": 568452,
+          "valid_active": 568452
+        },
+        {
+          "field": "shock_rates_br_30_5",
+          "gained": 0,
+          "lost": 0,
+          "previous_valid_active": 567951,
+          "source_valid_active": 567951,
+          "valid_active": 567951
+        },
+        {
+          "field": "shock_rates_br_90_1",
+          "gained": 0,
+          "lost": 0,
+          "previous_valid_active": 568200,
+          "source_valid_active": 568200,
+          "valid_active": 568200
+        },
+        {
+          "field": "shock_rates_br_90_5",
+          "gained": 0,
+          "lost": 0,
+          "previous_valid_active": 567702,
+          "source_valid_active": 567702,
+          "valid_active": 567702
+        },
+        {
+          "field": "shock_rates_br_180_1",
+          "gained": 0,
+          "lost": 0,
+          "previous_valid_active": 568452,
+          "source_valid_active": 568452,
+          "valid_active": 568452
+        },
+        {
+          "field": "shock_rates_br_180_5",
+          "gained": 0,
+          "lost": 0,
+          "previous_valid_active": 567951,
+          "source_valid_active": 567951,
+          "valid_active": 567951
+        },
+        {
+          "field": "shock_rates_br_360_1",
+          "gained": 0,
+          "lost": 0,
+          "previous_valid_active": 568331,
+          "source_valid_active": 568331,
+          "valid_active": 568331
+        },
+        {
+          "field": "shock_rates_br_360_5",
+          "gained": 0,
+          "lost": 0,
+          "previous_valid_active": 567832,
+          "source_valid_active": 567832,
+          "valid_active": 567832
+        },
+        {
+          "field": "shock_rates_br_720_1",
+          "gained": 0,
+          "lost": 0,
+          "previous_valid_active": 568452,
+          "source_valid_active": 568452,
+          "valid_active": 568452
+        },
+        {
+          "field": "shock_rates_br_720_5",
+          "gained": 0,
+          "lost": 0,
+          "previous_valid_active": 567951,
+          "source_valid_active": 567951,
+          "valid_active": 567951
+        },
+        {
+          "field": "shock_rates_br_1080_1",
+          "gained": 0,
+          "lost": 0,
+          "previous_valid_active": 568452,
+          "source_valid_active": 568452,
+          "valid_active": 568452
+        },
+        {
+          "field": "shock_rates_br_1080_5",
+          "gained": 0,
+          "lost": 0,
+          "previous_valid_active": 567951,
+          "source_valid_active": 567951,
+          "valid_active": 567951
+        },
+        {
+          "field": "shock_rates_us_3m_1",
+          "gained": 0,
+          "lost": 0,
+          "previous_valid_active": 568567,
+          "source_valid_active": 568567,
+          "valid_active": 568567
+        },
+        {
+          "field": "shock_rates_us_3m_5",
+          "gained": 0,
+          "lost": 0,
+          "previous_valid_active": 568064,
+          "source_valid_active": 568064,
+          "valid_active": 568064
+        },
+        {
+          "field": "shock_rates_us_2y_1",
+          "gained": 0,
+          "lost": 0,
+          "previous_valid_active": 568567,
+          "source_valid_active": 568567,
+          "valid_active": 568567
+        },
+        {
+          "field": "shock_rates_us_2y_5",
+          "gained": 0,
+          "lost": 0,
+          "previous_valid_active": 568064,
+          "source_valid_active": 568064,
+          "valid_active": 568064
+        },
+        {
+          "field": "shock_rates_us_5y_1",
+          "gained": 0,
+          "lost": 0,
+          "previous_valid_active": 568567,
+          "source_valid_active": 568567,
+          "valid_active": 568567
+        },
+        {
+          "field": "shock_rates_us_5y_5",
+          "gained": 0,
+          "lost": 0,
+          "previous_valid_active": 568064,
+          "source_valid_active": 568064,
+          "valid_active": 568064
+        },
+        {
+          "field": "shock_rates_us_10y_1",
+          "gained": 0,
+          "lost": 0,
+          "previous_valid_active": 568567,
+          "source_valid_active": 568567,
+          "valid_active": 568567
+        },
+        {
+          "field": "shock_rates_us_10y_5",
+          "gained": 0,
+          "lost": 0,
+          "previous_valid_active": 568064,
+          "source_valid_active": 568064,
+          "valid_active": 568064
+        },
+        {
+          "field": "shock_oil_1",
+          "gained": 0,
+          "lost": 0,
+          "previous_valid_active": 568567,
+          "source_valid_active": 568567,
+          "valid_active": 568567
+        },
+        {
+          "field": "shock_oil_5",
+          "gained": 0,
+          "lost": 0,
+          "previous_valid_active": 568064,
+          "source_valid_active": 568064,
+          "valid_active": 568064
+        },
+        {
+          "field": "shock_vix_1",
+          "gained": 0,
+          "lost": 0,
+          "previous_valid_active": 568567,
+          "source_valid_active": 568567,
+          "valid_active": 568567
+        },
+        {
+          "field": "shock_vix_5",
+          "gained": 0,
+          "lost": 0,
+          "previous_valid_active": 568064,
+          "source_valid_active": 568064,
+          "valid_active": 568064
+        },
+        {
+          "field": "shock_iron_1",
+          "gained": 0,
+          "lost": 0,
+          "previous_valid_active": 307592,
+          "source_valid_active": 307592,
+          "valid_active": 307592
+        },
+        {
+          "field": "shock_iron_5",
+          "gained": 0,
+          "lost": 0,
+          "previous_valid_active": 281712,
+          "source_valid_active": 281712,
+          "valid_active": 281712
+        },
+        {
+          "field": "shock_rebar_1",
+          "gained": 0,
+          "lost": 0,
+          "previous_valid_active": 474083,
+          "source_valid_active": 474083,
+          "valid_active": 474083
+        },
+        {
+          "field": "shock_rebar_5",
+          "gained": 0,
+          "lost": 0,
+          "previous_valid_active": 466355,
+          "source_valid_active": 466355,
+          "valid_active": 466355
+        },
+        {
+          "field": "shock_hrc_1",
+          "gained": 0,
+          "lost": 0,
+          "previous_valid_active": 432105,
+          "source_valid_active": 432105,
+          "valid_active": 432105
+        },
+        {
+          "field": "shock_hrc_5",
+          "gained": 0,
+          "lost": 0,
+          "previous_valid_active": 428874,
+          "source_valid_active": 428874,
+          "valid_active": 428874
+        },
+        {
+          "field": "shock_pulp_1",
+          "gained": 0,
+          "lost": 0,
+          "previous_valid_active": 288197,
+          "source_valid_active": 288197,
+          "valid_active": 288197
+        },
+        {
+          "field": "shock_pulp_5",
+          "gained": 0,
+          "lost": 0,
+          "previous_valid_active": 287609,
+          "source_valid_active": 287609,
+          "valid_active": 287609
+        },
+        {
+          "field": "shock_ewz_1",
+          "gained": 0,
+          "lost": 0,
+          "previous_valid_active": 568567,
+          "source_valid_active": 568567,
+          "valid_active": 568567
+        },
+        {
+          "field": "shock_ewz_5",
+          "gained": 0,
+          "lost": 0,
+          "previous_valid_active": 568064,
+          "source_valid_active": 568064,
+          "valid_active": 568064
+        },
+        {
+          "field": "exposure_fx",
+          "gained": 0,
+          "lost": 0,
+          "previous_valid_active": 533357,
+          "source_valid_active": 533357,
+          "valid_active": 533357
+        },
+        {
+          "field": "exposure_rates_br",
+          "gained": 0,
+          "lost": 0,
+          "previous_valid_active": 533330,
+          "source_valid_active": 533330,
+          "valid_active": 533330
+        },
+        {
+          "field": "exposure_rates_us",
+          "gained": 0,
+          "lost": 0,
+          "previous_valid_active": 532351,
+          "source_valid_active": 532351,
+          "valid_active": 532351
+        },
+        {
+          "field": "exposure_oil",
+          "gained": 0,
+          "lost": 0,
+          "previous_valid_active": 532340,
+          "source_valid_active": 532340,
+          "valid_active": 532340
+        },
+        {
+          "field": "exposure_iron",
+          "gained": 0,
+          "lost": 0,
+          "previous_valid_active": 260180,
+          "source_valid_active": 260180,
+          "valid_active": 260180
+        },
+        {
+          "field": "exposure_vix",
+          "gained": 0,
+          "lost": 0,
+          "previous_valid_active": 532630,
+          "source_valid_active": 532630,
+          "valid_active": 532630
+        },
+        {
+          "field": "exposure_fx_times_shock_1",
+          "gained": 0,
+          "lost": 0,
+          "previous_valid_active": 533357,
+          "source_valid_active": 533357,
+          "valid_active": 533357
+        },
+        {
+          "field": "exposure_fx_times_shock_5",
+          "gained": 0,
+          "lost": 0,
+          "previous_valid_active": 533357,
+          "source_valid_active": 533357,
+          "valid_active": 533357
+        },
+        {
+          "field": "exposure_rates_br_times_shock_1",
+          "gained": 0,
+          "lost": 0,
+          "previous_valid_active": 533099,
+          "source_valid_active": 533099,
+          "valid_active": 533099
+        },
+        {
+          "field": "exposure_rates_br_times_shock_5",
+          "gained": 0,
+          "lost": 0,
+          "previous_valid_active": 533103,
+          "source_valid_active": 533103,
+          "valid_active": 533103
+        },
+        {
+          "field": "exposure_rates_us_times_shock_1",
+          "gained": 0,
+          "lost": 0,
+          "previous_valid_active": 532351,
+          "source_valid_active": 532351,
+          "valid_active": 532351
+        },
+        {
+          "field": "exposure_rates_us_times_shock_5",
+          "gained": 0,
+          "lost": 0,
+          "previous_valid_active": 532351,
+          "source_valid_active": 532351,
+          "valid_active": 532351
+        },
+        {
+          "field": "exposure_oil_times_shock_1",
+          "gained": 0,
+          "lost": 0,
+          "previous_valid_active": 532340,
+          "source_valid_active": 532340,
+          "valid_active": 532340
+        },
+        {
+          "field": "exposure_oil_times_shock_5",
+          "gained": 0,
+          "lost": 0,
+          "previous_valid_active": 532340,
+          "source_valid_active": 532340,
+          "valid_active": 532340
+        },
+        {
+          "field": "exposure_iron_times_shock_1",
+          "gained": 0,
+          "lost": 0,
+          "previous_valid_active": 260180,
+          "source_valid_active": 260180,
+          "valid_active": 260180
+        },
+        {
+          "field": "exposure_iron_times_shock_5",
+          "gained": 0,
+          "lost": 0,
+          "previous_valid_active": 248458,
+          "source_valid_active": 248458,
+          "valid_active": 248458
+        },
+        {
+          "field": "exposure_vix_times_shock_1",
+          "gained": 0,
+          "lost": 0,
+          "previous_valid_active": 532630,
+          "source_valid_active": 532630,
+          "valid_active": 532630
+        },
+        {
+          "field": "exposure_vix_times_shock_5",
+          "gained": 0,
+          "lost": 0,
+          "previous_valid_active": 532630,
+          "source_valid_active": 532630,
+          "valid_active": 532630
+        },
+        {
+          "field": "adr_return_gap_1",
+          "gained": 0,
+          "lost": 0,
+          "previous_valid_active": 55489,
+          "source_valid_active": 55489,
+          "valid_active": 55489
+        },
+        {
+          "field": "ewz_minus_bova11_1",
+          "gained": 0,
+          "lost": 0,
+          "previous_valid_active": 519010,
+          "source_valid_active": 519010,
+          "valid_active": 519010
+        },
+        {
+          "field": "adr_listed_flag",
+          "gained": 0,
+          "lost": 0,
+          "previous_valid_active": 568690,
+          "source_valid_active": 568690,
+          "valid_active": 568690
+        },
+        {
+          "field": "foreign_flow_1",
+          "gained": 0,
+          "lost": 0,
+          "previous_valid_active": 118927,
+          "source_valid_active": 118927,
+          "valid_active": 118927
+        },
+        {
+          "field": "foreign_flow_1_times_log_volume_mean_20",
+          "gained": 0,
+          "lost": 0,
+          "previous_valid_active": 118927,
+          "source_valid_active": 118927,
+          "valid_active": 118927
+        },
+        {
+          "field": "foreign_flow_1_times_adr_listed_flag",
+          "gained": 0,
+          "lost": 0,
+          "previous_valid_active": 118927,
+          "source_valid_active": 118927,
+          "valid_active": 118927
+        },
+        {
+          "field": "foreign_flow_5",
+          "gained": 0,
+          "lost": 0,
+          "previous_valid_active": 100364,
+          "source_valid_active": 100364,
+          "valid_active": 100364
+        },
+        {
+          "field": "foreign_flow_5_times_log_volume_mean_20",
+          "gained": 0,
+          "lost": 0,
+          "previous_valid_active": 100364,
+          "source_valid_active": 100364,
+          "valid_active": 100364
+        },
+        {
+          "field": "foreign_flow_5_times_adr_listed_flag",
+          "gained": 0,
+          "lost": 0,
+          "previous_valid_active": 100364,
+          "source_valid_active": 100364,
+          "valid_active": 100364
+        },
+        {
+          "field": "foreign_flow_month_reset",
+          "gained": 0,
+          "lost": 0,
+          "previous_valid_active": 135063,
+          "source_valid_active": 135063,
+          "valid_active": 135063
+        },
+        {
+          "field": "foreign_flow_methodology_change",
+          "gained": 0,
+          "lost": 0,
+          "previous_valid_active": 135063,
+          "source_valid_active": 135063,
+          "valid_active": 135063
+        }
+      ],
+      "source": {
+        "path": "D:\\quant-data\\b3\\interim\\round6_20260911T111805Z\\cross_market_action_extension\\features.parquet",
+        "sha256": "28826490ed48a1c1af4f93c79264d8f68eea45de1f2749ea5055584b2eb42705"
+      }
+    },
+    {
+      "family": "events",
+      "fields": [
+        {
+          "field": "sessions_since_financial_filing",
+          "gained": 0,
+          "lost": 0,
+          "previous_valid_active": 310858,
+          "source_valid_active": 310858,
+          "valid_active": 310858
+        },
+        {
+          "field": "filing_is_dfp",
+          "gained": 0,
+          "lost": 0,
+          "previous_valid_active": 310858,
+          "source_valid_active": 310858,
+          "valid_active": 310858
+        },
+        {
+          "field": "sessions_since_material_fact",
+          "gained": 0,
+          "lost": 0,
+          "previous_valid_active": 309367,
+          "source_valid_active": 309367,
+          "valid_active": 309367
+        },
+        {
+          "field": "material_fact_count_20",
+          "gained": 492,
+          "lost": 0,
+          "previous_valid_active": 310366,
+          "source_valid_active": 310858,
+          "valid_active": 310858
+        },
+        {
+          "field": "dividend_announcement_age",
+          "gained": 0,
+          "lost": 0,
+          "previous_valid_active": 282532,
+          "source_valid_active": 282532,
+          "valid_active": 282532
+        },
+        {
+          "field": "offering_or_buyback_flag",
+          "gained": 0,
+          "lost": 0,
+          "previous_valid_active": 310858,
+          "source_valid_active": 310858,
+          "valid_active": 310858
+        },
+        {
+          "field": "sessions_until_expected_filing",
+          "gained": 0,
+          "lost": 0,
+          "previous_valid_active": 298053,
+          "source_valid_active": 298053,
+          "valid_active": 298053
+        }
+      ],
+      "source": {
+        "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\family_0aea7a8\\events.parquet",
+        "sha256": "0770aa05b2313bb69918c60c668226378be2dae5b38e22226ecfb6402d867105"
+      }
+    },
+    {
+      "family": "fundamentals",
+      "fields": [
+        {
+          "field": "log_market_cap",
+          "gained": 19393,
+          "lost": 0,
+          "previous_valid_active": 120985,
+          "source_valid_active": 140378,
+          "valid_active": 140378
+        },
+        {
+          "field": "book_to_market",
+          "gained": 21191,
+          "lost": 0,
+          "previous_valid_active": 119178,
+          "source_valid_active": 140369,
+          "valid_active": 140369
+        },
+        {
+          "field": "earnings_yield_ttm",
+          "gained": 23300,
+          "lost": 0,
+          "previous_valid_active": 116553,
+          "source_valid_active": 139853,
+          "valid_active": 139853
+        },
+        {
+          "field": "gross_profitability",
+          "gained": 13568,
+          "lost": 0,
+          "previous_valid_active": 276143,
+          "source_valid_active": 289711,
+          "valid_active": 289711
+        },
+        {
+          "field": "liabilities_to_assets",
+          "gained": 442,
+          "lost": 0,
+          "previous_valid_active": 303755,
+          "source_valid_active": 304197,
+          "valid_active": 304197
+        },
+        {
+          "field": "accruals_to_assets",
+          "gained": 3771,
+          "lost": 0,
+          "previous_valid_active": 262854,
+          "source_valid_active": 266625,
+          "valid_active": 266625
+        },
+        {
+          "field": "revenue_growth_yoy",
+          "gained": 24464,
+          "lost": 0,
+          "previous_valid_active": 240056,
+          "source_valid_active": 264520,
+          "valid_active": 264520
+        },
+        {
+          "field": "sue",
+          "gained": 9222,
+          "lost": 0,
+          "previous_valid_active": 236725,
+          "source_valid_active": 245947,
+          "valid_active": 245947
+        },
+        {
+          "field": "statement_age_sessions",
+          "gained": 0,
+          "lost": 0,
+          "previous_valid_active": 304197,
+          "source_valid_active": 304197,
+          "valid_active": 304197
+        },
+        {
+          "field": "fundamental_financial_flag",
+          "gained": 221,
+          "lost": 0,
+          "previous_valid_active": 303976,
+          "source_valid_active": 304197,
+          "valid_active": 304197
+        },
+        {
+          "field": "fundamental_consolidated_flag",
+          "gained": 221,
+          "lost": 0,
+          "previous_valid_active": 303976,
+          "source_valid_active": 304197,
+          "valid_active": 304197
+        },
+        {
+          "field": "valuation_available_flag",
+          "gained": 0,
+          "lost": 0,
+          "previous_valid_active": 310858,
+          "source_valid_active": 310858,
+          "valid_active": 310858
+        },
+        {
+          "field": "earnings_negative_flag",
+          "gained": 303410,
+          "lost": 0,
+          "previous_valid_active": 0,
+          "source_valid_active": 303410,
+          "valid_active": 303410
+        },
+        {
+          "field": "incomplete_latest_statement_flag",
+          "gained": 304197,
+          "lost": 0,
+          "previous_valid_active": 0,
+          "source_valid_active": 304197,
+          "valid_active": 304197
+        }
+      ],
+      "source": {
+        "path": "D:\\quant-data\\b3\\interim\\data_repair_20260913T184500Z\\financial_family_e884836cf8bd\\fundamentals.parquet",
+        "sha256": "cc2787ad07e56d75eb3e8383cd9cb379b37b6cf59c16fcbc9f8bfdb19ee97abe"
+      }
+    },
+    {
+      "family": "lending",
+      "fields": [
+        {
+          "field": "loan_balance_to_volume_20",
+          "gained": 0,
+          "lost": 0,
+          "previous_valid_active": 182622,
+          "source_valid_active": 182622,
+          "valid_active": 182622
+        },
+        {
+          "field": "loan_balance_change_1",
+          "gained": 0,
+          "lost": 0,
+          "previous_valid_active": 176377,
+          "source_valid_active": 176377,
+          "valid_active": 176377
+        },
+        {
+          "field": "loan_balance_change_5",
+          "gained": 0,
+          "lost": 0,
+          "previous_valid_active": 173342,
+          "source_valid_active": 173342,
+          "valid_active": 173342
+        },
+        {
+          "field": "loan_rate",
+          "gained": 0,
+          "lost": 0,
+          "previous_valid_active": 42852,
+          "source_valid_active": 42852,
+          "valid_active": 42852
+        },
+        {
+          "field": "loan_rate_change_5",
+          "gained": 0,
+          "lost": 0,
+          "previous_valid_active": 37787,
+          "source_valid_active": 37787,
+          "valid_active": 37787
+        },
+        {
+          "field": "new_loan_volume_surprise",
+          "gained": 0,
+          "lost": 0,
+          "previous_valid_active": 33625,
+          "source_valid_active": 33625,
+          "valid_active": 33625
+        },
+        {
+          "field": "utilization_proxy",
+          "gained": 9747,
+          "lost": 0,
+          "previous_valid_active": 7032,
+          "source_valid_active": 16779,
+          "valid_active": 16779
+        }
+      ],
+      "source": {
+        "path": "D:\\quant-data\\b3\\interim\\round6_20260911T111805Z\\lending_extension\\lending\\features.parquet",
+        "sha256": "47341141aa362640b056ce0902d40d96b134fb525c2029afe6253193b2579ae5"
+      }
+    },
+    {
+      "family": "magnitudes",
+      "fields": [
+        {
+          "field": "return_1_over_vol_20",
+          "gained": 0,
+          "lost": 0,
+          "previous_valid_active": 565354,
+          "source_valid_active": 565354,
+          "valid_active": 565354
+        },
+        {
+          "field": "daily_vol_20_raw",
+          "gained": 0,
+          "lost": 0,
+          "previous_valid_active": 565354,
+          "source_valid_active": 565354,
+          "valid_active": 565354
+        },
+        {
+          "field": "log_traded_value_20",
+          "gained": 0,
+          "lost": 0,
+          "previous_valid_active": 566292,
+          "source_valid_active": 566292,
+          "valid_active": 566292
+        },
+        {
+          "field": "economic_beta_60",
+          "gained": 0,
+          "lost": 0,
+          "previous_valid_active": 563277,
+          "source_valid_active": 563277,
+          "valid_active": 563277
+        }
+      ],
+      "source": {
+        "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\derived_families_d05ed86\\magnitudes\\features.parquet",
+        "sha256": "b66991874b6edbdf0dababaec6ec8c1b7135c35acf6750bab1485c530b463f9e"
+      }
+    },
+    {
+      "family": "microstructure",
+      "fields": [
+        {
+          "field": "avg_trade_size_20",
+          "gained": 0,
+          "lost": 0,
+          "previous_valid_active": 565501,
+          "source_valid_active": 565501,
+          "valid_active": 565501
+        },
+        {
+          "field": "after_hours_volume_share_5",
+          "gained": 0,
+          "lost": 0,
+          "previous_valid_active": 253025,
+          "source_valid_active": 253025,
+          "valid_active": 253025
+        }
+      ],
+      "source": {
+        "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\microstructure_feature_archive\\features.parquet",
+        "sha256": "548134492d9d6847123478bb70628a6b03677237bc88836dc97bceda056e0aaa"
+      }
+    },
+    {
+      "family": "oddlot",
+      "fields": [
+        {
+          "field": "oddlot_volume_share",
+          "gained": 0,
+          "lost": 0,
+          "previous_valid_active": 568218,
+          "source_valid_active": 568218,
+          "valid_active": 568218
+        },
+        {
+          "field": "oddlot_volume_share_change_5",
+          "gained": 0,
+          "lost": 0,
+          "previous_valid_active": 568211,
+          "source_valid_active": 568211,
+          "valid_active": 568211
+        }
+      ],
+      "source": {
+        "bytes": 10818087,
+        "path": "D:\\quant-data\\b3\\interim\\b3\\odd_lot\\v2_archive_b830fb5_20260909T011714Z\\odd_lot_activity.parquet",
+        "sha256": "4ba8658599c36b16cd89aff2df812e59e823e77e0a8fe8dd86f1cc2caaa3bcd5"
+      }
+    },
+    {
+      "family": "options",
+      "fields": [
+        {
+          "field": "option_to_stock_volume_20",
+          "gained": 21352,
+          "lost": 0,
+          "previous_valid_active": 230135,
+          "source_valid_active": 251487,
+          "valid_active": 251487
+        },
+        {
+          "field": "put_call_volume_ratio_5",
+          "gained": 20335,
+          "lost": 0,
+          "previous_valid_active": 213649,
+          "source_valid_active": 233984,
+          "valid_active": 233984
+        },
+        {
+          "field": "put_call_oi_log_ratio",
+          "gained": 442,
+          "lost": 0,
+          "previous_valid_active": 0,
+          "source_valid_active": 442,
+          "valid_active": 442
+        },
+        {
+          "field": "delta_oi_to_volume_1",
+          "gained": 409,
+          "lost": 0,
+          "previous_valid_active": 0,
+          "source_valid_active": 409,
+          "valid_active": 409
+        },
+        {
+          "field": "uncovered_call_share",
+          "gained": 0,
+          "lost": 0,
+          "previous_valid_active": 0,
+          "source_valid_active": 0,
+          "valid_active": 0
+        },
+        {
+          "field": "observed_series_put_call_oi_log_ratio",
+          "gained": 0,
+          "lost": 0,
+          "previous_valid_active": 178026,
+          "source_valid_active": 178026,
+          "valid_active": 178026
+        },
+        {
+          "field": "observed_series_oi_coverage",
+          "gained": 0,
+          "lost": 0,
+          "previous_valid_active": 202458,
+          "source_valid_active": 202458,
+          "valid_active": 202458
+        }
+      ],
+      "source": {
+        "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\options_feature_archive\\features.parquet",
+        "sha256": "4b06571eb5980261b1f02ee41e552b6e81c628981c4eacd237ac9b28ebaea0be"
+      }
+    },
+    {
+      "family": "rebalance",
+      "fields": [
+        {
+          "field": "index_pressure",
+          "gained": 0,
+          "lost": 0,
+          "previous_valid_active": 65272,
+          "source_valid_active": 65272,
+          "valid_active": 65272
+        },
+        {
+          "field": "index_event_age",
+          "gained": 0,
+          "lost": 0,
+          "previous_valid_active": 65272,
+          "source_valid_active": 65272,
+          "valid_active": 65272
+        }
+      ],
+      "source": {
+        "path": "D:\\quant-data\\b3\\interim\\round6_20260911T111805Z\\index_features\\index_features.parquet",
+        "rows": 65272,
+        "sha256": "f23587c58be0219b7eec6354060428837b13d797bb63126d6b8bdf60a7d04e58"
+      }
+    },
+    {
+      "family": "sector",
+      "fields": [
+        {
+          "field": "name_minus_sector_return_5",
+          "gained": 11848,
+          "lost": 0,
+          "previous_valid_active": 195146,
+          "source_valid_active": 206994,
+          "valid_active": 206994
+        },
+        {
+          "field": "name_minus_sector_return_21",
+          "gained": 11848,
+          "lost": 0,
+          "previous_valid_active": 195060,
+          "source_valid_active": 206908,
+          "valid_active": 206908
+        },
+        {
+          "field": "sector_momentum_12_1",
+          "gained": 10721,
+          "lost": 0,
+          "previous_valid_active": 177230,
+          "source_valid_active": 187951,
+          "valid_active": 187951
+        }
+      ],
+      "source": {
+        "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\fca_dependencies_0aea7a8\\derived\\sector\\features.parquet",
+        "sha256": "8066d15daa73e9490348639f87bb713fc650b5718254f4efae9f2fee09864041"
+      }
+    }
+  ],
+  "financial_family": {
+    "path": "D:\\quant-data\\b3\\interim\\data_repair_20260913T184500Z\\financial_family_e884836cf8bd\\manifest.json",
+    "sha256": "0dc0076550c8cd3e3d89f1b00fc2fce48de69b721f3a18dff4dd9823edf30f37"
+  },
+  "forward_capture": false,
+  "heldout_access": false,
+  "parent": {
+    "manifest_sha256": "1db29cbf7b30244b2327ab7e0c212a796fd25280141a45e4ee28213b2644aa65",
+    "root": "D:\\quant-data\\b3\\processed\\v2_round7_store_de6476b_20260912T232200Z"
+  },
+  "protected_arrays": [
+    "action_cash_per_prior_share",
+    "action_has_action",
+    "action_payment_session",
+    "action_session_resolved",
+    "action_shares_per_prior_share",
+    "action_successor_index",
+    "active",
+    "activity_valid",
+    "ambiguous_action_mask",
+    "audit_eventual_survives_to_final_year",
+    "common_state_diagnostic_valid",
+    "common_state_diagnostic_values",
+    "continuation_quote_mask",
+    "detected_cash_event_mask",
+    "detected_event_mask",
+    "detected_split_mask",
+    "distribution_change_mask",
+    "distribution_number",
+    "entry_fill_allowed",
+    "fast_last_price_age_minutes",
+    "fast_last_price_age_valid",
+    "fast_patch_mask",
+    "fast_patch_valid",
+    "fast_patch_values",
+    "fast_present",
+    "inferred_action_c1_mask",
+    "inferred_action_large_move_no_action_mask",
+    "inferred_action_u1_mask",
+    "inferred_action_u2_mask",
+    "intraday_age_sessions",
+    "intraday_boundary_lagged_mask",
+    "intraday_boundary_sameday_mask",
+    "intraday_support_fraction",
+    "intraday_unit_or_unresolved_boundary_mask",
+    "intraday_valid",
+    "intraday_values",
+    "m1_cotahist_return_consistent_mask",
+    "observed",
+    "price_jump_anomaly_mask",
+    "prior_reference_close",
+    "quantity",
+    "raw_close",
+    "raw_high",
+    "raw_low",
+    "raw_open",
+    "shareholder_wealth_close",
+    "shareholder_wealth_high",
+    "shareholder_wealth_low",
+    "shareholder_wealth_open",
+    "shareholder_wealth_valid",
+    "slow_age_sessions",
+    "slow_timestep_valid",
+    "source_session_complete",
+    "target_normalized_cross_section_valid",
+    "target_normalized_residual",
+    "target_price_midrank",
+    "target_price_simple_return",
+    "target_price_valid",
+    "target_primary",
+    "target_scale_sigma",
+    "target_shareholder_midrank",
+    "target_shareholder_simple_return",
+    "target_shareholder_valid",
+    "target_terminal_loss",
+    "target_terminal_wealth",
+    "target_to_close",
+    "target_to_close_normalized_residual",
+    "target_to_close_raw_log_return",
+    "target_to_close_valid",
+    "target_valid",
+    "trade_count",
+    "trade_observed",
+    "volume_brl"
+  ],
+  "protected_arrays_exact": true,
+  "store": {
+    "manifest_sha256": "61149d43a23fc55fcd92b43aaa4e74d747fbdf62f852bedbbbdb2cf18281f3cc",
+    "root": "C:\\quant-data\\b3\\processed\\v2_data_store_2d59b9d_20260913T211700Z"
+  }
+}

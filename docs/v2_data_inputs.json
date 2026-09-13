@@ -1,0 +1,159 @@
+{
+  "accepted": true,
+  "active_stock_days": 568815,
+  "coverage_by_family": [
+    {
+      "family": "cross_market",
+      "lost_existing_field_observations": 0,
+      "new_field_observations": 0,
+      "recovered_existing_field_observations": 0
+    },
+    {
+      "family": "events",
+      "lost_existing_field_observations": 0,
+      "new_field_observations": 0,
+      "recovered_existing_field_observations": 492
+    },
+    {
+      "family": "fundamentals",
+      "lost_existing_field_observations": 0,
+      "new_field_observations": 607607,
+      "recovered_existing_field_observations": 115793
+    },
+    {
+      "family": "lending",
+      "lost_existing_field_observations": 0,
+      "new_field_observations": 0,
+      "recovered_existing_field_observations": 9747
+    },
+    {
+      "family": "magnitudes",
+      "lost_existing_field_observations": 0,
+      "new_field_observations": 0,
+      "recovered_existing_field_observations": 0
+    },
+    {
+      "family": "microstructure",
+      "lost_existing_field_observations": 0,
+      "new_field_observations": 0,
+      "recovered_existing_field_observations": 0
+    },
+    {
+      "family": "oddlot",
+      "lost_existing_field_observations": 0,
+      "new_field_observations": 0,
+      "recovered_existing_field_observations": 0
+    },
+    {
+      "family": "options",
+      "lost_existing_field_observations": 0,
+      "new_field_observations": 0,
+      "recovered_existing_field_observations": 42538
+    },
+    {
+      "family": "rebalance",
+      "lost_existing_field_observations": 0,
+      "new_field_observations": 0,
+      "recovered_existing_field_observations": 0
+    },
+    {
+      "family": "sector",
+      "lost_existing_field_observations": 0,
+      "new_field_observations": 0,
+      "recovered_existing_field_observations": 34417
+    }
+  ],
+  "cpu_acceptance_log": {
+    "path": "D:\\quant-data\\b3\\interim\\data_repair_20260913T184500Z\\acceptance_final.log",
+    "sha256": "b03f8e3104ff00acc263739238ffbfcf1e69569515a9b449a39b29d499082ddf"
+  },
+  "evidence": [
+    {
+      "path": "docs\\v2_data_acceptance.json",
+      "sha256": "6ee1944fc414c7860399bc9abc17eb1e7c99e8703ee95d7db0290b0bc9e4a627"
+    },
+    {
+      "path": "docs\\v2_data_store_comparison.json",
+      "sha256": "a28cd7384e552213ba62064ca88c3a6dd7a9fdad3a2e2e3b09c4fae3099c0897"
+    },
+    {
+      "path": "docs\\v2_data_financial_comparison.json",
+      "sha256": "ee1f1e87d292ed913543b6bc2c181c1f3a5e1d965c56ae8829046a2ef085f962"
+    }
+  ],
+  "financial_family": {
+    "path": "D:\\quant-data\\b3\\interim\\data_repair_20260913T184500Z\\financial_family_e884836cf8bd\\manifest.json",
+    "sha256": "0dc0076550c8cd3e3d89f1b00fc2fce48de69b721f3a18dff4dd9823edf30f37"
+  },
+  "forward_capture": false,
+  "gpu_instances_launched": 0,
+  "heldout_access": false,
+  "implementation_git_commit": "2d59b9d2ba6bb970c88321b4f245eceff7fa27a5",
+  "maximum_active_names": 243,
+  "new_model_fitting": false,
+  "parent": {
+    "manifest_sha256": "1db29cbf7b30244b2327ab7e0c212a796fd25280141a45e4ee28213b2644aa65",
+    "root": "D:\\quant-data\\b3\\processed\\v2_round7_store_de6476b_20260912T232200Z"
+  },
+  "preprocessing": "Fit-only median/IQR then asinh for continuous sidecars; retain varied P coordinates in F; absent/constant P fields learn scale only on F fit rows; no clipping or extra stale cutoff.",
+  "protected_array_count": 73,
+  "protected_arrays_exact": true,
+  "repair_root": "D:\\quant-data\\b3\\interim\\data_repair_20260913T184500Z",
+  "runtime_contract": "Resolve this pointer for new data research. Historical Round7 uses its own pointer and original code. CLI training/scoring takes an explicit resolved store.",
+  "scalar_fields": 145,
+  "source_review": {
+    "path": "docs\\v2_data_source_review.json",
+    "sha256": "a31f86218bebcf5c22fb87d5a733e576bcf6f8686eea2268d4f9cae7d291df41"
+  },
+  "source_verification_limits": "86 initial triage candidates still lack an exact original PDF; no guessed correction or blanket rejection. Five residual extreme earnings yields are supported distressed observations.",
+  "status": "development_data_acceptance_no_alpha_claim",
+  "store": {
+    "manifest_sha256": "61149d43a23fc55fcd92b43aaa4e74d747fbdf62f852bedbbbdb2cf18281f3cc",
+    "root": "C:\\quant-data\\b3\\processed\\v2_data_store_2d59b9d_20260913T211700Z"
+  },
+  "target_group_changes": [],
+  "tests": [
+    {
+      "log": {
+        "path": "D:\\quant-data\\b3\\interim\\data_repair_20260913T184500Z\\final_targeted_tests.log",
+        "sha256": "fb0aa17dcfd9b76ce87878383d5974da969c016540a95a094a72446ea16735f9"
+      },
+      "passed": 362,
+      "scope": "data/model targeted suite",
+      "seconds": 52.19
+    },
+    {
+      "log": {
+        "path": "D:\\quant-data\\b3\\interim\\data_repair_20260913T184500Z\\source_final_tests.log",
+        "sha256": "1b588d758bb5ad323a8d8bf15e8a26ad51c4d7f4ffbd5029fd4ccf887458f213"
+      },
+      "passed": 177,
+      "scope": "final source/transform/store/score/training suite (overlapping tests)",
+      "seconds": 50.94
+    },
+    {
+      "log": {
+        "path": "D:\\quant-data\\b3\\interim\\data_repair_20260913T184500Z\\age_integration_tests.log",
+        "sha256": "e128a06fb585283d20fe30dbb75f4467b3285beafbae72487ffb145d2ec9455d"
+      },
+      "passed": 47,
+      "scope": "history decoding/pipeline integration"
+    },
+    {
+      "log": {
+        "path": "D:\\quant-data\\b3\\interim\\data_repair_20260913T184500Z\\label_tie_tests.log",
+        "sha256": "d6fbd57059e164f5853cdb00d982872e0c7f4b72dd4b547d166b5d4804ae8d7a"
+      },
+      "passed": 50,
+      "scope": "target tie/store regression"
+    },
+    {
+      "log": {
+        "path": "D:\\quant-data\\b3\\interim\\data_repair_20260913T184500Z\\target_contract_tests.log",
+        "sha256": "c26b34567b43a1ef1f63b23741aa7448722872ba8b61b212d963ebcd354cb4b4"
+      },
+      "passed": 25,
+      "scope": "target/checkpoint/score/Round7 training"
+    }
+  ]
+}

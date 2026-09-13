@@ -1,0 +1,1624 @@
+{
+  "fields": [
+    {
+      "by_year": [
+        {
+          "changed_values": 0,
+          "gained": 0,
+          "lost": 0,
+          "previous_valid": 0,
+          "valid": 0,
+          "year": 2010
+        },
+        {
+          "changed_values": 0,
+          "gained": 0,
+          "lost": 0,
+          "previous_valid": 2552,
+          "valid": 2552,
+          "year": 2011
+        },
+        {
+          "changed_values": 3,
+          "gained": 0,
+          "lost": 0,
+          "previous_valid": 2996,
+          "valid": 2996,
+          "year": 2012
+        },
+        {
+          "changed_values": 0,
+          "gained": 0,
+          "lost": 0,
+          "previous_valid": 2717,
+          "valid": 2717,
+          "year": 2013
+        },
+        {
+          "changed_values": 0,
+          "gained": 0,
+          "lost": 0,
+          "previous_valid": 3840,
+          "valid": 3840,
+          "year": 2014
+        },
+        {
+          "changed_values": 1,
+          "gained": 0,
+          "lost": 0,
+          "previous_valid": 3754,
+          "valid": 3754,
+          "year": 2015
+        },
+        {
+          "changed_values": 0,
+          "gained": 5,
+          "lost": 0,
+          "previous_valid": 3562,
+          "valid": 3567,
+          "year": 2016
+        },
+        {
+          "changed_values": 0,
+          "gained": 0,
+          "lost": 0,
+          "previous_valid": 3030,
+          "valid": 3030,
+          "year": 2017
+        },
+        {
+          "changed_values": 0,
+          "gained": 0,
+          "lost": 0,
+          "previous_valid": 9104,
+          "valid": 9104,
+          "year": 2018
+        },
+        {
+          "changed_values": 0,
+          "gained": 0,
+          "lost": 0,
+          "previous_valid": 12534,
+          "valid": 12534,
+          "year": 2019
+        },
+        {
+          "changed_values": 2,
+          "gained": 2,
+          "lost": 0,
+          "previous_valid": 18458,
+          "valid": 18460,
+          "year": 2020
+        },
+        {
+          "changed_values": 60,
+          "gained": 18,
+          "lost": 0,
+          "previous_valid": 22048,
+          "valid": 22066,
+          "year": 2021
+        },
+        {
+          "changed_values": 70,
+          "gained": 0,
+          "lost": 0,
+          "previous_valid": 19298,
+          "valid": 19298,
+          "year": 2022
+        },
+        {
+          "changed_values": 5,
+          "gained": 9,
+          "lost": 0,
+          "previous_valid": 19173,
+          "valid": 19182,
+          "year": 2023
+        },
+        {
+          "changed_values": 8,
+          "gained": 5,
+          "lost": 0,
+          "previous_valid": 17273,
+          "valid": 17278,
+          "year": 2024
+        }
+      ],
+      "changed_values": 149,
+      "field": "log_market_cap",
+      "gained": 39,
+      "lost": 0,
+      "previous_valid": 140339,
+      "valid": 140378
+    },
+    {
+      "by_year": [
+        {
+          "changed_values": 0,
+          "gained": 0,
+          "lost": 0,
+          "previous_valid": 0,
+          "valid": 0,
+          "year": 2010
+        },
+        {
+          "changed_values": 0,
+          "gained": 37,
+          "lost": 0,
+          "previous_valid": 2506,
+          "valid": 2543,
+          "year": 2011
+        },
+        {
+          "changed_values": 3,
+          "gained": 9,
+          "lost": 0,
+          "previous_valid": 2987,
+          "valid": 2996,
+          "year": 2012
+        },
+        {
+          "changed_values": 0,
+          "gained": 0,
+          "lost": 0,
+          "previous_valid": 2717,
+          "valid": 2717,
+          "year": 2013
+        },
+        {
+          "changed_values": 0,
+          "gained": 21,
+          "lost": 0,
+          "previous_valid": 3819,
+          "valid": 3840,
+          "year": 2014
+        },
+        {
+          "changed_values": 0,
+          "gained": 15,
+          "lost": 0,
+          "previous_valid": 3739,
+          "valid": 3754,
+          "year": 2015
+        },
+        {
+          "changed_values": 0,
+          "gained": 136,
+          "lost": 0,
+          "previous_valid": 3431,
+          "valid": 3567,
+          "year": 2016
+        },
+        {
+          "changed_values": 1,
+          "gained": 61,
+          "lost": 0,
+          "previous_valid": 2969,
+          "valid": 3030,
+          "year": 2017
+        },
+        {
+          "changed_values": 0,
+          "gained": 147,
+          "lost": 0,
+          "previous_valid": 8957,
+          "valid": 9104,
+          "year": 2018
+        },
+        {
+          "changed_values": 0,
+          "gained": 108,
+          "lost": 0,
+          "previous_valid": 12426,
+          "valid": 12534,
+          "year": 2019
+        },
+        {
+          "changed_values": 101,
+          "gained": 366,
+          "lost": 0,
+          "previous_valid": 18094,
+          "valid": 18460,
+          "year": 2020
+        },
+        {
+          "changed_values": 203,
+          "gained": 218,
+          "lost": 0,
+          "previous_valid": 21848,
+          "valid": 22066,
+          "year": 2021
+        },
+        {
+          "changed_values": 70,
+          "gained": 338,
+          "lost": 0,
+          "previous_valid": 18960,
+          "valid": 19298,
+          "year": 2022
+        },
+        {
+          "changed_values": 4,
+          "gained": 254,
+          "lost": 0,
+          "previous_valid": 18928,
+          "valid": 19182,
+          "year": 2023
+        },
+        {
+          "changed_values": 8,
+          "gained": 210,
+          "lost": 0,
+          "previous_valid": 17068,
+          "valid": 17278,
+          "year": 2024
+        }
+      ],
+      "changed_values": 390,
+      "field": "book_to_market",
+      "gained": 1920,
+      "lost": 0,
+      "previous_valid": 138449,
+      "valid": 140369
+    },
+    {
+      "by_year": [
+        {
+          "changed_values": 0,
+          "gained": 0,
+          "lost": 0,
+          "previous_valid": 0,
+          "valid": 0,
+          "year": 2010
+        },
+        {
+          "changed_values": 0,
+          "gained": 1908,
+          "lost": 0,
+          "previous_valid": 626,
+          "valid": 2534,
+          "year": 2011
+        },
+        {
+          "changed_values": 3,
+          "gained": 418,
+          "lost": 0,
+          "previous_valid": 2560,
+          "valid": 2978,
+          "year": 2012
+        },
+        {
+          "changed_values": 0,
+          "gained": 56,
+          "lost": 0,
+          "previous_valid": 2630,
+          "valid": 2686,
+          "year": 2013
+        },
+        {
+          "changed_values": 0,
+          "gained": 37,
+          "lost": 0,
+          "previous_valid": 3779,
+          "valid": 3816,
+          "year": 2014
+        },
+        {
+          "changed_values": 1,
+          "gained": 63,
+          "lost": 0,
+          "previous_valid": 3691,
+          "valid": 3754,
+          "year": 2015
+        },
+        {
+          "changed_values": 0,
+          "gained": 122,
+          "lost": 0,
+          "previous_valid": 3445,
+          "valid": 3567,
+          "year": 2016
+        },
+        {
+          "changed_values": 1,
+          "gained": 0,
+          "lost": 0,
+          "previous_valid": 3030,
+          "valid": 3030,
+          "year": 2017
+        },
+        {
+          "changed_values": 0,
+          "gained": 284,
+          "lost": 0,
+          "previous_valid": 8820,
+          "valid": 9104,
+          "year": 2018
+        },
+        {
+          "changed_values": 0,
+          "gained": 278,
+          "lost": 0,
+          "previous_valid": 12256,
+          "valid": 12534,
+          "year": 2019
+        },
+        {
+          "changed_values": 103,
+          "gained": 388,
+          "lost": 0,
+          "previous_valid": 17868,
+          "valid": 18256,
+          "year": 2020
+        },
+        {
+          "changed_values": 239,
+          "gained": 1309,
+          "lost": 0,
+          "previous_valid": 20673,
+          "valid": 21982,
+          "year": 2021
+        },
+        {
+          "changed_values": 109,
+          "gained": 712,
+          "lost": 0,
+          "previous_valid": 18440,
+          "valid": 19152,
+          "year": 2022
+        },
+        {
+          "changed_values": 5,
+          "gained": 274,
+          "lost": 0,
+          "previous_valid": 18908,
+          "valid": 19182,
+          "year": 2023
+        },
+        {
+          "changed_values": 8,
+          "gained": 301,
+          "lost": 0,
+          "previous_valid": 16977,
+          "valid": 17278,
+          "year": 2024
+        }
+      ],
+      "changed_values": 469,
+      "field": "earnings_yield_ttm",
+      "gained": 6150,
+      "lost": 0,
+      "previous_valid": 133703,
+      "valid": 139853
+    },
+    {
+      "by_year": [
+        {
+          "changed_values": 0,
+          "gained": 0,
+          "lost": 0,
+          "previous_valid": 0,
+          "valid": 0,
+          "year": 2010
+        },
+        {
+          "changed_values": 0,
+          "gained": 4705,
+          "lost": 0,
+          "previous_valid": 1335,
+          "valid": 6040,
+          "year": 2011
+        },
+        {
+          "changed_values": 0,
+          "gained": 1250,
+          "lost": 0,
+          "previous_valid": 6042,
+          "valid": 7292,
+          "year": 2012
+        },
+        {
+          "changed_values": 0,
+          "gained": 58,
+          "lost": 0,
+          "previous_valid": 6760,
+          "valid": 6818,
+          "year": 2013
+        },
+        {
+          "changed_values": 0,
+          "gained": 88,
+          "lost": 0,
+          "previous_valid": 8752,
+          "valid": 8840,
+          "year": 2014
+        },
+        {
+          "changed_values": 0,
+          "gained": 161,
+          "lost": 0,
+          "previous_valid": 8495,
+          "valid": 8656,
+          "year": 2015
+        },
+        {
+          "changed_values": 0,
+          "gained": 170,
+          "lost": 0,
+          "previous_valid": 7934,
+          "valid": 8104,
+          "year": 2016
+        },
+        {
+          "changed_values": 1,
+          "gained": 151,
+          "lost": 0,
+          "previous_valid": 7802,
+          "valid": 7953,
+          "year": 2017
+        },
+        {
+          "changed_values": 0,
+          "gained": 328,
+          "lost": 0,
+          "previous_valid": 20459,
+          "valid": 20787,
+          "year": 2018
+        },
+        {
+          "changed_values": 129,
+          "gained": 278,
+          "lost": 0,
+          "previous_valid": 28166,
+          "valid": 28444,
+          "year": 2019
+        },
+        {
+          "changed_values": 231,
+          "gained": 685,
+          "lost": 0,
+          "previous_valid": 33426,
+          "valid": 34111,
+          "year": 2020
+        },
+        {
+          "changed_values": 226,
+          "gained": 1930,
+          "lost": 0,
+          "previous_valid": 41132,
+          "valid": 43062,
+          "year": 2021
+        },
+        {
+          "changed_values": 63,
+          "gained": 2003,
+          "lost": 0,
+          "previous_valid": 34859,
+          "valid": 36862,
+          "year": 2022
+        },
+        {
+          "changed_values": 0,
+          "gained": 761,
+          "lost": 0,
+          "previous_valid": 36513,
+          "valid": 37274,
+          "year": 2023
+        },
+        {
+          "changed_values": 4,
+          "gained": 523,
+          "lost": 0,
+          "previous_valid": 34945,
+          "valid": 35468,
+          "year": 2024
+        }
+      ],
+      "changed_values": 654,
+      "field": "gross_profitability",
+      "gained": 13091,
+      "lost": 0,
+      "previous_valid": 276620,
+      "valid": 289711
+    },
+    {
+      "by_year": [
+        {
+          "changed_values": 0,
+          "gained": 0,
+          "lost": 0,
+          "previous_valid": 0,
+          "valid": 0,
+          "year": 2010
+        },
+        {
+          "changed_values": 0,
+          "gained": 0,
+          "lost": 0,
+          "previous_valid": 6273,
+          "valid": 6273,
+          "year": 2011
+        },
+        {
+          "changed_values": 0,
+          "gained": 0,
+          "lost": 0,
+          "previous_valid": 7792,
+          "valid": 7792,
+          "year": 2012
+        },
+        {
+          "changed_values": 0,
+          "gained": 0,
+          "lost": 0,
+          "previous_valid": 7345,
+          "valid": 7345,
+          "year": 2013
+        },
+        {
+          "changed_values": 0,
+          "gained": 0,
+          "lost": 0,
+          "previous_valid": 9314,
+          "valid": 9314,
+          "year": 2014
+        },
+        {
+          "changed_values": 0,
+          "gained": 0,
+          "lost": 0,
+          "previous_valid": 9148,
+          "valid": 9148,
+          "year": 2015
+        },
+        {
+          "changed_values": 0,
+          "gained": 0,
+          "lost": 0,
+          "previous_valid": 8602,
+          "valid": 8602,
+          "year": 2016
+        },
+        {
+          "changed_values": 0,
+          "gained": 0,
+          "lost": 0,
+          "previous_valid": 8445,
+          "valid": 8445,
+          "year": 2017
+        },
+        {
+          "changed_values": 0,
+          "gained": 0,
+          "lost": 0,
+          "previous_valid": 21684,
+          "valid": 21684,
+          "year": 2018
+        },
+        {
+          "changed_values": 0,
+          "gained": 0,
+          "lost": 0,
+          "previous_valid": 29752,
+          "valid": 29752,
+          "year": 2019
+        },
+        {
+          "changed_values": 0,
+          "gained": 0,
+          "lost": 0,
+          "previous_valid": 36071,
+          "valid": 36071,
+          "year": 2020
+        },
+        {
+          "changed_values": 0,
+          "gained": 16,
+          "lost": 0,
+          "previous_valid": 45400,
+          "valid": 45416,
+          "year": 2021
+        },
+        {
+          "changed_values": 0,
+          "gained": 17,
+          "lost": 0,
+          "previous_valid": 38211,
+          "valid": 38228,
+          "year": 2022
+        },
+        {
+          "changed_values": 0,
+          "gained": 23,
+          "lost": 0,
+          "previous_valid": 38990,
+          "valid": 39013,
+          "year": 2023
+        },
+        {
+          "changed_values": 0,
+          "gained": 165,
+          "lost": 0,
+          "previous_valid": 36949,
+          "valid": 37114,
+          "year": 2024
+        }
+      ],
+      "changed_values": 0,
+      "field": "liabilities_to_assets",
+      "gained": 221,
+      "lost": 0,
+      "previous_valid": 303976,
+      "valid": 304197
+    },
+    {
+      "by_year": [
+        {
+          "changed_values": 0,
+          "gained": 0,
+          "lost": 0,
+          "previous_valid": 0,
+          "valid": 0,
+          "year": 2010
+        },
+        {
+          "changed_values": 0,
+          "gained": 0,
+          "lost": 0,
+          "previous_valid": 0,
+          "valid": 0,
+          "year": 2011
+        },
+        {
+          "changed_values": 0,
+          "gained": 0,
+          "lost": 0,
+          "previous_valid": 6020,
+          "valid": 6020,
+          "year": 2012
+        },
+        {
+          "changed_values": 0,
+          "gained": 0,
+          "lost": 0,
+          "previous_valid": 6760,
+          "valid": 6760,
+          "year": 2013
+        },
+        {
+          "changed_values": 0,
+          "gained": 40,
+          "lost": 0,
+          "previous_valid": 8760,
+          "valid": 8800,
+          "year": 2014
+        },
+        {
+          "changed_values": 0,
+          "gained": 209,
+          "lost": 0,
+          "previous_valid": 8447,
+          "valid": 8656,
+          "year": 2015
+        },
+        {
+          "changed_values": 0,
+          "gained": 218,
+          "lost": 0,
+          "previous_valid": 7886,
+          "valid": 8104,
+          "year": 2016
+        },
+        {
+          "changed_values": 1,
+          "gained": 33,
+          "lost": 0,
+          "previous_valid": 7802,
+          "valid": 7835,
+          "year": 2017
+        },
+        {
+          "changed_values": 36,
+          "gained": 164,
+          "lost": 0,
+          "previous_valid": 19562,
+          "valid": 19726,
+          "year": 2018
+        },
+        {
+          "changed_values": 129,
+          "gained": 124,
+          "lost": 0,
+          "previous_valid": 26438,
+          "valid": 26562,
+          "year": 2019
+        },
+        {
+          "changed_values": 233,
+          "gained": 325,
+          "lost": 0,
+          "previous_valid": 31070,
+          "valid": 31395,
+          "year": 2020
+        },
+        {
+          "changed_values": 248,
+          "gained": 453,
+          "lost": 0,
+          "previous_valid": 38551,
+          "valid": 39004,
+          "year": 2021
+        },
+        {
+          "changed_values": 63,
+          "gained": 727,
+          "lost": 0,
+          "previous_valid": 33545,
+          "valid": 34272,
+          "year": 2022
+        },
+        {
+          "changed_values": 0,
+          "gained": 772,
+          "lost": 0,
+          "previous_valid": 34659,
+          "valid": 35431,
+          "year": 2023
+        },
+        {
+          "changed_values": 4,
+          "gained": 524,
+          "lost": 0,
+          "previous_valid": 33536,
+          "valid": 34060,
+          "year": 2024
+        }
+      ],
+      "changed_values": 714,
+      "field": "accruals_to_assets",
+      "gained": 3589,
+      "lost": 0,
+      "previous_valid": 263036,
+      "valid": 266625
+    },
+    {
+      "by_year": [
+        {
+          "changed_values": 0,
+          "gained": 0,
+          "lost": 0,
+          "previous_valid": 0,
+          "valid": 0,
+          "year": 2010
+        },
+        {
+          "changed_values": 0,
+          "gained": 0,
+          "lost": 0,
+          "previous_valid": 0,
+          "valid": 0,
+          "year": 2011
+        },
+        {
+          "changed_values": 0,
+          "gained": 4736,
+          "lost": 0,
+          "previous_valid": 1228,
+          "valid": 5964,
+          "year": 2012
+        },
+        {
+          "changed_values": 0,
+          "gained": 1592,
+          "lost": 0,
+          "previous_valid": 5168,
+          "valid": 6760,
+          "year": 2013
+        },
+        {
+          "changed_values": 0,
+          "gained": 330,
+          "lost": 0,
+          "previous_valid": 8094,
+          "valid": 8424,
+          "year": 2014
+        },
+        {
+          "changed_values": 0,
+          "gained": 305,
+          "lost": 0,
+          "previous_valid": 8068,
+          "valid": 8373,
+          "year": 2015
+        },
+        {
+          "changed_values": 0,
+          "gained": 592,
+          "lost": 0,
+          "previous_valid": 7474,
+          "valid": 8066,
+          "year": 2016
+        },
+        {
+          "changed_values": 1,
+          "gained": 446,
+          "lost": 0,
+          "previous_valid": 7389,
+          "valid": 7835,
+          "year": 2017
+        },
+        {
+          "changed_values": 36,
+          "gained": 1154,
+          "lost": 0,
+          "previous_valid": 18530,
+          "valid": 19684,
+          "year": 2018
+        },
+        {
+          "changed_values": 129,
+          "gained": 1319,
+          "lost": 0,
+          "previous_valid": 25242,
+          "valid": 26561,
+          "year": 2019
+        },
+        {
+          "changed_values": 233,
+          "gained": 1279,
+          "lost": 0,
+          "previous_valid": 30084,
+          "valid": 31363,
+          "year": 2020
+        },
+        {
+          "changed_values": 186,
+          "gained": 5141,
+          "lost": 0,
+          "previous_valid": 33392,
+          "valid": 38533,
+          "year": 2021
+        },
+        {
+          "changed_values": 63,
+          "gained": 3527,
+          "lost": 0,
+          "previous_valid": 30202,
+          "valid": 33729,
+          "year": 2022
+        },
+        {
+          "changed_values": 126,
+          "gained": 2203,
+          "lost": 0,
+          "previous_valid": 32965,
+          "valid": 35168,
+          "year": 2023
+        },
+        {
+          "changed_values": 4,
+          "gained": 1138,
+          "lost": 0,
+          "previous_valid": 32922,
+          "valid": 34060,
+          "year": 2024
+        }
+      ],
+      "changed_values": 778,
+      "field": "revenue_growth_yoy",
+      "gained": 23762,
+      "lost": 0,
+      "previous_valid": 240758,
+      "valid": 264520
+    },
+    {
+      "by_year": [
+        {
+          "changed_values": 0,
+          "gained": 0,
+          "lost": 0,
+          "previous_valid": 0,
+          "valid": 0,
+          "year": 2010
+        },
+        {
+          "changed_values": 0,
+          "gained": 0,
+          "lost": 0,
+          "previous_valid": 0,
+          "valid": 0,
+          "year": 2011
+        },
+        {
+          "changed_values": 0,
+          "gained": 0,
+          "lost": 0,
+          "previous_valid": 0,
+          "valid": 0,
+          "year": 2012
+        },
+        {
+          "changed_values": 0,
+          "gained": 0,
+          "lost": 0,
+          "previous_valid": 0,
+          "valid": 0,
+          "year": 2013
+        },
+        {
+          "changed_values": 0,
+          "gained": 0,
+          "lost": 0,
+          "previous_valid": 6067,
+          "valid": 6067,
+          "year": 2014
+        },
+        {
+          "changed_values": 0,
+          "gained": 0,
+          "lost": 0,
+          "previous_valid": 8575,
+          "valid": 8575,
+          "year": 2015
+        },
+        {
+          "changed_values": 0,
+          "gained": 218,
+          "lost": 0,
+          "previous_valid": 7929,
+          "valid": 8147,
+          "year": 2016
+        },
+        {
+          "changed_values": 1,
+          "gained": 246,
+          "lost": 0,
+          "previous_valid": 7874,
+          "valid": 8120,
+          "year": 2017
+        },
+        {
+          "changed_values": 0,
+          "gained": 760,
+          "lost": 0,
+          "previous_valid": 19784,
+          "valid": 20544,
+          "year": 2018
+        },
+        {
+          "changed_values": 316,
+          "gained": 1024,
+          "lost": 0,
+          "previous_valid": 26629,
+          "valid": 27653,
+          "year": 2019
+        },
+        {
+          "changed_values": 587,
+          "gained": 1161,
+          "lost": 0,
+          "previous_valid": 31714,
+          "valid": 32875,
+          "year": 2020
+        },
+        {
+          "changed_values": 313,
+          "gained": 895,
+          "lost": 0,
+          "previous_valid": 36120,
+          "valid": 37015,
+          "year": 2021
+        },
+        {
+          "changed_values": 250,
+          "gained": 1220,
+          "lost": 0,
+          "previous_valid": 27849,
+          "valid": 29069,
+          "year": 2022
+        },
+        {
+          "changed_values": 262,
+          "gained": 1671,
+          "lost": 0,
+          "previous_valid": 31290,
+          "valid": 32961,
+          "year": 2023
+        },
+        {
+          "changed_values": 386,
+          "gained": 1943,
+          "lost": 0,
+          "previous_valid": 32978,
+          "valid": 34921,
+          "year": 2024
+        }
+      ],
+      "changed_values": 2115,
+      "field": "sue",
+      "gained": 9138,
+      "lost": 0,
+      "previous_valid": 236809,
+      "valid": 245947
+    },
+    {
+      "by_year": [
+        {
+          "changed_values": 0,
+          "gained": 0,
+          "lost": 0,
+          "previous_valid": 0,
+          "valid": 0,
+          "year": 2010
+        },
+        {
+          "changed_values": 0,
+          "gained": 0,
+          "lost": 0,
+          "previous_valid": 6273,
+          "valid": 6273,
+          "year": 2011
+        },
+        {
+          "changed_values": 0,
+          "gained": 0,
+          "lost": 0,
+          "previous_valid": 7792,
+          "valid": 7792,
+          "year": 2012
+        },
+        {
+          "changed_values": 0,
+          "gained": 0,
+          "lost": 0,
+          "previous_valid": 7345,
+          "valid": 7345,
+          "year": 2013
+        },
+        {
+          "changed_values": 0,
+          "gained": 0,
+          "lost": 0,
+          "previous_valid": 9314,
+          "valid": 9314,
+          "year": 2014
+        },
+        {
+          "changed_values": 0,
+          "gained": 0,
+          "lost": 0,
+          "previous_valid": 9148,
+          "valid": 9148,
+          "year": 2015
+        },
+        {
+          "changed_values": 0,
+          "gained": 0,
+          "lost": 0,
+          "previous_valid": 8602,
+          "valid": 8602,
+          "year": 2016
+        },
+        {
+          "changed_values": 0,
+          "gained": 0,
+          "lost": 0,
+          "previous_valid": 8445,
+          "valid": 8445,
+          "year": 2017
+        },
+        {
+          "changed_values": 0,
+          "gained": 0,
+          "lost": 0,
+          "previous_valid": 21684,
+          "valid": 21684,
+          "year": 2018
+        },
+        {
+          "changed_values": 0,
+          "gained": 0,
+          "lost": 0,
+          "previous_valid": 29752,
+          "valid": 29752,
+          "year": 2019
+        },
+        {
+          "changed_values": 0,
+          "gained": 0,
+          "lost": 0,
+          "previous_valid": 36071,
+          "valid": 36071,
+          "year": 2020
+        },
+        {
+          "changed_values": 0,
+          "gained": 0,
+          "lost": 0,
+          "previous_valid": 45416,
+          "valid": 45416,
+          "year": 2021
+        },
+        {
+          "changed_values": 0,
+          "gained": 0,
+          "lost": 0,
+          "previous_valid": 38228,
+          "valid": 38228,
+          "year": 2022
+        },
+        {
+          "changed_values": 0,
+          "gained": 0,
+          "lost": 0,
+          "previous_valid": 39013,
+          "valid": 39013,
+          "year": 2023
+        },
+        {
+          "changed_values": 0,
+          "gained": 0,
+          "lost": 0,
+          "previous_valid": 37114,
+          "valid": 37114,
+          "year": 2024
+        }
+      ],
+      "changed_values": 0,
+      "field": "statement_age_sessions",
+      "gained": 0,
+      "lost": 0,
+      "previous_valid": 304197,
+      "valid": 304197
+    },
+    {
+      "by_year": [
+        {
+          "changed_values": 0,
+          "gained": 0,
+          "lost": 0,
+          "previous_valid": 0,
+          "valid": 0,
+          "year": 2010
+        },
+        {
+          "changed_values": 0,
+          "gained": 0,
+          "lost": 0,
+          "previous_valid": 6273,
+          "valid": 6273,
+          "year": 2011
+        },
+        {
+          "changed_values": 0,
+          "gained": 0,
+          "lost": 0,
+          "previous_valid": 7792,
+          "valid": 7792,
+          "year": 2012
+        },
+        {
+          "changed_values": 0,
+          "gained": 0,
+          "lost": 0,
+          "previous_valid": 7345,
+          "valid": 7345,
+          "year": 2013
+        },
+        {
+          "changed_values": 0,
+          "gained": 0,
+          "lost": 0,
+          "previous_valid": 9314,
+          "valid": 9314,
+          "year": 2014
+        },
+        {
+          "changed_values": 0,
+          "gained": 0,
+          "lost": 0,
+          "previous_valid": 9148,
+          "valid": 9148,
+          "year": 2015
+        },
+        {
+          "changed_values": 0,
+          "gained": 0,
+          "lost": 0,
+          "previous_valid": 8602,
+          "valid": 8602,
+          "year": 2016
+        },
+        {
+          "changed_values": 0,
+          "gained": 0,
+          "lost": 0,
+          "previous_valid": 8445,
+          "valid": 8445,
+          "year": 2017
+        },
+        {
+          "changed_values": 0,
+          "gained": 0,
+          "lost": 0,
+          "previous_valid": 21684,
+          "valid": 21684,
+          "year": 2018
+        },
+        {
+          "changed_values": 0,
+          "gained": 0,
+          "lost": 0,
+          "previous_valid": 29752,
+          "valid": 29752,
+          "year": 2019
+        },
+        {
+          "changed_values": 0,
+          "gained": 0,
+          "lost": 0,
+          "previous_valid": 36071,
+          "valid": 36071,
+          "year": 2020
+        },
+        {
+          "changed_values": 0,
+          "gained": 16,
+          "lost": 0,
+          "previous_valid": 45400,
+          "valid": 45416,
+          "year": 2021
+        },
+        {
+          "changed_values": 0,
+          "gained": 17,
+          "lost": 0,
+          "previous_valid": 38211,
+          "valid": 38228,
+          "year": 2022
+        },
+        {
+          "changed_values": 0,
+          "gained": 23,
+          "lost": 0,
+          "previous_valid": 38990,
+          "valid": 39013,
+          "year": 2023
+        },
+        {
+          "changed_values": 0,
+          "gained": 165,
+          "lost": 0,
+          "previous_valid": 36949,
+          "valid": 37114,
+          "year": 2024
+        }
+      ],
+      "changed_values": 0,
+      "field": "fundamental_financial_flag",
+      "gained": 221,
+      "lost": 0,
+      "previous_valid": 303976,
+      "valid": 304197
+    },
+    {
+      "by_year": [
+        {
+          "changed_values": 0,
+          "gained": 0,
+          "lost": 0,
+          "previous_valid": 0,
+          "valid": 0,
+          "year": 2010
+        },
+        {
+          "changed_values": 0,
+          "gained": 0,
+          "lost": 0,
+          "previous_valid": 6273,
+          "valid": 6273,
+          "year": 2011
+        },
+        {
+          "changed_values": 0,
+          "gained": 0,
+          "lost": 0,
+          "previous_valid": 7792,
+          "valid": 7792,
+          "year": 2012
+        },
+        {
+          "changed_values": 0,
+          "gained": 0,
+          "lost": 0,
+          "previous_valid": 7345,
+          "valid": 7345,
+          "year": 2013
+        },
+        {
+          "changed_values": 0,
+          "gained": 0,
+          "lost": 0,
+          "previous_valid": 9314,
+          "valid": 9314,
+          "year": 2014
+        },
+        {
+          "changed_values": 0,
+          "gained": 0,
+          "lost": 0,
+          "previous_valid": 9148,
+          "valid": 9148,
+          "year": 2015
+        },
+        {
+          "changed_values": 0,
+          "gained": 0,
+          "lost": 0,
+          "previous_valid": 8602,
+          "valid": 8602,
+          "year": 2016
+        },
+        {
+          "changed_values": 0,
+          "gained": 0,
+          "lost": 0,
+          "previous_valid": 8445,
+          "valid": 8445,
+          "year": 2017
+        },
+        {
+          "changed_values": 0,
+          "gained": 0,
+          "lost": 0,
+          "previous_valid": 21684,
+          "valid": 21684,
+          "year": 2018
+        },
+        {
+          "changed_values": 0,
+          "gained": 0,
+          "lost": 0,
+          "previous_valid": 29752,
+          "valid": 29752,
+          "year": 2019
+        },
+        {
+          "changed_values": 0,
+          "gained": 0,
+          "lost": 0,
+          "previous_valid": 36071,
+          "valid": 36071,
+          "year": 2020
+        },
+        {
+          "changed_values": 0,
+          "gained": 16,
+          "lost": 0,
+          "previous_valid": 45400,
+          "valid": 45416,
+          "year": 2021
+        },
+        {
+          "changed_values": 0,
+          "gained": 17,
+          "lost": 0,
+          "previous_valid": 38211,
+          "valid": 38228,
+          "year": 2022
+        },
+        {
+          "changed_values": 0,
+          "gained": 23,
+          "lost": 0,
+          "previous_valid": 38990,
+          "valid": 39013,
+          "year": 2023
+        },
+        {
+          "changed_values": 0,
+          "gained": 165,
+          "lost": 0,
+          "previous_valid": 36949,
+          "valid": 37114,
+          "year": 2024
+        }
+      ],
+      "changed_values": 0,
+      "field": "fundamental_consolidated_flag",
+      "gained": 221,
+      "lost": 0,
+      "previous_valid": 303976,
+      "valid": 304197
+    },
+    {
+      "by_year": [
+        {
+          "changed_values": 0,
+          "gained": 0,
+          "lost": 0,
+          "previous_valid": 5171,
+          "valid": 5171,
+          "year": 2010
+        },
+        {
+          "changed_values": 0,
+          "gained": 0,
+          "lost": 0,
+          "previous_valid": 7763,
+          "valid": 7763,
+          "year": 2011
+        },
+        {
+          "changed_values": 0,
+          "gained": 0,
+          "lost": 0,
+          "previous_valid": 7792,
+          "valid": 7792,
+          "year": 2012
+        },
+        {
+          "changed_values": 0,
+          "gained": 0,
+          "lost": 0,
+          "previous_valid": 7345,
+          "valid": 7345,
+          "year": 2013
+        },
+        {
+          "changed_values": 0,
+          "gained": 0,
+          "lost": 0,
+          "previous_valid": 9314,
+          "valid": 9314,
+          "year": 2014
+        },
+        {
+          "changed_values": 0,
+          "gained": 0,
+          "lost": 0,
+          "previous_valid": 9148,
+          "valid": 9148,
+          "year": 2015
+        },
+        {
+          "changed_values": 5,
+          "gained": 0,
+          "lost": 0,
+          "previous_valid": 8602,
+          "valid": 8602,
+          "year": 2016
+        },
+        {
+          "changed_values": 0,
+          "gained": 0,
+          "lost": 0,
+          "previous_valid": 8445,
+          "valid": 8445,
+          "year": 2017
+        },
+        {
+          "changed_values": 0,
+          "gained": 0,
+          "lost": 0,
+          "previous_valid": 21684,
+          "valid": 21684,
+          "year": 2018
+        },
+        {
+          "changed_values": 0,
+          "gained": 0,
+          "lost": 0,
+          "previous_valid": 29752,
+          "valid": 29752,
+          "year": 2019
+        },
+        {
+          "changed_values": 2,
+          "gained": 0,
+          "lost": 0,
+          "previous_valid": 36071,
+          "valid": 36071,
+          "year": 2020
+        },
+        {
+          "changed_values": 18,
+          "gained": 0,
+          "lost": 0,
+          "previous_valid": 45416,
+          "valid": 45416,
+          "year": 2021
+        },
+        {
+          "changed_values": 0,
+          "gained": 0,
+          "lost": 0,
+          "previous_valid": 38228,
+          "valid": 38228,
+          "year": 2022
+        },
+        {
+          "changed_values": 9,
+          "gained": 0,
+          "lost": 0,
+          "previous_valid": 39013,
+          "valid": 39013,
+          "year": 2023
+        },
+        {
+          "changed_values": 5,
+          "gained": 0,
+          "lost": 0,
+          "previous_valid": 37114,
+          "valid": 37114,
+          "year": 2024
+        }
+      ],
+      "changed_values": 39,
+      "field": "valuation_available_flag",
+      "gained": 0,
+      "lost": 0,
+      "previous_valid": 310858,
+      "valid": 310858
+    }
+  ],
+  "original": {
+    "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\family_0aea7a8\\fundamentals.parquet",
+    "sha256": "29a42a5c5231fce2402d17b1a3c19ca70808ba7d2561f3e2e01b11e556fc7012"
+  },
+  "repaired": {
+    "path": "D:\\quant-data\\b3\\interim\\data_repair_20260913T184500Z\\financial_family_e884836cf8bd\\fundamentals.parquet",
+    "sha256": "cc2787ad07e56d75eb3e8383cd9cb379b37b6cf59c16fcbc9f8bfdb19ee97abe"
+  },
+  "residual_triage": [
+    {
+      "absolute_triage_threshold": 10,
+      "field": "earnings_yield_ttm",
+      "previous_count": 154,
+      "remaining_by_isin": [
+        {
+          "first": "2019-03-19",
+          "isin": "BRLIQOACNOR2",
+          "last": "2019-04-01",
+          "maximum": -13.458953311938384,
+          "minimum": -14.2664897405272,
+          "stock_days": 4
+        },
+        {
+          "first": "2016-05-12",
+          "isin": "BROIBRACNPR8",
+          "last": "2016-05-12",
+          "maximum": -10.278395732357088,
+          "minimum": -10.278395732357088,
+          "stock_days": 1
+        }
+      ],
+      "repaired_count": 5
+    },
+    {
+      "absolute_triage_threshold": 100,
+      "field": "book_to_market",
+      "previous_count": 144,
+      "remaining_by_isin": [],
+      "repaired_count": 0
+    },
+    {
+      "absolute_triage_threshold": 10,
+      "field": "gross_profitability",
+      "previous_count": 427,
+      "remaining_by_isin": [],
+      "repaired_count": 0
+    },
+    {
+      "absolute_triage_threshold": 100,
+      "field": "revenue_growth_yoy",
+      "previous_count": 36,
+      "remaining_by_isin": [],
+      "repaired_count": 0
+    }
+  ],
+  "store": {
+    "manifest_sha256": "61149d43a23fc55fcd92b43aaa4e74d747fbdf62f852bedbbbdb2cf18281f3cc",
+    "root": "C:\\quant-data\\b3\\processed\\v2_data_store_2d59b9d_20260913T211700Z"
+  },
+  "threshold_policy": "Review triggers only; never automatic correction or deletion."
+}

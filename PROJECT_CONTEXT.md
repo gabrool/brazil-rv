@@ -2,6 +2,23 @@
 
 Last verified: 2026-09-13.
 
+The post-Round-7 **data-only repair is accepted** for new development research.
+Resolve [the canonical data pointer](docs/v2_data_inputs.json); the new store is
+`v2_data_store_2d59b9d_20260913T211700Z`, manifest SHA-256
+`61149d43a23fc55fcd92b43aaa4e74d747fbdf62f852bedbbbdb2cf18281f3cc`.
+It preserves all 568,815 active stock-days and 73 protected arrays exactly,
+repairs own-filing monetary/capital inconsistencies and financial dependencies,
+and removes auxiliary rank-support exclusions without losing valid observations.
+Continuous sidecars use fit-only median/IQR plus smooth asinh, with established
+P coordinates inherited by F; scoring uses checkpoint-bound preprocessing.
+Known age is independent of value validity. Canonical fundamentals occur once;
+the store has 145 scalar fields after removing nine duplicate channels and adding
+two financial flags. Full warm-up/lookback and all active names remain.
+See [the data repair review](docs/v2_DATA_REPAIR.md) for acceptance, source limits
+and the unchanged boundary: no fits, new alpha conclusion or held-out access.
+Historical Round-7 checkpoints/results retain their original store and code;
+they must not be silently evaluated with the new preprocessing.
+
 Round 7 and its separately frozen temporal pathway extension are complete. Both
 retain A0 (repaired-store S0) as the research comparator; no new architecture
 qualified for replacement. The six-seed continuous book is descriptive and retains
