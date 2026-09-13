@@ -2,6 +2,11 @@
 
 Status: both research programs complete; artifacts recovered and verified.
 
+The subsequent [pipeline audit](v2_POST_ROUND7_PIPELINE_AUDIT.md) finds severe
+training/selection overfitting, an early calibration peak excluded by the budget
+rule, and source/preprocessing defects. It supersedes the causal speculation in
+this review; the sealed results and registered decisions below remain unchanged.
+
 ## Decision and interpretation
 
 Both registered programs retain **A0**, the repaired-store S0 comparator. Original
@@ -307,15 +312,14 @@ The compact results retain source-report hashes; full results reside in the reco
 run roots recorded there. Frozen fit provenance remains distinct from the final
 merged reporting and readout corrections.
 
-The strongest next research question is why the richer B4 representation loses to
-A0 under this training protocol. The GL/GE result does not justify simply promoting
-early stock mixing. Before another broad architecture search, use a tightly matched
-optimization/representation study: verify learning curves and perturbation scale,
-then test a small number of causal input/optimizer changes with chronological
-confirmation. The synthetic SAM sensitivity makes optimization a credible hypothesis,
-but the financial AdamW screen did not demonstrate a winning replacement. Neither
-fact alone settles the cause. Budget-specific undertraining, weak incremental inputs,
-regularization and unfavorable interactions remain competing explanations.
+The subsequent pipeline audit reads the saved financial learning curves directly:
+B4's final clean training IC averages .7689 on the twelve screen fits, versus .0045
+on selection. The calibration selection curve peaks at epoch three, excluded by
+the registered minimum budget of twenty. Severe overfitting and checkpoint policy
+therefore take priority over the earlier undertraining hypothesis. Source-level
+fundamental errors and remaining input-encoding losses also require repair. These
+findings do not establish the performance of a repaired model; see the audit for
+bounded evidence and a matched follow-up sequence.
 
 This round establishes a research comparator, not production readiness. The retained
 unresolved valuation scenarios and repeated development-panel use must accompany any
