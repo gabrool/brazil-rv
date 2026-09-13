@@ -3,7 +3,7 @@
 Reference: [accepted plan](v2_POST_DATA_RESEARCH_PLAN.md) and
 [implementation registration](../research/preregistrations/v2_post_data.md).
 
-## Stage A — in progress
+## Stage A — accepted
 
 Implemented selection from epoch 1 with fixed-schedule patience, ASAM,
 module-owned bias/norm routing, explicit transferred names/LR, and exact selected
@@ -50,11 +50,20 @@ learned mappings. Shared fusion tensors remain transferred. This avoids
 suppressing genuinely newly available families by the .3 transfer multiplier.
 Twenty targeted adaptive-training/selection/resume tests pass after this change.
 
-Acceptance still required: final review;
-full-path CUDA AMP/compile engineering measurements;
-re-read the reference plan and record A's closure before calibration.
+Acceptance closed after re-reading the reference plan's sections 4–6 and 9.
+The [CUDA evidence](v2_post_data_cuda_engineering.json) passed on full F14
+16-date, 256-slot, 60-session batches: BF16 discrepancies were 0.57–0.76%
+of FP32 score standard deviation; complete ASAM updates stayed finite.
+Compiled steady-state TE/TL steps were about 23.5/18.1 ms versus eager
+49.8/38.7 ms. GRU C1 was about 88 ms eager and 91–107 ms compiled; it and
+common-recipe S0 will use eager BF16. TE/TL retain compilation. First compile
+costs (48–193 seconds) remain visible; these are batch timings, not fit ETAs.
+The recorded CUDA memory is process high-water, not isolated per-model memory.
+CUDA source hashes bind commit 983b176; the later cold-family transfer-contract
+correction is separately covered by targeted tests and changes no model or
+optimizer numerics. No financial trajectory or evaluation score was read.
 
-## Stage B — pending
+## Stage B — in progress
 
 Unseen-date full-model teachers, then fit/selection-only financial calibration.
 Freeze screen settings/roster before evaluation-score access. Re-read the plan

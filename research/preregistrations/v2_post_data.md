@@ -107,3 +107,11 @@ source limitations; this is repeatedly studied development history, not a new
 untouched holdout or a production designation. Secure artifacts and publish the
 combined A–C report, then terminate only the recorded research instance after
 complete recovery and exact-ID verification.
+
+Paired daily uncertainty uses within-fold moving blocks of 20 sessions with a
+60-session sensitivity, 10,000 draws and seed 20260913. Keep same-date names,
+heads and seeds together; do not count stock-days as independent samples.
+Report each cell versus S0, S0_common versus S0, TE_slow versus TL_slow and
+C1_slow, and family/FiLM increments within each architecture. These are
+descriptive development screens with nominal intervals, not multiplicity-
+adjusted confirmatory claims. No winner automatically triggers stages D–F.

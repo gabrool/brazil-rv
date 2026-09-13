@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import time
 from dataclasses import asdict
@@ -225,6 +226,19 @@ def run(
         "compiled": compiled,
         "validation_recipients_only": True,
         "financial_data_read": False,
+        "torch": torch.__version__,
+        "source_hashes_lf": {
+            p.name: hashlib.sha256(p.read_bytes().replace(b"\r\n", b"\n")).hexdigest()
+            for p in Path(__file__).parent.glob("*.py")
+            if p.name
+            in {
+                "relational_engineering.py",
+                "round7_training.py",
+                "characteristic_model.py",
+                "temporal_pathway.py",
+                "post_data_program.py",
+            }
+        },
     }
     write_json_atomic(output, result)
     return result

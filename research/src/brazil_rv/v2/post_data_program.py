@@ -201,6 +201,10 @@ def plan(root, phase, *, max_parallel=2):
             ]
             if stage == "F":
                 command += ["--parent", str(parent), "--parent-sha256", digest]
+            if name.startswith("C1") or name == "S0_common":
+                # Full-batch GH200 checks show no steady-state GRU benefit;
+                # retain compilation for the temporal-attention graphs.
+                command.append("--eager")
             if phase == "c_screen":
                 command.append("--export-scores")
         # Existing complete B fits are submitted once more only to attach scores;
