@@ -21,6 +21,7 @@ from .features import monthly_cluster_labels
 from .normalization import average_ranks, midrank_unit_interval
 from .pathway_statistics import infer
 from .round5_derived import identity_axes
+from .round6 import resolve_file
 from .round7_corrector import mature_before
 from .round7_data import PROJECT
 from .round7_program import read
@@ -229,9 +230,7 @@ def run(root, output):
         identity_record = read(PROJECT / "docs/v2_round5_cvm_final_acceptance.json")[
             "identity_proof"
         ]["final_identity"]
-        identity = resolve_external_root(identity_record["path"])[0]
-        if sha256_file(identity) != identity_record["sha256"]:
-            raise ValueError("accepted historical sector identity changed")
+        identity = resolve_file(identity_record)
         sectors, _ = identity_axes(
             pl.read_parquet(identity), store.dates.astype(object).tolist(), store.isins
         )
