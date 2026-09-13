@@ -77,20 +77,28 @@ def test_future_history_age_hash_uses_integer_counts_and_separate_validity():
 
 def test_registered_book_stop_includes_nonheadline_defects():
     summary = {
-        "scenario": "borrow_balance", "entry_defect_signatures": {},
+        "scenario": "borrow_balance",
+        "entry_defect_signatures": {},
         "mean_gross_fraction_nav": 2.0,
-        "mean_unresolved_stale_inventory_fraction_nav": 0.0, "insolvent": False,
+        "mean_unresolved_stale_inventory_fraction_nav": 0.0,
+        "insolvent": False,
         "mean_absolute_volatility_occupancy_deviation_long": 0.0,
         "mean_absolute_volatility_occupancy_deviation_short": 0.0,
     }
-    report = {"economics": {
-        "summaries": [summary],
-        "d5_only_diagnostic": {"summary": {"entry_defect_signatures": {}}},
-    }}
+    report = {
+        "economics": {
+            "summaries": [summary],
+            "d5_only_diagnostic": {"summary": {"entry_defect_signatures": {}}},
+        }
+    }
     evaluate_module.enforce_registered_book_bounds(report)
-    report["economics"]["summaries"].append({
-        **summary, "scenario": "borrow_open", "entry_defect_signatures": {"D4": 1},
-    })
+    report["economics"]["summaries"].append(
+        {
+            **summary,
+            "scenario": "borrow_open",
+            "entry_defect_signatures": {"D4": 1},
+        }
+    )
     with pytest.raises(RuntimeError, match="borrow_open.*D4"):
         evaluate_module.enforce_registered_book_bounds(report)
 
@@ -939,3 +947,44 @@ def test_evaluator_rejects_nonretrospective_action_alignment() -> None:
             replace(_fixture(), action_alignment="decision_known"),
             window_name="F2",
         )
+
+
+@pytest.mark.parametrize("fault", [None, "freeze", "data"])
+def test_cross_experiment_pair_keeps_data_identity_checks(monkeypatch, tmp_path, fault):
+    from types import SimpleNamespace
+    from brazil_rv.v2 import checkpoint_readouts as cr
+    from brazil_rv.v2.evaluate import _validate_paired_identity
+
+    baseline = evaluate_scores(_fixture(), window_name="F2")
+    reports = [copy.deepcopy(baseline.report), copy.deepcopy(baseline.report)]
+    for report, digest in zip(reports, ("a" * 64, "b" * 64)):
+        report["source_artifact_hashes"]["round7_frozen_design"] = digest
+    if fault == "data":
+        reports[1]["source_artifact_hashes"]["store_manifest"] = "c" * 64
+    paths = {"L": {"F2": tmp_path / "L"}, "R": {"F2": tmp_path / "R"}}
+    expected = {str(tmp_path / "L"): "a" * 64, str(tmp_path / "R"): "b" * 64}
+    if fault == "freeze":
+        expected[str(tmp_path / "R")] = "c" * 64
+    monkeypatch.setattr(
+        cr,
+        "retained",
+        lambda context, path, fold: SimpleNamespace(
+            result=SimpleNamespace(report=copy.deepcopy(reports[path.name == "R"]))
+        ),
+    )
+
+    def compare(left, right):
+        _validate_paired_identity(left["F2"].result.report, right["F2"].result.report)
+        raise RuntimeError("identity accepted")
+
+    monkeypatch.setattr(cr.rr, "_paired_readouts", compare)
+    message = (
+        "bound freeze"
+        if fault == "freeze"
+        else "identical source identities"
+        if fault
+        else "identity accepted"
+    )
+    with pytest.raises(ValueError if fault else RuntimeError, match=message):
+        cr.paired_readouts(None, paths, tmp_path / "out", experiment_hashes=expected)
+    assert reports[0]["source_artifact_hashes"]["round7_frozen_design"] == "a" * 64

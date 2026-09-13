@@ -198,6 +198,19 @@ def evaluate(root, cells, folds, group, seeds=SEEDS, *, cells_only=False):
         if group == "confirmation" or design.get("pathway_extension"):
             requested |= set(combinations(cells, 2))
         requested = {tuple(sorted(pair)) for pair in requested}
+        experiment_hashes = None
+        if design.get("pathway_extension"):
+            from .round7_pathway import original_at
+
+            original = original_at(design)
+            experiment_hashes = {
+                str(location): sha256_file(
+                    (original if location.is_relative_to(original) else root)
+                    / "frozen_design.json"
+                )
+                for locations in paths.values()
+                for location in locations.values()
+            }
         pairs = {}
         for left, right in sorted(requested):
             pairs.update(
@@ -205,6 +218,7 @@ def evaluate(root, cells, folds, group, seeds=SEEDS, *, cells_only=False):
                     context,
                     {left: paths[left], right: paths[right]},
                     root / "paired" / group,
+                    experiment_hashes=experiment_hashes,
                 )
             )
         momentum = {cell: {} for cell in cells}

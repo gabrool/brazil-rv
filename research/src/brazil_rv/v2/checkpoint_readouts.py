@@ -133,6 +133,7 @@ def paired_readouts(
     output: Path,
     *,
     informative_folds: dict[str, list[str]] | None = None,
+    experiment_hashes: dict[str, str] | None = None,
 ) -> dict:
     """Retain per-fold population audits and pool their paired daily deltas."""
     names = tuple(paths)
@@ -144,7 +145,17 @@ def paired_readouts(
         for fold in common_folds:
             left = retained(context, paths[left_name][fold], fold)
             right = retained(context, paths[right_name][fold], fold)
+            if experiment_hashes is not None:
+                for name, retained_result in ((left_name, left), (right_name, right)):
+                    sources = dict(retained_result.result.report["source_artifact_hashes"])
+                    if sources.pop("round7_frozen_design") != experiment_hashes[str(paths[name][fold])]:
+                        raise ValueError("paired experiment differs from bound freeze")
+                    retained_result.result.report["source_artifact_hashes"] = sources
             pair = rr._paired_readouts({fold: left}, {fold: right})
+            if experiment_hashes is not None:
+                pair["experiment_design_hashes"] = {
+                    name: experiment_hashes[str(paths[name][fold])] for name in (left_name, right_name)
+                }
             write_json_atomic(output / key / f"{fold}.json", pair)
             daily[key][fold] = {
                 metric: np.asarray(
