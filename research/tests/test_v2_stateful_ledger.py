@@ -2308,6 +2308,7 @@ def test_execution_entry_restriction_preserves_orders_and_printed_exits():
     assert ordinary.intended_orders[0] == blocked.intended_orders[0]
     assert ordinary.intended_orders[1] == blocked.intended_orders[1]
     assert ordinary.fills and not blocked.fills
+    assert blocked.entry_pending_printed_unblocked_unfilled.sum() == 0
     # Once held, a restriction on opening risk must not obstruct liquidation.
     allowed = np.ones_like(close, dtype=bool)
     allowed[1] = False

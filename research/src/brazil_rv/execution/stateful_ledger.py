@@ -2785,7 +2785,9 @@ def simulate_stateful_ledger(
                     submission_nav[name] = 0.0
 
         pending_printed_unfilled_today = sum(
-            bool(printed[name]) for name in pending_entries
+            bool(printed[name])
+            and (entry_fill_allowed is None or bool(entry_fill_allowed[day, name]))
+            for name in pending_entries
         )
         pending_end_long = sum(
             pending.order.side == "buy" for pending in pending_entries.values()

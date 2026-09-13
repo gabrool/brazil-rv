@@ -1,0 +1,80 @@
+{
+  "patch_sha256": "dbc9c4b4df21d604aad78bd21b934b7ac0053a57c9d163bd58a21908dcee9ef5",
+  "differences": [
+    {
+      "path": ".economics.d5_only_diagnostic.summary.entry_defect_signatures.D1_entry_pending_printed_unblocked_unfilled",
+      "before": 1,
+      "after": 0
+    },
+    {
+      "path": ".economics.headline.entry_defect_signatures.D1_entry_pending_printed_unblocked_unfilled",
+      "before": 1,
+      "after": 0
+    },
+    {
+      "path": ".economics.summaries[0].entry_defect_signatures.D1_entry_pending_printed_unblocked_unfilled",
+      "before": 1,
+      "after": 0
+    },
+    {
+      "path": ".economics.summaries[1].entry_defect_signatures.D1_entry_pending_printed_unblocked_unfilled",
+      "before": 1,
+      "after": 0
+    },
+    {
+      "path": ".economics.summaries[2].entry_defect_signatures.D1_entry_pending_printed_unblocked_unfilled",
+      "before": 1,
+      "after": 0
+    },
+    {
+      "path": ".economics.summaries[3].entry_defect_signatures.D1_entry_pending_printed_unblocked_unfilled",
+      "before": 1,
+      "after": 0
+    },
+    {
+      "path": ".economics.summaries[4].entry_defect_signatures.D1_entry_pending_printed_unblocked_unfilled",
+      "before": 1,
+      "after": 0
+    },
+    {
+      "path": ".economics.summaries[5].entry_defect_signatures.D1_entry_pending_printed_unblocked_unfilled",
+      "before": 1,
+      "after": 0
+    },
+    {
+      "path": ".economics.summaries[6].entry_defect_signatures.D1_entry_pending_printed_unblocked_unfilled",
+      "before": 1,
+      "after": 0
+    },
+    {
+      "path": ".economics.summaries[7].entry_defect_signatures.D1_entry_pending_printed_unblocked_unfilled",
+      "before": 1,
+      "after": 0
+    },
+    {
+      "path": ".economics.summaries[8].entry_defect_signatures.D1_entry_pending_printed_unblocked_unfilled",
+      "before": 1,
+      "after": 0
+    },
+    {
+      "path": ".economics.summaries[9].entry_defect_signatures.D1_entry_pending_printed_unblocked_unfilled",
+      "before": 1,
+      "after": 0
+    },
+    {
+      "path": ".economics.summaries[10].entry_defect_signatures.D1_entry_pending_printed_unblocked_unfilled",
+      "before": 1,
+      "after": 0
+    },
+    {
+      "path": ".economics.summaries[11].entry_defect_signatures.D1_entry_pending_printed_unblocked_unfilled",
+      "before": 1,
+      "after": 0
+    },
+    {
+      "path": ".economics.summaries[12].entry_defect_signatures.D1_entry_pending_printed_unblocked_unfilled",
+      "before": 1,
+      "after": 0
+    }
+  ]
+}
