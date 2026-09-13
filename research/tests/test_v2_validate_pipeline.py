@@ -550,7 +550,6 @@ def test_development_pipeline_orchestrates_and_seals_every_output(
         max_pretrain_fit_sessions=12,
         max_pretrain_selection_sessions=12,
         slow_lookback=20,
-        pairs_per_batch=8,
         compile_forward=False,
         device="cpu",
     )
@@ -936,8 +935,6 @@ def test_parser_requires_and_documents_both_cdi_sources() -> None:
 def test_runtime_caps_and_dataset_refuse_sealed_dates(tmp_path: Path) -> None:
     with pytest.raises(ValueError, match="one and three"):
         pipeline.ValidationRuntime(fine_epochs=4)
-    with pytest.raises(ValueError, match="exactly 8 date pairs"):
-        pipeline.ValidationRuntime(pairs_per_batch=7)
     store = V2Store(
         root=tmp_path,
         manifest={},
@@ -958,11 +955,15 @@ def test_runtime_caps_and_dataset_refuse_sealed_dates(tmp_path: Path) -> None:
 
 @pytest.mark.parametrize("invalid_slow_diagnostics", [False, True])
 @pytest.mark.parametrize("canonical_history_age", [False, True])
+@pytest.mark.parametrize(
+    "feature_version", ["decision_feature_2", "decision_feature_3"]
+)
 def test_evaluation_inputs_zero_targets_outside_the_exact_window(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
     invalid_slow_diagnostics: bool,
     canonical_history_age: bool,
+    feature_version: str,
 ) -> None:
     store_root, _, _, _, _ = _development_store(tmp_path)
     dates = np.load(store_root / "date_index.npy", allow_pickle=False)
@@ -978,11 +979,21 @@ def test_evaluation_inputs_zero_targets_outside_the_exact_window(
     age_index = store.manifest["feature_names"]["slow"].index(
         "observed_history_age_sessions"
     )
+    for spec in store.manifest["metadata"]["feature_schema"]["specifications"]:
+        if spec["family"] == "slow" and spec["name"] == "observed_history_age_sessions":
+            spec["version"] = feature_version
 
     def read_with_diagnostic_age(self, name, selectors):
         values = original_read(self, name, selectors)
         if name == "slow_values":
-            values[..., age_index] = np.float32(np.log1p(60.0) / np.log1p(252.0))
+            values[..., age_index] = np.float32(
+                np.log1p(60.0)
+                / (
+                    np.log1p(60.0) + np.log1p(252.0)
+                    if feature_version == "decision_feature_3"
+                    else np.log1p(252.0)
+                )
+            )
         if name == "slow_valid" and invalid_slow_diagnostics:
             values[:] = False
         return values
@@ -1037,7 +1048,9 @@ def test_evaluation_inputs_zero_targets_outside_the_exact_window(
     elif canonical_history_age:
         assert np.all(inputs.history_age_sessions == 60)
     else:
-        assert np.all(inputs.history_age_sessions < 60)
+        assert np.all(np.abs(inputs.history_age_sessions - 60) < 0.001)
+        if feature_version == "decision_feature_2":
+            assert np.all(inputs.history_age_sessions < 60)
     assert inputs.action_payment_session[0, 0] == len(indices)
     assert np.all(inputs.action_payment_session[:, 1:] == -1)
     assert inputs.security_ids == store.isins

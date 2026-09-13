@@ -72,12 +72,20 @@ def flat_dfp_accounts(document: dict, payload: bytes, envelope: ET.Element) -> d
     quantity_scale = {"1": 1, "2": 1000}.get(annual.findtext("EscalaQtdAcoes"))
     capital = form.find("DadosEmpresa/ComposicaoCapital")
     if quantity_scale is not None and capital is not None:
+
+        def printed_quantity(value):
+            return (
+                float(value.replace(".", "").replace(",", "."))
+                if value and value.strip()
+                else None
+            )
+
         paid_in = {
-            code: capital.findtext(f"CaptalIntegralizado/{label}")
+            code: printed_quantity(capital.findtext(f"CaptalIntegralizado/{label}"))
             for code, label in (("ON", "Ordinarias"), ("PN", "Preferenciais"))
         }
         treasury = {
-            code: capital.findtext(f"Tesouraria/{label}")
+            code: printed_quantity(capital.findtext(f"Tesouraria/{label}"))
             for code, label in (("ON", "Ordinarias"), ("PN", "Preferenciais"))
         }
         shares = net_share_counts(paid_in, treasury)

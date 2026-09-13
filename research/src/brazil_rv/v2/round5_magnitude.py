@@ -1,9 +1,6 @@
-"""Physical-scale daily channels and fit-isolated clipping for Round 5."""
+"""Physical-scale daily channels from completed, decision-causal observations."""
 
 from __future__ import annotations
-
-from collections.abc import Mapping
-from dataclasses import dataclass
 
 import numpy as np
 from numpy.typing import NDArray
@@ -86,73 +83,3 @@ def magnitude_panel(
     values[..., 3] = np.where(valid[..., 3], economic_beta, 0)
     ages[..., 3] = np.where(valid[..., 3], economic_beta_age_sessions, -1)
     return values, valid, ages
-
-
-@dataclass(frozen=True)
-class FitClip:
-    """Per-field 0.5/99.5 percentiles estimated solely from declared fit rows."""
-
-    lower: NDArray
-    upper: NDArray
-    fit_date_indices: tuple[int, ...]
-
-    @classmethod
-    def fit(
-        cls, values: NDArray, valid: NDArray, active: NDArray, fit_date_indices: NDArray
-    ) -> "FitClip":
-        indices = np.asarray(fit_date_indices, np.int64)
-        sample = np.asarray(values)[indices]
-        known = (
-            np.asarray(valid)[indices]
-            & np.asarray(active)[indices, :, None]
-            & np.isfinite(sample)
-        )
-        lower, upper = [], []
-        for field in range(sample.shape[-1]):
-            selected = sample[..., field][known[..., field]]
-            bounds = (
-                np.quantile(selected, (0.005, 0.995))
-                if selected.size
-                else (-np.inf, np.inf)
-            )
-            lower.append(bounds[0])
-            upper.append(bounds[1])
-        return cls(
-            np.array(lower, np.float32),
-            np.array(upper, np.float32),
-            tuple(indices.tolist()),
-        )
-
-    def transform(self, values: NDArray, valid: NDArray) -> NDArray:
-        return np.where(valid, np.clip(values, self.lower, self.upper), 0).astype(
-            np.float32
-        )
-
-    @classmethod
-    def from_payload(cls, payload: Mapping) -> "FitClip":
-        """Restore frozen checkpoint bounds; absent fit support stays unbounded."""
-        lower = np.array(
-            [-np.inf if x is None else x for x in payload["lower"]], np.float32
-        )
-        upper = np.array(
-            [np.inf if x is None else x for x in payload["upper"]], np.float32
-        )
-        if (
-            payload.get("quantiles") != [0.005, 0.995]
-            or lower.ndim != 1
-            or upper.shape != lower.shape
-            or np.isnan(lower).any()
-            or np.isnan(upper).any()
-            or np.any(lower > upper)
-        ):
-            raise ValueError("checkpoint magnitude clipping bounds are malformed")
-        return cls(lower, upper, tuple(int(x) for x in payload["fit_date_indices"]))
-
-    def payload(self) -> dict:
-        return {
-            "quantiles": [0.005, 0.995],
-            "fit_date_indices": list(self.fit_date_indices),
-            "lower": [float(x) if np.isfinite(x) else None for x in self.lower],
-            "upper": [float(x) if np.isfinite(x) else None for x in self.upper],
-            "no_fit_observations_rule": "unclipped, not fit on later observations",
-        }

@@ -14,7 +14,8 @@ from .characteristic_model import CharacteristicConfig, CharacteristicModel
 from .config import ModelConfig
 from .model import DailyMultiHorizonModel
 from .round5_derived import bind
-from .round7_data import NATIVE_FIELDS, PROJECT, registered_sources
+from .round7_data import PROJECT, registered_sources
+from .round7_preprocessing import cross_market_partition
 
 SCREEN_FOLDS = ("F2", "F6", "F10", "F14")
 SEEDS = (11, 29, 47)
@@ -56,23 +57,6 @@ CELLS = (
 )
 
 
-def cross_market_partition(names):
-    common = tuple(
-        n
-        for n in names
-        if n.startswith("shock_")
-        or n
-        in {
-            "foreign_flow_1",
-            "foreign_flow_5",
-            "foreign_flow_month_reset",
-            "foreign_flow_methodology_change",
-            "ewz_minus_bova11_1",
-        }
-    )
-    return common, tuple(n for n in names if n not in common)
-
-
 # Separately registered extension; the original CELLS/protocol remain unchanged.
 PATHWAY_CELLS = tuple(
     {
@@ -99,7 +83,6 @@ def configuration(cell, names):
         for k, v in names.items()
         if k.startswith("sidecar_")
     }
-    families["fundamentals_native"] = NATIVE_FIELDS
     if cell["inputs"] == "slow":
         families = {}
     if cell["graph"] == "s0":

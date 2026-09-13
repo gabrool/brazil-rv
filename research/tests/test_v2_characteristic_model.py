@@ -80,12 +80,16 @@ def test_invalid_families_and_initial_film_are_exactly_neutral():
     model = CharacteristicModel(config).eval()
     x, valid, age = batch["sidecars"]["fundamentals"]
     valid.zero_()
+    age.fill_(-1.0)
     with torch.no_grad():
         before = model(**batch)
         x.fill_(float("nan"))
-        age.fill_(200.0)
         batch["common_state"][0].mul_(100.0)
         assert torch.equal(model(**batch), before)
+        # A known publication age is real information even if its value failed
+        # a source-quality check. Only the value channel must stay neutral.
+        age.fill_(200.0)
+        assert not torch.equal(model(**batch), before)
 
 
 def test_tabm_encodes_history_once_and_trains_all_members():

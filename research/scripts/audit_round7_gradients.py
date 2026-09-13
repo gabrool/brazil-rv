@@ -64,7 +64,6 @@ for cell_name in ("A1", "B4", "B5", "B9", "B11", "GE"):
         purpose="training",
     )
     try:
-        dataset.magnitude_clip = prep.magnitude
         batch = model_batch(
             prep.collate(
                 [dataset[i] for i in range(len(dataset))],

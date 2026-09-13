@@ -99,9 +99,10 @@ def assemble_gbdt_scalar_view(
             f"{label} feature ages must be at least -1 and known for valid features"
         )
     encoded_values = np.where(valid, values, np.nan)
+    log_age = np.log1p(np.maximum(ages, 0.0))
     encoded_ages = np.where(
         ages >= 0.0,
-        np.log1p(np.clip(ages, 0.0, 252.0)) / np.log1p(252.0),
+        log_age / (log_age + np.log1p(252.0)),
         np.nan,
     )
     return np.concatenate((encoded_values, encoded_ages), axis=-1, dtype=np.float32)

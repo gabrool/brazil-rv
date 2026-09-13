@@ -11,20 +11,12 @@ from brazil_rv.v2.artifacts import write_json_atomic
 from brazil_rv.v2.gbdt import GBDTConfig, MultiHorizonGBDT
 
 
-def test_fit_only_magnitude_bounds_ignore_later_rows_and_keep_global_identity():
-    rng = np.random.default_rng(0)
-    encoded = rng.normal(size=(20, 25, 8)).astype(np.float32)
+def test_tree_inputs_preserve_extreme_values_and_missingness():
+    encoded = np.arange(40, dtype=np.float32).reshape(5, 2, 4)
     encoded[0, 0, 0] = np.nan
-    active = np.ones((20, 25), bool)
-    local, global_rows = np.arange(10), np.arange(100, 110)
-    first = screen.clip_magnitudes(encoded, active, local, global_rows)
-    encoded[10:, :, :4] = 1e8
-    second = screen.clip_magnitudes(encoded, active, local, global_rows)
-    assert first.payload() == second.payload()
-    assert first.fit_date_indices == tuple(global_rows)
-    joined = screen._features(encoded[..., :2], encoded, np.arange(20), first)
-    assert np.isnan(joined[0, 0, 2])
-    assert np.all(joined[10:, :, 2:6] <= first.upper)
+    encoded[-1, :, :2] = 1e8
+    joined = screen._features(encoded[..., :2], encoded, np.arange(5))
+    np.testing.assert_array_equal(joined[..., 2:], encoded)
 
 
 def test_targets_respect_fit_purge_and_future_mutation():

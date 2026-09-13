@@ -358,8 +358,19 @@ def train(
     selection = V2DailyDataset(store_root, select, purpose="selection", **options)
     device = device or torch.device("cuda" if torch.cuda.is_available() else "cpu")
     try:
-        preparation = Round7Preprocessing.fit(training, split_common=split_common)
-        training.magnitude_clip = selection.magnitude_clip = preparation.magnitude
+        parent_payload = None
+        parent_preprocessing = None
+        if stage == "F":
+            if parent is None or parent_sha256 != sha256_file(parent):
+                raise ValueError("F requires a hash-bound compatible Stage-P parent")
+            parent_payload = torch.load(parent, map_location="cpu", weights_only=True)
+            if parent_payload.get("schema") == CHECKPOINT_SCHEMA:
+                parent_preprocessing = Round7Preprocessing.from_payload(
+                    parent_payload["contract"]["preprocessing"]
+                )
+        preparation = Round7Preprocessing.fit(
+            training, split_common=split_common, parent=parent_preprocessing
+        )
         width = stage_name_count(training, selection)
         collator = partial(preparation.collate, fixed_name_count=width)
         sampler = DateBatchSampler(fit, seed=seed)
@@ -411,7 +422,7 @@ def train(
         if stage == "F":
             if parent is None or parent_sha256 != sha256_file(parent):
                 raise ValueError("F requires a hash-bound compatible Stage-P parent")
-            payload = torch.load(parent, map_location="cpu", weights_only=True)
+            payload = parent_payload
             if payload["stage"] != "P" or payload["seed"] != seed:
                 raise ValueError("parent stage/seed differs")
             if payload.get("schema") == CHECKPOINT_SCHEMA:

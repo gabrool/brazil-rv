@@ -1,0 +1,3521 @@
+{
+  "bindings": [
+    {
+      "path": "D:\\quant-data\\b3\\interim\\data_repair_20260913T184500Z\\account_unit_dispositions.json",
+      "sha256": "468862aacc3c59b42be15e44c820ae7deb0d3f502b56da41905c936299c3a12b"
+    },
+    {
+      "path": "D:\\quant-data\\b3\\interim\\data_repair_20260913T184500Z\\capital_source_dispositions.json",
+      "sha256": "6ac85169694f23bdba64914ddcc53d357883f06564c8cffc6b68ff8864b091c4"
+    },
+    {
+      "path": "D:\\quant-data\\b3\\interim\\data_repair_20260913T184500Z\\filing_unit_inventory.json",
+      "sha256": "e8ebd01f503b49227ab41c37a385a61038b6d29a562cfb81b7bdfdd9ba48b7ae"
+    }
+  ],
+  "capital": [
+    {
+      "disposition": "reconciled",
+      "document": {
+        "cnpj": "08807432000110",
+        "cvm_code": "021016",
+        "id": "55631",
+        "kind": "ITR",
+        "reference": "2016-03-31",
+        "version": "1"
+      },
+      "evidence": [
+        {
+          "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\original_zips\\55631\\source.zip",
+          "sha256": "66cfd66e490f13435dcbd9d8b12f5088581fd49e0eea40f733db87a4c4c24ebd"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\interim\\data_repair_20260913T184500Z\\filing_evidence\\55631\\pages.json",
+          "sha256": "2b87728bbc24ec929cd4661d33832e07466a5d89c4d36f782fdba8a53ab2f96c"
+        }
+      ],
+      "pages": [
+        2,
+        67,
+        68
+      ],
+      "paid_in_shares": {
+        "ON": 316684999,
+        "PN": 0
+      },
+      "reason": "Own note18 capital and treasury tables reconcile316684999 minus9337178; the rounded front paid-in row already excludes treasury.",
+      "treasury_shares": {
+        "ON": 9337178,
+        "PN": 0
+      }
+    },
+    {
+      "disposition": "reconciled",
+      "document": {
+        "cnpj": "08807432000110",
+        "cvm_code": "021016",
+        "id": "58976",
+        "kind": "ITR",
+        "reference": "2016-06-30",
+        "version": "3"
+      },
+      "evidence": [
+        {
+          "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\original_zips\\58976\\source.zip",
+          "sha256": "6500ab96c6b1e83e1b3f1a3808fedeb5622f1f94876956ac3b264f0d02f4c050"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\interim\\data_repair_20260913T184500Z\\filing_evidence\\58976\\pages.json",
+          "sha256": "8703dd423f63016187d78eed47782e5b845ffe069e9a57fb72a1ec2559638d66"
+        }
+      ],
+      "pages": [
+        2,
+        79,
+        80
+      ],
+      "paid_in_shares": {
+        "ON": 317178517,
+        "PN": 0
+      },
+      "reason": "Own version3 notes give exact paid-in and treasury counts; replace rounded printed quantities with their same-filing exact values.",
+      "treasury_shares": {
+        "ON": 9498058,
+        "PN": 0
+      }
+    },
+    {
+      "disposition": "reconciled",
+      "document": {
+        "cnpj": "08807432000110",
+        "cvm_code": "021016",
+        "id": "60672",
+        "kind": "ITR",
+        "reference": "2016-09-30",
+        "version": "1"
+      },
+      "evidence": [
+        {
+          "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\original_zips\\60672\\source.zip",
+          "sha256": "16f438b6281f1a64aa73d10753c7a3867b6fc9bc42fc559b7a5dc690ac1485b1"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\interim\\data_repair_20260913T184500Z\\filing_evidence\\60672\\pages.json",
+          "sha256": "ffba6dccc0b37e9b50721b62ab506ce9026f6fa76836763ef984d8ec5d51780c"
+        }
+      ],
+      "pages": [
+        2,
+        76,
+        77
+      ],
+      "paid_in_shares": {
+        "ON": 317896418,
+        "PN": 0
+      },
+      "reason": "Own note17 gives exact paid-in and treasury quantities for2016Q3; preserve those rather than the rounded front table.",
+      "treasury_shares": {
+        "ON": 9498058,
+        "PN": 0
+      }
+    },
+    {
+      "disposition": "reconciled",
+      "document": {
+        "cnpj": "08807432000110",
+        "cvm_code": "021016",
+        "id": "63235",
+        "kind": "DFP",
+        "reference": "2016-12-31",
+        "version": "2"
+      },
+      "evidence": [
+        {
+          "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\original_zips\\63235\\source.zip",
+          "sha256": "97acaec1caba13e956c52f821bbc65b899c610319e768572617a1b2dc21bd349"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\interim\\data_repair_20260913T184500Z\\filing_evidence\\63235\\pages.json",
+          "sha256": "3ee4412360deb66b00b9a370bac516529bea1a3ce200d1abf1d921cc379d9250"
+        }
+      ],
+      "pages": [
+        3,
+        112,
+        113,
+        115
+      ],
+      "paid_in_shares": {
+        "ON": 317896418,
+        "PN": 0
+      },
+      "reason": "Own version2 capital, treasury and dividend-denominator reconciliations agree; the front table's paid-in quantity already excludes treasury.",
+      "treasury_shares": {
+        "ON": 9498058,
+        "PN": 0
+      }
+    },
+    {
+      "disposition": "reconciled",
+      "document": {
+        "cnpj": "08807432000110",
+        "cvm_code": "021016",
+        "id": "58890",
+        "kind": "ITR",
+        "reference": "2016-06-30",
+        "version": "1"
+      },
+      "evidence": [
+        {
+          "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\original_zips\\58890\\source.zip",
+          "sha256": "04140b095bdbe40560ed7e49254b1cec180464bc41633ed8ddcd351cb0d5a430"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\interim\\data_repair_20260913T184500Z\\filing_evidence\\58890\\pages.json",
+          "sha256": "73f53c903b30927cc1a8257a4ecd2ad06fcb513347990e76abbb7e48a1eafd04"
+        }
+      ],
+      "pages": [
+        2,
+        79,
+        80
+      ],
+      "paid_in_shares": {
+        "ON": 317178517,
+        "PN": 0
+      },
+      "reason": "Own note18 capital and treasury rollforwards reconcile317178517 paid-in minus9498058. The front table both mislabels units and puts already-net shares in its paid-in row.",
+      "treasury_shares": {
+        "ON": 9498058,
+        "PN": 0
+      }
+    },
+    {
+      "disposition": "reconciled",
+      "document": {
+        "cnpj": "08807432000110",
+        "cvm_code": "021016",
+        "id": "58924",
+        "kind": "ITR",
+        "reference": "2016-06-30",
+        "version": "2"
+      },
+      "evidence": [
+        {
+          "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\original_zips\\58924\\source.zip",
+          "sha256": "f1cba2642bc642e18c1736619bc992f450e7b433b8302517d1ebabb2e00b4562"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\interim\\data_repair_20260913T184500Z\\filing_evidence\\58924\\pages.json",
+          "sha256": "d300d3ea9128b6b5e6d73ca62a754452b1c21b37bd1b3de2fe0d069bf5fdd1d0"
+        }
+      ],
+      "pages": [
+        2,
+        79,
+        80
+      ],
+      "paid_in_shares": {
+        "ON": 317178517,
+        "PN": 0
+      },
+      "reason": "Own version2 note18 independently reconciles317178517 paid-in minus9498058; do not double-subtract treasury from the front table.",
+      "treasury_shares": {
+        "ON": 9498058,
+        "PN": 0
+      }
+    },
+    {
+      "disposition": "reconciled",
+      "document": {
+        "cnpj": "08807432000110",
+        "cvm_code": "021016",
+        "id": "63187",
+        "kind": "DFP",
+        "reference": "2016-12-31",
+        "version": "1"
+      },
+      "evidence": [
+        {
+          "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\original_zips\\63187\\source.zip",
+          "sha256": "95dd7406102df550b789902d3140d7b6f01696f48a8be3d6589994de8ea38603"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\interim\\data_repair_20260913T184500Z\\filing_evidence\\63187\\pages.json",
+          "sha256": "b5691d733ad986257790f0d97f4ca50aa7f0487c2cc4b3418ac86eaca158bfa0"
+        }
+      ],
+      "pages": [
+        3,
+        112,
+        113
+      ],
+      "paid_in_shares": {
+        "ON": 317896418,
+        "PN": 0
+      },
+      "reason": "Own note18 capital and treasury rollforwards reconcile317896418 paid-in minus9498058. The front table both mislabels units and puts already-net shares in its paid-in row.",
+      "treasury_shares": {
+        "ON": 9498058,
+        "PN": 0
+      }
+    },
+    {
+      "disposition": "reconciled",
+      "document": {
+        "cnpj": "16404287000155",
+        "cvm_code": "013986",
+        "id": "71393",
+        "kind": "DFP",
+        "reference": "2017-12-31",
+        "version": "1"
+      },
+      "evidence": [
+        {
+          "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\original_zips\\71393\\source.zip",
+          "sha256": "b8c1a142a4aa1adf456dbdf61e7a4bb47d1e2ae6b12f741b2f9fe4409969d6b8"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\interim\\data_repair_20260913T184500Z\\filing_evidence\\71393\\pages.json",
+          "sha256": "c6353702d6e587e8fcde10dc789185cd7f98c32046e647ed1e2120228385125c"
+        }
+      ],
+      "pages": [
+        3,
+        104,
+        105
+      ],
+      "paid_in_shares": {
+        "ON": 1105826145,
+        "PN": 0
+      },
+      "reason": "Own notes25.1 and25.3 reconcile absolute paid-in and treasury shares, including the completed PN-to-ON conversion; the front-table thousand scale is misdeclared.",
+      "treasury_shares": {
+        "ON": 13842004,
+        "PN": 0
+      }
+    },
+    {
+      "disposition": "reconciled",
+      "document": {
+        "cnpj": "07594978000178",
+        "cvm_code": "024260",
+        "id": "83884",
+        "kind": "ITR",
+        "reference": "2019-03-31",
+        "version": "2"
+      },
+      "evidence": [
+        {
+          "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\original_zips\\83884\\source.zip",
+          "sha256": "9bb862de6b90bb0e3f317e5f52b22cb7b299b6fe7ef2eea88d02f9368732e546"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\interim\\data_repair_20260913T184500Z\\filing_evidence\\83884\\pages.json",
+          "sha256": "0da3b3e113b1d69ac5ffd004f5297c63ffd86b412f7b4ada1084fd75d850b60b"
+        }
+      ],
+      "pages": [
+        2,
+        77,
+        79,
+        83
+      ],
+      "paid_in_shares": {
+        "ON": 11057992,
+        "PN": 7313964
+      },
+      "reason": "Own version2 notes independently reconcile paid-in counts and unweighted available shares. The front table reports net shares as paid-in, causing a second treasury subtraction.",
+      "treasury_shares": {
+        "ON": 0,
+        "PN": 167896
+      }
+    },
+    {
+      "disposition": "reconciled",
+      "document": {
+        "cnpj": "02998609000127",
+        "cvm_code": "018350",
+        "id": "5523",
+        "kind": "DFP",
+        "reference": "2010-12-31",
+        "version": "1"
+      },
+      "evidence": [
+        {
+          "path": "D:\\quant-data\\b3\\interim\\data_repair_20260913T184500Z\\filing_evidence\\5523\\source.zip",
+          "sha256": "5a858282a01dfe2ce1bc472768c952acc54897ca7f370ab4dcc42be989209ba6"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\interim\\data_repair_20260913T184500Z\\filing_evidence\\5523\\pages.json",
+          "sha256": "7223de17acfe2bd41aa7aed0eb06125f677fe1bb1ce27c30ff3046df2cbdba4e"
+        }
+      ],
+      "pages": [
+        3,
+        40
+      ],
+      "paid_in_shares": {
+        "ON": 197461211,
+        "PN": 183792282
+      },
+      "reason": "Own-date shareholder table sums to exact ON/PN counts; the rounded unit-labelled capital table understates both classes.",
+      "treasury_shares": {
+        "ON": 0,
+        "PN": 0
+      }
+    },
+    {
+      "disposition": "reconciled",
+      "document": {
+        "cnpj": "42150391000170",
+        "cvm_code": "004820",
+        "id": "14984",
+        "kind": "DFP",
+        "reference": "2011-12-31",
+        "version": "1"
+      },
+      "evidence": [
+        {
+          "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\original_zips\\14984\\source.zip",
+          "sha256": "fff4b8dd2084631cebe4ddce3ca0dafe13590d3a860dcc06924cf0301fe4ce59"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\interim\\data_repair_20260913T184500Z\\filing_evidence\\14984\\pages.json",
+          "sha256": "68fcdbcb1c71965f27c7faebe7a279d41f43ab5129a649fe0184c13d5f23ed5b"
+        }
+      ],
+      "pages": [
+        3,
+        164,
+        166
+      ],
+      "paid_in_shares": {
+        "ON": 451669063,
+        "PN": 349996554
+      },
+      "reason": "Own note29a sums PN classes A+B; note29 treasury table gives parent-company ON411 and PN1542258. Its consolidated treasury includes subsidiary holdings and is a different basis.",
+      "treasury_shares": {
+        "ON": 411,
+        "PN": 1542258
+      }
+    },
+    {
+      "disposition": "reconciled",
+      "document": {
+        "cnpj": "11094546000175",
+        "cvm_code": "021946",
+        "id": "20227",
+        "kind": "ITR",
+        "reference": "2012-06-30",
+        "version": "1"
+      },
+      "evidence": [
+        {
+          "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\original_zips\\20227\\source.zip",
+          "sha256": "1766b93a5ade34b276c4dcdaa31eadb627a4fb69ff5f6ff398ae2eac0202e233"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\interim\\data_repair_20260913T184500Z\\filing_evidence\\20227\\pages.json",
+          "sha256": "2dac6bc2f259ab1871d0f91ee815d10c52a194809fb0a2f56ec51aef61364d6e"
+        }
+      ],
+      "pages": [
+        2,
+        35
+      ],
+      "paid_in_shares": {
+        "ON": 161371285,
+        "PN": 0
+      },
+      "reason": "Own-date capital rollforward and prose report161371285 ON; source table reports zero treasury. Its quantity-scale label is inconsistent with those absolute counts.",
+      "treasury_shares": {
+        "ON": 0,
+        "PN": 0
+      }
+    },
+    {
+      "disposition": "reconciled",
+      "document": {
+        "cnpj": "05197443000138",
+        "cvm_code": "024392",
+        "id": "74525",
+        "kind": "ITR",
+        "reference": "2018-03-31",
+        "version": "1"
+      },
+      "evidence": [
+        {
+          "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\original_zips\\74525\\source.zip",
+          "sha256": "cab7443ee726b556fd5000c96420901fe262e4cc37d7d3204312ec7e217bcf9e"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\interim\\data_repair_20260913T184500Z\\filing_evidence\\74525\\pages.json",
+          "sha256": "cc2468f6a288592bca9bdf7835bdd2bd875fb3a69978f648bfc4bbfe9b547ff7"
+        }
+      ],
+      "pages": [
+        2,
+        57
+      ],
+      "paid_in_shares": {
+        "ON": 560000000,
+        "PN": 0
+      },
+      "reason": "Own note states the split had already taken effect by2017-12-31 and560000000 ON at2018-03-31; source table reports zero treasury.",
+      "treasury_shares": {
+        "ON": 0,
+        "PN": 0
+      }
+    },
+    {
+      "disposition": "reconciled",
+      "document": {
+        "cnpj": "07594978000178",
+        "cvm_code": "024260",
+        "id": "83778",
+        "kind": "ITR",
+        "reference": "2019-03-31",
+        "version": "1"
+      },
+      "evidence": [
+        {
+          "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\original_zips\\83778\\source.zip",
+          "sha256": "eb89fa01c95925a192c27ae5c64140ffcc7eb77e16c78c792cf541ad32cb4310"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\interim\\data_repair_20260913T184500Z\\filing_evidence\\83778\\pages.json",
+          "sha256": "27131e4490e7706fc306ace9a9e684a57f5f034e68a7f493d6b1635054071d37"
+        }
+      ],
+      "pages": [
+        2,
+        77,
+        79,
+        83
+      ],
+      "paid_in_shares": {
+        "ON": 11057992,
+        "PN": 7313964
+      },
+      "reason": "Own-date capital note gives paid-in counts. Note28 separately gives unweighted available ON11057992 and PN32861+7113207, implying treasury167896. Do not subtract treasury twice from the already-net rounded front table or use its weighted average.",
+      "treasury_shares": {
+        "ON": 0,
+        "PN": 167896
+      }
+    },
+    {
+      "disposition": "reconciled",
+      "document": {
+        "cnpj": "22543331000100",
+        "cvm_code": "023795",
+        "id": "89113",
+        "kind": "ITR",
+        "reference": "2019-09-30",
+        "version": "1"
+      },
+      "evidence": [
+        {
+          "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\original_zips\\89113\\source.zip",
+          "sha256": "da0678bd99736b104e745289c6b38d637fc8c65d3848385b6dde5033ebdee8de"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\interim\\data_repair_20260913T184500Z\\filing_evidence\\89113\\pages.json",
+          "sha256": "884f6cb1dae86416778b1c1abb1b8d15b4ae2505d880f5a3a61783b5dc34dc6b"
+        }
+      ],
+      "pages": [
+        2,
+        67
+      ],
+      "paid_in_shares": {
+        "ON": 1200000000,
+        "PN": 0
+      },
+      "reason": "Own-date note15 shareholder table explicitly totals1200000000 ON held100% by Caixa; book equity/BVPS corroborates the unit reconciliation.",
+      "treasury_shares": {
+        "ON": 0,
+        "PN": 0
+      }
+    },
+    {
+      "disposition": "reconciled",
+      "document": {
+        "cnpj": "94813102000170",
+        "cvm_code": "025950",
+        "id": "123449",
+        "kind": "DFP",
+        "reference": "2022-12-31",
+        "version": "1"
+      },
+      "evidence": [
+        {
+          "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\original_zips\\123449\\source.zip",
+          "sha256": "ccfd7c15f20fb542c3e534413942aae15b66ce0e4d7eca63d64517856e692c1b"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\interim\\data_repair_20260913T184500Z\\filing_evidence\\123449\\pages.json",
+          "sha256": "c5f6330d79d823829d73d8c1c17bbf7bb5feb4fcf34076859f16e5cd51ff4403"
+        }
+      ],
+      "pages": [
+        2,
+        114
+      ],
+      "paid_in_shares": {
+        "ON": 497018000,
+        "PN": 0
+      },
+      "reason": "Own2022 note23 capital rollforward labels quantities in thousands and ends497018; source table treasury is zero. No2023 filing is used.",
+      "treasury_shares": {
+        "ON": 0,
+        "PN": 0
+      }
+    },
+    {
+      "disposition": "reconciled",
+      "document": {
+        "cnpj": "28594234000123",
+        "cvm_code": "026620",
+        "id": "125769",
+        "kind": "ITR",
+        "reference": "2023-03-31",
+        "version": "1"
+      },
+      "evidence": [
+        {
+          "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\original_zips\\125769\\source.zip",
+          "sha256": "c6d85ea9e4f08470195645b1af2be51230034fce432e9d77110afa00a4b0aa90"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\interim\\data_repair_20260913T184500Z\\filing_evidence\\125769\\pages.json",
+          "sha256": "0b36e2bb0b76c27224db74366013987bbf17eb7528c71806c6d2fd83529a20e4"
+        }
+      ],
+      "pages": [
+        2,
+        57
+      ],
+      "paid_in_shares": {
+        "ON": 1000000000,
+        "PN": 0
+      },
+      "reason": "Own note19.1 explicitly labels shares in units and totals1000000000 ON; shareholder rows sum100%, with zero source treasury.",
+      "treasury_shares": {
+        "ON": 0,
+        "PN": 0
+      }
+    },
+    {
+      "disposition": "reconciled",
+      "document": {
+        "cnpj": "94813102000170",
+        "cvm_code": "025950",
+        "id": "134143",
+        "kind": "DFP",
+        "reference": "2023-12-31",
+        "version": "1"
+      },
+      "evidence": [
+        {
+          "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\original_zips\\134143\\source.zip",
+          "sha256": "69de5c284d24efcea48d983c746aff42fd622f5caa032f92234a360c5ffb9404"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\interim\\data_repair_20260913T184500Z\\filing_evidence\\134143\\pages.json",
+          "sha256": "b2737859494eaafa709189c30d838fb5527c634c307563c871f2491a17d4e087"
+        }
+      ],
+      "pages": [
+        2,
+        120,
+        121
+      ],
+      "paid_in_shares": {
+        "ON": 498298000,
+        "PN": 0
+      },
+      "reason": "Own note23 spells out498298000 shares and separately reconciles treasury85000+50000=135000; retain both capital and repurchase information.",
+      "treasury_shares": {
+        "ON": 135000,
+        "PN": 0
+      }
+    }
+  ],
+  "currency": [
+    {
+      "document": {
+        "cnpj": "09112685000132",
+        "cvm_code": "021342",
+        "id": "5264",
+        "kind": "DFP",
+        "reference": "2010-12-31",
+        "version": "1"
+      },
+      "evidence": [
+        {
+          "path": "D:\\quant-data\\b3\\interim\\data_repair_20260913T184500Z\\filing_evidence\\5264\\source.zip",
+          "sha256": "d06a5185fceb2b12a11489b00a18502de05ad64cdd32cdfff24c1e750aaadacc"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\interim\\data_repair_20260913T184500Z\\filing_evidence\\5264\\pages.json",
+          "sha256": "47fc4ada1f73bd0aad7f60dce3689c940d09e089b9d190c8aa47031b4018e5e7"
+        }
+      ],
+      "multiplier": 1000,
+      "pages": [
+        101
+      ],
+      "reason": "Own-period monetary amounts reconcile to the issuer's statements/notes explicitly in thousands of BRL; the submitted unit-scale heading is inconsistent. Preserve signs, periods, bases, shares and the original receipt."
+    },
+    {
+      "document": {
+        "cnpj": "60398369000479",
+        "cvm_code": "009393",
+        "id": "5768",
+        "kind": "DFP",
+        "reference": "2010-12-31",
+        "version": "1"
+      },
+      "evidence": [
+        {
+          "path": "D:\\quant-data\\b3\\interim\\data_repair_20260913T184500Z\\filing_evidence\\5768\\source.zip",
+          "sha256": "b6a8a34ecb72b15759333d76aa905031de14b468c66e3c530207df35e9253cd5"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\interim\\data_repair_20260913T184500Z\\filing_evidence\\5768\\pages.json",
+          "sha256": "7e307755962e58c9c36bd12aa2006e3998431611d7a345308c24fc9c333cb100"
+        }
+      ],
+      "multiplier": 1000,
+      "pages": [
+        36,
+        62,
+        105,
+        106,
+        112
+      ],
+      "reason": "Own-period monetary amounts reconcile to the issuer's statements/notes explicitly in thousands of BRL; the submitted unit-scale heading is inconsistent. Preserve signs, periods, bases, shares and the original receipt."
+    },
+    {
+      "document": {
+        "cnpj": "01425787000104",
+        "cvm_code": "020893",
+        "id": "6728",
+        "kind": "ITR",
+        "reference": "2011-03-31",
+        "version": "1"
+      },
+      "evidence": [
+        {
+          "path": "D:\\quant-data\\b3\\interim\\data_repair_20260913T184500Z\\filing_evidence\\6728\\source.zip",
+          "sha256": "8de05e16dd44b61c351da3d71f0357835c79a675a79d4f046ffa6084be1db61e"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\interim\\data_repair_20260913T184500Z\\filing_evidence\\6728\\pages.json",
+          "sha256": "da2b5d855f9f6bdae8eb7b7ba00f3a396ec5f2522592db2be6607b7bb7b94787"
+        }
+      ],
+      "multiplier": 1000,
+      "pages": [
+        38,
+        39
+      ],
+      "reason": "Own-period monetary amounts reconcile to the issuer's statements/notes explicitly in thousands of BRL; the submitted unit-scale heading is inconsistent. Preserve signs, periods, bases, shares and the original receipt."
+    },
+    {
+      "document": {
+        "cnpj": "89463822000112",
+        "cvm_code": "020060",
+        "id": "7054",
+        "kind": "ITR",
+        "reference": "2011-03-31",
+        "version": "1"
+      },
+      "evidence": [
+        {
+          "path": "D:\\quant-data\\b3\\interim\\data_repair_20260913T184500Z\\filing_evidence\\7054\\source.zip",
+          "sha256": "b1c177b2c1e98e0fc747158c88913b1b6288883eed4eb8c8dc53ceb2731b8ea1"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\interim\\data_repair_20260913T184500Z\\filing_evidence\\7054\\pages.json",
+          "sha256": "82acb074b0889e16246983d7087e0919c9705d27c014748162b66e00c6b174ab"
+        }
+      ],
+      "multiplier": 1000,
+      "pages": [
+        29,
+        33,
+        37,
+        38,
+        44,
+        46,
+        89,
+        90,
+        93
+      ],
+      "reason": "Own-period monetary amounts reconcile to the issuer's statements/notes explicitly in thousands of BRL; the submitted unit-scale heading is inconsistent. Preserve signs, periods, bases, shares and the original receipt."
+    },
+    {
+      "document": {
+        "cnpj": "52548435000179",
+        "cvm_code": "022020",
+        "id": "7636",
+        "kind": "ITR",
+        "reference": "2011-03-31",
+        "version": "2"
+      },
+      "evidence": [
+        {
+          "path": "D:\\quant-data\\b3\\interim\\data_repair_20260913T184500Z\\filing_evidence\\7636\\source.zip",
+          "sha256": "56b4c98567be0622dc67841059a101f7ef4870a0d38cceccc2577986e3c2c250"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\interim\\data_repair_20260913T184500Z\\filing_evidence\\7636\\pages.json",
+          "sha256": "42566e2ae3abbf9541df0fdb42ac71e614e213e4e7bbf4b6a57221a9e29fe9bb"
+        }
+      ],
+      "multiplier": 1000,
+      "pages": [
+        41,
+        42,
+        43,
+        44,
+        45,
+        46,
+        95,
+        103,
+        105
+      ],
+      "reason": "Own-period monetary amounts reconcile to the issuer's statements/notes explicitly in thousands of BRL; the submitted unit-scale heading is inconsistent. Preserve signs, periods, bases, shares and the original receipt."
+    },
+    {
+      "document": {
+        "cnpj": "09295063000197",
+        "cvm_code": "022519",
+        "id": "10642",
+        "kind": "ITR",
+        "reference": "2011-06-30",
+        "version": "1"
+      },
+      "evidence": [
+        {
+          "path": "D:\\quant-data\\b3\\interim\\data_repair_20260913T184500Z\\filing_evidence\\10642\\source.zip",
+          "sha256": "2a56d155d7f8f81be21de61c72623524d4353769b3a5a8f90d6767cfc386ec5f"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\interim\\data_repair_20260913T184500Z\\filing_evidence\\10642\\pages.json",
+          "sha256": "9ef2beae11ff3cf63732bed044e0f49f44938a9cd7e9a801938656aa36dc6bcc"
+        }
+      ],
+      "multiplier": 1000,
+      "pages": [
+        35,
+        37,
+        38,
+        39,
+        64,
+        74,
+        88,
+        90,
+        91
+      ],
+      "reason": "Own-period monetary amounts reconcile to the issuer's statements/notes explicitly in thousands of BRL; the submitted unit-scale heading is inconsistent. Preserve signs, periods, bases, shares and the original receipt."
+    },
+    {
+      "document": {
+        "cnpj": "89096457000155",
+        "cvm_code": "020745",
+        "id": "10727",
+        "kind": "ITR",
+        "reference": "2011-06-30",
+        "version": "1"
+      },
+      "evidence": [
+        {
+          "path": "D:\\quant-data\\b3\\interim\\data_repair_20260913T184500Z\\filing_evidence\\10727\\source.zip",
+          "sha256": "56023333b2eb273dc9fe8c5b2d725edc834a65b24187d8a21cba67e7a34dbac8"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\interim\\data_repair_20260913T184500Z\\filing_evidence\\10727\\pages.json",
+          "sha256": "a0cea6bdf00177cdf31e57062510d62c3e6d99c12ec3865caa79ee3467776a45"
+        }
+      ],
+      "multiplier": 1000,
+      "pages": [
+        22
+      ],
+      "reason": "Own-period monetary amounts reconcile to the issuer's statements/notes explicitly in thousands of BRL; the submitted unit-scale heading is inconsistent. Preserve signs, periods, bases, shares and the original receipt."
+    },
+    {
+      "document": {
+        "cnpj": "52548435000179",
+        "cvm_code": "022020",
+        "id": "17879",
+        "kind": "ITR",
+        "reference": "2012-03-31",
+        "version": "1"
+      },
+      "evidence": [
+        {
+          "path": "D:\\quant-data\\b3\\interim\\data_repair_20260913T184500Z\\filing_evidence\\17879\\source.zip",
+          "sha256": "605bcef4e0683718c56943caddf1321e37bb9e1b409d6b1ee6740236fc88ec00"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\interim\\data_repair_20260913T184500Z\\filing_evidence\\17879\\pages.json",
+          "sha256": "3348ed42e0dff7624889b5a830440d8b8fa6be97ee63ff0742cf3eb82725b049"
+        }
+      ],
+      "multiplier": 1000,
+      "pages": [
+        32,
+        33,
+        34,
+        35,
+        36,
+        37,
+        86,
+        90
+      ],
+      "reason": "Own-period monetary amounts reconcile to the issuer's statements/notes explicitly in thousands of BRL; the submitted unit-scale heading is inconsistent. Preserve signs, periods, bases, shares and the original receipt."
+    },
+    {
+      "document": {
+        "cnpj": "52548435000179",
+        "cvm_code": "022020",
+        "id": "17913",
+        "kind": "ITR",
+        "reference": "2012-03-31",
+        "version": "2"
+      },
+      "evidence": [
+        {
+          "path": "D:\\quant-data\\b3\\interim\\data_repair_20260913T184500Z\\filing_evidence\\17913\\source.zip",
+          "sha256": "bb02a1206653ce862dc5bdf79fb8b7e262b616381269c94454afa9f56b687b5b"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\interim\\data_repair_20260913T184500Z\\filing_evidence\\17913\\pages.json",
+          "sha256": "0366366d4caea30e25c1fc4fa91b1748800cf6ba15457520b8372142b8c595ae"
+        }
+      ],
+      "multiplier": 1000,
+      "pages": [
+        32,
+        33,
+        34,
+        35,
+        36,
+        37,
+        86,
+        90
+      ],
+      "reason": "Own-period monetary amounts reconcile to the issuer's statements/notes explicitly in thousands of BRL; the submitted unit-scale heading is inconsistent. Preserve signs, periods, bases, shares and the original receipt."
+    },
+    {
+      "document": {
+        "cnpj": "09295063000197",
+        "cvm_code": "022519",
+        "id": "20229",
+        "kind": "ITR",
+        "reference": "2012-06-30",
+        "version": "1"
+      },
+      "evidence": [
+        {
+          "path": "D:\\quant-data\\b3\\interim\\data_repair_20260913T184500Z\\filing_evidence\\20229\\source.zip",
+          "sha256": "4696551827f987f7bc6b2894673583148ae72b2f98d3a228a06641ef3ec40c73"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\interim\\data_repair_20260913T184500Z\\filing_evidence\\20229\\pages.json",
+          "sha256": "59c7ddde42a90c253ddc70a477773390f7e0fde91d8434e01b947aacdcade881"
+        }
+      ],
+      "multiplier": 1000,
+      "pages": [
+        39,
+        41,
+        42,
+        43,
+        66,
+        68
+      ],
+      "reason": "Own-period monetary amounts reconcile to the issuer's statements/notes explicitly in thousands of BRL; the submitted unit-scale heading is inconsistent. Preserve signs, periods, bases, shares and the original receipt."
+    },
+    {
+      "document": {
+        "cnpj": "09112685000132",
+        "cvm_code": "021342",
+        "id": "57623",
+        "kind": "ITR",
+        "reference": "2016-03-31",
+        "version": "1"
+      },
+      "evidence": [
+        {
+          "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\original_zips\\57623\\source.zip",
+          "sha256": "659ca56d70daf35444dcd8972bbfec2e92d9e21735fdd349287b0092a54d0df1"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\interim\\data_repair_20260913T184500Z\\filing_evidence\\57623\\pages.json",
+          "sha256": "eb9def83624205bce20b9b30757079ccce3cd3ba36b1e507a9e8e0c5a77ab5eb"
+        }
+      ],
+      "multiplier": 1000,
+      "pages": [
+        22,
+        23,
+        24,
+        25,
+        26,
+        51,
+        52,
+        79,
+        80,
+        81,
+        83,
+        86
+      ],
+      "reason": "Own-period monetary amounts reconcile to the issuer's statements/notes explicitly in thousands of BRL; the submitted unit-scale heading is inconsistent. Preserve signs, periods, bases, shares and the original receipt."
+    },
+    {
+      "document": {
+        "cnpj": "84429695000111",
+        "cvm_code": "005410",
+        "id": "64416",
+        "kind": "ITR",
+        "reference": "2017-03-31",
+        "version": "1"
+      },
+      "evidence": [
+        {
+          "path": "D:\\quant-data\\b3\\interim\\data_repair_20260913T184500Z\\filing_evidence\\64416\\source.zip",
+          "sha256": "cee14744a4f5fc292fec7268018fae7a9272f769d6683936f900345db3009248"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\interim\\data_repair_20260913T184500Z\\filing_evidence\\64416\\pages.json",
+          "sha256": "17a81fa257b4fdcf78ca6d75b273349c30611895e28058d058d587e09cc3c21e"
+        }
+      ],
+      "multiplier": 1000,
+      "pages": [
+        43,
+        49,
+        50
+      ],
+      "reason": "Own-period monetary amounts reconcile to the issuer's statements/notes explicitly in thousands of BRL; the submitted unit-scale heading is inconsistent. Preserve signs, periods, bases, shares and the original receipt."
+    },
+    {
+      "document": {
+        "cnpj": "42771949000135",
+        "cvm_code": "024058",
+        "id": "67679",
+        "kind": "ITR",
+        "reference": "2017-06-30",
+        "version": "1"
+      },
+      "evidence": [
+        {
+          "path": "D:\\quant-data\\b3\\interim\\data_repair_20260913T184500Z\\filing_evidence\\67679\\source.zip",
+          "sha256": "0629433fcea6836aa7f51ba342bf4aa143cda7dc74c5227c21f599d916841ca7"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\interim\\data_repair_20260913T184500Z\\filing_evidence\\67679\\pages.json",
+          "sha256": "c3c28d80ba63cc1ca0f60f32ce488d75d8cf0d2f74c7955960256857cf27340a"
+        }
+      ],
+      "multiplier": 1000,
+      "pages": [
+        34,
+        35,
+        36,
+        58,
+        67
+      ],
+      "reason": "Own-period monetary amounts reconcile to the issuer's statements/notes explicitly in thousands of BRL; the submitted unit-scale heading is inconsistent. Preserve signs, periods, bases, shares and the original receipt."
+    },
+    {
+      "document": {
+        "cnpj": "13574594000196",
+        "cvm_code": "024317",
+        "id": "70549",
+        "kind": "DFP",
+        "reference": "2016-12-31",
+        "version": "1"
+      },
+      "evidence": [
+        {
+          "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\original_zips\\70549\\source.zip",
+          "sha256": "10eb5065d77e37a32a2ba3294ac66cda0bb20ad185790ad05a0caf5cc4f8c2b7"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\interim\\data_repair_20260913T184500Z\\filing_evidence\\70549\\pages.json",
+          "sha256": "5013ed32b42a9a65f5b03fa08b623237c1c1e6b4e4392004a2e22d6296f99054"
+        }
+      ],
+      "multiplier": 1000,
+      "pages": [
+        94,
+        103
+      ],
+      "reason": "Own-period monetary amounts reconcile to the issuer's statements/notes explicitly in thousands of BRL; the submitted unit-scale heading is inconsistent. Preserve signs, periods, bases, shares and the original receipt."
+    },
+    {
+      "document": {
+        "cnpj": "19853511000184",
+        "cvm_code": "024384",
+        "id": "74380",
+        "kind": "ITR",
+        "reference": "2018-03-31",
+        "version": "1"
+      },
+      "evidence": [
+        {
+          "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\original_zips\\74380\\source.zip",
+          "sha256": "8cd98390bbb78783ae11b5db0bda2a0ced3d8d9e026e7bac9ad2dc365004e748"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\interim\\data_repair_20260913T184500Z\\filing_evidence\\74380\\pages.json",
+          "sha256": "2a2f55074f0a7b4c69782e010893088d63e849cba18fac594e9fbae97090a42d"
+        }
+      ],
+      "multiplier": 1000,
+      "pages": [
+        43,
+        58,
+        75,
+        80,
+        81
+      ],
+      "reason": "Own-period monetary amounts reconcile to the issuer's statements/notes explicitly in thousands of BRL; the submitted unit-scale heading is inconsistent. Preserve signs, periods, bases, shares and the original receipt."
+    },
+    {
+      "document": {
+        "cnpj": "33035536000100",
+        "cvm_code": "007811",
+        "id": "74832",
+        "kind": "ITR",
+        "reference": "2018-03-31",
+        "version": "1"
+      },
+      "evidence": [
+        {
+          "path": "D:\\quant-data\\b3\\interim\\data_repair_20260913T184500Z\\filing_evidence\\74832\\source.zip",
+          "sha256": "42fad1f6be8b5bd8b4100bd4f8b9a8d9b107d8ba6ecfb2d881a477b7abedf8dd"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\interim\\data_repair_20260913T184500Z\\filing_evidence\\74832\\pages.json",
+          "sha256": "71bd14c119c1416a811687aa2e325fe4500558d6c2c087ab3f50df26842cca8b"
+        }
+      ],
+      "multiplier": 1000,
+      "pages": [
+        45,
+        46,
+        47,
+        48,
+        51,
+        62,
+        82,
+        84
+      ],
+      "reason": "Own-period monetary amounts reconcile to the issuer's statements/notes explicitly in thousands of BRL; the submitted unit-scale heading is inconsistent. Preserve signs, periods, bases, shares and the original receipt."
+    },
+    {
+      "document": {
+        "cnpj": "11721921000160",
+        "cvm_code": "022217",
+        "id": "76875",
+        "kind": "ITR",
+        "reference": "2018-06-30",
+        "version": "1"
+      },
+      "evidence": [
+        {
+          "path": "D:\\quant-data\\b3\\interim\\data_repair_20260913T184500Z\\filing_evidence\\76875\\source.zip",
+          "sha256": "02628c737875211f9e329f23dd19faa81ff13db7e262a59b05099f3fa36c727a"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\interim\\data_repair_20260913T184500Z\\filing_evidence\\76875\\pages.json",
+          "sha256": "87fc446aa16a08c057867c2374ec60ff9dfc3b00fda583cf61d66f1a067790b3"
+        }
+      ],
+      "multiplier": 1000,
+      "pages": [
+        35,
+        36,
+        37,
+        38,
+        39,
+        51,
+        65,
+        71,
+        72
+      ],
+      "reason": "Own-period monetary amounts reconcile to the issuer's statements/notes explicitly in thousands of BRL; the submitted unit-scale heading is inconsistent. Preserve signs, periods, bases, shares and the original receipt."
+    },
+    {
+      "document": {
+        "cnpj": "11721921000160",
+        "cvm_code": "022217",
+        "id": "76910",
+        "kind": "ITR",
+        "reference": "2018-06-30",
+        "version": "2"
+      },
+      "evidence": [
+        {
+          "path": "D:\\quant-data\\b3\\interim\\data_repair_20260913T184500Z\\filing_evidence\\76910\\source.zip",
+          "sha256": "3308525e39a26f75cf4f47b1d5060de8aefb25c1d348e18e08b617f1b858f010"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\interim\\data_repair_20260913T184500Z\\filing_evidence\\76910\\pages.json",
+          "sha256": "c6988dada716fb1031861d2ea230127062cc370de7a6905d4f102690d6922b59"
+        }
+      ],
+      "multiplier": 1000,
+      "pages": [
+        35,
+        36,
+        37,
+        38,
+        39,
+        51,
+        65,
+        71,
+        72
+      ],
+      "reason": "Own-period monetary amounts reconcile to the issuer's statements/notes explicitly in thousands of BRL; the submitted unit-scale heading is inconsistent. Preserve signs, periods, bases, shares and the original receipt."
+    },
+    {
+      "document": {
+        "cnpj": "21314559000166",
+        "cvm_code": "023825",
+        "id": "82496",
+        "kind": "ITR",
+        "reference": "2019-03-31",
+        "version": "1"
+      },
+      "evidence": [
+        {
+          "path": "D:\\quant-data\\b3\\interim\\data_repair_20260913T184500Z\\filing_evidence\\82496\\source.zip",
+          "sha256": "65e46b064ae6f5ec98aaf5a7021c61ff75cc7e7faf9f2fb4fc66a45de2394bb3"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\interim\\data_repair_20260913T184500Z\\filing_evidence\\82496\\pages.json",
+          "sha256": "1f9e458a792e827df44dbfcc8ce805be13aaeb2a41cfc96ce25cfc5cdb24b4ef"
+        }
+      ],
+      "multiplier": 1000,
+      "pages": [
+        49,
+        50,
+        75,
+        79
+      ],
+      "reason": "Own-period monetary amounts reconcile to the issuer's statements/notes explicitly in thousands of BRL; the submitted unit-scale heading is inconsistent. Preserve signs, periods, bases, shares and the original receipt."
+    },
+    {
+      "document": {
+        "cnpj": "21314559000166",
+        "cvm_code": "023825",
+        "id": "82499",
+        "kind": "ITR",
+        "reference": "2019-03-31",
+        "version": "2"
+      },
+      "evidence": [
+        {
+          "path": "D:\\quant-data\\b3\\interim\\data_repair_20260913T184500Z\\filing_evidence\\82499\\source.zip",
+          "sha256": "c57061cb789edf71d600707c993e7a28f9dc10d57ce5bf549fe8b9c208ac80ca"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\interim\\data_repair_20260913T184500Z\\filing_evidence\\82499\\pages.json",
+          "sha256": "61ae96300d609d7b8ca8fb29b46375bd5db8159bc43551b5bdfd146a26a4f5da"
+        }
+      ],
+      "multiplier": 1000,
+      "pages": [
+        49,
+        50,
+        75,
+        79
+      ],
+      "reason": "Own-period monetary amounts reconcile to the issuer's statements/notes explicitly in thousands of BRL; the submitted unit-scale heading is inconsistent. Preserve signs, periods, bases, shares and the original receipt."
+    },
+    {
+      "document": {
+        "cnpj": "07594978000178",
+        "cvm_code": "024260",
+        "id": "83778",
+        "kind": "ITR",
+        "reference": "2019-03-31",
+        "version": "1"
+      },
+      "evidence": [
+        {
+          "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\original_zips\\83778\\source.zip",
+          "sha256": "eb89fa01c95925a192c27ae5c64140ffcc7eb77e16c78c792cf541ad32cb4310"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\interim\\data_repair_20260913T184500Z\\filing_evidence\\83778\\pages.json",
+          "sha256": "27131e4490e7706fc306ace9a9e684a57f5f034e68a7f493d6b1635054071d37"
+        }
+      ],
+      "multiplier": 1000,
+      "pages": [
+        39,
+        40,
+        41,
+        42,
+        43,
+        44
+      ],
+      "reason": "Own-period monetary amounts reconcile to the issuer's statements/notes explicitly in thousands of BRL; the submitted unit-scale heading is inconsistent. Preserve signs, periods, bases, shares and the original receipt."
+    },
+    {
+      "document": {
+        "cnpj": "11721921000160",
+        "cvm_code": "022217",
+        "id": "86198",
+        "kind": "ITR",
+        "reference": "2019-06-30",
+        "version": "1"
+      },
+      "evidence": [
+        {
+          "path": "D:\\quant-data\\b3\\interim\\data_repair_20260913T184500Z\\filing_evidence\\86198\\source.zip",
+          "sha256": "1a52d34fe3681322cf55f6a1d27c47bfe852821219009948d11b1a3477dfa97d"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\interim\\data_repair_20260913T184500Z\\filing_evidence\\86198\\pages.json",
+          "sha256": "6fd546b7274f95eb6abd151ce7c89c85f0dcc816300cba013e58c5d97178437b"
+        }
+      ],
+      "multiplier": 1000,
+      "pages": [
+        60,
+        61,
+        62,
+        63,
+        64,
+        65,
+        103,
+        107
+      ],
+      "reason": "Own-period monetary amounts reconcile to the issuer's statements/notes explicitly in thousands of BRL; the submitted unit-scale heading is inconsistent. Preserve signs, periods, bases, shares and the original receipt."
+    },
+    {
+      "document": {
+        "cnpj": "45242914000105",
+        "cvm_code": "024848",
+        "id": "87073",
+        "kind": "ITR",
+        "reference": "2019-03-31",
+        "version": "1"
+      },
+      "evidence": [
+        {
+          "path": "D:\\quant-data\\b3\\interim\\data_repair_20260913T184500Z\\filing_evidence\\87073\\source.zip",
+          "sha256": "173dc873073f2c472697cf11cb8e5258cb7b912f166d702c18c038ffd8d3e619"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\interim\\data_repair_20260913T184500Z\\filing_evidence\\87073\\pages.json",
+          "sha256": "42636ed213aa04698aa80fa844e148db5370ac727e1264ba0f9fda699bd6d072"
+        }
+      ],
+      "multiplier": 1000,
+      "pages": [
+        51,
+        59,
+        63
+      ],
+      "reason": "Own-period monetary amounts reconcile to the issuer's statements/notes explicitly in thousands of BRL; the submitted unit-scale heading is inconsistent. Preserve signs, periods, bases, shares and the original receipt."
+    },
+    {
+      "document": {
+        "cnpj": "22543331000100",
+        "cvm_code": "023795",
+        "id": "89113",
+        "kind": "ITR",
+        "reference": "2019-09-30",
+        "version": "1"
+      },
+      "evidence": [
+        {
+          "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\original_zips\\89113\\source.zip",
+          "sha256": "da0678bd99736b104e745289c6b38d637fc8c65d3848385b6dde5033ebdee8de"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\interim\\data_repair_20260913T184500Z\\filing_evidence\\89113\\pages.json",
+          "sha256": "884f6cb1dae86416778b1c1abb1b8d15b4ae2505d880f5a3a61783b5dc34dc6b"
+        }
+      ],
+      "multiplier": 1000,
+      "pages": [
+        21,
+        23,
+        24,
+        25,
+        28,
+        45,
+        67,
+        68
+      ],
+      "reason": "Own-period monetary amounts reconcile to the issuer's statements/notes explicitly in thousands of BRL; the submitted unit-scale heading is inconsistent. Preserve signs, periods, bases, shares and the original receipt."
+    },
+    {
+      "document": {
+        "cnpj": "45242914000105",
+        "cvm_code": "024848",
+        "id": "91677",
+        "kind": "DFP",
+        "reference": "2019-12-31",
+        "version": "1"
+      },
+      "evidence": [
+        {
+          "path": "D:\\quant-data\\b3\\interim\\data_repair_20260913T184500Z\\filing_evidence\\91677\\source.zip",
+          "sha256": "aa519a51ed2979869ebdebb3b6a7c03bad64710c79adb33496f8f51742bfd50a"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\interim\\data_repair_20260913T184500Z\\filing_evidence\\91677\\pages.json",
+          "sha256": "da5126275dfc38285160a624e874b8f4a5b80d7880724d7a36e6b8adb457fe04"
+        }
+      ],
+      "multiplier": 1000,
+      "pages": [
+        96,
+        97,
+        105,
+        109
+      ],
+      "reason": "Own-period monetary amounts reconcile to the issuer's statements/notes explicitly in thousands of BRL; the submitted unit-scale heading is inconsistent. Preserve signs, periods, bases, shares and the original receipt."
+    },
+    {
+      "document": {
+        "cnpj": "06626253000151",
+        "cvm_code": "022608",
+        "id": "97958",
+        "kind": "ITR",
+        "reference": "2020-09-30",
+        "version": "1"
+      },
+      "evidence": [
+        {
+          "path": "D:\\quant-data\\b3\\interim\\data_repair_20260913T184500Z\\filing_evidence\\97958\\source.zip",
+          "sha256": "e932f1bf7416655c5ad28c729550e89a50c2e746f9f83630344b9a34343cef1b"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\interim\\data_repair_20260913T184500Z\\filing_evidence\\97958\\pages.json",
+          "sha256": "25aec6a0ac39942e8a2724eea8304dd6a0eb45d796116e44cc7bd97361104331"
+        }
+      ],
+      "multiplier": 1000,
+      "pages": [
+        51,
+        56
+      ],
+      "reason": "Own-period monetary amounts reconcile to the issuer's statements/notes explicitly in thousands of BRL; the submitted unit-scale heading is inconsistent. Preserve signs, periods, bases, shares and the original receipt."
+    },
+    {
+      "document": {
+        "cnpj": "14776142000150",
+        "cvm_code": "025518",
+        "id": "98998",
+        "kind": "DFP",
+        "reference": "2019-12-31",
+        "version": "1"
+      },
+      "evidence": [
+        {
+          "path": "D:\\quant-data\\b3\\interim\\data_repair_20260913T184500Z\\filing_evidence\\98998\\source.zip",
+          "sha256": "d8994e825fb7992cbb53e3d2ab5ad4c10ef303bfec62c2eaa20b8a3f9ea1b404"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\interim\\data_repair_20260913T184500Z\\filing_evidence\\98998\\pages.json",
+          "sha256": "f924c3f41c84246a726b74694fd07c905a9270c0a0bdcbccf3b88a5c2520181b"
+        }
+      ],
+      "multiplier": 1000,
+      "pages": [
+        19,
+        20,
+        50,
+        52,
+        54
+      ],
+      "reason": "Own-period monetary amounts reconcile to the issuer's statements/notes explicitly in thousands of BRL; the submitted unit-scale heading is inconsistent. Preserve signs, periods, bases, shares and the original receipt."
+    },
+    {
+      "document": {
+        "cnpj": "07415333000120",
+        "cvm_code": "025003",
+        "id": "100841",
+        "kind": "DFP",
+        "reference": "2020-12-31",
+        "version": "1"
+      },
+      "evidence": [
+        {
+          "path": "D:\\quant-data\\b3\\interim\\data_repair_20260913T184500Z\\filing_evidence\\100841\\source.zip",
+          "sha256": "a25064276996f25938ba70684faeddbcb5937e829e290ecd17d2886e3506b38c"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\interim\\data_repair_20260913T184500Z\\filing_evidence\\100841\\pages.json",
+          "sha256": "3bc8a4af5074ab9c1b33e2b853bad3e8ea8d6091a84e8d6cf2c2991e212a03cc"
+        }
+      ],
+      "multiplier": 1000,
+      "pages": [
+        88,
+        144,
+        147,
+        148
+      ],
+      "reason": "Own-period monetary amounts reconcile to the issuer's statements/notes explicitly in thousands of BRL; the submitted unit-scale heading is inconsistent. Preserve signs, periods, bases, shares and the original receipt."
+    },
+    {
+      "document": {
+        "cnpj": "08797760000183",
+        "cvm_code": "025100",
+        "id": "102051",
+        "kind": "DFP",
+        "reference": "2020-12-31",
+        "version": "1"
+      },
+      "evidence": [
+        {
+          "path": "D:\\quant-data\\b3\\interim\\data_repair_20260913T184500Z\\filing_evidence\\102051\\source.zip",
+          "sha256": "e020ebd4debe9e0c7606ef50200aac82fbe7b8b7ea5f9eb36085f6011ee10d0d"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\interim\\data_repair_20260913T184500Z\\filing_evidence\\102051\\pages.json",
+          "sha256": "b5238832cfda22fa3d4fe8b104fba5d4767df7ceb1cc583bd0b1cf3ea3af36b0"
+        }
+      ],
+      "multiplier": 1000,
+      "pages": [
+        42,
+        43,
+        44,
+        45,
+        46,
+        47,
+        48,
+        49,
+        76,
+        79
+      ],
+      "reason": "Own-period monetary amounts reconcile to the issuer's statements/notes explicitly in thousands of BRL; the submitted unit-scale heading is inconsistent. Preserve signs, periods, bases, shares and the original receipt."
+    },
+    {
+      "document": {
+        "cnpj": "08797760000183",
+        "cvm_code": "025100",
+        "id": "102053",
+        "kind": "DFP",
+        "reference": "2020-12-31",
+        "version": "2"
+      },
+      "evidence": [
+        {
+          "path": "D:\\quant-data\\b3\\interim\\data_repair_20260913T184500Z\\filing_evidence\\102053\\source.zip",
+          "sha256": "de6e22912af63677bdbfb3dc9ed1b935e205cc806f04dc6f93c635295ea60a31"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\interim\\data_repair_20260913T184500Z\\filing_evidence\\102053\\pages.json",
+          "sha256": "446a3489bd770f4e60bbfea8e5597ffde8dc357065f675218a8af8569c951eac"
+        }
+      ],
+      "multiplier": 1000,
+      "pages": [
+        42,
+        43,
+        44,
+        45,
+        46,
+        47,
+        48,
+        49,
+        76,
+        79
+      ],
+      "reason": "Own-period monetary amounts reconcile to the issuer's statements/notes explicitly in thousands of BRL; the submitted unit-scale heading is inconsistent. Preserve signs, periods, bases, shares and the original receipt."
+    },
+    {
+      "document": {
+        "cnpj": "61351532000168",
+        "cvm_code": "011975",
+        "id": "102601",
+        "kind": "DFP",
+        "reference": "2020-12-31",
+        "version": "1"
+      },
+      "evidence": [
+        {
+          "path": "D:\\quant-data\\b3\\interim\\data_repair_20260913T184500Z\\filing_evidence\\102601\\source.zip",
+          "sha256": "592d55308128694e8550ad79f89ccf593b2ada3b41f05ed2f19f96f51a072efa"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\interim\\data_repair_20260913T184500Z\\filing_evidence\\102601\\pages.json",
+          "sha256": "2ba7589feddc3ac3ed757a59dea7ac0b67853bd5e9a0086ae93e80dbd44de1d5"
+        }
+      ],
+      "multiplier": 1000,
+      "pages": [
+        32,
+        65,
+        67
+      ],
+      "reason": "Own-period monetary amounts reconcile to the issuer's statements/notes explicitly in thousands of BRL; the submitted unit-scale heading is inconsistent. Preserve signs, periods, bases, shares and the original receipt."
+    },
+    {
+      "document": {
+        "cnpj": "16590234000176",
+        "cvm_code": "022349",
+        "id": "104154",
+        "kind": "ITR",
+        "reference": "2021-03-31",
+        "version": "1"
+      },
+      "evidence": [
+        {
+          "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\original_zips\\104154\\source.zip",
+          "sha256": "0a9dd50176499322903ccc2571b14ed4884a49bbeccd012f26c1cf8bce7968cd"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\interim\\data_repair_20260913T184500Z\\filing_evidence\\104154\\pages.json",
+          "sha256": "02e72033d3434d55d065e258a251478d26a0dd7dda621a2202e83fb0a9e883a3"
+        }
+      ],
+      "multiplier": 1000,
+      "pages": [
+        83,
+        92
+      ],
+      "reason": "Own-period monetary amounts reconcile to the issuer's statements/notes explicitly in thousands of BRL; the submitted unit-scale heading is inconsistent. Preserve signs, periods, bases, shares and the original receipt."
+    },
+    {
+      "document": {
+        "cnpj": "16590234000176",
+        "cvm_code": "022349",
+        "id": "105870",
+        "kind": "ITR",
+        "reference": "2021-03-31",
+        "version": "2"
+      },
+      "evidence": [
+        {
+          "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\original_zips\\105870\\source.zip",
+          "sha256": "508e3412203527ea469bb0879df45df227e0aa905597197de462a9968da1ca98"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\interim\\data_repair_20260913T184500Z\\filing_evidence\\105870\\pages.json",
+          "sha256": "8d536aa2235da07aa18f6bc9048e105540c7eb6075506b27e172ad65ccc6134e"
+        }
+      ],
+      "multiplier": 1000,
+      "pages": [
+        83,
+        92
+      ],
+      "reason": "Own-period monetary amounts reconcile to the issuer's statements/notes explicitly in thousands of BRL; the submitted unit-scale heading is inconsistent. Preserve signs, periods, bases, shares and the original receipt."
+    },
+    {
+      "document": {
+        "cnpj": "33130691000105",
+        "cvm_code": "026247",
+        "id": "106245",
+        "kind": "ITR",
+        "reference": "2021-03-31",
+        "version": "1"
+      },
+      "evidence": [
+        {
+          "path": "D:\\quant-data\\b3\\interim\\data_repair_20260913T184500Z\\filing_evidence\\106245\\source.zip",
+          "sha256": "42633980621dfbf1daf2bc2205754ef1e216711260e891818b74817c602a87aa"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\interim\\data_repair_20260913T184500Z\\filing_evidence\\106245\\pages.json",
+          "sha256": "c1ea5d3d5aff730aaccb7876c5ff7d637e63702a1c3352ed2101cfb7c0bf48b3"
+        }
+      ],
+      "multiplier": 1000,
+      "pages": [
+        25,
+        54,
+        71
+      ],
+      "reason": "Own-period monetary amounts reconcile to the issuer's statements/notes explicitly in thousands of BRL; the submitted unit-scale heading is inconsistent. Preserve signs, periods, bases, shares and the original receipt."
+    },
+    {
+      "document": {
+        "cnpj": "58119199000151",
+        "cvm_code": "020125",
+        "id": "106749",
+        "kind": "ITR",
+        "reference": "2021-06-30",
+        "version": "1"
+      },
+      "evidence": [
+        {
+          "path": "D:\\quant-data\\b3\\interim\\data_repair_20260913T184500Z\\filing_evidence\\106749\\source.zip",
+          "sha256": "ed7e081848af33cf661cd77b1bf653c1fec42041c865994b6ffc679674980f86"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\interim\\data_repair_20260913T184500Z\\filing_evidence\\106749\\pages.json",
+          "sha256": "26841a599d9a198288908d2c903b13c9a8281dbb4b086a49d1ad4cb26b7f5fda"
+        }
+      ],
+      "multiplier": 1000,
+      "pages": [
+        46,
+        67,
+        76,
+        85,
+        87
+      ],
+      "reason": "Own-period monetary amounts reconcile to the issuer's statements/notes explicitly in thousands of BRL; the submitted unit-scale heading is inconsistent. Preserve signs, periods, bases, shares and the original receipt."
+    },
+    {
+      "document": {
+        "cnpj": "10139870000108",
+        "cvm_code": "025399",
+        "id": "107648",
+        "kind": "ITR",
+        "reference": "2021-06-30",
+        "version": "1"
+      },
+      "evidence": [
+        {
+          "path": "D:\\quant-data\\b3\\interim\\data_repair_20260913T184500Z\\filing_evidence\\107648\\source.zip",
+          "sha256": "bb9ea5b9880be375ada3f10932d19021d05435c5516604b690d64439b718925f"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\interim\\data_repair_20260913T184500Z\\filing_evidence\\107648\\pages.json",
+          "sha256": "5a9732da88a56b5ac846fa0468fd9716617e665b94c88a70d45107ccd8258e1b"
+        }
+      ],
+      "multiplier": 1000,
+      "pages": [
+        21,
+        22,
+        24,
+        38,
+        61,
+        64
+      ],
+      "reason": "Own-period monetary amounts reconcile to the issuer's statements/notes explicitly in thousands of BRL; the submitted unit-scale heading is inconsistent. Preserve signs, periods, bases, shares and the original receipt."
+    },
+    {
+      "document": {
+        "cnpj": "07594978000178",
+        "cvm_code": "024260",
+        "id": "109780",
+        "kind": "ITR",
+        "reference": "2021-09-30",
+        "version": "2"
+      },
+      "evidence": [
+        {
+          "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\original_zips\\109780\\source.zip",
+          "sha256": "c68b296a31c98ac94bdd42ead348384e0adbbba1d875dedcffae992e02d33845"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\interim\\data_repair_20260913T184500Z\\filing_evidence\\109780\\pages.json",
+          "sha256": "abdc5271f2dbb5e6dc9ecec7f75f3af8c9485f9c01d7c974180a089f602ea223"
+        }
+      ],
+      "multiplier": 1000,
+      "pages": [
+        48,
+        49,
+        50,
+        51,
+        52
+      ],
+      "reason": "Own-period monetary amounts reconcile to the issuer's statements/notes explicitly in thousands of BRL; the submitted unit-scale heading is inconsistent. Preserve signs, periods, bases, shares and the original receipt."
+    }
+  ],
+  "rejected_blanket_corrections": [
+    {
+      "document": "74588",
+      "reason": "Carrefour performance tables use millions of BRL within a report that also contains thousands headings; the apparent inverse1,000 correction is false."
+    },
+    {
+      "document": "91085",
+      "reason": "An own-note share split is a subsequent event; it must not be backdated to the year-end capital reference."
+    },
+    {
+      "documents": [
+        "76255",
+        "76263",
+        "76257",
+        "76265"
+      ],
+      "reason": "Ambev notes independently confirm billions of shares, with tables explicitly in thousands; large quantities alone are not defects."
+    }
+  ],
+  "scope": "Exact own-filing data repairs; source archives and original availability are unchanged.",
+  "triage": {
+    "additional_used_xml_documents_reviewed": 22,
+    "candidate_documents": 567,
+    "pdf_extracted": 479,
+    "unresolved_retrieval": [
+      {
+        "accepted_shares": {
+          "ON": 1360286034.0,
+          "PN": 0.0
+        },
+        "document": {
+          "cnpj": "01027058000191",
+          "cvm_code": "021733",
+          "id": "4680",
+          "kind": "DFP",
+          "reference": "2010-12-31",
+          "version": "1"
+        },
+        "error": "ValueError: exact original unavailable: non-ZIP response",
+        "fields": [
+          "con.assets",
+          "con.equity"
+        ],
+        "status": "unresolved"
+      },
+      {
+        "accepted_shares": {
+          "ON": 1360286034.0,
+          "PN": 0.0
+        },
+        "document": {
+          "cnpj": "01027058000191",
+          "cvm_code": "021733",
+          "id": "4737",
+          "kind": "DFP",
+          "reference": "2010-12-31",
+          "version": "2"
+        },
+        "error": "TimeoutError: The read operation timed out",
+        "fields": [
+          "con.assets",
+          "con.equity"
+        ],
+        "status": "unresolved"
+      },
+      {
+        "accepted_shares": {
+          "ON": 457838204.0,
+          "PN": 0.0
+        },
+        "document": {
+          "cnpj": "97837181000147",
+          "cvm_code": "021091",
+          "id": "4753",
+          "kind": "DFP",
+          "reference": "2010-12-31",
+          "version": "2"
+        },
+        "error": "ValueError: exact original unavailable: non-ZIP response",
+        "fields": [
+          "con.assets",
+          "con.equity"
+        ],
+        "status": "unresolved"
+      },
+      {
+        "accepted_shares": {
+          "ON": 170812872.0,
+          "PN": 275229304.0
+        },
+        "document": {
+          "cnpj": "88611835000129",
+          "cvm_code": "008451",
+          "id": "4926",
+          "kind": "DFP",
+          "reference": "2010-12-31",
+          "version": "1"
+        },
+        "error": "ValueError: exact original unavailable: non-ZIP response",
+        "fields": [
+          "con.assets",
+          "con.equity"
+        ],
+        "status": "unresolved"
+      },
+      {
+        "accepted_shares": {
+          "ON": 131298550.0,
+          "PN": 0.0
+        },
+        "document": {
+          "cnpj": "60840055000131",
+          "cvm_code": "021881",
+          "id": "4990",
+          "kind": "DFP",
+          "reference": "2010-12-31",
+          "version": "2"
+        },
+        "error": "ValueError: exact original unavailable: non-ZIP response",
+        "fields": [
+          "con.assets",
+          "con.equity"
+        ],
+        "status": "unresolved"
+      },
+      {
+        "accepted_shares": {
+          "ON": 162722079.0,
+          "PN": 0.0
+        },
+        "document": {
+          "cnpj": "78876950000171",
+          "cvm_code": "014761",
+          "id": "5143",
+          "kind": "DFP",
+          "reference": "2010-12-31",
+          "version": "2"
+        },
+        "error": "ValueError: exact original unavailable: non-ZIP response",
+        "fields": [
+          "shares.ON"
+        ],
+        "status": "unresolved"
+      },
+      {
+        "accepted_shares": {
+          "ON": 11212500.0,
+          "PN": 0.0
+        },
+        "document": {
+          "cnpj": "09112685000132",
+          "cvm_code": "021342",
+          "id": "5267",
+          "kind": "DFP",
+          "reference": "2010-12-31",
+          "version": "2"
+        },
+        "error": "IncompleteRead: IncompleteRead(6491681 bytes read)",
+        "fields": [
+          "con.assets",
+          "con.equity"
+        ],
+        "status": "unresolved"
+      },
+      {
+        "accepted_shares": {
+          "ON": 547846000.0,
+          "PN": 0.0
+        },
+        "document": {
+          "cnpj": "02932074000191",
+          "cvm_code": "021431",
+          "id": "5428",
+          "kind": "DFP",
+          "reference": "2010-12-31",
+          "version": "2"
+        },
+        "error": "ValueError: exact original unavailable: non-ZIP response",
+        "fields": [
+          "shares.ON"
+        ],
+        "status": "unresolved"
+      },
+      {
+        "accepted_shares": {
+          "ON": 2492718276.0,
+          "PN": 0.0
+        },
+        "document": {
+          "cnpj": "02916265000160",
+          "cvm_code": "020575",
+          "id": "5492",
+          "kind": "DFP",
+          "reference": "2010-12-31",
+          "version": "1"
+        },
+        "error": "ValueError: exact original unavailable: non-ZIP response",
+        "fields": [
+          "con.assets",
+          "con.equity"
+        ],
+        "status": "unresolved"
+      },
+      {
+        "accepted_shares": {
+          "ON": 871692074.0,
+          "PN": 0.0
+        },
+        "document": {
+          "cnpj": "01838723000127",
+          "cvm_code": "016292",
+          "id": "5532",
+          "kind": "DFP",
+          "reference": "2010-12-31",
+          "version": "2"
+        },
+        "error": "IncompleteRead: IncompleteRead(7625263 bytes read)",
+        "fields": [
+          "con.assets",
+          "con.equity"
+        ],
+        "status": "unresolved"
+      },
+      {
+        "accepted_shares": {
+          "ON": 1308211000.0,
+          "PN": 1061000.0
+        },
+        "document": {
+          "cnpj": "91983056000169",
+          "cvm_code": "007870",
+          "id": "5668",
+          "kind": "DFP",
+          "reference": "2010-12-31",
+          "version": "2"
+        },
+        "error": "ValueError: exact original unavailable: non-ZIP response",
+        "fields": [
+          "con.assets",
+          "con.equity"
+        ],
+        "status": "unresolved"
+      },
+      {
+        "accepted_shares": {
+          "ON": 871692074.0,
+          "PN": 0.0
+        },
+        "document": {
+          "cnpj": "01838723000127",
+          "cvm_code": "016292",
+          "id": "6508",
+          "kind": "DFP",
+          "reference": "2010-12-31",
+          "version": "3"
+        },
+        "error": "ValueError: exact original unavailable: non-ZIP response",
+        "fields": [
+          "con.assets",
+          "con.equity"
+        ],
+        "status": "unresolved"
+      },
+      {
+        "accepted_shares": {
+          "ON": 316827563.0,
+          "PN": 573658933.0
+        },
+        "document": {
+          "cnpj": "89637490000145",
+          "cvm_code": "012653",
+          "id": "6741",
+          "kind": "ITR",
+          "reference": "2011-03-31",
+          "version": "2"
+        },
+        "error": "ValueError: exact original unavailable: non-ZIP response",
+        "fields": [
+          "con.assets",
+          "con.equity"
+        ],
+        "status": "unresolved"
+      },
+      {
+        "accepted_shares": {
+          "ON": 672760257.0,
+          "PN": 0.0
+        },
+        "document": {
+          "cnpj": "01425787000104",
+          "cvm_code": "020893",
+          "id": "6748",
+          "kind": "ITR",
+          "reference": "2011-03-31",
+          "version": "2"
+        },
+        "error": "ValueError: exact original unavailable: non-ZIP response",
+        "fields": [
+          "ind.assets",
+          "ind.equity"
+        ],
+        "status": "unresolved"
+      },
+      {
+        "accepted_shares": {
+          "ON": 47716103.0,
+          "PN": 0.0
+        },
+        "document": {
+          "cnpj": "89463822000112",
+          "cvm_code": "020060",
+          "id": "7065",
+          "kind": "ITR",
+          "reference": "2011-03-31",
+          "version": "2"
+        },
+        "error": "TimeoutError: The read operation timed out",
+        "fields": [
+          "con.assets",
+          "con.equity"
+        ],
+        "status": "unresolved"
+      },
+      {
+        "accepted_shares": {
+          "ON": 61042763.0,
+          "PN": 0.0
+        },
+        "document": {
+          "cnpj": "60605664000106",
+          "cvm_code": "022306",
+          "id": "7069",
+          "kind": "DFP",
+          "reference": "2010-12-31",
+          "version": "3"
+        },
+        "error": "ValueError: exact original unavailable: non-ZIP response",
+        "fields": [
+          "ind.assets",
+          "ind.equity"
+        ],
+        "status": "unresolved"
+      },
+      {
+        "accepted_shares": {
+          "ON": 197041056.0,
+          "PN": 0.0
+        },
+        "document": {
+          "cnpj": "52548435000179",
+          "cvm_code": "022020",
+          "id": "7613",
+          "kind": "ITR",
+          "reference": "2011-03-31",
+          "version": "1"
+        },
+        "error": "ValueError: exact original unavailable: non-ZIP response",
+        "fields": [
+          "con.assets",
+          "con.equity"
+        ],
+        "status": "unresolved"
+      },
+      {
+        "accepted_shares": {
+          "ON": 76175206.0,
+          "PN": 0.0
+        },
+        "document": {
+          "cnpj": "09295063000197",
+          "cvm_code": "022519",
+          "id": "17109",
+          "kind": "ITR",
+          "reference": "2012-03-31",
+          "version": "1"
+        },
+        "error": "ValueError: exact original unavailable: non-ZIP response",
+        "fields": [
+          "con.assets",
+          "con.equity"
+        ],
+        "status": "unresolved"
+      },
+      {
+        "accepted_shares": {
+          "ON": 1765587200.0,
+          "PN": 0.0
+        },
+        "document": {
+          "cnpj": "02846056000197",
+          "cvm_code": "018821",
+          "id": "22415",
+          "kind": "ITR",
+          "reference": "2012-09-30",
+          "version": "2"
+        },
+        "error": "ValueError: exact original unavailable: non-ZIP response",
+        "fields": [
+          "con.assets",
+          "con.equity"
+        ],
+        "status": "unresolved"
+      },
+      {
+        "accepted_shares": {
+          "ON": 198447352.0,
+          "PN": 0.0
+        },
+        "document": {
+          "cnpj": "03220438000173",
+          "cvm_code": "020010",
+          "id": "36916",
+          "kind": "ITR",
+          "reference": "2014-03-31",
+          "version": "1"
+        },
+        "error": "ValueError: exact original unavailable: non-ZIP response",
+        "fields": [
+          "con.assets",
+          "con.equity"
+        ],
+        "status": "unresolved"
+      },
+      {
+        "accepted_shares": {
+          "ON": 97155207.0,
+          "PN": 0.0
+        },
+        "document": {
+          "cnpj": "89096457000155",
+          "cvm_code": "020745",
+          "id": "63538",
+          "kind": "DFP",
+          "reference": "2016-12-31",
+          "version": "2"
+        },
+        "error": "TimeoutError: The read operation timed out",
+        "fields": [
+          "con.assets",
+          "con.equity"
+        ],
+        "status": "unresolved"
+      },
+      {
+        "accepted_shares": {
+          "ON": 239128295000.0,
+          "PN": 0.0
+        },
+        "document": {
+          "cnpj": "04423567000121",
+          "cvm_code": "021237",
+          "id": "63576",
+          "kind": "DFP",
+          "reference": "2016-12-31",
+          "version": "1"
+        },
+        "error": "ValueError: exact original unavailable: non-ZIP response",
+        "fields": [
+          "shares.ON"
+        ],
+        "status": "unresolved"
+      },
+      {
+        "accepted_shares": {
+          "ON": 1980958942.0,
+          "PN": 0.0
+        },
+        "document": {
+          "cnpj": "75315333000109",
+          "cvm_code": "024171",
+          "id": "71848",
+          "kind": "DFP",
+          "reference": "2017-12-31",
+          "version": "2"
+        },
+        "error": "ValueError: exact original unavailable: non-ZIP response",
+        "fields": [
+          "con.assets",
+          "con.equity"
+        ],
+        "status": "unresolved"
+      },
+      {
+        "accepted_shares": {
+          "ON": 7368221.0,
+          "PN": 0.0
+        },
+        "document": {
+          "cnpj": "11721921000160",
+          "cvm_code": "022217",
+          "id": "74201",
+          "kind": "ITR",
+          "reference": "2018-03-31",
+          "version": "1"
+        },
+        "error": "ValueError: exact original unavailable: non-ZIP response",
+        "fields": [
+          "con.assets",
+          "con.equity"
+        ],
+        "status": "unresolved"
+      },
+      {
+        "accepted_shares": {
+          "ON": 406617107.0,
+          "PN": 0.0
+        },
+        "document": {
+          "cnpj": "50746577000115",
+          "cvm_code": "019836",
+          "id": "74245",
+          "kind": "ITR",
+          "reference": "2018-03-31",
+          "version": "1"
+        },
+        "error": "ValueError: exact original unavailable: non-ZIP response",
+        "fields": [
+          "con.assets",
+          "con.equity"
+        ],
+        "status": "unresolved"
+      },
+      {
+        "accepted_shares": {
+          "ON": 1050298158.0,
+          "PN": 0.0
+        },
+        "document": {
+          "cnpj": "33035536000100",
+          "cvm_code": "007811",
+          "id": "74853",
+          "kind": "ITR",
+          "reference": "2018-03-31",
+          "version": "2"
+        },
+        "error": "TimeoutError: The read operation timed out",
+        "fields": [
+          "con.assets",
+          "con.equity"
+        ],
+        "status": "unresolved"
+      },
+      {
+        "accepted_shares": {
+          "ON": 262899600.0,
+          "PN": 0.0
+        },
+        "document": {
+          "cnpj": "23373000000132",
+          "cvm_code": "024716",
+          "id": "80868",
+          "kind": "DFP",
+          "reference": "2018-12-31",
+          "version": "1"
+        },
+        "error": "ValueError: exact original unavailable: non-ZIP response",
+        "fields": [
+          "con.assets",
+          "con.equity",
+          "ind.assets",
+          "ind.equity"
+        ],
+        "status": "unresolved"
+      },
+      {
+        "accepted_shares": {
+          "ON": 145031080.0,
+          "PN": 128624295.0
+        },
+        "document": {
+          "cnpj": "76483817000120",
+          "cvm_code": "014311",
+          "id": "81731",
+          "kind": "DFP",
+          "reference": "2018-12-31",
+          "version": "1"
+        },
+        "error": "IncompleteRead: IncompleteRead(7686832 bytes read)",
+        "fields": [
+          "con.assets",
+          "con.equity"
+        ],
+        "status": "unresolved"
+      },
+      {
+        "accepted_shares": {
+          "ON": 262367514.0,
+          "PN": 0.0
+        },
+        "document": {
+          "cnpj": "21314559000166",
+          "cvm_code": "023825",
+          "id": "81989",
+          "kind": "DFP",
+          "reference": "2018-12-31",
+          "version": "4"
+        },
+        "error": "ValueError: exact original unavailable: non-ZIP response",
+        "fields": [
+          "con.assets",
+          "con.equity"
+        ],
+        "status": "unresolved"
+      },
+      {
+        "accepted_shares": {
+          "ON": 310415400.0,
+          "PN": 1.0
+        },
+        "document": {
+          "cnpj": "33376989000191",
+          "cvm_code": "024180",
+          "id": "82591",
+          "kind": "ITR",
+          "reference": "2019-03-31",
+          "version": "1"
+        },
+        "error": "ValueError: exact original unavailable: non-ZIP response",
+        "fields": [
+          "con.assets",
+          "con.equity"
+        ],
+        "status": "unresolved"
+      },
+      {
+        "accepted_shares": {
+          "ON": 310415400.0,
+          "PN": 1.0
+        },
+        "document": {
+          "cnpj": "33376989000191",
+          "cvm_code": "024180",
+          "id": "82684",
+          "kind": "ITR",
+          "reference": "2019-03-31",
+          "version": "2"
+        },
+        "error": "ValueError: exact original unavailable: non-ZIP response",
+        "fields": [
+          "con.assets",
+          "con.equity"
+        ],
+        "status": "unresolved"
+      },
+      {
+        "accepted_shares": {
+          "ON": 262899600.0,
+          "PN": 0.0
+        },
+        "document": {
+          "cnpj": "23373000000132",
+          "cvm_code": "024716",
+          "id": "82959",
+          "kind": "ITR",
+          "reference": "2019-03-31",
+          "version": "1"
+        },
+        "error": "ValueError: exact original unavailable: non-ZIP response",
+        "fields": [
+          "con.assets",
+          "con.equity",
+          "ind.assets",
+          "ind.equity"
+        ],
+        "status": "unresolved"
+      },
+      {
+        "accepted_shares": {
+          "ON": 62400.0,
+          "PN": 0.0
+        },
+        "document": {
+          "cnpj": "08402943000152",
+          "cvm_code": "004669",
+          "id": "83485",
+          "kind": "ITR",
+          "reference": "2019-03-31",
+          "version": "1"
+        },
+        "error": "IncompleteRead: IncompleteRead(5901484 bytes read)",
+        "fields": [
+          "shares.ON"
+        ],
+        "status": "unresolved"
+      },
+      {
+        "accepted_shares": {
+          "ON": 145031080.0,
+          "PN": 128624295.0
+        },
+        "document": {
+          "cnpj": "76483817000120",
+          "cvm_code": "014311",
+          "id": "83492",
+          "kind": "ITR",
+          "reference": "2019-03-31",
+          "version": "1"
+        },
+        "error": "ValueError: exact original unavailable: non-ZIP response",
+        "fields": [
+          "con.assets",
+          "con.equity"
+        ],
+        "status": "unresolved"
+      },
+      {
+        "accepted_shares": {
+          "ON": 7368221.0,
+          "PN": 0.0
+        },
+        "document": {
+          "cnpj": "11721921000160",
+          "cvm_code": "022217",
+          "id": "83655",
+          "kind": "ITR",
+          "reference": "2019-03-31",
+          "version": "1"
+        },
+        "error": "ValueError: exact original unavailable: non-ZIP response",
+        "fields": [
+          "con.assets",
+          "con.equity"
+        ],
+        "status": "unresolved"
+      },
+      {
+        "accepted_shares": {
+          "ON": 459912417000.0,
+          "PN": 0.0
+        },
+        "document": {
+          "cnpj": "06047087000139",
+          "cvm_code": "024821",
+          "id": "84759",
+          "kind": "DFP",
+          "reference": "2018-12-31",
+          "version": "1"
+        },
+        "error": "ValueError: exact original unavailable: non-ZIP response",
+        "fields": [
+          "shares.ON"
+        ],
+        "status": "unresolved"
+      },
+      {
+        "accepted_shares": {
+          "ON": 105029815.0,
+          "PN": 0.0
+        },
+        "document": {
+          "cnpj": "33035536000100",
+          "cvm_code": "007811",
+          "id": "84933",
+          "kind": "DFP",
+          "reference": "2018-12-31",
+          "version": "3"
+        },
+        "error": "ValueError: exact original unavailable: non-ZIP response",
+        "fields": [
+          "con.assets",
+          "ind.assets",
+          "ind.equity"
+        ],
+        "status": "unresolved"
+      },
+      {
+        "accepted_shares": {
+          "ON": 158781267.0,
+          "PN": 0.0
+        },
+        "document": {
+          "cnpj": "06948969000175",
+          "cvm_code": "023035",
+          "id": "84984",
+          "kind": "DFP",
+          "reference": "2018-12-31",
+          "version": "3"
+        },
+        "error": "ValueError: exact original unavailable: non-ZIP response",
+        "fields": [
+          "shares.ON"
+        ],
+        "status": "unresolved"
+      },
+      {
+        "accepted_shares": {
+          "ON": 147427439.0,
+          "PN": 0.0
+        },
+        "document": {
+          "cnpj": "10215988000160",
+          "cvm_code": "022691",
+          "id": "86056",
+          "kind": "ITR",
+          "reference": "2019-06-30",
+          "version": "1"
+        },
+        "error": "ValueError: exact original unavailable: non-ZIP response",
+        "fields": [
+          "con.assets",
+          "con.equity"
+        ],
+        "status": "unresolved"
+      },
+      {
+        "accepted_shares": {
+          "ON": 7315801.0,
+          "PN": 0.0
+        },
+        "document": {
+          "cnpj": "11721921000160",
+          "cvm_code": "022217",
+          "id": "86271",
+          "kind": "ITR",
+          "reference": "2019-06-30",
+          "version": "2"
+        },
+        "error": "IncompleteRead: IncompleteRead(20548098 bytes read)",
+        "fields": [
+          "con.assets",
+          "con.equity"
+        ],
+        "status": "unresolved"
+      },
+      {
+        "accepted_shares": {
+          "ON": 35480938.0,
+          "PN": 0.0
+        },
+        "document": {
+          "cnpj": "08613550000198",
+          "cvm_code": "021180",
+          "id": "86286",
+          "kind": "ITR",
+          "reference": "2019-06-30",
+          "version": "1"
+        },
+        "error": "IncompleteRead: IncompleteRead(32971004 bytes read)",
+        "fields": [
+          "con.assets",
+          "con.equity"
+        ],
+        "status": "unresolved"
+      },
+      {
+        "accepted_shares": {
+          "ON": 400007354000.0,
+          "PN": 100000000000.0
+        },
+        "document": {
+          "cnpj": "61186680000174",
+          "cvm_code": "024600",
+          "id": "87065",
+          "kind": "ITR",
+          "reference": "2019-06-30",
+          "version": "4"
+        },
+        "error": "IncompleteRead: IncompleteRead(6613809 bytes read)",
+        "fields": [
+          "shares.ON",
+          "shares.PN"
+        ],
+        "status": "unresolved"
+      },
+      {
+        "accepted_shares": {
+          "ON": 400007354.0,
+          "PN": 100000000.0
+        },
+        "document": {
+          "cnpj": "61186680000174",
+          "cvm_code": "024600",
+          "id": "88536",
+          "kind": "DFP",
+          "reference": "2018-12-31",
+          "version": "3"
+        },
+        "error": "ValueError: exact original unavailable: non-ZIP response",
+        "fields": [
+          "shares.ON",
+          "shares.PN"
+        ],
+        "status": "unresolved"
+      },
+      {
+        "accepted_shares": {
+          "ON": 458758661.0,
+          "PN": 0.0
+        },
+        "document": {
+          "cnpj": "00776574000156",
+          "cvm_code": "020990",
+          "id": "88911",
+          "kind": "ITR",
+          "reference": "2019-09-30",
+          "version": "1"
+        },
+        "error": "ValueError: exact original unavailable: non-ZIP response",
+        "fields": [
+          "con.assets",
+          "con.equity"
+        ],
+        "status": "unresolved"
+      },
+      {
+        "accepted_shares": {
+          "ON": 147766703.0,
+          "PN": 0.0
+        },
+        "document": {
+          "cnpj": "10215988000160",
+          "cvm_code": "022691",
+          "id": "89140",
+          "kind": "ITR",
+          "reference": "2019-09-30",
+          "version": "1"
+        },
+        "error": "IncompleteRead: IncompleteRead(10042335 bytes read)",
+        "fields": [
+          "con.assets",
+          "con.equity"
+        ],
+        "status": "unresolved"
+      },
+      {
+        "accepted_shares": {
+          "ON": 147766703.0,
+          "PN": 0.0
+        },
+        "document": {
+          "cnpj": "10215988000160",
+          "cvm_code": "022691",
+          "id": "89175",
+          "kind": "ITR",
+          "reference": "2019-09-30",
+          "version": "2"
+        },
+        "error": "ValueError: exact original unavailable: non-ZIP response",
+        "fields": [
+          "con.assets",
+          "con.equity"
+        ],
+        "status": "unresolved"
+      },
+      {
+        "accepted_shares": {
+          "ON": 523229262.0,
+          "PN": 0.0
+        },
+        "document": {
+          "cnpj": "00776574000156",
+          "cvm_code": "020990",
+          "id": "91145",
+          "kind": "DFP",
+          "reference": "2019-12-31",
+          "version": "1"
+        },
+        "error": "IncompleteRead: IncompleteRead(9255148 bytes read)",
+        "fields": [
+          "con.assets",
+          "con.equity"
+        ],
+        "status": "unresolved"
+      },
+      {
+        "accepted_shares": {
+          "ON": 68643905.0,
+          "PN": 2489675.0
+        },
+        "document": {
+          "cnpj": "08797760000183",
+          "cvm_code": "025100",
+          "id": "91176",
+          "kind": "DFP",
+          "reference": "2019-12-31",
+          "version": "1"
+        },
+        "error": "ValueError: exact original unavailable: non-ZIP response",
+        "fields": [
+          "shares.ON"
+        ],
+        "status": "unresolved"
+      },
+      {
+        "accepted_shares": {
+          "ON": 308245068.0,
+          "PN": 0.0
+        },
+        "document": {
+          "cnpj": "45242914000105",
+          "cvm_code": "024848",
+          "id": "91737",
+          "kind": "DFP",
+          "reference": "2019-12-31",
+          "version": "2"
+        },
+        "error": "ValueError: exact original unavailable: non-ZIP response",
+        "fields": [
+          "con.assets",
+          "con.equity"
+        ],
+        "status": "unresolved"
+      },
+      {
+        "accepted_shares": {
+          "ON": 107491070.0,
+          "PN": 0.0
+        },
+        "document": {
+          "cnpj": "07415333000120",
+          "cvm_code": "025003",
+          "id": "93814",
+          "kind": "ITR",
+          "reference": "2020-03-31",
+          "version": "1"
+        },
+        "error": "TimeoutError: The read operation timed out",
+        "fields": [
+          "shares.ON"
+        ],
+        "status": "unresolved"
+      },
+      {
+        "accepted_shares": {
+          "ON": 1800000.0,
+          "PN": 3600000.0
+        },
+        "document": {
+          "cnpj": "61351532000168",
+          "cvm_code": "011975",
+          "id": "94283",
+          "kind": "ITR",
+          "reference": "2019-06-30",
+          "version": "1"
+        },
+        "error": "ValueError: exact original unavailable: non-ZIP response",
+        "fields": [
+          "con.assets",
+          "con.equity"
+        ],
+        "status": "unresolved"
+      },
+      {
+        "accepted_shares": {
+          "ON": 370000000.0,
+          "PN": 0.0
+        },
+        "document": {
+          "cnpj": "64904295000103",
+          "cvm_code": "024228",
+          "id": "94640",
+          "kind": "ITR",
+          "reference": "2020-05-31",
+          "version": "2"
+        },
+        "error": "ValueError: exact original unavailable: non-ZIP response",
+        "fields": [
+          "shares.ON"
+        ],
+        "status": "unresolved"
+      },
+      {
+        "accepted_shares": {
+          "ON": 136846635000.0,
+          "PN": 0.0
+        },
+        "document": {
+          "cnpj": "08797760000183",
+          "cvm_code": "025100",
+          "id": "94983",
+          "kind": "ITR",
+          "reference": "2020-06-30",
+          "version": "1"
+        },
+        "error": "ValueError: exact original unavailable: non-ZIP response",
+        "fields": [
+          "con.assets",
+          "con.equity",
+          "shares.ON"
+        ],
+        "status": "unresolved"
+      },
+      {
+        "accepted_shares": {
+          "ON": 342726580.0,
+          "PN": 0.0
+        },
+        "document": {
+          "cnpj": "06626253000151",
+          "cvm_code": "022608",
+          "id": "94992",
+          "kind": "ITR",
+          "reference": "2020-06-30",
+          "version": "1"
+        },
+        "error": "IncompleteRead: IncompleteRead(28562650 bytes read)",
+        "fields": [
+          "ind.assets",
+          "ind.equity"
+        ],
+        "status": "unresolved"
+      },
+      {
+        "accepted_shares": {
+          "ON": 1800000.0,
+          "PN": 3600000.0
+        },
+        "document": {
+          "cnpj": "61351532000168",
+          "cvm_code": "011975",
+          "id": "95046",
+          "kind": "ITR",
+          "reference": "2020-03-31",
+          "version": "1"
+        },
+        "error": "ValueError: exact original unavailable: non-ZIP response",
+        "fields": [
+          "con.assets",
+          "con.equity"
+        ],
+        "status": "unresolved"
+      },
+      {
+        "accepted_shares": {
+          "ON": 1800000.0,
+          "PN": 3600000.0
+        },
+        "document": {
+          "cnpj": "61351532000168",
+          "cvm_code": "011975",
+          "id": "95179",
+          "kind": "ITR",
+          "reference": "2020-03-31",
+          "version": "2"
+        },
+        "error": "ValueError: exact original unavailable: non-ZIP response",
+        "fields": [
+          "con.assets",
+          "con.equity"
+        ],
+        "status": "unresolved"
+      },
+      {
+        "accepted_shares": {
+          "ON": 2863682710.0,
+          "PN": 272045668.0
+        },
+        "document": {
+          "cnpj": "06164253000187",
+          "cvm_code": "019569",
+          "id": "95617",
+          "kind": "ITR",
+          "reference": "2020-06-30",
+          "version": "2"
+        },
+        "error": "ValueError: exact original unavailable: non-ZIP response",
+        "fields": [
+          "con.assets",
+          "con.equity"
+        ],
+        "status": "unresolved"
+      },
+      {
+        "accepted_shares": {
+          "ON": 107491070.0,
+          "PN": 0.0
+        },
+        "document": {
+          "cnpj": "07415333000120",
+          "cvm_code": "025003",
+          "id": "96303",
+          "kind": "ITR",
+          "reference": "2020-06-30",
+          "version": "1"
+        },
+        "error": "TimeoutError: The read operation timed out",
+        "fields": [
+          "con.assets",
+          "con.equity"
+        ],
+        "status": "unresolved"
+      },
+      {
+        "accepted_shares": {
+          "ON": 107491070.0,
+          "PN": 0.0
+        },
+        "document": {
+          "cnpj": "07415333000120",
+          "cvm_code": "025003",
+          "id": "97108",
+          "kind": "ITR",
+          "reference": "2020-06-30",
+          "version": "2"
+        },
+        "error": "ValueError: exact original unavailable: non-ZIP response",
+        "fields": [
+          "con.assets",
+          "con.equity"
+        ],
+        "status": "unresolved"
+      },
+      {
+        "accepted_shares": {
+          "ON": 154017.0,
+          "PN": 0.0
+        },
+        "document": {
+          "cnpj": "08801621000186",
+          "cvm_code": "021040",
+          "id": "98247",
+          "kind": "ITR",
+          "reference": "2020-09-30",
+          "version": "1"
+        },
+        "error": "ValueError: exact original unavailable: non-ZIP response",
+        "fields": [
+          "con.assets",
+          "con.equity",
+          "shares.ON"
+        ],
+        "status": "unresolved"
+      },
+      {
+        "accepted_shares": {
+          "ON": 214628652.0,
+          "PN": 0.0
+        },
+        "document": {
+          "cnpj": "26462693000128",
+          "cvm_code": "025062",
+          "id": "98359",
+          "kind": "ITR",
+          "reference": "2020-09-30",
+          "version": "1"
+        },
+        "error": "TimeoutError: The read operation timed out",
+        "fields": [
+          "shares.ON"
+        ],
+        "status": "unresolved"
+      },
+      {
+        "accepted_shares": {
+          "ON": 291875088.0,
+          "PN": 0.0
+        },
+        "document": {
+          "cnpj": "08797760000183",
+          "cvm_code": "025100",
+          "id": "98388",
+          "kind": "ITR",
+          "reference": "2020-09-30",
+          "version": "1"
+        },
+        "error": "ValueError: exact original unavailable: non-ZIP response",
+        "fields": [
+          "con.assets",
+          "con.equity",
+          "shares.ON"
+        ],
+        "status": "unresolved"
+      },
+      {
+        "accepted_shares": {
+          "ON": 1762974356.0,
+          "PN": 0.0
+        },
+        "document": {
+          "cnpj": "06047087000139",
+          "cvm_code": "024821",
+          "id": "98628",
+          "kind": "DFP",
+          "reference": "2019-12-31",
+          "version": "2"
+        },
+        "error": "ValueError: exact original unavailable: non-ZIP response",
+        "fields": [
+          "shares.ON"
+        ],
+        "status": "unresolved"
+      },
+      {
+        "accepted_shares": {
+          "ON": 1800000.0,
+          "PN": 3600000.0
+        },
+        "document": {
+          "cnpj": "61351532000168",
+          "cvm_code": "011975",
+          "id": "98670",
+          "kind": "ITR",
+          "reference": "2020-09-30",
+          "version": "1"
+        },
+        "error": "ValueError: exact original unavailable: non-ZIP response",
+        "fields": [
+          "con.assets",
+          "con.equity"
+        ],
+        "status": "unresolved"
+      },
+      {
+        "accepted_shares": {
+          "ON": 123752332.0,
+          "PN": 0.0
+        },
+        "document": {
+          "cnpj": "45365558000109",
+          "cvm_code": "025763",
+          "id": "98745",
+          "kind": "ITR",
+          "reference": "2020-09-30",
+          "version": "1"
+        },
+        "error": "ValueError: exact original unavailable: non-ZIP response",
+        "fields": [
+          "shares.ON"
+        ],
+        "status": "unresolved"
+      },
+      {
+        "accepted_shares": {
+          "ON": 456199.0,
+          "PN": 0.0
+        },
+        "document": {
+          "cnpj": "02635522000195",
+          "cvm_code": "025496",
+          "id": "98984",
+          "kind": "ITR",
+          "reference": "2020-09-30",
+          "version": "1"
+        },
+        "error": "ValueError: exact original unavailable: non-ZIP response",
+        "fields": [
+          "shares.ON"
+        ],
+        "status": "unresolved"
+      },
+      {
+        "accepted_shares": {
+          "ON": 145031080.0,
+          "PN": 128624295.0
+        },
+        "document": {
+          "cnpj": "76483817000120",
+          "cvm_code": "014311",
+          "id": "99259",
+          "kind": "ITR",
+          "reference": "2019-03-31",
+          "version": "2"
+        },
+        "error": "ValueError: exact original unavailable: non-ZIP response",
+        "fields": [
+          "con.assets",
+          "con.equity"
+        ],
+        "status": "unresolved"
+      },
+      {
+        "accepted_shares": {
+          "ON": 506762749.0,
+          "PN": 0.0
+        },
+        "document": {
+          "cnpj": "10215988000160",
+          "cvm_code": "022691",
+          "id": "100384",
+          "kind": "DFP",
+          "reference": "2020-12-31",
+          "version": "2"
+        },
+        "error": "IncompleteRead: IncompleteRead(10896559 bytes read)",
+        "fields": [
+          "con.assets",
+          "con.equity"
+        ],
+        "status": "unresolved"
+      },
+      {
+        "accepted_shares": {
+          "ON": 205470066.0,
+          "PN": 0.0
+        },
+        "document": {
+          "cnpj": "07415333000120",
+          "cvm_code": "025003",
+          "id": "102776",
+          "kind": "DFP",
+          "reference": "2020-12-31",
+          "version": "2"
+        },
+        "error": "IncompleteRead: IncompleteRead(9356133 bytes read)",
+        "fields": [
+          "con.assets",
+          "con.equity"
+        ],
+        "status": "unresolved"
+      },
+      {
+        "accepted_shares": {
+          "ON": 530404251.0,
+          "PN": 0.0
+        },
+        "document": {
+          "cnpj": "58119199000151",
+          "cvm_code": "020125",
+          "id": "103130",
+          "kind": "ITR",
+          "reference": "2021-03-31",
+          "version": "1"
+        },
+        "error": "ValueError: exact original unavailable: non-ZIP response",
+        "fields": [
+          "con.assets",
+          "con.equity",
+          "ind.assets",
+          "ind.equity"
+        ],
+        "status": "unresolved"
+      },
+      {
+        "accepted_shares": {
+          "ON": 506056812.0,
+          "PN": 0.0
+        },
+        "document": {
+          "cnpj": "10215988000160",
+          "cvm_code": "022691",
+          "id": "103182",
+          "kind": "ITR",
+          "reference": "2021-03-31",
+          "version": "1"
+        },
+        "error": "ValueError: exact original unavailable: non-ZIP response",
+        "fields": [
+          "con.assets",
+          "con.equity"
+        ],
+        "status": "unresolved"
+      },
+      {
+        "accepted_shares": {
+          "ON": 506056812.0,
+          "PN": 0.0
+        },
+        "document": {
+          "cnpj": "10215988000160",
+          "cvm_code": "022691",
+          "id": "103219",
+          "kind": "ITR",
+          "reference": "2021-03-31",
+          "version": "2"
+        },
+        "error": "IncompleteRead: IncompleteRead(9818333 bytes read)",
+        "fields": [
+          "con.assets",
+          "con.equity"
+        ],
+        "status": "unresolved"
+      },
+      {
+        "accepted_shares": {
+          "ON": 236286439.0,
+          "PN": 0.0
+        },
+        "document": {
+          "cnpj": "10139870000108",
+          "cvm_code": "025399",
+          "id": "103302",
+          "kind": "ITR",
+          "reference": "2021-03-31",
+          "version": "1"
+        },
+        "error": "ValueError: exact original unavailable: non-ZIP response",
+        "fields": [
+          "con.assets",
+          "con.equity",
+          "ind.assets",
+          "ind.equity"
+        ],
+        "status": "unresolved"
+      },
+      {
+        "accepted_shares": {
+          "ON": 99627000.0,
+          "PN": 0.0
+        },
+        "document": {
+          "cnpj": "16590234000176",
+          "cvm_code": "022349",
+          "id": "106082",
+          "kind": "ITR",
+          "reference": "2021-03-31",
+          "version": "3"
+        },
+        "error": "ValueError: exact original unavailable: non-ZIP response",
+        "fields": [
+          "con.assets",
+          "con.equity"
+        ],
+        "status": "unresolved"
+      },
+      {
+        "accepted_shares": {
+          "ON": 170132930.0,
+          "PN": 0.0
+        },
+        "document": {
+          "cnpj": "09149503000106",
+          "cvm_code": "023426",
+          "id": "108734",
+          "kind": "ITR",
+          "reference": "2020-06-30",
+          "version": "2"
+        },
+        "error": "IncompleteRead: IncompleteRead(20641153 bytes read)",
+        "fields": [
+          "con.assets",
+          "con.equity"
+        ],
+        "status": "unresolved"
+      },
+      {
+        "accepted_shares": {
+          "ON": 195753679.0,
+          "PN": 0.0
+        },
+        "document": {
+          "cnpj": "09149503000106",
+          "cvm_code": "023426",
+          "id": "108736",
+          "kind": "ITR",
+          "reference": "2020-09-30",
+          "version": "2"
+        },
+        "error": "ValueError: exact original unavailable: non-ZIP response",
+        "fields": [
+          "con.assets",
+          "con.equity"
+        ],
+        "status": "unresolved"
+      },
+      {
+        "accepted_shares": {
+          "ON": 533333333.0,
+          "PN": 0.0
+        },
+        "document": {
+          "cnpj": "61409892000173",
+          "cvm_code": "025984",
+          "id": "109637",
+          "kind": "ITR",
+          "reference": "2021-06-30",
+          "version": "4"
+        },
+        "error": "ValueError: exact original unavailable: non-ZIP response",
+        "fields": [
+          "shares.ON"
+        ],
+        "status": "unresolved"
+      },
+      {
+        "accepted_shares": {
+          "ON": 492106495.0,
+          "PN": 0.0
+        },
+        "document": {
+          "cnpj": "37663076000107",
+          "cvm_code": "025640",
+          "id": "112200",
+          "kind": "DFP",
+          "reference": "2021-12-31",
+          "version": "1"
+        },
+        "error": "IncompleteRead: IncompleteRead(9030440 bytes read)",
+        "fields": [
+          "con.assets",
+          "con.equity"
+        ],
+        "status": "unresolved"
+      },
+      {
+        "accepted_shares": {
+          "ON": 492106495.0,
+          "PN": 0.0
+        },
+        "document": {
+          "cnpj": "37663076000107",
+          "cvm_code": "025640",
+          "id": "112240",
+          "kind": "DFP",
+          "reference": "2021-12-31",
+          "version": "2"
+        },
+        "error": "TimeoutError: The read operation timed out",
+        "fields": [
+          "con.assets",
+          "con.equity"
+        ],
+        "status": "unresolved"
+      },
+      {
+        "accepted_shares": {
+          "ON": 379181000.0,
+          "PN": 0.0
+        },
+        "document": {
+          "cnpj": "17281106000103",
+          "cvm_code": "019445",
+          "id": "116984",
+          "kind": "DFP",
+          "reference": "2021-12-31",
+          "version": "3"
+        },
+        "error": "ValueError: exact original unavailable: non-ZIP response",
+        "fields": [
+          "shares.ON"
+        ],
+        "status": "unresolved"
+      },
+      {
+        "accepted_shares": {
+          "ON": 192397000.0,
+          "PN": 0.0
+        },
+        "document": {
+          "cnpj": "67571414000141",
+          "cvm_code": "020702",
+          "id": "124920",
+          "kind": "DFP",
+          "reference": "2022-12-31",
+          "version": "2"
+        },
+        "error": "IncompleteRead: IncompleteRead(8750947 bytes read)",
+        "fields": [
+          "shares.ON"
+        ],
+        "status": "unresolved"
+      },
+      {
+        "accepted_shares": {
+          "ON": 234784492000.0,
+          "PN": 0.0
+        },
+        "document": {
+          "cnpj": "67571414000141",
+          "cvm_code": "020702",
+          "id": "126353",
+          "kind": "ITR",
+          "reference": "2023-03-31",
+          "version": "1"
+        },
+        "error": "IncompleteRead: IncompleteRead(108129313 bytes read)",
+        "fields": [
+          "shares.ON"
+        ],
+        "status": "unresolved"
+      },
+      {
+        "accepted_shares": {
+          "ON": 115208000.0,
+          "PN": 0.0
+        },
+        "document": {
+          "cnpj": "08170849000115",
+          "cvm_code": "026026",
+          "id": "126749",
+          "kind": "ITR",
+          "reference": "2023-03-31",
+          "version": "1"
+        },
+        "error": "ValueError: exact original unavailable: non-ZIP response",
+        "fields": [
+          "shares.ON"
+        ],
+        "status": "unresolved"
+      },
+      {
+        "accepted_shares": {
+          "ON": 451668652.0,
+          "PN": 345060338.0
+        },
+        "document": {
+          "cnpj": "42150391000170",
+          "cvm_code": "004820",
+          "id": "131980",
+          "kind": "ITR",
+          "reference": "2023-09-30",
+          "version": "1"
+        },
+        "error": "ValueError: exact original unavailable: non-ZIP response",
+        "fields": [
+          "con.assets",
+          "con.equity"
+        ],
+        "status": "unresolved"
+      },
+      {
+        "accepted_shares": {
+          "ON": 451668652.0,
+          "PN": 345060338.0
+        },
+        "document": {
+          "cnpj": "42150391000170",
+          "cvm_code": "004820",
+          "id": "134849",
+          "kind": "DFP",
+          "reference": "2023-12-31",
+          "version": "1"
+        },
+        "error": "ValueError: exact original unavailable: non-ZIP response",
+        "fields": [
+          "con.assets",
+          "con.equity"
+        ],
+        "status": "unresolved"
+      },
+      {
+        "accepted_shares": {
+          "ON": 451668652.0,
+          "PN": 345060338.0
+        },
+        "document": {
+          "cnpj": "42150391000170",
+          "cvm_code": "004820",
+          "id": "137259",
+          "kind": "ITR",
+          "reference": "2024-03-31",
+          "version": "2"
+        },
+        "error": "ValueError: exact original unavailable: non-ZIP response",
+        "fields": [
+          "con.assets",
+          "con.equity"
+        ],
+        "status": "unresolved"
+      },
+      {
+        "accepted_shares": {
+          "ON": 451668652.0,
+          "PN": 345060338.0
+        },
+        "document": {
+          "cnpj": "42150391000170",
+          "cvm_code": "004820",
+          "id": "137260",
+          "kind": "DFP",
+          "reference": "2023-12-31",
+          "version": "2"
+        },
+        "error": "ValueError: exact original unavailable: non-ZIP response",
+        "fields": [
+          "con.assets",
+          "con.equity"
+        ],
+        "status": "unresolved"
+      },
+      {
+        "accepted_shares": {
+          "ON": 451668652.0,
+          "PN": 345539155.0
+        },
+        "document": {
+          "cnpj": "42150391000170",
+          "cvm_code": "004820",
+          "id": "139362",
+          "kind": "DFP",
+          "reference": "2023-12-31",
+          "version": "3"
+        },
+        "error": "ValueError: exact original unavailable: non-ZIP response",
+        "fields": [
+          "con.assets",
+          "con.equity"
+        ],
+        "status": "unresolved"
+      }
+    ]
+  }
+}

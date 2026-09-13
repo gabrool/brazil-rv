@@ -248,7 +248,7 @@ class CharacteristicModel(nn.Module):
         for name, encoder in self.families.items():
             values, valid, age = supplied[name]
             valid = valid.bool() & active[..., None]
-            present = valid.any(dim=-1, keepdim=True)
+            present = (valid | (age >= 0)).any(dim=-1, keepdim=True) & active[..., None]
             encoded = encoder(encode_values(values, valid, age))
             parts.extend(
                 (torch.where(present, encoded, 0.0), present.to(encoded.dtype))

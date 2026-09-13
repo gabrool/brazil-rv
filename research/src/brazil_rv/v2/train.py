@@ -69,7 +69,7 @@ from .data import (
 from .losses import multi_horizon_loss, multi_horizon_loss_normalizers
 from .model import DailyMultiHorizonModel
 from .normalization import average_ranks
-from .round5_magnitude import FitClip
+from .round7_preprocessing import Round7Preprocessing
 from .splits import development_folds
 
 
@@ -550,7 +550,7 @@ def _verify_additive_parent_transfer(source_contract, fine_contract, store_roots
             "sidecar_encoding",
             "enabled_sidecar_groups",
             "ordered_sidecar_names",
-            "magnitude_clip",
+            "input_preprocessing",
         ):
             features.pop(name, None)
         identity["features"] = features
@@ -647,15 +647,15 @@ def load_pretrain_handoff(
             _input_static_identity(pretrain_inputs),
             _input_static_identity(fine_inputs),
         ]
-        # Each stage estimates clipping from its own fit dates. Its frozen
-        # bounds remain part of scoring identity, not P/F structural identity.
+        # Fit-date/support provenance changes at F; established scales are
+        # inherited by the fitter and remain part of frozen scoring identity.
         for identity in identities:
             features = identity.get("features")
             if isinstance(features, Mapping):
                 identity["features"] = {
                     name: value
                     for name, value in features.items()
-                    if name != "magnitude_clip"
+                    if name != "input_preprocessing"
                 }
         if parent_store_roots is None and identities[0] != identities[1]:
             raise ValueError("stage-P and stage-F store/feature identities differ")
@@ -1242,18 +1242,12 @@ def _loader_input_payload(
                     candidate, "external_artifact_resolutions", ()
                 )
             ]
-            magnitude_provenance = {}
-            if "magnitudes" in enabled_sidecars:
-                clip = getattr(candidate, "magnitude_clip", None)
-                if not isinstance(clip, FitClip):
-                    raise ValueError(
-                        "magnitude inputs require frozen fit clipping bounds"
-                    )
-                if clip.lower.size != len(sidecar_names["magnitudes"]):
-                    raise ValueError(
-                        "magnitude clipping width differs from store fields"
-                    )
-                magnitude_provenance["magnitude_clip"] = clip.payload()
+            preprocessing_provenance = {}
+            if enabled_sidecars:
+                preparation = candidate.input_preprocessing
+                if preparation is None:
+                    raise ValueError("sidecar inputs require frozen fit conditioning")
+                preprocessing_provenance["input_preprocessing"] = preparation.payload()
             return {
                 "schema": MODEL_INPUT_SCHEMA,
                 "store": {
@@ -1274,7 +1268,7 @@ def _loader_input_payload(
                     "sidecar_encoding": "masked_zero_initialized_residual_projection",
                     "enabled_sidecar_groups": list(enabled_sidecars),
                     "ordered_sidecar_names": sidecar_names,
-                    **magnitude_provenance,
+                    **preprocessing_provenance,
                     "ordered_intraday_names": intraday_names,
                     "ordered_native_fast_names": native_fast_names,
                     "ordered_common_state_names": common_names,
@@ -1485,41 +1479,39 @@ def stage_p_model_config(config: ModelConfig) -> ModelConfig:
     )
 
 
-def _magnitude_dataset(loader: object) -> V2DailyDataset | None:
+def _sidecar_dataset(loader: object) -> V2DailyDataset | None:
     candidate: object | None = loader
     seen: set[int] = set()
     while candidate is not None and id(candidate) not in seen:
         seen.add(id(candidate))
         if isinstance(candidate, V2DailyDataset):
-            return candidate if "magnitudes" in candidate.enabled_sidecars else None
+            return candidate if candidate.enabled_sidecars else None
         candidate = getattr(candidate, "dataset", None)
     return None
 
 
-def _fit_magnitude_clip(train_loader: object, selection_loader: object) -> None:
-    training = _magnitude_dataset(train_loader)
-    selection = _magnitude_dataset(selection_loader)
+def _fit_input_preprocessing(
+    train_loader: object, selection_loader: object, parent=None
+) -> None:
+    training = _sidecar_dataset(train_loader)
+    selection = _sidecar_dataset(selection_loader)
     if training is None:
         return
-    indices = training.date_indices
-    # Read only authorized fit rows, excluding history, embargo and selection.
-    fit = FitClip.fit(
-        training.store.read("sidecar_magnitudes_values", indices),
-        training.store.read("sidecar_magnitudes_valid", indices),
-        training.store.read("active", indices),
-        np.arange(indices.size),
+    training.input_preprocessing = Round7Preprocessing.fit(
+        training, split_common=False, parent=parent
     )
-    training.magnitude_clip = FitClip(fit.lower, fit.upper, tuple(indices.tolist()))
     if selection is not None:
-        selection.magnitude_clip = training.magnitude_clip
+        selection.input_preprocessing = training.input_preprocessing
 
 
 def build_checkpoint_input_contract(
     model_config: ModelConfig,
     train_loader: Iterable[Mapping[str, object]],
     selection_loader: Iterable[Mapping[str, object]],
+    *,
+    parent_preprocessing=None,
 ) -> dict[str, object]:
-    _fit_magnitude_clip(train_loader, selection_loader)
+    _fit_input_preprocessing(train_loader, selection_loader, parent_preprocessing)
     training = _loader_input_payload(train_loader)
     selection = _loader_input_payload(selection_loader)
     if training is None or selection is None:
@@ -1975,8 +1967,21 @@ def train_stage(
         raise ValueError("v2 training cannot access the sealed test window")
     if official_validation_accessed:
         raise ValueError("v2 training/selection cannot access official validation")
+    parent_preprocessing = None
+    if pretrain_checkpoint is not None:
+        if sha256_file(pretrain_checkpoint) != expected_pretrain_sha256:
+            raise ValueError("Stage-P checkpoint hash differs")
+        parent_input = _verified_checkpoint_input_contract(
+            torch.load(pretrain_checkpoint, map_location="cpu", weights_only=True)
+        )
+        preparation = parent_input["training"]["features"].get("input_preprocessing")
+        if preparation is not None:
+            parent_preprocessing = Round7Preprocessing.from_payload(preparation)
     checkpoint_input_contract = build_checkpoint_input_contract(
-        model_config, train_loader, selection_loader
+        model_config,
+        train_loader,
+        selection_loader,
+        parent_preprocessing=parent_preprocessing,
     )
     input_stores = {
         name: checkpoint_input_contract[name] for name in ("training", "selection")

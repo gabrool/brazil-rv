@@ -155,7 +155,7 @@ def _panel(frame, path, family, names, days, isins):
         "raw_age": age,
         "values": values,
         "mask": mask,
-        "age": np.where(mask, age, -1),
+        "age": age,
     }
 
 
@@ -204,6 +204,29 @@ def _before_equal(left, right, first):
             ), (family, array)
 
 
+def test_missing_balance_fields_do_not_suppress_current_flows_or_sue():
+    days, _, identity, documents, rad, market = _fixture("15_44")
+    baseline, _ = fundamental_features(deepcopy(documents), rad, identity, days, market)
+    for field in ("assets", "equity", "minority_equity"):
+        del documents[-1]["accounts"]["con"][field]
+    changed, _ = fundamental_features(documents, rad, identity, days, market)
+    base_name = baseline.filter(pl.col("isin") == "BRFIXTURE000")
+    changed_name = changed.filter(pl.col("isin") == "BRFIXTURE000")
+    for feature in ("earnings_yield_ttm", "revenue_growth_yoy", "sue"):
+        assert changed_name[feature].equals(base_name[feature])
+        assert changed_name[feature + "_age_sessions"].equals(
+            base_name[feature + "_age_sessions"]
+        )
+    # Missing current assets use the earlier coherent ratio, with its own clock.
+    assert (
+        changed_name["gross_profitability"][2] == changed_name["gross_profitability"][1]
+    )
+    assert changed_name["gross_profitability_age_sessions"][2] == (
+        changed_name["gross_profitability_age_sessions"][1] + 1
+    )
+    assert changed_name["incomplete_latest_statement_flag"][2] == 1
+
+
 def _clock_evidence(output, clock, first):
     fixture = _fixture(clock)
     baseline, audit = _run(output / "baseline", "baseline", fixture)
@@ -236,23 +259,25 @@ def _clock_evidence(output, clock, first):
             assert panel["raw_age"][first, 0, column] == 0
             assert panel["age"][first, 0, column] == 0
             assert panel["age"][first + 1, 0, column] == 1
-    # The TTM bridge also consumes already published annual/prior-YTD history.
-    assert f["age"][first, 0, FUNDAMENTALS.index("earnings_yield_ttm")] == first
+    # The feature becomes fresh on arrival; old dependency age is separate.
+    assert f["age"][first, 0, FUNDAMENTALS.index("earnings_yield_ttm")] == 0
     missing = changes["financial_missing"]["fundamentals"]
     for name in (
         "log_market_cap",
         "book_to_market",
         "earnings_yield_ttm",
-        "liabilities_to_assets",
     ):
         column = FUNDAMENTALS.index(name)
         assert not missing["raw_mask"][first, 0, column]
         assert not missing["mask"][first, 0, column]
-        assert missing["raw_age"][first, 0, column] == -1
-        assert missing["age"][first, 0, column] == -1
+        assert missing["raw_age"][first, 0, column] >= 0
+        assert missing["age"][first, 0, column] >= 0
         assert missing["mask"][
             first, 1:, column
         ].all()  # Remaining23 pass actual20-name minimum.
+    liabilities = FUNDAMENTALS.index("liabilities_to_assets")
+    assert missing["mask"][first, 0, liabilities]
+    assert missing["raw_age"][first, 0, liabilities] > 0
 
     e, removed = baseline["events"], changes["material_fact_missing"]["events"]
     for name in ("sessions_since_material_fact", "dividend_announcement_age"):

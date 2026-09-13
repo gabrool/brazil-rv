@@ -45,9 +45,9 @@ def synthetic_samples(sample):
         * sample["sidecar_oddlot_values"][:, 0],
         0.0,
     )
-    native = sample["sidecar_fundamentals_native_values"][:, 2]
-    native_valid = sample["sidecar_fundamentals_native_valid"][:, 2]
-    family_signal += np.where(native_valid, 0.5 * (native > 0.2), 0.0)
+    earnings = sample["sidecar_fundamentals_values"][:, 2]
+    earnings_valid = sample["sidecar_fundamentals_valid"][:, 2]
+    family_signal += np.where(earnings_valid, 0.5 * (earnings > 0.2), 0.0)
     family_target = np.zeros_like(target)
     family_target[active] = midrank_unit_interval(family_signal[active])[:, None]
     keep = {
@@ -100,7 +100,6 @@ def run(store_root, output, *, device, cells, maximum_steps=120):
     )
     try:
         preparation = Round7Preprocessing.fit(dataset, split_common=True)
-        dataset.magnitude_clip = preparation.magnitude
         width = stage_name_count(dataset)
         # CUDA acceptance uses a complete 16-date batch, with distinct real dates.
         # CPU keeps the bounded one-date engineering fixture already reported.
@@ -121,9 +120,8 @@ def run(store_root, output, *, device, cells, maximum_steps=120):
                 preparation
                 if characteristic and cell["inputs"] == "all"
                 else Round7Preprocessing(
-                    preparation.native if cell["inputs"] == "all" else None,
-                    None,
-                    preparation.magnitude if cell["inputs"] == "all" else None,
+                    preparation.families if cell["inputs"] == "all" else {},
+                    feature_names=preparation.feature_names,
                 )
             )
             batch = model_batch(prep.collate(inputs, fixed_name_count=width), device)

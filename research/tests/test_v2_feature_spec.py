@@ -3,6 +3,7 @@ from dataclasses import replace
 
 from brazil_rv.v2.feature_spec import (
     FeatureSpec,
+    decode_history_age,
     feature_schema_sha256,
     feature_specs,
     native_fast_feature_specs,
@@ -15,6 +16,20 @@ from brazil_rv.v2.contract import (
     SLOW_FEATURES,
 )
 from brazil_rv.v2.intraday_features import NATIVE_FAST_FEATURES
+
+
+def test_history_age_decodes_new_uncapped_and_sealed_legacy_coordinates():
+    ages = np.array([0, 1, 59, 60, 61, 252, 1260, 4000])
+    logs = np.log1p(ages)
+    values = (logs / (logs + np.log1p(252))).astype(np.float32)
+    np.testing.assert_array_equal(
+        np.rint(decode_history_age(values, feature_version="decision_feature_3")), ages
+    )
+    old = (np.log1p(np.minimum(ages, 252)) / np.log1p(252)).astype(np.float32)
+    np.testing.assert_array_equal(
+        np.rint(decode_history_age(old, feature_version="decision_feature_2")),
+        np.minimum(ages, 252),
+    )
 
 
 def test_typed_transforms_keep_zero_distinct_from_missing() -> None:
@@ -44,7 +59,7 @@ def test_typed_transforms_keep_zero_distinct_from_missing() -> None:
     np.testing.assert_allclose(output[0, :, 0], [0.0, 1.0])
     np.testing.assert_allclose(output[0, :, 1], [-1.0, 1.0])
     assert output[0, 0, 2] == 0.0 and not output_valid[0, 0, 2]
-    assert output[0, 1, 2] == 1.0 and output_valid[0, 1, 2]
+    assert output[0, 1, 2] == 0.5 and output_valid[0, 1, 2]
     assert output[0, 0, 3] == 0.0 and output_valid[0, 0, 3]
     assert output[0, 1, 3] == np.float32(np.arcsinh(1.0))
 

@@ -757,9 +757,18 @@ def apply_account_unit_dispositions(root: Path, documents: list[dict]) -> dict |
                 raise ValueError("Account unit correction evidence hash differs")
         accounts = document.get("accounts", {})
         snapshot = json.loads(json.dumps(accounts, default=str))
+        multiplier = float(record["multiplier"])
+        corrected = json.loads(json.dumps(record["accounts_before"]))
+        for metrics in corrected.values():
+            for account in metrics.values():
+                account["value"] *= multiplier
+        if accounts and snapshot == corrected:
+            # A parser repair can now recover the same own-note units directly.
+            # Exact full-row equality prevents multiplying that correction twice.
+            applied.append(identifier)
+            continue
         if not accounts or snapshot != record["accounts_before"]:
             raise ValueError("Account unit correction differs from the reviewed rows")
-        multiplier = float(record["multiplier"])
         if not np.isfinite(multiplier) or multiplier <= 0:
             raise ValueError("Account currency multiplier must preserve amount signs")
         for metrics in accounts.values():
@@ -1486,9 +1495,12 @@ def fiscal_quarters(
     metric: str,
     source_indices: dict[date, int] | None = None,
     source_versions: dict[date, int] | None = None,
+    newest_source_indices: dict[date, int] | None = None,
 ) -> dict[date, float]:
     cumulative = {}
-    for document in ledger.values():
+    for document in sorted(
+        ledger.values(), key=lambda d: (d["version"], d.get("available_index", 0))
+    ):
         account = flow_account(document, basis, metric)
         if account is None or account["start"] is None:
             continue
@@ -1523,6 +1535,10 @@ def fiscal_quarters(
                 source_versions[account["end"]] = (
                     max(source_version, prior[2]) if prior else source_version
                 )
+            if newest_source_indices is not None:
+                newest_source_indices[account["end"]] = (
+                    max(source_index, prior[1]) if prior else source_index
+                )
     return quarters
 
 
@@ -1532,6 +1548,7 @@ def trailing_twelve_months(
     metric: str,
     end: date,
     source_versions: list[int] | None = None,
+    source_receipts: list[int] | None = None,
 ) -> tuple[float | None, int | None]:
     """Annual flow directly, otherwise current YTD + prior annual − prior YTD.
 
@@ -1571,6 +1588,8 @@ def trailing_twelve_months(
     if months == 12:
         if source_versions is not None:
             source_versions.append(source_version)
+        if source_receipts is not None:
+            source_receipts.append(source_index)
         return account["value"], source_index
     if months not in (3, 6, 9):
         return None, None
@@ -1587,12 +1606,14 @@ def trailing_twelve_months(
         return None, None
     if source_versions is not None:
         source_versions.extend((source_version, annual[2], prior_ytd[2]))
+    if source_receipts is not None:
+        source_receipts.extend((source_index, annual[1], prior_ytd[1]))
     return account["value"] + annual[0]["value"] - prior_ytd[0]["value"], min(
         source_index, annual[1], prior_ytd[1]
     )
 
 
-def fundamental_state(ledger: dict, sector: str | None = None) -> dict:
+def _fundamental_snapshot(ledger: dict, sector: str | None = None) -> dict:
     """All inputs are documents already received at the current decision.
 
     Missing original contents are not backdated from a later version. Annual
@@ -1606,28 +1627,24 @@ def fundamental_state(ledger: dict, sector: str | None = None) -> dict:
     latest = max(ledger.values(), key=lambda d: (d["reference"], d["version"]))
     end = latest["reference"]
     basis = next(
-        (
-            b
-            for b in ("con", "ind")
-            if "assets" in latest.get("accounts", {}).get(b, {})
-            and "equity" in latest["accounts"][b]
-        ),
+        (b for b in ("con", "ind") if latest.get("accounts", {}).get(b)),
         None,
     )
     if basis is None:
         return result
     stocks = latest["accounts"][basis]
-    assets, equity = stocks["assets"]["value"], stocks["equity"]["value"]
-    if assets <= 0:
-        return result
-    result["liabilities_to_assets"] = 1 - equity / assets
+    assets = stocks.get("assets", {}).get("value")
+    equity = stocks.get("equity", {}).get("value")
+    positive_assets = assets is not None and assets > 0
+    if positive_assets and equity is not None:
+        result["liabilities_to_assets"] = 1 - equity / assets
     result["_book_equity"] = (
         equity
         if basis == "ind"
         else stocks["parent_equity"]["value"]
         if "parent_equity" in stocks
         else equity - stocks["minority_equity"]["value"]
-        if "minority_equity" in stocks
+        if equity is not None and "minority_equity" in stocks
         else None
     )
     result["_basis_consolidated"] = float(basis == "con")
@@ -1635,14 +1652,20 @@ def fundamental_state(ledger: dict, sector: str | None = None) -> dict:
     result["_version"] = latest["version"]
     result["_balance_source_index"] = latest.get("available_index", 0)
     flow_sources = defaultdict(dict)
+    flow_newest = defaultdict(dict)
     flow_versions = defaultdict(dict)
     flow = {
-        m: fiscal_quarters(ledger, basis, m, flow_sources[m], flow_versions[m])
+        m: fiscal_quarters(
+            ledger, basis, m, flow_sources[m], flow_versions[m], flow_newest[m]
+        )
         for m in ("net_income", "parent_income")
     }
     ttm_versions = defaultdict(list)
+    ttm_receipts = defaultdict(list)
     ttm_values = {
-        m: trailing_twelve_months(ledger, basis, m, end, ttm_versions[m])
+        m: trailing_twelve_months(
+            ledger, basis, m, end, ttm_versions[m], ttm_receipts[m]
+        )
         for m in ("revenue", "gross_profit", "net_income", "parent_income", "cash_flow")
     }
     ttm = {m: value[0] for m, value in ttm_values.items()}
@@ -1654,6 +1677,7 @@ def fundamental_state(ledger: dict, sector: str | None = None) -> dict:
         "liabilities_to_assets": latest["version"] > 1,
         "book_to_market": latest["version"] > 1,
     }
+    newest_indices = dict(source_indices)
 
     def ttm_source(metric, endpoint):
         return (
@@ -1662,7 +1686,10 @@ def fundamental_state(ledger: dict, sector: str | None = None) -> dict:
             else trailing_twelve_months(ledger, basis, metric, endpoint)[1]
         )
 
-    if ttm["gross_profit"] is not None:
+    if ttm["gross_profit"] is not None and positive_assets:
+        newest_indices["gross_profitability"] = max(
+            latest.get("available_index", 0), *ttm_receipts["gross_profit"]
+        )
         source_indices["gross_profitability"] = min(
             latest.get("available_index", 0), ttm_source("gross_profit", end)
         )
@@ -1671,21 +1698,28 @@ def fundamental_state(ledger: dict, sector: str | None = None) -> dict:
         )
     earnings_metric = "parent_income" if basis == "con" else "net_income"
     if ttm[earnings_metric] is not None:
+        newest_indices["earnings_yield_ttm"] = max(ttm_receipts[earnings_metric])
         source_indices["earnings_yield_ttm"] = ttm_source(earnings_metric, end)
         restated["earnings_yield_ttm"] = any(
             v > 1 for v in ttm_versions[earnings_metric]
         )
     result["_earnings_ttm"] = ttm[earnings_metric]
     previous_year = year_before(end)
-    past_asset_documents = [
-        d
-        for d in ledger.values()
-        if d["reference"] == previous_year
-        and "assets" in d.get("accounts", {}).get(basis, {})
-    ]
+    past_assets = max(
+        (
+            d
+            for d in ledger.values()
+            if d["reference"] == previous_year
+            and "assets" in d.get("accounts", {}).get(basis, {})
+        ),
+        key=lambda d: (d["version"], d.get("available_index", 0)),
+        default=None,
+    )
     average_assets = (
-        (assets + past_asset_documents[-1]["accounts"][basis]["assets"]["value"]) / 2
-        if past_asset_documents
+        (assets + past_assets["accounts"][basis]["assets"]["value"]) / 2
+        if positive_assets
+        and past_assets
+        and past_assets["accounts"][basis]["assets"]["value"] > 0
         else None
     )
     sector_text = normalized(sector or "")
@@ -1701,7 +1735,7 @@ def fundamental_state(ledger: dict, sector: str | None = None) -> dict:
     )
     # The published statement can identify a financial accounting chart before
     # a dated sector cadastre is available; no modern sector backprojection.
-    statement_financial = stocks["equity"].get("source_code") in {
+    statement_financial = stocks.get("equity", {}).get("source_code") in {
         "2.05",
         "2.07",
         "2.08",
@@ -1723,12 +1757,18 @@ def fundamental_state(ledger: dict, sector: str | None = None) -> dict:
         if statement_financial or sector is None
         else None
     )
-    if ttm["gross_profit"] is not None and gross_comparable:
+    if ttm["gross_profit"] is not None and gross_comparable and positive_assets:
         result["gross_profitability"] = ttm["gross_profit"] / assets
     if not financial:
         prior_revenue_versions = []
+        prior_revenue_receipts = []
         prior_revenue = trailing_twelve_months(
-            ledger, basis, "revenue", previous_year, prior_revenue_versions
+            ledger,
+            basis,
+            "revenue",
+            previous_year,
+            prior_revenue_versions,
+            prior_revenue_receipts,
         )[0]
         if ttm["revenue"] is not None and prior_revenue not in (None, 0):
             result["revenue_growth_yoy"] = (ttm["revenue"] - prior_revenue) / abs(
@@ -1736,6 +1776,9 @@ def fundamental_state(ledger: dict, sector: str | None = None) -> dict:
             )
             source_indices["revenue_growth_yoy"] = min(
                 ttm_source("revenue", end), ttm_source("revenue", previous_year)
+            )
+            newest_indices["revenue_growth_yoy"] = max(
+                ttm_receipts["revenue"] + prior_revenue_receipts
             )
             restated["revenue_growth_yoy"] = any(
                 v > 1 for v in ttm_versions["revenue"] + prior_revenue_versions
@@ -1753,16 +1796,17 @@ def fundamental_state(ledger: dict, sector: str | None = None) -> dict:
                 latest.get("available_index", 0),
                 ttm_source("net_income", end),
                 ttm_source("cash_flow", end),
-                *[
-                    d.get("available_index", 0)
-                    for d in ledger.values()
-                    if d["reference"] == previous_year
-                    and "assets" in d.get("accounts", {}).get(basis, {})
-                ],
+                past_assets.get("available_index", 0),
+            )
+            newest_indices["accruals_to_assets"] = max(
+                latest.get("available_index", 0),
+                *ttm_receipts["net_income"],
+                *ttm_receipts["cash_flow"],
+                past_assets.get("available_index", 0),
             )
             restated["accruals_to_assets"] = (
                 latest["version"] > 1
-                or past_asset_documents[-1]["version"] > 1
+                or past_assets["version"] > 1
                 or any(
                     v > 1
                     for v in ttm_versions["net_income"] + ttm_versions["cash_flow"]
@@ -1790,13 +1834,101 @@ def fundamental_state(ledger: dict, sector: str | None = None) -> dict:
                 for ending in [*prior, end]
                 for d in (ending, year_before(ending))
             )
+            newest_indices["sue"] = max(
+                flow_newest[sue_metric][d]
+                for ending in [*prior, end]
+                for d in (ending, year_before(ending))
+            )
             restated["sue"] = any(
                 flow_versions[sue_metric][d] > 1
                 for ending in [*prior, end]
                 for d in (ending, year_before(ending))
             )
     result["_feature_source_indices"] = source_indices
+    result["_feature_update_indices"] = newest_indices
+    result["_feature_reference_dates"] = dict.fromkeys(source_indices, end)
     result["_feature_has_later_version"] = restated
+    return result
+
+
+def fundamental_state(ledger: dict, sector: str | None = None) -> dict:
+    """Latest coherent calculation per field using only already-public books.
+
+    A new incomplete filing does not withdraw earlier public information. Each
+    fallback recomputes a complete historical-period calculation with versions
+    already in this ledger; it never mixes newer assets with older cash flows.
+    Per-field reference dates and both dependency clocks travel with the value.
+    """
+    result = _fundamental_snapshot(ledger, sector)
+    if not ledger:
+        return result
+    fields = {
+        "book_to_market": "_book_equity",
+        "earnings_yield_ttm": "_earnings_ttm",
+        **{
+            k: k
+            for k in (
+                "gross_profitability",
+                "liabilities_to_assets",
+                "accruals_to_assets",
+                "revenue_growth_yoy",
+                "sue",
+            )
+        },
+    }
+    missing = {f for f, key in fields.items() if result.get(key) is None}
+    # Insufficient warmup for SUE is not an incomplete filing. Signal actual
+    # source incompleteness or use of an earlier coherent field calculation.
+    result["_incomplete_latest"] = float(result.get("_reference") is None)
+    # These two industrial ratios have no comparable bank/insurer definition.
+    if result.get("_financial"):
+        missing -= {"accruals_to_assets", "revenue_growth_yoy"}
+    candidates = sorted(
+        {(d["reference"], d["version"]) for d in ledger.values()}, reverse=True
+    )
+    for end, version in candidates[1:]:
+        if not missing:
+            break
+        earlier = _fundamental_snapshot(
+            {
+                k: d
+                for k, d in ledger.items()
+                if d["reference"] < end
+                or (d["reference"] == end and d["version"] <= version)
+            },
+            sector,
+        )
+        if (
+            earlier.get("_financial") != result.get("_financial")
+            and result.get("_financial") is not None
+        ):
+            continue
+        for feature in tuple(missing):
+            key = fields[feature]
+            if earlier.get(key) is None:
+                continue
+            result[key] = earlier[key]
+            result["_incomplete_latest"] = 1.0
+            for provenance in (
+                "_feature_source_indices",
+                "_feature_update_indices",
+                "_feature_reference_dates",
+                "_feature_has_later_version",
+            ):
+                result.setdefault(provenance, {})[feature] = earlier[provenance][
+                    feature
+                ]
+            missing.remove(feature)
+        if result.get("_reference") is None and earlier.get("_reference") is not None:
+            for key in (
+                "_reference",
+                "_version",
+                "_balance_source_index",
+                "_basis_consolidated",
+                "_financial",
+                "_financial_statement_source_index",
+            ):
+                result[key] = earlier.get(key)
     return result
 
 
@@ -1942,7 +2074,9 @@ def fundamental_features(
             while cursor < len(source) and source[cursor]["available_index"] <= index:
                 d = source[cursor]
                 cursor += 1
-                slot = (d["kind"], d["reference"])
+                # Retain already-public earlier versions for explicit fallback
+                # when a later receipt has incomplete recoverable contents.
+                slot = (d["kind"], d["reference"], d["version"])
                 prior = ledger.get(slot)
                 if prior is None or (
                     d["version"],
@@ -1982,6 +2116,8 @@ def fundamental_features(
                 key=lambda d: (d["reference"], d["version"]),
                 default=None,
             )
+            if capital_index is None and capital_document is not None:
+                capital_index = capital_document["available_index"]
             capital_later_version = (
                 capital_document is not None and capital_document["version"] > 1
             )
@@ -2018,11 +2154,15 @@ def fundamental_features(
                     ):
                         if cached.get(numerator) is not None:
                             record[feature] = cached[numerator] / market_cap
-                # Ages identify the oldest contributing publication. Daily
-                # price revaluation never resets the filing/capital age.
+                # Freshness is the newest required publication, separate from
+                # the oldest dependency and economic reference period. Daily
+                # revaluation does not pretend a new filing was published.
                 balance_index = cached.get("_balance_source_index")
                 for feature in FEATURES_FUNDAMENTALS:
-                    source_index = cached.get("_feature_source_indices", {}).get(
+                    source_index = cached.get("_feature_update_indices", {}).get(
+                        feature
+                    )
+                    dependency_index = cached.get("_feature_source_indices", {}).get(
                         feature
                     )
                     if feature in (
@@ -2031,17 +2171,54 @@ def fundamental_features(
                         "earnings_yield_ttm",
                     ):
                         source_index = (
-                            min(source_index, capital_index)
+                            max(source_index, capital_index)
                             if source_index is not None and capital_index is not None
+                            else capital_index
+                        )
+                        dependency_index = (
+                            min(dependency_index, capital_index)
+                            if dependency_index is not None
+                            and capital_index is not None
                             else capital_index
                         )
                     if feature == "statement_age_sessions":
                         source_index = latest_index
+                        dependency_index = latest_index
                     record[feature + "_age_sessions"] = (
                         float(index - source_index)
-                        if record[feature] is not None and source_index is not None
+                        if source_index is not None
                         else None
                     )
+                    record[feature + "_oldest_dependency_age_sessions"] = (
+                        float(index - dependency_index)
+                        if dependency_index is not None
+                        else None
+                    )
+                    reference = cached.get("_feature_reference_dates", {}).get(feature)
+                    record[feature + "_reference_age_sessions"] = (
+                        float(index - bisect.bisect_left(sessions, reference))
+                        if reference is not None
+                        else None
+                    )
+                record["earnings_negative_flag"] = (
+                    float(cached["_earnings_ttm"] < 0)
+                    if cached.get("_earnings_ttm") is not None
+                    else None
+                )
+                earnings_index = cached.get("_feature_update_indices", {}).get(
+                    "earnings_yield_ttm"
+                )
+                record["earnings_negative_flag_age_sessions"] = (
+                    float(index - earnings_index)
+                    if earnings_index is not None
+                    else None
+                )
+                record["incomplete_latest_statement_flag"] = cached.get(
+                    "_incomplete_latest"
+                )
+                record["incomplete_latest_statement_flag_age_sessions"] = (
+                    float(index - latest_index) if latest_index is not None else None
+                )
                 record["fundamental_financial_flag_age_sessions"] = (
                     float(index - min(financial_source_indices))
                     if record["fundamental_financial_flag"] is not None
@@ -2093,6 +2270,17 @@ def fundamental_features(
             "isin": pl.String,
             **dict.fromkeys(FEATURES_FUNDAMENTALS, pl.Float64),
             **{f + "_age_sessions": pl.Float64 for f in FEATURES_FUNDAMENTALS},
+            **{
+                f + "_oldest_dependency_age_sessions": pl.Float64
+                for f in FEATURES_FUNDAMENTALS
+            },
+            **{
+                f + "_reference_age_sessions": pl.Float64 for f in FEATURES_FUNDAMENTALS
+            },
+            "earnings_negative_flag": pl.Float64,
+            "earnings_negative_flag_age_sessions": pl.Float64,
+            "incomplete_latest_statement_flag": pl.Float64,
+            "incomplete_latest_statement_flag_age_sessions": pl.Float64,
             "fundamental_financial_flag": pl.Float64,
             "fundamental_financial_flag_age_sessions": pl.Float64,
             "fundamental_consolidated_flag": pl.Float64,
@@ -2340,6 +2528,156 @@ def target_issuers(root: Path, observations: pl.DataFrame) -> set[str]:
     return issuers
 
 
+def load_financial_documents(
+    root: Path, issuers: set[str] | None = None, *, repair_root: Path | None = None
+):
+    """Load the actual own-version books/counts used by both audits and builds.
+
+    Optional reviewed repairs and newly recovered exact originals live outside
+    the immutable source root. They never substitute another filing version.
+    """
+
+    def source_path(kind, identifier):
+        candidate = repair_root / kind / identifier if repair_root is not None else None
+        return (
+            candidate
+            if candidate is not None and (candidate / "manifest.json").exists()
+            else root / kind / identifier
+        )
+
+    documents = load_accounts(root, issuers)
+    from .round5_cvm_capital import load_capital_dispositions
+
+    disposition_path = root / "capital_source_dispositions.json"
+    capital_dispositions = load_capital_dispositions(disposition_path, documents)
+    repairs = (
+        load_capital_dispositions(
+            repair_root / "capital_source_dispositions.json", documents
+        )
+        if repair_root is not None
+        else {}
+    )
+    capital_dispositions.update(repairs)
+    repair_ids = set(repairs)
+    recovery_audit = {"attached": 0, "invalid": []}
+    original_sources = []
+    capital_sources = []
+    capital_issues = []
+    capital_coverage = defaultdict(lambda: defaultdict(int))
+    for document in documents:
+        shares_source = None
+        path = source_path("originals", document["id"])
+        if not document.get("accounts") and (path / "manifest.json").exists():
+            try:
+                manifests = attach_viewer_accounts(document, path)
+                recovery_audit["attached"] += 1
+                original_sources.extend(
+                    {
+                        "document_id": document["id"],
+                        "manifest_path": str(manifest_path),
+                        "manifest_sha256": sha256(manifest_path),
+                    }
+                    for manifest_path in manifests
+                )
+            except (ValueError, KeyError) as error:
+                recovery_audit["invalid"].append(
+                    {"id": document["id"], "reason": str(error)}
+                )
+        zip_root = source_path("original_zips", document["id"])
+        if (not document.get("accounts") or document.get("shares") is None) and (
+            zip_root / "manifest.json"
+        ).exists():
+            from .round5_cvm_xml import original_accounts
+
+            original_manifest = json.loads(
+                (zip_root / "manifest.json").read_text(encoding="utf8")
+            )
+            if sha256(zip_root / "source.zip") != original_manifest["sha256"]:
+                raise ValueError(
+                    "Original financial ZIP differs from its source manifest"
+                )
+            parsed = original_accounts(document, zip_root / "source.zip")
+            if "capital_issue" in parsed:
+                capital_issues.append(
+                    {
+                        "document_id": document["id"],
+                        "source": "original_zip",
+                        **parsed["capital_issue"],
+                    }
+                )
+            if not document.get("accounts"):
+                document.update(parsed)
+                recovery_audit["attached"] += 1
+            if document.get("shares") is None and parsed.get("shares") is not None:
+                document["shares"] = parsed["shares"]
+            if shares_source is None and parsed.get("shares") is not None:
+                shares_source = "original_zip"
+            original_sources.append(
+                {
+                    "document_id": document["id"],
+                    "manifest_path": str(zip_root / "manifest.json"),
+                    "manifest_sha256": sha256(zip_root / "manifest.json"),
+                }
+            )
+        capital_root = source_path("capital", document["id"])
+        if document.get("shares") is None and (capital_root / "manifest.json").exists():
+            from .round5_cvm_capital import load_capital
+
+            document["shares"] = load_capital(document, capital_root)["shares"]
+            shares_source = "capital_html"
+            capital_sources.append(
+                {
+                    "document_id": document["id"],
+                    "manifest_path": str(capital_root / "manifest.json"),
+                    "manifest_sha256": sha256(capital_root / "manifest.json"),
+                }
+            )
+        active_disposition_path = (
+            repair_root / "capital_source_dispositions.json"
+            if repair_root is not None and document["id"] in repair_ids
+            else disposition_path
+        )
+        # An exact own-note audit can disprove a numerically parseable table.
+        # It therefore supersedes that table, not only absent/negative counts.
+        if document["id"] in capital_dispositions:
+            disposition = capital_dispositions[document["id"]]
+            document["shares"] = disposition["shares"]
+            document["capital_change_approval_dates"] = disposition.get(
+                "capital_change_approval_dates", []
+            )
+            shares_source = (
+                "source_note_reconciliation"
+                if disposition["shares"] is not None
+                else "audited_unavailable"
+            )
+            capital_sources.append(
+                {
+                    "document_id": document["id"],
+                    "manifest_path": str(active_disposition_path),
+                    "manifest_sha256": sha256(active_disposition_path),
+                    "disposition": disposition["disposition"],
+                }
+            )
+        capital_coverage[str(document["reference"].year)][
+            shares_source or "unavailable"
+        ] += 1
+    account_units = apply_account_unit_dispositions(root, documents)
+    repair_units = (
+        apply_account_unit_dispositions(repair_root, documents)
+        if repair_root is not None
+        else None
+    )
+    return documents, dict(
+        original_sources=original_sources,
+        capital_sources=capital_sources,
+        capital_issues=capital_issues,
+        recovery_audit=recovery_audit,
+        capital_coverage=dict(capital_coverage),
+        account_units=account_units,
+        repair_units=repair_units,
+    )
+
+
 def build(root: Path, store: Path, output: Path) -> dict:
     """Materialize bounded source-derived families, never mutate a base store."""
     output.mkdir(parents=True, exist_ok=False)
@@ -2432,109 +2770,16 @@ def build(root: Path, store: Path, output: Path) -> dict:
         .drop("cvm_code")
     )
     events.write_parquet(output / "events.parquet")
-    documents = load_accounts(root, set(identity.get_column("cnpj")))
-    from .round5_cvm_capital import load_capital_dispositions
-
+    documents, source_evidence = load_financial_documents(
+        root, set(identity.get_column("cnpj"))
+    )
+    original_sources = source_evidence["original_sources"]
+    capital_sources = source_evidence["capital_sources"]
+    capital_issues = source_evidence["capital_issues"]
+    recovery_audit = source_evidence["recovery_audit"]
+    capital_coverage = source_evidence["capital_coverage"]
+    account_units = source_evidence["account_units"]
     disposition_path = root / "capital_source_dispositions.json"
-    capital_dispositions = load_capital_dispositions(disposition_path, documents)
-    recovery_audit = {"attached": 0, "invalid": []}
-    original_sources = []
-    capital_sources = []
-    capital_issues = []
-    capital_coverage = defaultdict(lambda: defaultdict(int))
-    for document in documents:
-        shares_source = None
-        path = root / "originals" / document["id"]
-        if not document.get("accounts") and (path / "manifest.json").exists():
-            try:
-                manifests = attach_viewer_accounts(document, path)
-                recovery_audit["attached"] += 1
-                original_sources.extend(
-                    {
-                        "document_id": document["id"],
-                        "manifest_path": str(manifest_path),
-                        "manifest_sha256": sha256(manifest_path),
-                    }
-                    for manifest_path in manifests
-                )
-            except (ValueError, KeyError) as error:
-                recovery_audit["invalid"].append(
-                    {"id": document["id"], "reason": str(error)}
-                )
-        zip_root = root / "original_zips" / document["id"]
-        if (not document.get("accounts") or document.get("shares") is None) and (
-            zip_root / "manifest.json"
-        ).exists():
-            from .round5_cvm_xml import original_accounts
-
-            original_manifest = json.loads(
-                (zip_root / "manifest.json").read_text(encoding="utf8")
-            )
-            if sha256(zip_root / "source.zip") != original_manifest["sha256"]:
-                raise ValueError(
-                    "Original financial ZIP differs from its source manifest"
-                )
-            parsed = original_accounts(document, zip_root / "source.zip")
-            if "capital_issue" in parsed:
-                capital_issues.append(
-                    {
-                        "document_id": document["id"],
-                        "source": "original_zip",
-                        **parsed["capital_issue"],
-                    }
-                )
-            if not document.get("accounts"):
-                document.update(parsed)
-                recovery_audit["attached"] += 1
-            if document.get("shares") is None and parsed.get("shares") is not None:
-                document["shares"] = parsed["shares"]
-            if shares_source is None and parsed.get("shares") is not None:
-                shares_source = "original_zip"
-            original_sources.append(
-                {
-                    "document_id": document["id"],
-                    "manifest_path": str(zip_root / "manifest.json"),
-                    "manifest_sha256": sha256(zip_root / "manifest.json"),
-                }
-            )
-        capital_root = root / "capital" / document["id"]
-        if document.get("shares") is None and (capital_root / "manifest.json").exists():
-            from .round5_cvm_capital import load_capital
-
-            document["shares"] = load_capital(document, capital_root)["shares"]
-            shares_source = "capital_html"
-            capital_sources.append(
-                {
-                    "document_id": document["id"],
-                    "manifest_path": str(capital_root / "manifest.json"),
-                    "manifest_sha256": sha256(capital_root / "manifest.json"),
-                }
-            )
-        # An exact own-note audit can disprove a numerically parseable table.
-        # It therefore supersedes that table, not only absent/negative counts.
-        if document["id"] in capital_dispositions:
-            disposition = capital_dispositions[document["id"]]
-            document["shares"] = disposition["shares"]
-            document["capital_change_approval_dates"] = disposition.get(
-                "capital_change_approval_dates", []
-            )
-            shares_source = (
-                "source_note_reconciliation"
-                if disposition["shares"] is not None
-                else "audited_unavailable"
-            )
-            capital_sources.append(
-                {
-                    "document_id": document["id"],
-                    "manifest_path": str(disposition_path),
-                    "manifest_sha256": sha256(disposition_path),
-                    "disposition": disposition["disposition"],
-                }
-            )
-        capital_coverage[str(document["reference"].year)][
-            shares_source or "unavailable"
-        ] += 1
-    account_units = apply_account_unit_dispositions(root, documents)
     write_json(output / "original_source_manifests.json", original_sources)
     write_json(output / "capital_source_manifests.json", capital_sources)
     write_json(output / "capital_quantity_issues.json", capital_issues)

@@ -66,6 +66,7 @@ def original_fixture(tmp_path, quantity_scale="1", treasury="3985658"):
     )
     inner = io.BytesIO()
     with zipfile.ZipFile(inner, "w") as archive:
+        archive.writestr("Documento.xml", envelope)
         archive.writestr("PeriodoDemonstracaoFinanceira.xml", periods)
         archive.writestr("InformacaoFinanceiraDemonstracaoFinanceira.xml", accounts)
         archive.writestr(
@@ -120,7 +121,8 @@ def identity_fixture(tmp_path, outer_cnpj="0", inner_change=None):
     with zipfile.ZipFile(io.BytesIO(files[nested_name])) as before:
         with zipfile.ZipFile(inner_bytes, "w") as after:
             for member in before.namelist():
-                after.writestr(member, before.read(member))
+                if member != "Documento.xml":
+                    after.writestr(member, before.read(member))
             after.writestr("Documento.xml", body)
     files[nested_name] = inner_bytes.getvalue()
     result = tmp_path / "missing_public_identity.zip"
@@ -257,4 +259,29 @@ def test_invalid_capital_never_inflates_shares_or_erases_accounts(
     parsed = original_accounts(document, path)
     assert parsed["shares"] is None
     assert parsed["accounts"]
-    assert parsed["capital_issue"]["treasury"]["ON"] in (treasury, None)
+    reported = parsed["capital_issue"]["treasury"]["ON"]
+    assert (
+        reported in ("", None) if not treasury else float(reported) == float(treasury)
+    )
+
+
+def test_flat_capital_uses_brazilian_printed_numbers_and_ignores_cadastral_units(
+    tmp_path,
+):
+    document, path = flat_fixture(tmp_path, treasury="1.234,5")
+    with zipfile.ZipFile(path) as archive:
+        files = {n: archive.read(n) for n in archive.namelist()}
+    key = next(n for n in files if not n.startswith("Formulario"))
+    files[key] = files[key].replace(
+        b"<Ordinarias>1000</Ordinarias>", b"<Ordinarias>197.461</Ordinarias>"
+    )
+    with zipfile.ZipFile(path, "w") as archive:
+        archive.writestr(
+            "FormularioCadastral.xml",
+            "<Documento><CodigoEscalaQuantidade>2</CodigoEscalaQuantidade></Documento>",
+        )
+        for name, body in files.items():
+            archive.writestr(name, body)
+    parsed = original_accounts(document, path)
+    assert parsed["shares"] == {"ON": 197461 - 1234.5, "PN": 0}
+    assert parsed["accounts"]["ind"]["revenue"]["value"] == 1234500

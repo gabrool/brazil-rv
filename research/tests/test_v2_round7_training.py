@@ -176,6 +176,13 @@ def test_fixed_fit_resume_and_tail_scoring_are_identical(
             "seed": 11,
             "contract": {
                 "pretrain_key": pretrain_key(cell),
+                "preprocessing": {
+                    "families": {},
+                    "diagnostic": None,
+                    "common_columns": [],
+                    "per_name_columns": [],
+                    "feature_names": {},
+                },
                 "config": asdict(config),
                 "store_manifest_sha256": sha256_file(manifest_path),
             },

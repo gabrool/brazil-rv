@@ -134,11 +134,12 @@ def run(output, *, source_root=None, store_root=None, arm="S0"):
                 known = store.read(family + "_valid", ix)[d, n]
                 value = store.read(family + "_values", ix)[d, n]
                 age = store.read(family + "_age_sessions", ix)[d, n]
+                log_age = np.log1p(np.maximum(age, 0.0))
                 fields.append(np.where(known, value, np.nan))
                 ages.append(
                     np.where(
                         age >= 0.0,
-                        np.log1p(np.clip(age, 0.0, 252.0)) / np.log1p(252.0),
+                        log_age / (log_age + np.log1p(252.0)),
                         np.nan,
                     )
                 )

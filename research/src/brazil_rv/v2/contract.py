@@ -27,7 +27,7 @@ FEATURE_AGE_CONTRACT: Final[dict[str, object]] = {
     "definition": "sessions since the most recent usable source observation",
     "current_observation": 0.0,
     "unknown_or_left_censored_sentinel": -1.0,
-    "model_transform": "log1p(min(age,252))/log1p(252)",
+    "model_transform": "log1p(age)/(log1p(age)+log1p(252)); no hard age cap",
     "age_known_is_independent_of_feature_validity": True,
 }
 

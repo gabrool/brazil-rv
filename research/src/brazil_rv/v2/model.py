@@ -24,8 +24,7 @@ _NATIVE_FAST_INPUT_WIDTH = 2 * _NATIVE_FAST_CHANNELS
 _FAST_HIDDEN_WIDTH = TCN_ARCHITECTURE.width
 _V1_EQUITY_PREFIX_PATCHES = 12
 _V1_ABSOLUTE_STATE_POSITION = _V1_EQUITY_PREFIX_PATCHES + FAST_REAL_PATCHES
-_FEATURE_AGE_CAP_SESSIONS = 252.0
-_FEATURE_AGE_LOG_DENOMINATOR = math.log1p(_FEATURE_AGE_CAP_SESSIONS)
+_FEATURE_AGE_LOG_REFERENCE = math.log1p(252.0)
 
 
 def _bounded_feature_age(
@@ -43,10 +42,8 @@ def _bounded_feature_age(
         torch.all((age_sessions >= -1.0) & (~valid | age_known)),
         "feature ages must be at least -1 and known for every valid feature",
     )
-    bounded = (
-        torch.log1p(age_sessions.clamp(min=0.0, max=_FEATURE_AGE_CAP_SESSIONS))
-        / _FEATURE_AGE_LOG_DENOMINATOR
-    )
+    log_age = torch.log1p(age_sessions.clamp(min=0.0))
+    bounded = log_age / (log_age + _FEATURE_AGE_LOG_REFERENCE)
     return torch.where(age_known, bounded, torch.zeros_like(bounded)), age_known
 
 
@@ -864,14 +861,19 @@ class DailyMultiHorizonModel(nn.Module):
                 )
             valid = valid.bool() & active_mask.bool()[..., None]
             clean = torch.where(valid, values, torch.zeros_like(values))
-            bounded_age, _ = _bounded_feature_age(age, valid)
-            bounded_age = torch.where(valid, bounded_age, torch.zeros_like(bounded_age))
+            bounded_age, age_known = _bounded_feature_age(age, valid)
+            bounded_age = torch.where(
+                age_known, bounded_age, -torch.ones_like(bounded_age)
+            )
             inputs = torch.cat((clean, valid.to(clean.dtype), bounded_age), dim=-1)
             residual = torch.nn.functional.linear(inputs, projection)
             # Gate after cross-sectional pooling: an invalid name's own parent
             # representation cannot change through another name's sidecar.
             hidden = torch.where(
-                valid.any(dim=-1, keepdim=True), hidden + residual, hidden
+                (valid | age_known).any(dim=-1, keepdim=True)
+                & active_mask.bool()[..., None],
+                hidden + residual,
+                hidden,
             )
         hidden = self.trunk(hidden)
         predictions = torch.cat(

@@ -19,7 +19,8 @@ from brazil_rv.v2.contract import (
 )
 from brazil_rv.v2.data import V2DailyDataset
 from brazil_rv.v2.model import DailyMultiHorizonModel
-from brazil_rv.v2.round5_magnitude import FEATURE_NAMES, FitClip
+from brazil_rv.v2.round5_magnitude import FEATURE_NAMES
+from brazil_rv.v2.round7_preprocessing import Round7Preprocessing
 from brazil_rv.v2.score import score_checkpoint_artifact
 from v2_store_fixtures import write_fixture_store as write_store
 from brazil_rv.v2.train import (
@@ -173,19 +174,18 @@ def test_magnitude_scoring_restores_training_bounds_without_refitting(
     dataset, config, checkpoint, _ = _scoring_fixture(tmp_path, include_magnitudes=True)
     payload = torch.load(checkpoint, map_location="cpu", weights_only=True)
     inputs = payload["input_contract"]
-    frozen = inputs["training"]["features"]["magnitude_clip"]
-    assert frozen == inputs["selection"]["features"]["magnitude_clip"]
-    assert frozen["fit_date_indices"] == [20, 21]
-    assert frozen["lower"][0] > 0 and frozen["upper"][0] < 1000
-    assert frozen["lower"][3] is None and frozen["upper"][3] is None
-    dataset.magnitude_clip = None
-    with pytest.raises(ValueError, match="frozen fit clipping"):
-        dataset[0]
+    frozen = inputs["training"]["features"]["input_preprocessing"]
+    assert frozen == inputs["selection"]["features"]["input_preprocessing"]
+    scaler = frozen["families"]["magnitudes"]
+    assert scaler["fit_date_indices"] == [20, 21]
+    assert 0 < scaler["center"][0] < 1000
+    assert scaler["support"][3] == 0
+    dataset.input_preprocessing = None
 
     def no_fit(*args, **kwargs):
-        raise AssertionError("scoring must never estimate clipping bounds")
+        raise AssertionError("scoring must never refit conditioning")
 
-    monkeypatch.setattr(FitClip, "fit", no_fit)
+    monkeypatch.setattr(Round7Preprocessing, "fit", no_fit)
     artifact = score_checkpoint_artifact(
         checkpoint=checkpoint,
         model_config=config,
@@ -193,12 +193,12 @@ def test_magnitude_scoring_restores_training_bounds_without_refitting(
         output_dir=tmp_path / "magnitude_scores",
         device=torch.device("cpu"),
     )
-    assert dataset.magnitude_clip.payload() == frozen
+    assert dataset.input_preprocessing.payload() == frozen
     sample = dataset[0]
-    assert (sample["sidecar_magnitudes_values"][:, 0] <= frozen["upper"][0]).all()
-    assert (sample["sidecar_magnitudes_values"][:, 3] > 1e6).all()
+    assert np.isfinite(sample["sidecar_magnitudes_values"]).all()
+    assert (sample["sidecar_magnitudes_values"][:, 3] > 5).all()
     manifest = json.loads(artifact.manifest_path.read_text(encoding="utf8"))
-    assert manifest["scoring_input"]["features"]["magnitude_clip"] == frozen
+    assert manifest["scoring_input"]["features"]["input_preprocessing"] == frozen
 
 
 def test_family_ablation_masks_trained_projection_without_changing_population(tmp_path):
@@ -252,10 +252,12 @@ def test_magnitude_handoff_allows_stage_fit_bounds_but_keeps_feature_identity(tm
     contract = payload["input_contract"]
     contract["model_config"] = model_config_contract(pretrain_config)
     for subset in ("training", "selection"):
-        clip = contract[subset]["features"]["magnitude_clip"]
+        clip = contract[subset]["features"]["input_preprocessing"]["families"][
+            "magnitudes"
+        ]
         clip["fit_date_indices"] = [0, 1]
-        clip["lower"] = [x / 2 if x is not None else None for x in clip["lower"]]
-        clip["upper"] = [x / 2 if x is not None else None for x in clip["upper"]]
+        clip["center"] = [x / 2 for x in clip["center"]]
+        clip["scale"] = [x / 2 for x in clip["scale"]]
     contract.pop("sha256")
     contract["sha256"] = _canonical_payload_sha256(contract)
     pretrain_path = tmp_path / "magnitude_pretrain.pt"
@@ -321,7 +323,7 @@ def test_scoring_is_repeat_bit_identical_and_provenance_bound(tmp_path) -> None:
     assert np.all(scores[~score_mask] == 0.0)
 
     manifest = json.loads(first.manifest_path.read_text(encoding="utf-8"))
-    assert "magnitude_clip" not in manifest["scoring_input"]["features"]
+    assert "input_preprocessing" not in manifest["scoring_input"]["features"]
     assert manifest["checkpoint"]["kind"] == "BRAZIL_RV_V2_RAW_PATIENCE_V2"
     assert manifest["checkpoint"]["seed"] == 29
     assert manifest["access_ledger"]["purpose"] == "evaluation"

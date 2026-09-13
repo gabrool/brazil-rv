@@ -1,6 +1,6 @@
 import numpy as np
 
-from brazil_rv.v2.round5_magnitude import FitClip, magnitude_panel
+from brazil_rv.v2.round5_magnitude import magnitude_panel
 
 
 def _inputs():
@@ -50,18 +50,6 @@ def test_price_scale_invariance_and_parent_invalidity():
     assert (age[45, 0, :2] == -1).all()
 
 
-def test_clipping_does_not_fit_on_selection_or_later_dates():
-    values = np.arange(60, dtype=np.float32).reshape(10, 3, 2)
-    valid = np.ones(values.shape, bool)
-    active = np.ones(values.shape[:2], bool)
-    fit = FitClip.fit(values, valid, active, np.arange(5))
-    values[5:] *= 1e6
-    repeated = FitClip.fit(values, valid, active, np.arange(5))
-    np.testing.assert_array_equal(fit.lower, repeated.lower)
-    np.testing.assert_array_equal(fit.upper, repeated.upper)
-    assert (fit.transform(values, valid)[5:] <= fit.upper).all()
-
-
 def test_magnitude_preserves_actual_parent_and_beta_pair_ages():
     inputs = _inputs()
     inputs["slow_age_sessions"][45, 0] = [1, 3, 2]
@@ -69,23 +57,3 @@ def test_magnitude_preserves_actual_parent_and_beta_pair_ages():
     _, valid, ages = magnitude_panel(**inputs)
     assert valid[45, 0].all()
     np.testing.assert_array_equal(ages[45, 0], [3, 3, 2, 4])
-
-
-def test_fit_support_excludes_invalid_inactive_and_unobserved_fields():
-    values = np.arange(24, dtype=np.float32).reshape(4, 2, 3)
-    valid = np.ones_like(values, bool)
-    active = np.ones(values.shape[:2], bool)
-    valid[0, 0, 0] = False
-    active[1, 1] = False
-    valid[:2, :, 2] = False
-    values[0, 0, 0] = -1e9
-    values[1, 1] = 1e9
-    clip = FitClip.fit(values, valid, active, np.arange(2))
-    assert clip.lower[0] > 0
-    assert clip.upper[0] < 10
-    restored = FitClip.from_payload(clip.payload())
-    assert restored.payload() == clip.payload()
-    assert np.isneginf(restored.lower[2]) and np.isposinf(restored.upper[2])
-    np.testing.assert_array_equal(
-        restored.transform(values, valid)[2:, :, 2], values[2:, :, 2]
-    )

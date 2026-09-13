@@ -78,7 +78,8 @@ def align_family(
             raise ValueError(f"{name} marks unknown source age as available")
         values[d[known], n[known], index] = payload[known]
         valid[d[known], n[known], index] = True
-        ages[d[known], n[known], index] = age[known]
+        age_known = np.isfinite(age) & (age >= 0)
+        ages[d[age_known], n[age_known], index] = age[age_known]
     return values, valid, ages
 
 
@@ -236,7 +237,7 @@ def build(plan_path: Path, output: Path) -> dict:
                 values = staging.create_array(f"{family}_values", raw.shape, np.float32)
                 valid = staging.create_array(f"{family}_valid", mask.shape, np.bool_)
                 transform_feature_panel_into(raw, mask, active, specs, values, valid)
-                ages[~valid] = -1
+                ages[~active] = -1
                 staging.write_array(f"{family}_age_sessions", ages)
                 coverage = []
                 years = np.array([day.year for day in dates])

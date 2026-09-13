@@ -58,9 +58,12 @@ def test_selection_metric_cache_matches_original_arithmetic_and_isolates_fits():
             assert actual == reference(predictions, dataset.labels, dates)
             assert (name, higher) == ("mean_daily_spearman", True)
     assert [dataset.calls for dataset in datasets] == [1, 1]
-    assert gbdt_module._metric_for_dates(np.ones(3, dtype=np.int64))(
-        np.ones(3), Dataset(np.ones(3))
-    )[1] == 0.0
+    assert (
+        gbdt_module._metric_for_dates(np.ones(3, dtype=np.int64))(
+            np.ones(3), Dataset(np.ones(3))
+        )[1]
+        == 0.0
+    )
 
 
 def test_missing_lightgbm_has_clear_install_error(monkeypatch) -> None:
@@ -96,8 +99,10 @@ def test_gbdt_scalar_adapter_preserves_view_order_masks_ages_and_axes() -> None:
     np.testing.assert_array_equal(actual[..., :2][valid], values[valid])
     assert np.isnan(actual[0, 0, 1])
     assert np.isnan(actual[0, 0, 3])
-    assert actual[0, 1, 2] == pytest.approx(np.log1p(4.0) / np.log1p(252.0))
-    assert actual[0, 1, 3] == pytest.approx(1.0)
+    assert actual[0, 1, 2] == pytest.approx(
+        np.log1p(4.0) / (np.log1p(4.0) + np.log1p(252.0))
+    )
+    assert actual[0, 1, 3] == pytest.approx(0.5)
     assert view.date_indices.tolist() == [7]
     assert view.isins == ("BR1", "BR2")
     assert view.active.tolist() == [[True, False]]
@@ -169,15 +174,11 @@ def test_five_head_gbdt_round_trip_and_importances(tmp_path: Path) -> None:
     manifest_path, manifest_sha256 = model.save(
         model_root, metadata={"status": "completed"}
     )
-    loaded = MultiHorizonGBDT.load(
-        model_root, expected_manifest_sha256=manifest_sha256
-    )
+    loaded = MultiHorizonGBDT.load(model_root, expected_manifest_sha256=manifest_sha256)
     assert np.array_equal(raw_before, loaded.predict_raw(features[7:]))
     assert np.array_equal(scores, loaded.predict_ranks(features[7:], mask[7:]))
     assert manifest_path.is_file()
 
     (model_root / "head_0_seed_11.txt").write_text("tampered", encoding="ascii")
     with pytest.raises(ValueError, match="member hash or size"):
-        MultiHorizonGBDT.load(
-            model_root, expected_manifest_sha256=manifest_sha256
-        )
+        MultiHorizonGBDT.load(model_root, expected_manifest_sha256=manifest_sha256)

@@ -16,10 +16,11 @@ def test_robust_statistics_exclude_later_values_and_keep_sparse_signs():
     assert scaler.payload() == other.payload()
     np.testing.assert_array_equal(scaler.center, [0.0, 10.0])
     np.testing.assert_array_equal(scaler.scale, [4.0, 1.0])
-    np.testing.assert_array_equal(
-        scaler.transform(panel[:3], valid[:3])[..., 0], [[-1.0], [0.0], [1.0]]
+    np.testing.assert_allclose(
+        scaler.transform(panel[:3], valid[:3])[..., 0],
+        np.arcsinh([[-1.0], [0.0], [1.0]]),
     )
-    assert np.abs(scaler.transform(panel[-1:], valid[-1:])).max() == 5.0
+    assert np.abs(scaler.transform(panel[-1:], valid[-1:])).max() > 5.0
     assert not scaler.transform(panel, np.zeros_like(valid)).any()
 
 
@@ -36,7 +37,37 @@ def test_common_snapshot_is_unweighted_by_stock_count_and_rejects_exposures():
     )
     for first, second in zip(result, duplicated, strict=True):
         np.testing.assert_array_equal(first, second)
-    assert result[2][1, 1] == -1.0
+    assert result[2][1, 1] == 1.0  # Known source age survives missing value.
     values[0, 1, 0] = 3.0
     with pytest.raises(ValueError, match="varies by security"):
         common_snapshot(values, valid, ages)
+
+
+def test_parent_coordinates_are_retained_and_cold_fields_activate_from_fit_only():
+    values = np.array([[1.0, 0.0, 2.0], [3.0, 0.0, 2.0]])
+    valid = np.array([[True, False, True], [True, False, True]])
+    parent = RobustScaler.fit(values, valid, [0, 1])
+    future = np.array([[100.0, 10.0, 4.0], [200.0, 20.0, 8.0]])
+    child = RobustScaler.fit(future, np.ones_like(valid), [10, 11], parent=parent)
+    assert child.inherited == (True, False, False)
+    assert child.center[0] == parent.center[0]
+    assert child.scale[0] == parent.scale[0]
+    assert child.center[1:].tolist() == [15.0, 6.0]
+    np.testing.assert_array_equal(
+        child.transform(values, valid)[:, 0], parent.transform(values, valid)[:, 0]
+    )
+    assert RobustScaler.from_payload(child.payload()).payload() == child.payload()
+
+
+def test_rare_continuous_support_and_binary_fields_are_not_deleted_or_clipped():
+    values = np.array([[0.0, 0.0], [0.0, 1.0], [0.0, 0.0], [1000.0, 1.0]])
+    valid = np.ones_like(values, bool)
+    scaler = RobustScaler.fit(values, valid, [0, 1, 2, 3], passthrough=(False, True))
+    result = scaler.transform(values, valid)
+    assert np.isfinite(result).all() and result[-1, 0] > 0
+    np.testing.assert_array_equal(result[:, 1], values[:, 1])
+    extremes = np.array([[1e10, 0], [1e20, 1]])
+    assert (
+        scaler.transform(extremes, np.ones_like(extremes, bool))[1, 0]
+        > scaler.transform(extremes, np.ones_like(extremes, bool))[0, 0]
+    )

@@ -25,7 +25,7 @@ from .contract import (
 )
 from .data import V2DailyDataset, collate_v2_daily, restore_name_axis, stage_name_count
 from .model import DailyMultiHorizonModel
-from .round5_magnitude import FitClip
+from .round7_preprocessing import Round7Preprocessing
 from .train import (
     _canonical_payload_sha256,
     _input_static_identity,
@@ -125,6 +125,8 @@ def _model_batch(
     for family in invalid_sidecars:
         key = f"sidecar_{family}_valid"
         result[key] = torch.zeros_like(result[key])
+        age_key = f"sidecar_{family}_age_sessions"
+        result[age_key] = torch.full_like(result[age_key], -1)
     if omit_fast_stream and "fast_present" in result:
         result["fast_present"] = torch.zeros_like(result["fast_present"])
     any_fast_present = "fast_present" in result and torch.any(
@@ -248,16 +250,20 @@ def score_checkpoint_artifact(
     if recorded_commit is not None and current_commit != recorded_commit:
         raise ValueError("scoring implementation commit differs from the checkpoint")
     checkpoint_selection = checkpoint_contract.get("selection")
-    if "magnitudes" in dataset.enabled_sidecars:
+    if dataset.enabled_sidecars:
         features = (
             checkpoint_selection.get("features", {})
             if isinstance(checkpoint_selection, Mapping)
             else {}
         )
-        clip = features.get("magnitude_clip") if isinstance(features, Mapping) else None
-        if not isinstance(clip, Mapping):
-            raise ValueError("checkpoint lacks frozen magnitude clipping bounds")
-        dataset.magnitude_clip = FitClip.from_payload(clip)
+        preparation = (
+            features.get("input_preprocessing")
+            if isinstance(features, Mapping)
+            else None
+        )
+        if not isinstance(preparation, Mapping):
+            raise ValueError("checkpoint lacks frozen input conditioning")
+        dataset.input_preprocessing = Round7Preprocessing.from_payload(preparation)
     scoring_input = _loader_input_payload(loader)
     if not isinstance(scoring_input, Mapping) or not isinstance(
         checkpoint_selection, Mapping

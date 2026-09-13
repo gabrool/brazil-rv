@@ -98,7 +98,6 @@ def score(
     )
     try:
         preparation = Round7Preprocessing.from_payload(contract["preprocessing"])
-        dataset.magnitude_clip = preparation.magnitude
         loader = DataLoader(
             dataset,
             batch_sampler=sequential_batches(len(dataset)),

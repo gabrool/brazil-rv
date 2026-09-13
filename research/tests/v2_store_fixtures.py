@@ -43,7 +43,9 @@ def fixture_feature_schema(
         FeatureSpec(
             name=str(name),
             family=family,
-            transform="signed_identity",
+            transform="precomputed_native"
+            if family.startswith("sidecar_")
+            else "signed_identity",
             source_units="synthetic_test_units",
             availability_rule="synthetic fixture available at the decision time",
             formula="synthetic fixture value",

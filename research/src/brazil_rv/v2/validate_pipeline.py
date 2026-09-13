@@ -758,9 +758,18 @@ def _evaluation_inputs(
     transformed_history_age = np.asarray(
         slow_prior[..., history_index], dtype=np.float64
     )
+    from .feature_spec import decode_history_age
+
+    history_spec = next(
+        s
+        for s in metadata["feature_schema"]["specifications"]
+        if s["family"] == "slow" and s["name"] == "observed_history_age_sessions"
+    )
     history_age_sessions = np.where(
         history_valid,
-        np.expm1(np.clip(transformed_history_age, 0.0, 1.0) * np.log1p(252.0)),
+        decode_history_age(
+            transformed_history_age, feature_version=history_spec["version"]
+        ),
         np.nan,
     )
     if execution_policy is not None:

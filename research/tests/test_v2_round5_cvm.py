@@ -1092,6 +1092,42 @@ def test_direct_annual_ttm_survives_unavailable_old_itr_contents():
     assert fundamental_state(ledger, "Industry")["gross_profitability"] == 2.0
 
 
+def test_gross_profitability_does_not_require_equity():
+    annual = report(date(2023, 12, 31), 100)
+    del annual["accounts"]["con"]["equity"]
+    state = fundamental_state({"annual": annual}, "Industry")
+    assert state["gross_profitability"] == 2.0
+    assert state["liabilities_to_assets"] is None
+
+
+def test_accrual_assets_and_age_use_selected_public_version():
+    prior = report(date(2022, 12, 31), 100, version=2)
+    prior["available_index"] = 5
+    prior["accounts"]["con"]["assets"]["value"] = 300
+    current = report(date(2023, 12, 31), 200)
+    current["available_index"] = 10
+    late_old = deepcopy(prior)
+    late_old.update(version=1, available_index=12)
+    late_old["accounts"]["con"]["assets"]["value"] = 10000
+    ledger = {"prior": prior, "current": current}
+    before = fundamental_state(ledger)
+    after = fundamental_state({**ledger, "late_old": late_old})
+    assert after["accruals_to_assets"] == before["accruals_to_assets"]
+    assert after["_feature_source_indices"]["accruals_to_assets"] == 5
+    assert after["_feature_update_indices"]["accruals_to_assets"] == 10
+    assert after["_feature_has_later_version"]["accruals_to_assets"]
+
+
+def test_negative_earnings_sign_survives_unpriceable_share_class():
+    sessions, document, rad, identity, market = family_fixture()
+    document["shares"]["PN"] = 50
+    document["accounts"]["con"]["net_income"]["value"] = -100
+    result, _ = fundamental_features([document], rad, identity, sessions, market)
+    assert result["earnings_yield_ttm"].null_count() == len(sessions)
+    assert result["earnings_negative_flag"].to_list() == [1.0] * len(sessions)
+    assert result["earnings_negative_flag_age_sessions"].to_list() == [0, 1, 2, 3]
+
+
 def test_interim_ttm_bridge_rejects_mixed_basis_and_fiscal_periods():
     previous = report(date(2022, 9, 30), 60)
     annual = report(date(2022, 12, 31), 100)
@@ -1176,7 +1212,8 @@ def test_joined_ttm_restatement_changes_on_its_own_first_receipt():
         market,
     )
     assert masked.head(2).equals(base.head(2))
-    assert masked["gross_profitability"][2] is None
+    assert masked["gross_profitability"][2] == pytest.approx(2.3)
+    assert masked["gross_profitability_age_sessions"][2] == 2
 
 
 def test_old_fca_ticker_cannot_relabel_a_new_isin_after_ticker_reuse():
@@ -1245,3 +1282,29 @@ def test_preannounced_exact_listing_date_admits_new_isin_without_age_rule():
     assert result["identity_method"].unique().to_list() == [
         "dated_fca_preannounced_listing"
     ]
+
+
+def test_later_arriving_older_version_does_not_replace_public_restated_quarters():
+    account = {"value": 10.0, "start": date(2023, 1, 1), "end": date(2023, 3, 31)}
+    original = {
+        "id": "1",
+        "version": 1,
+        "available_index": 50,
+        "reference": account["end"],
+        "accounts": {"con": {"net_income": account}},
+    }
+    revised = deepcopy(original)
+    revised.update(id="2", version=2, available_index=40)
+    revised["accounts"]["con"]["net_income"]["value"] = 15.0
+    assert fiscal_quarters(
+        {"revised": revised, "late_original": original}, "con", "net_income"
+    ) == {account["end"]: 15.0}
+
+
+def test_exact_own_note_correction_is_not_applied_twice(tmp_path):
+    _, document, _, _, _ = family_fixture()
+    write_account_unit_disposition(tmp_path, document)
+    round5_cvm.apply_account_unit_dispositions(tmp_path, [document])
+    before = deepcopy(document)
+    round5_cvm.apply_account_unit_dispositions(tmp_path, [document])
+    assert document == before

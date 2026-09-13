@@ -9,7 +9,7 @@ import time
 import platform
 from importlib.metadata import version
 from concurrent.futures import ProcessPoolExecutor, as_completed
-from dataclasses import asdict, replace
+from dataclasses import asdict
 from pathlib import Path
 
 import numpy as np
@@ -33,7 +33,6 @@ from .gbdt import (
     assemble_gbdt_scalar_view,
     gbdt_scalar_feature_names,
 )
-from .round5_magnitude import FitClip
 from .store import open_store_for_dates, peak_rss_bytes
 from .validate_pipeline import _window_target_mask
 
@@ -237,25 +236,11 @@ def window_targets(targets, source_mask, indices, start, target_window):
     return np.where(mask, targets[local], 0), mask
 
 
-def clip_magnitudes(encoded, active, fit_local, fit_global):
-    """A cache may contain later values, but only fit rows estimate bounds."""
-    width = encoded.shape[-1] // 2
-    raw = np.asarray(encoded[..., :width])
-    valid = np.isfinite(raw)
-    fitted = FitClip.fit(raw, valid, active, np.asarray(fit_local))
-    return replace(fitted, fit_date_indices=tuple(int(x) for x in fit_global))
-
-
-def _features(parent, sidecar, local, clip):
+def _features(parent, sidecar, local):
+    # Trees consume physical magnitudes directly. Hard clipping would merge
+    # distinct tail observations; monotone neural conditioning is unnecessary.
     base = np.asarray(parent[local])
-    if sidecar is None:
-        return base
-    extra = np.array(sidecar[local], copy=True)
-    if clip is not None:
-        width = extra.shape[-1] // 2
-        # np.clip preserves NaN; unsupported fields remain missing, not zero.
-        extra[..., :width] = np.clip(extra[..., :width], clip.lower, clip.upper)
-    return np.concatenate((base, extra), axis=-1)
+    return base if sidecar is None else np.concatenate((base, sidecar[local]), axis=-1)
 
 
 def shap_coordinates(eligible, maximum_per_day=16):
@@ -327,16 +312,11 @@ def run_cell(design_path: str, family: str, fold: str, seed: int):
     sidecar = (
         None if family == "a_slow" else _cache(design["families"][family]["values"])
     )
-    clip = (
-        clip_magnitudes(sidecar, arrays["active"], fit - start, fit)
-        if family == "magnitudes"
-        else None
-    )
     names = tuple(design["families"]["a_slow"]["encoded_names"])
     if sidecar is not None:
         names += tuple(design["families"][family]["encoded_names"])
-    train_x = _features(parent, sidecar, fit - start, clip)
-    selection_x = _features(parent, sidecar, selection - start, clip)
+    train_x = _features(parent, sidecar, fit - start)
+    selection_x = _features(parent, sidecar, selection - start)
     train_y, train_mask = window_targets(
         arrays["targets"],
         arrays["target_mask"],
@@ -380,12 +360,12 @@ def run_cell(design_path: str, family: str, fold: str, seed: int):
                 "family": family,
                 "fold": fold,
                 "seed": seed,
-                "magnitude_clip": None if clip is None else clip.payload(),
+                "scalar_conditioning": "physical_values_no_clipping",
             },
         )
     del train_x, selection_x, train_y, train_mask, selection_y, selection_mask
     gc.collect()
-    evaluation_x = _features(parent, sidecar, evaluation - start, clip)
+    evaluation_x = _features(parent, sidecar, evaluation - start)
     active = np.asarray(arrays["active"][evaluation - start])
     scores = model.predict_ranks(
         evaluation_x, np.repeat(active[..., None], len(HORIZONS), axis=-1)
@@ -423,7 +403,7 @@ def run_cell(design_path: str, family: str, fold: str, seed: int):
         "feature_names": list(names),
         "importance": {k: v.tolist() for k, v in importance.items()},
         "tree_shap_coordinates": coordinates.tolist(),
-        "magnitude_clip": None if clip is None else clip.payload(),
+        "scalar_conditioning": "physical_values_no_clipping",
         "mean_primary_ic": float(np.nanmean(daily))
         if np.isfinite(daily).any()
         else None,

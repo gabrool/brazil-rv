@@ -18,9 +18,21 @@ Transform = Literal[
     "signed_identity",
     "age_sessions",
     "signed_clip",
+    "signed_asinh",
     "annual_rate",
     "precomputed_native",
 ]
+
+
+def decode_history_age(values, *, feature_version):
+    """Invert the stored history feature, retaining sealed earlier-store semantics."""
+    values = np.asarray(values, dtype=np.float64)
+    log_age = (
+        values / (1.0 - values) * np.log1p(252.0)
+        if feature_version == "decision_feature_3"
+        else np.clip(values, 0.0, 1.0) * np.log1p(252.0)
+    )
+    return np.expm1(log_age)
 
 
 @dataclass(frozen=True)
@@ -87,7 +99,7 @@ _SIGNED = {
     "pre_effective_ramp",
     "post_effective_reversal",
 }
-_SIGNED_CLIPPED = {
+_SIGNED_ASINH = {
     "realized_skew_60",
     "realized_kurtosis_60",
     "standardized_unexpected_earnings",
@@ -661,8 +673,13 @@ for _factor, _series in {
 
 
 def _semantic_definition(family: str, name: str) -> tuple[str, str]:
-    if family == "sidecar_fundamentals_native" and name == "earnings_negative_flag":
+    if family.startswith("sidecar_fundamentals") and name == "earnings_negative_flag":
         return "flag", "one when receipt-known earnings are negative"
+    if family == "sidecar_fundamentals" and name == "incomplete_latest_statement_flag":
+        return (
+            "flag",
+            "one when latest contents are unavailable or a field uses an earlier coherent public calculation; insufficient SUE warmup alone is not incompleteness",
+        )
     if family.startswith("sidecar_") and name in _ROUND5_FORMULAS:
         return _ROUND5_FORMULAS[name][:2]
     if family == "slow":
@@ -725,7 +742,10 @@ def feature_specs(
                     "flag",
                     "one when valid signed earnings_yield_ttm is negative; zero otherwise",
                 )
-            formula += "; physical store value; median/IQR scaling and +/-5 clipping fitted only on each training window"
+            formula += "; legacy stored log field; smooth fit-only conditioning at the model boundary"
+        elif name in {"earnings_negative_flag", "incomplete_latest_statement_flag"}:
+            transform = "binary"
+            clip = None
         elif round5 is not None:
             transform = round5[2]
             clip = None
@@ -741,15 +761,22 @@ def feature_specs(
         elif suffix in _SIGNED:
             transform = "signed_identity"
             clip = None
-        elif suffix in _SIGNED_CLIPPED:
-            transform = "signed_clip"
-            clip = 5.0
+        elif suffix in _SIGNED_ASINH:
+            transform = "signed_asinh"
+            clip = None
         elif suffix in _ANNUAL_RATES:
             transform = "annual_rate"
             clip = None
         else:
             transform = "rank_gauss"
             clip = None
+        if family.startswith("sidecar_") and transform in {
+            "rank_gauss",
+            "precomputed_native",
+            "signed_asinh",
+        }:
+            transform = "precomputed_native"
+            formula += "; physical value; fit-only median/IQR plus smooth asinh at the model boundary"
         output.append(
             FeatureSpec(
                 name=name,
@@ -773,7 +800,7 @@ def feature_specs(
                     else "source_valid & active & finite"
                 ),
                 age_staleness_policy=(
-                    "clip at 252 sessions then log1p-scale"
+                    "log1p(age)/(log1p(age)+log1p(252)); no hard cap"
                     if transform == "age_sessions"
                     else (
                         "source age is at least one exchange session"
@@ -782,7 +809,7 @@ def feature_specs(
                         else "family producer's causal mask; no forward-fill as observed"
                     )
                 ),
-                version="decision_feature_2",
+                version="decision_feature_3",
             )
         )
     return tuple(output)
@@ -961,16 +988,15 @@ def transform_feature_panel_into(
                 transformed[usable] = cross[usable]
             elif spec.transform == "age_sessions":
                 usable &= cross >= 0.0
-                transformed[usable] = np.log1p(
-                    np.minimum(cross[usable], 252.0)
-                ) / np.log1p(252.0)
+                log_age = np.log1p(cross[usable])
+                transformed[usable] = log_age / (log_age + np.log1p(252.0))
             elif spec.transform == "signed_clip":
                 assert spec.clip is not None
                 transformed[usable] = np.clip(cross[usable], -spec.clip, spec.clip)
+            elif spec.transform == "signed_asinh":
+                transformed[usable] = np.arcsinh(cross[usable])
             elif spec.transform == "annual_rate":
-                transformed[usable] = np.clip(
-                    np.arcsinh(cross[usable] / 0.01), -5.0, 5.0
-                )
+                transformed[usable] = np.arcsinh(cross[usable] / 0.01)
             elif spec.transform == "precomputed_native":
                 transformed[usable] = cross[usable]
             else:  # pragma: no cover - Literal plus FeatureSpec validation
