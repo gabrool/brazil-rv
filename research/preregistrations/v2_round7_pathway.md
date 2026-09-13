@@ -40,6 +40,15 @@ names and a real history suffix at that session; invalid queries are zeroed.
 An interior missing observation remains an encoded missing observation, not
 left padding. The current eligible cohort can use its known historical data.
 
+Attention QKV and output matrices use Xavier uniform initialization; their biases
+start at zero. This applies to both temporal and peer attention in every cell.
+All other B4 initialization remains unchanged. Before financial fitting, an
+unseen-date synthetic leave-one-out group-return experiment identified failure
+with inherited .02 initialization and successful information transport with
+Xavier in all four temporal components. Preserve the failed probes and verify
+the full model with the registered SAM recipe as well; this engineering choice
+does not establish a financial advantage or change original Round 7.
+
 Every cell uses identical learned last-step-query temporal pooling with a
 bias-free 64x64 map and valid-session softmax. Late cells pool then apply the peer
 block; early cells apply the same peer block then pool. All downstream B4 core
@@ -65,8 +74,25 @@ and gradient bridge; dynamic full-graph training/evaluation; exact interrupted
 fit recovery. Synthetic tests do not assert that B4 is unable to learn a target.
 Measure complete-step memory/throughput on the same sixteen full F14 dates and
 then complete fit throughput. Use fused SDPA, shared encoders and bounded
-concurrency. No real fit until acceptance. Changes to numerical execution need
+concurrency. No real fit until correctness and full-model CUDA acceptance. Changes to numerical execution need
 documented engineering evidence and a fresh code freeze.
+
+**Engineering amendment after synthetic probes, before any extension market fit:**
+the unseen-date peer task is a mandatory reported diagnostic, not a binary veto
+based on IC > .5. That threshold was initially treated as acceptance, but the
+probes distinguish structural correctness from optimization on an artificial
+target: all four exact temporal/peer components learned it in one controlled
+Xavier run, another initialization left TL below threshold, and the full B4
+trunk with SAM failed this task even when a matched AdamW run learned it. A
+4,800-update warmup/cosine GL run did not remove that failure. These failures
+remain explicit evidence; they are not renamed passes. Gate leakage, masks,
+identity, finite gradients, exact resume and the original full-model CUDA
+precision/compile/synthetic-fit requirements. Run the four financial cells with
+unchanged R/SAM .05 to answer the registered comparison. Qualify a negative
+result as conditional on this optimizer and budget; it cannot establish that
+the temporal architecture lacks capacity or peer information. This amendment
+uses the user's authorization to choose the recommended resolution and prevents
+an artificial surrogate test from replacing the actual research comparison.
 
 ## Contrasts and interpretation
 
@@ -122,6 +148,37 @@ Use repeated blocked/randomized controls with an explicit null construction;
 never require a future-shifted feature to have zero IC. No negative linear result
 can rule out nonlinear relationships, alternative peer definitions or trajectories.
 No fundamental-family trajectory or macro-token architecture change is included.
+
+Operational diagnostic specification (fixed before its outcomes): reconstruct
+the admitted t-1 log return as magnitude `return_1_over_vol_20` times
+`daily_vol_20_raw`, without fitting or clipping that source. This is narrower
+volatility-supported history and does not promise identical original clusters.
+Subtract the active median each decision date; rebuild monthly 12-cluster groups
+from 126 prior sessions with 101 observed samples. Correct the already-lagged
+array to ending-session indexing so the month starts with available t-1 data.
+Use the accepted CVM receipt-dated sector identity. Group means exclude the
+subject, use the current eligible cohort and lags 1–5. Leaders are the ten largest
+admitted prior 20-session traded values; multiply their leave-one-out lagged
+residual means by the admitted economic beta. The ADR proxy is the admitted
+ADR return-gap mean excluding self, interacted separately with economic beta,
+FX exposure and ADR-listed status. It is explicitly a gap proxy, not raw US ADR
+returns. Preserve all field masks and report coverage.
+
+The ridge target is the mean D3/D5/D10 neutral rank, a supporting composite rather
+than a substitute for official primary IC. Equal weight per date. Train-only
+0.5/99.5 percentile clipping, observed-value mean/scale, mean imputation and
+observed indicators. Choose alpha from .0001/.001/.01/.1/1 on internal Stage P
+chronological validation using peer-only daily rank IC; use that same frozen
+alpha for every downstream control. Objective is weighted-average squared error
+plus alpha times squared non-intercept coefficients. Expanding OOF controls begin
+at F2 using earlier F evaluation forecasts with t+10 strictly before the new
+fold. F1 and earlier OOF controls are unavailable. Ten deterministic label-blind
+63-session block sign randomizations (seeds 4200–4209) are descriptive temporal
+alignment controls, not exact-exchangeability randomization p-values. Fit each
+control only on preceding mature observations. Conventional partial rank
+correlation residualizes both the peer forecast and target on S0 within each
+evaluation cross-section; this is a descriptive statistic, never a fitted
+forecast or a neural advancement gate.
 
 ## Operational integration
 

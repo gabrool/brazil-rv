@@ -1,0 +1,366 @@
+{
+  "financial_fits": 0,
+  "records": [
+    {
+      "file": "pathway_synthetic_learning.json",
+      "result": {
+        "fresh_training_dates_per_update": 4,
+        "results": [
+          {
+            "cell": "GL",
+            "heldout_synthetic_ic": -0.323529452085495,
+            "passed": false,
+            "seconds": 14.13217729999451,
+            "steps": 240
+          },
+          {
+            "cell": "GE",
+            "heldout_synthetic_ic": -0.32561278343200684,
+            "passed": false,
+            "seconds": 16.942497599986382,
+            "steps": 240
+          },
+          {
+            "cell": "TL",
+            "heldout_synthetic_ic": -0.31936272978782654,
+            "passed": false,
+            "seconds": 18.731448100006673,
+            "steps": 240
+          },
+          {
+            "cell": "TE",
+            "heldout_synthetic_ic": -0.260906845331192,
+            "passed": false,
+            "seconds": 21.721065099991392,
+            "steps": 240
+          }
+        ],
+        "steps_fixed_in_advance": 240,
+        "synthetic_only": true,
+        "unseen_validation_dates": 24
+      },
+      "sha256": "fb87ed077c9c50d7cb7c21d4d77dd7758539b22df2c8780688b5761d293b7c66"
+    },
+    {
+      "file": "pathway_group_learning.json",
+      "result": {
+        "fresh_training_dates_per_update": 4,
+        "results": [
+          {
+            "cell": "GL",
+            "heldout_synthetic_ic": 0.4446078836917877,
+            "passed": false,
+            "seconds": 14.990369400009513,
+            "steps": 240
+          },
+          {
+            "cell": "GE",
+            "heldout_synthetic_ic": 0.46066176891326904,
+            "passed": false,
+            "seconds": 17.88792690000264,
+            "steps": 240
+          },
+          {
+            "cell": "TL",
+            "heldout_synthetic_ic": 0.46568623185157776,
+            "passed": false,
+            "seconds": 18.688220099982573,
+            "steps": 240
+          },
+          {
+            "cell": "TE",
+            "heldout_synthetic_ic": 0.4644608199596405,
+            "passed": false,
+            "seconds": 23.147134099999676,
+            "steps": 240
+          }
+        ],
+        "steps_fixed_in_advance": 240,
+        "synthetic_only": true,
+        "unseen_validation_dates": 24
+      },
+      "sha256": "d4de634427a26981d1b444f02af331341ed2464ccb5208a66556ba175ec1f3b2"
+    },
+    {
+      "file": "pathway_group_learning_960.json",
+      "result": {
+        "fresh_training_dates_per_update": 4,
+        "results": [
+          {
+            "cell": "GL",
+            "heldout_synthetic_ic": 0.44877445697784424,
+            "passed": false,
+            "seconds": 55.923966599977575,
+            "steps": 960
+          },
+          {
+            "cell": "GE",
+            "heldout_synthetic_ic": 0.44987741112709045,
+            "passed": false,
+            "seconds": 70.26932900000247,
+            "steps": 960
+          },
+          {
+            "cell": "TL",
+            "heldout_synthetic_ic": 0.44877445697784424,
+            "passed": false,
+            "seconds": 74.65540380001767,
+            "steps": 960
+          },
+          {
+            "cell": "TE",
+            "heldout_synthetic_ic": 0.44877445697784424,
+            "passed": false,
+            "seconds": 102.15447219999623,
+            "steps": 960
+          }
+        ],
+        "steps_fixed_in_advance": 960,
+        "synthetic_only": true,
+        "unseen_validation_dates": 24
+      },
+      "sha256": "6df8b2bdaf852abf45af04359e9d31804de416a1b21d189791dd7f3eb58dd4a5"
+    },
+    {
+      "file": "pathway_group_mse_learning.json",
+      "result": {
+        "fresh_training_dates_per_update": 4,
+        "results": [
+          {
+            "cell": "GL",
+            "heldout_synthetic_ic": 0.35134804248809814,
+            "passed": false,
+            "seconds": 71.10314390002168,
+            "steps": 960
+          },
+          {
+            "cell": "GE",
+            "heldout_synthetic_ic": 0.35122549533843994,
+            "passed": false,
+            "seconds": 79.75738629998523,
+            "steps": 960
+          },
+          {
+            "cell": "TL",
+            "heldout_synthetic_ic": -0.3056372404098511,
+            "passed": false,
+            "seconds": 75.4712661000085,
+            "steps": 960
+          },
+          {
+            "cell": "TE",
+            "heldout_synthetic_ic": -0.3079656660556793,
+            "passed": false,
+            "seconds": 88.78778189999866,
+            "steps": 960
+          }
+        ],
+        "steps_fixed_in_advance": 960,
+        "synthetic_loss": "MSE on known continuous teacher; rank-loss acceptance is separate",
+        "synthetic_only": true,
+        "unseen_validation_dates": 24
+      },
+      "sha256": "d954a3e3b828220675022c782ee40f83ae97157154c9156d7d693e12c3278347"
+    },
+    {
+      "file": "pathway_component_xavier.json",
+      "result": [
+        {
+          "cell": "GL",
+          "ic": 0.9721813797950745,
+          "mse": 0.01710391603410244
+        },
+        {
+          "cell": "GE",
+          "ic": 0.9944241046905518,
+          "mse": 0.0022737369872629642
+        },
+        {
+          "cell": "TL",
+          "ic": 0.993198573589325,
+          "mse": 0.0047561232931911945
+        },
+        {
+          "cell": "TE",
+          "ic": 0.9920956492424011,
+          "mse": 0.000711473694536835
+        }
+      ],
+      "sha256": "cf21ed54924f1cb662ca54ec1012c10e70c7fcd3eb1f39839cb365a51e1079f4"
+    },
+    {
+      "file": "pathway_group_xavier_mse.json",
+      "result": {
+        "fresh_training_dates_per_update": 4,
+        "results": [
+          {
+            "cell": "GL",
+            "heldout_synthetic_ic": 0.026593143120408058,
+            "passed": false,
+            "seconds": 45.01789630000712,
+            "steps": 960
+          },
+          {
+            "cell": "GE",
+            "heldout_synthetic_ic": 0.35134804248809814,
+            "passed": false,
+            "seconds": 55.173527500010096,
+            "steps": 960
+          },
+          {
+            "cell": "TL",
+            "heldout_synthetic_ic": 0.3609068691730499,
+            "passed": false,
+            "seconds": 60.07073340000352,
+            "steps": 960
+          },
+          {
+            "cell": "TE",
+            "heldout_synthetic_ic": -0.38149502873420715,
+            "passed": false,
+            "seconds": 86.52644600000349,
+            "steps": 960
+          }
+        ],
+        "steps_fixed_in_advance": 960,
+        "synthetic_loss": "MSE on known continuous teacher; rank-loss acceptance is separate",
+        "synthetic_only": true,
+        "unseen_validation_dates": 24
+      },
+      "sha256": "f23bb87d4ece1a8b3e30db6efd63adfff4289d316e4379f04346a71a71c35855"
+    },
+    {
+      "file": "pathway_group_xavier_rank.json",
+      "result": {
+        "fresh_training_dates_per_update": 8,
+        "results": [
+          {
+            "cell": "GL",
+            "heldout_synthetic_ic": 0.45049020648002625,
+            "passed": false,
+            "seconds": 81.54635550000239,
+            "steps": 960
+          },
+          {
+            "cell": "GE",
+            "heldout_synthetic_ic": 0.44877445697784424,
+            "passed": false,
+            "seconds": 87.30952589999652,
+            "steps": 960
+          },
+          {
+            "cell": "TL",
+            "heldout_synthetic_ic": 0.44963231682777405,
+            "passed": false,
+            "seconds": 124.55427219998091,
+            "steps": 960
+          },
+          {
+            "cell": "TE",
+            "heldout_synthetic_ic": 0.44963231682777405,
+            "passed": false,
+            "seconds": 150.3624663000228,
+            "steps": 960
+          }
+        ],
+        "steps_fixed_in_advance": 960,
+        "synthetic_loss": "registered soft Spearman, SAM .05, AdamW peak LR/decay; fixed 960 updates without epoch schedule",
+        "synthetic_only": true,
+        "unseen_validation_dates": 24
+      },
+      "sha256": "8135832e730255e9f299407a2e680f38eb6fed80d74d67c235d137616ce8ffa2"
+    },
+    {
+      "file": "pathway_full_adamw_probe.json",
+      "result": {
+        "fresh_training_dates_per_update": 8,
+        "results": [
+          {
+            "cell": "GL",
+            "heldout_synthetic_ic": 0.904411792755127,
+            "passed": true,
+            "seconds": 43.567351500008954,
+            "steps": 960
+          },
+          {
+            "cell": "GE",
+            "heldout_synthetic_ic": 0.9818627238273621,
+            "passed": true,
+            "seconds": 57.89622580001014,
+            "steps": 960
+          }
+        ],
+        "steps_fixed_in_advance": 960,
+        "synthetic_loss": "registered soft Spearman, AdamW only diagnostic, AdamW peak LR/decay; fixed 960 updates without epoch schedule",
+        "synthetic_only": true,
+        "unseen_validation_dates": 24
+      },
+      "sha256": "ee4bde1dcea093f73370e6cb75c0eeb3c7062da7a04d19d900c35e602cbb2aa0"
+    },
+    {
+      "file": "pathway_full_scheduled_probe.json",
+      "result": {
+        "fresh_training_dates_per_update": 8,
+        "results": [
+          {
+            "cell": "GL",
+            "heldout_synthetic_ic": 0.44877445697784424,
+            "passed": false,
+            "seconds": 332.07588280001073,
+            "steps": 4800
+          }
+        ],
+        "steps_fixed_in_advance": 4800,
+        "synthetic_loss": "registered soft Spearman, SAM .05, AdamW peak LR/decay; fixed 4800 updates with registered warmup/cosine schedule",
+        "synthetic_only": true,
+        "unseen_validation_dates": 24
+      },
+      "sha256": "b5d4d1c8e0a5462c782678426c2a88f09eec66d736cf3618308cc23c79f587ad"
+    },
+    {
+      "file": "pathway_component_acceptance.json",
+      "result": {
+        "fresh_training_dates_per_update": 8,
+        "qualification": "full-model SAM peer-task failures are retained separately; this establishes representation learnability only",
+        "results": [
+          {
+            "cell": "GL",
+            "heldout_synthetic_ic": 0.9645220637321472,
+            "passed": true,
+            "seconds": 20.61549319999176,
+            "steps": 800
+          },
+          {
+            "cell": "GE",
+            "heldout_synthetic_ic": 0.9637255072593689,
+            "passed": true,
+            "seconds": 29.707733599992935,
+            "steps": 800
+          },
+          {
+            "cell": "TL",
+            "heldout_synthetic_ic": 0.45986518263816833,
+            "passed": false,
+            "seconds": 39.99851360000321,
+            "steps": 800
+          },
+          {
+            "cell": "TE",
+            "heldout_synthetic_ic": 0.8555147647857666,
+            "passed": true,
+            "seconds": 49.89358439997886,
+            "steps": 800
+          }
+        ],
+        "scope": "actual full-window temporal and peer components plus a linear diagnostic head; not the B4 trunk",
+        "steps_fixed_in_advance": 800,
+        "synthetic_loss": "continuous teacher MSE; AdamW .001 decay .01 clip1, dropout .1, fixed800 updates",
+        "synthetic_only": true,
+        "unseen_validation_dates": 48
+      },
+      "sha256": "c85d9ff2f7238bbe0bb87496acd2f62ad8d543f12bcc29bb831be25ee976194f"
+    }
+  ],
+  "status": "CPU_correctness_checked_CUDA_extension_pending",
+  "surrogate_role_amendment": "The initial binary IC gate was changed after observing the synthetic failures. Failed probes remain failed; registration explicitly changes their role to a non-veto diagnostic before financial fitting"
+}

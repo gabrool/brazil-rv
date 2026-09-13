@@ -73,6 +73,26 @@ def cross_market_partition(names):
     return common, tuple(n for n in names if n not in common)
 
 
+# Separately registered extension; the original CELLS/protocol remain unchanged.
+PATHWAY_CELLS = tuple(
+    {
+        "cell": name,
+        "graph": f"c1_pathway_{name.lower()}",
+        "recipe": "R",
+        "inputs": "all",
+        "rho": 0.05,
+        "temporal_encoder": encoder,
+        "peer_timing": timing,
+    }
+    for name, encoder, timing in (
+        ("GL", "gru", "late"),
+        ("GE", "gru", "early"),
+        ("TL", "attention", "late"),
+        ("TE", "attention", "early"),
+    )
+)
+
+
 def configuration(cell, names):
     families = {
         k.removeprefix("sidecar_"): tuple(v)
@@ -104,6 +124,8 @@ def configuration(cell, names):
         context="attention" if cell["graph"] == "c1_attention" else "pool",
         members=8 if cell["graph"] == "c1_tabm" else 1,
         horizons=(1, 2, 3, 5, 10) if cell["graph"] == "c1_five_heads" else (3, 5, 10),
+        temporal_encoder=cell.get("temporal_encoder", "gru"),
+        peer_timing=cell.get("peer_timing", "none"),
     )
 
 

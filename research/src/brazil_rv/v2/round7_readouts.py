@@ -49,6 +49,11 @@ def ensemble(root, design, cell, fold, seeds, dates, isins):
     members, mask, records = [], None, []
     for seed in seeds:
         directory = trajectory(root, cell, fold, seed)
+        if cell in design.get("comparison_roots", {}):
+            source = resolve_external_root(design["comparison_roots"][cell])[0]
+            original = trajectory(source, cell, fold, seed)
+            if (original / "run_manifest.json").exists():
+                directory = original
         manifest = read(directory / "run_manifest.json")
         if (
             manifest["status"] != "completed"
@@ -103,6 +108,19 @@ def evaluate(root, cells, folds, group, seeds=SEEDS, *, cells_only=False):
             for cell in cells:
                 output = aggregate_path(root, cell, fold, seeds)
                 paths[cell][fold] = output
+                if cell in design.get("comparison_roots", {}):
+                    source = resolve_external_root(design["comparison_roots"][cell])[0]
+                    original = aggregate_path(source, cell, fold, seeds)
+                    if _completed(original):
+                        metadata = read(original / "score_manifest.json")["metadata"]
+                        if metadata["round7_frozen_design_sha256"] != sha256_file(
+                            source / "frozen_design.json"
+                        ) or metadata["seeds"] != list(seeds):
+                            raise ValueError(
+                                "comparison aggregate differs from its original freeze"
+                            )
+                        paths[cell][fold] = original
+                        continue
                 if _completed(output):
                     metadata = read(output / "score_manifest.json")["metadata"]
                     if (
@@ -177,8 +195,9 @@ def evaluate(root, cells, folds, group, seeds=SEEDS, *, cells_only=False):
             requested.add(("B4", "A3"))
         if "B3" in cells and "B1" in cells:
             requested.add(("B3", "B1"))
-        if group == "confirmation":
+        if group == "confirmation" or design.get("pathway_extension"):
             requested |= set(combinations(cells, 2))
+        requested = {tuple(sorted(pair)) for pair in requested}
         pairs = {}
         for left, right in sorted(requested):
             pairs.update(
@@ -226,6 +245,10 @@ def evaluate(root, cells, folds, group, seeds=SEEDS, *, cells_only=False):
             "folds": list(folds),
             "seeds": list(seeds),
             "readouts": readouts,
+            "aggregate_paths": {
+                c: {f: str(p) for f, p in locations.items()}
+                for c, locations in paths.items()
+            },
             "paired": pairs,
             "seed_primary_ic": seed_points,
             "momentum": {

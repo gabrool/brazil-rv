@@ -1,0 +1,340 @@
+{
+  "cells": [
+    {
+      "cell": "GL",
+      "config": {
+        "blocks": 3,
+        "common_field_count": 44,
+        "context": "pool",
+        "dropout": 0.1,
+        "family_counts": [
+          [
+            "cross_market",
+            24
+          ],
+          [
+            "events",
+            7
+          ],
+          [
+            "fundamentals",
+            12
+          ],
+          [
+            "fundamentals_native",
+            9
+          ],
+          [
+            "lending",
+            7
+          ],
+          [
+            "magnitudes",
+            4
+          ],
+          [
+            "microstructure",
+            2
+          ],
+          [
+            "oddlot",
+            2
+          ],
+          [
+            "options",
+            7
+          ],
+          [
+            "rebalance",
+            2
+          ],
+          [
+            "sector",
+            3
+          ]
+        ],
+        "hidden_width": 64,
+        "horizons": [
+          3,
+          5,
+          10
+        ],
+        "inner_width": 256,
+        "lookback": 60,
+        "members": 1,
+        "peer_timing": "late",
+        "slow_feature_count": 32,
+        "temporal": true,
+        "temporal_encoder": "gru",
+        "width": 256
+      },
+      "graph": "c1_pathway_gl",
+      "inputs": "all",
+      "parameters": 1492643,
+      "peer_timing": "late",
+      "recipe": "R",
+      "rho": 0.05,
+      "temporal_encoder": "gru"
+    },
+    {
+      "cell": "GE",
+      "config": {
+        "blocks": 3,
+        "common_field_count": 44,
+        "context": "pool",
+        "dropout": 0.1,
+        "family_counts": [
+          [
+            "cross_market",
+            24
+          ],
+          [
+            "events",
+            7
+          ],
+          [
+            "fundamentals",
+            12
+          ],
+          [
+            "fundamentals_native",
+            9
+          ],
+          [
+            "lending",
+            7
+          ],
+          [
+            "magnitudes",
+            4
+          ],
+          [
+            "microstructure",
+            2
+          ],
+          [
+            "oddlot",
+            2
+          ],
+          [
+            "options",
+            7
+          ],
+          [
+            "rebalance",
+            2
+          ],
+          [
+            "sector",
+            3
+          ]
+        ],
+        "hidden_width": 64,
+        "horizons": [
+          3,
+          5,
+          10
+        ],
+        "inner_width": 256,
+        "lookback": 60,
+        "members": 1,
+        "peer_timing": "early",
+        "slow_feature_count": 32,
+        "temporal": true,
+        "temporal_encoder": "gru",
+        "width": 256
+      },
+      "graph": "c1_pathway_ge",
+      "inputs": "all",
+      "parameters": 1492643,
+      "peer_timing": "early",
+      "recipe": "R",
+      "rho": 0.05,
+      "temporal_encoder": "gru"
+    },
+    {
+      "cell": "TL",
+      "config": {
+        "blocks": 3,
+        "common_field_count": 44,
+        "context": "pool",
+        "dropout": 0.1,
+        "family_counts": [
+          [
+            "cross_market",
+            24
+          ],
+          [
+            "events",
+            7
+          ],
+          [
+            "fundamentals",
+            12
+          ],
+          [
+            "fundamentals_native",
+            9
+          ],
+          [
+            "lending",
+            7
+          ],
+          [
+            "magnitudes",
+            4
+          ],
+          [
+            "microstructure",
+            2
+          ],
+          [
+            "oddlot",
+            2
+          ],
+          [
+            "options",
+            7
+          ],
+          [
+            "rebalance",
+            2
+          ],
+          [
+            "sector",
+            3
+          ]
+        ],
+        "hidden_width": 64,
+        "horizons": [
+          3,
+          5,
+          10
+        ],
+        "inner_width": 256,
+        "lookback": 60,
+        "members": 1,
+        "peer_timing": "late",
+        "slow_feature_count": 32,
+        "temporal": true,
+        "temporal_encoder": "attention",
+        "width": 256
+      },
+      "graph": "c1_pathway_tl",
+      "inputs": "all",
+      "parameters": 1501283,
+      "peer_timing": "late",
+      "recipe": "R",
+      "rho": 0.05,
+      "temporal_encoder": "attention"
+    },
+    {
+      "cell": "TE",
+      "config": {
+        "blocks": 3,
+        "common_field_count": 44,
+        "context": "pool",
+        "dropout": 0.1,
+        "family_counts": [
+          [
+            "cross_market",
+            24
+          ],
+          [
+            "events",
+            7
+          ],
+          [
+            "fundamentals",
+            12
+          ],
+          [
+            "fundamentals_native",
+            9
+          ],
+          [
+            "lending",
+            7
+          ],
+          [
+            "magnitudes",
+            4
+          ],
+          [
+            "microstructure",
+            2
+          ],
+          [
+            "oddlot",
+            2
+          ],
+          [
+            "options",
+            7
+          ],
+          [
+            "rebalance",
+            2
+          ],
+          [
+            "sector",
+            3
+          ]
+        ],
+        "hidden_width": 64,
+        "horizons": [
+          3,
+          5,
+          10
+        ],
+        "inner_width": 256,
+        "lookback": 60,
+        "members": 1,
+        "peer_timing": "early",
+        "slow_feature_count": 32,
+        "temporal": true,
+        "temporal_encoder": "attention",
+        "width": 256
+      },
+      "graph": "c1_pathway_te",
+      "inputs": "all",
+      "parameters": 1501283,
+      "peer_timing": "early",
+      "recipe": "R",
+      "rho": 0.05,
+      "temporal_encoder": "attention"
+    }
+  ],
+  "fine_tune_budget": "inherit_original_B4_calibration",
+  "forward_capture": false,
+  "heldout_access": false,
+  "original_protocol_sha256": "8a8e065d8233da7dacad3e7928f42c2256924a5d9e40959460f77210d4520c7e",
+  "primary_contrasts": [
+    "GE_minus_GL",
+    "TE_minus_TL"
+  ],
+  "registration_sha256": "6391d12a50c20c249145b504c3d65a7f46370f8cc676f834c62a4da32414170b",
+  "rho": 0.05,
+  "schema": "BRAZIL_RV_PATHWAY_PROTOCOL_V1",
+  "screen_folds": [
+    "F2",
+    "F6",
+    "F10",
+    "F14"
+  ],
+  "secondary_contrasts": [
+    "TL_minus_GL",
+    "TE_minus_GE",
+    "interaction"
+  ],
+  "seeds": [
+    11,
+    29,
+    47
+  ],
+  "stage_p_epochs": 60,
+  "store": {
+    "manifest_sha256": "1db29cbf7b30244b2327ab7e0c212a796fd25280141a45e4ee28213b2644aa65",
+    "root": "D:\\quant-data\\b3\\processed\\v2_round7_store_de6476b_20260912T232200Z"
+  }
+}

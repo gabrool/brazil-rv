@@ -24,7 +24,7 @@ from .data import V2DailyDataset, stage_name_count
 from .model import DailyMultiHorizonModel
 from .normalization import average_ranks
 from .research_rounds import _git_identity
-from .round7 import CELLS, configuration, pretrain_key
+from .round7 import CELLS, PATHWAY_CELLS, configuration, pretrain_key
 from .round7_preprocessing import Round7Preprocessing
 from .train import (
     DateBatchSampler,
@@ -318,7 +318,7 @@ def train(
     export_scores=False,
 ):
     code = _git_identity()
-    cell = next(c for c in CELLS if c["cell"] == cell_name)
+    cell = next(c for c in (*CELLS, *PATHWAY_CELLS) if c["cell"] == cell_name)
     if cell["recipe"] != "R":
         raise ValueError("A0 uses the unchanged Round-6 training path")
     if stage == "P":
@@ -703,7 +703,7 @@ def main():
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument(
         "--cell",
-        choices=[c["cell"] for c in CELLS if c["recipe"] == "R"],
+        choices=[c["cell"] for c in (*CELLS, *PATHWAY_CELLS) if c["recipe"] == "R"],
         required=True,
     )
     parser.add_argument("--stage", choices=("P", "F"), required=True)

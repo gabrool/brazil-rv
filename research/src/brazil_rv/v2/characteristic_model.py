@@ -11,6 +11,7 @@ from torch.nn import functional as F
 from .config import ModelConfig
 from .contract import TARGETED_FUSION_GATE_BIAS
 from .model import _bounded_feature_age, _initialize_module, encode_slow_history
+from .temporal_pathway import HistoricalAttention, PeerAttention, TemporalPeerPathway
 
 
 @dataclass(frozen=True)
@@ -28,6 +29,8 @@ class CharacteristicConfig:
     inner_width: int = 256
     blocks: int = 3
     dropout: float = 0.1
+    temporal_encoder: str = "gru"
+    peer_timing: str = "none"
 
 
 def encode_values(values, valid, ages):
@@ -139,9 +142,17 @@ class CharacteristicModel(nn.Module):
                 4 * config.slow_feature_count, config.hidden_width
             )
             self.slow_input_norm = nn.LayerNorm(config.hidden_width)
-            self.slow_encoder = nn.GRU(
-                config.hidden_width, config.hidden_width, batch_first=True
+            self.slow_encoder = (
+                HistoricalAttention(
+                    config.hidden_width, config.lookback, config.dropout
+                )
+                if config.temporal_encoder == "attention"
+                else nn.GRU(config.hidden_width, config.hidden_width, batch_first=True)
             )
+            if config.peer_timing != "none":
+                self.temporal_peer = TemporalPeerPathway(
+                    config.hidden_width, config.dropout, config.peer_timing
+                )
         self.core = nn.Sequential(
             nn.Linear(3 * config.slow_feature_count, 128),
             nn.GELU(),
@@ -182,6 +193,9 @@ class CharacteristicModel(nn.Module):
         )
         self.head = nn.Linear(config.width, len(config.horizons))
         self.apply(_initialize_module)
+        for module in self.modules():
+            if isinstance(module, PeerAttention):
+                module.initialize_attention()
         if self.film is not None:
             nn.init.zeros_(self.film[-1].weight)
             nn.init.zeros_(self.film[-1].bias)
@@ -203,18 +217,21 @@ class CharacteristicModel(nn.Module):
         active = active_mask.bool()
         parts = []
         if self.config.temporal:
-            parts.append(
-                encode_slow_history(
-                    slow_features,
-                    slow_feature_mask,
-                    slow_history_mask,
-                    slow_feature_age_sessions,
-                    config=self.temporal_config,
-                    input_projection=self.slow_input_projection,
-                    input_norm=self.slow_input_norm,
-                    encoder=self.slow_encoder,
-                )
+            history = encode_slow_history(
+                slow_features,
+                slow_feature_mask,
+                slow_history_mask,
+                slow_feature_age_sessions,
+                config=self.temporal_config,
+                input_projection=self.slow_input_projection,
+                input_norm=self.slow_input_norm,
+                encoder=self.slow_encoder,
+                return_sequence=self.config.peer_timing != "none",
+                temporal_attention=self.config.temporal_encoder == "attention",
             )
+            if self.config.peer_timing != "none":
+                history = self.temporal_peer(history, slow_history_mask.bool(), active)
+            parts.append(history)
         # The final permitted decision row is already aligned by the store;
         # no consumer-side extra lag, and no substitution of an older valid row.
         core_valid = slow_feature_mask[..., -1, :].bool() & active[..., None]

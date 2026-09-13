@@ -238,6 +238,8 @@ def encode_slow_history(
     input_projection: nn.Module,
     input_norm: nn.Module,
     encoder: nn.Module,
+    return_sequence: bool = False,
+    temporal_attention: bool = False,
 ) -> torch.Tensor:
     """Shared exact calendar-window encoder for S0 and the characteristic model."""
     if slow_features.ndim != 4:
@@ -288,6 +290,9 @@ def encode_slow_history(
         )
     )
     projected = torch.where(valid[..., None], projected, torch.zeros_like(projected))
+    if temporal_attention:
+        sequence = encoder(projected, valid)
+        return sequence if return_sequence else sequence[..., -1, :]
     if config.slow_encoder_kind == "mlp":
         state = encoder(projected[..., 0, :])
         return torch.where(valid[..., -1, None], state, torch.zeros_like(state))
@@ -310,6 +315,12 @@ def encode_slow_history(
     # state.  This is equivalent to a packed GRU while remaining friendly
     # to full-graph compilation.
     sequence, _ = encoder(packed_inputs)
+    if return_sequence:
+        calendar_positions = (positions - (lookback - lengths[:, None])).clamp_min(0)
+        restored = sequence.gather(
+            1, calendar_positions[..., None].expand(-1, -1, sequence.shape[-1])
+        ).reshape(batch_size, name_count, lookback, config.hidden_width)
+        return torch.where(valid[..., None], restored, 0.0)
     last = (lengths - 1).clamp_min(0)
     state = sequence.gather(
         1,

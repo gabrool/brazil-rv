@@ -17,7 +17,7 @@ from .contract import HORIZONS
 from .data import V2DailyDataset, stage_name_count
 from .model import DailyMultiHorizonModel
 from .normalization import midrank_unit_interval
-from .round7 import CELLS, configuration
+from .round7 import CELLS, PATHWAY_CELLS, configuration
 from .round7_preprocessing import Round7Preprocessing
 from .round7_training import (
     TrainingObjective,
@@ -113,7 +113,7 @@ def run(store_root, output, *, device, cells, maximum_steps=120):
             torch.manual_seed(11)
             torch._dynamo.reset()
             torch._dynamo.utils.counters.clear()
-            cell = next(c for c in CELLS if c["cell"] == cell_name)
+            cell = next(c for c in (*CELLS, *PATHWAY_CELLS) if c["cell"] == cell_name)
             characteristic = cell["graph"] != "s0"
             config = configuration(cell, manifest["feature_names"])
             inputs = [s[int(cell["inputs"] == "all")] for s in samples]

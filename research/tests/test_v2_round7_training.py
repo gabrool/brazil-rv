@@ -114,7 +114,10 @@ def test_three_head_export_never_fabricates_short_horizon_predictions():
     assert not scores[0, 1].any() and not mask[0, 1].any()
 
 
-def test_fixed_fit_resume_and_tail_scoring_are_identical(tmp_path, monkeypatch):
+@pytest.mark.parametrize("cell_name", ["B3", "GE", "TE"])
+def test_fixed_fit_resume_and_tail_scoring_are_identical(
+    tmp_path, monkeypatch, cell_name
+):
     import json
     from dataclasses import asdict
     from test_v2_training import _tracked_pretrain_loaders
@@ -155,7 +158,14 @@ def test_fixed_fit_resume_and_tail_scoring_are_identical(tmp_path, monkeypatch):
     monkeypatch.setattr(training, "_cli_stage_indices", indices)
     monkeypatch.setattr(scoring, "_cli_stage_indices", indices)
     monkeypatch.setattr(training, "_git_identity", lambda: {"commit": "f" * 40})
-    cell = next(c for c in CELLS if c["cell"] == "B3")
+    from brazil_rv.v2.round7 import PATHWAY_CELLS, pretrain_key
+
+    cell = {
+        **next(c for c in (*CELLS, *PATHWAY_CELLS) if c["cell"] == cell_name),
+        "inputs": "slow",
+    }
+    if cell_name != "B3":
+        monkeypatch.setattr(training, "PATHWAY_CELLS", (cell,))
     config = configuration(cell, manifest["feature_names"])
     torch.manual_seed(22)
     parent = tmp_path / "parent.pt"
@@ -165,7 +175,7 @@ def test_fixed_fit_resume_and_tail_scoring_are_identical(tmp_path, monkeypatch):
             "stage": "P",
             "seed": 11,
             "contract": {
-                "pretrain_key": "c1_slow",
+                "pretrain_key": pretrain_key(cell),
                 "config": asdict(config),
                 "store_manifest_sha256": sha256_file(manifest_path),
             },
@@ -174,7 +184,7 @@ def test_fixed_fit_resume_and_tail_scoring_are_identical(tmp_path, monkeypatch):
         parent,
     )
     options = dict(
-        cell_name="B3",
+        cell_name=cell_name,
         stage="F",
         fold="F1",
         seed=11,

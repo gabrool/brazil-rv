@@ -20,6 +20,13 @@ This repairs retrospective U2 accounting and continued quotes, preserves histori
 decision inputs, and adds fit-scaled native fundamentals without a rank-support gate.
 All new Round-7 fits use this same store; sealed earlier results remain unchanged.
 
+The user also authorized a separately frozen [temporal pathway factorial](research/preregistrations/v2_round7_pathway.md)
+while preserving original Round 7. It compares GRU/temporal-attention encoders
+and early/late peer interaction at unchanged history and eligibility. It inherits
+the original B4 budget, uses fresh compatible parents and keeps its decision
+separate. [Engineering evidence](docs/v2_round7_pathway_engineering.md) records
+synthetic optimizer sensitivity and the explicit non-veto diagnostic amendment.
+
 Round 6's user-authorized compute amendment is recorded in
 [the registered contract](research/preregistrations/v2_round6_compute_amendment.md).
 The revised comparison uses every PIT-active name on a stage-fixed compact axis,
