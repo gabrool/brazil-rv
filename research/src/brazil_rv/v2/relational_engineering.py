@@ -161,6 +161,7 @@ def run(
         return {name: tensor.to(device) for name, tensor in value.items()}
 
     validation = [batch(100_000_000 + seed * 100 + i) for i in range(8)]
+    validation_support = []
 
     def readout():
         model.eval()
@@ -184,7 +185,29 @@ def run(
                     )
                 )
         model.train()
-        return float(np.mean(values))
+        defined = np.isfinite(values)
+        validation_support.append(int(defined.sum()))
+        # A flat prediction can make IC undefined. Retain that failure as null
+        # and its support, instead of losing the run to JSON's NaN rejection.
+        return float(np.mean(values)) if defined.all() else None
+
+    from .training_diagnostics import probe
+
+    diagnostic_batch = batch(seed * 1_000_000, size=2)
+
+    def diagnostic():
+        return probe(
+            model,
+            optimizer,
+            diagnostic_batch,
+            characteristic=True,
+            horizons=config.horizons,
+            rho=rho,
+            adaptive=recipe.adaptive,
+            eta=recipe.eta,
+        )
+
+    diagnostics = {"initial": diagnostic()}
 
     history = [{"update": 0, "validation_ic": readout()}]
     start = time.perf_counter()
@@ -215,6 +238,7 @@ def run(
                     "history": history,
                 },
             )
+    diagnostics["terminal"] = diagnostic()
     result = {
         "status": "completed",
         "task": task,
@@ -227,6 +251,8 @@ def run(
         "unique_training_dates": steps * 16,
         "independent_validation_dates": 128,
         "history": history,
+        "defined_validation_dates": validation_support,
+        "diagnostics": diagnostics,
         "seconds": time.perf_counter() - start,
         "compiled": compiled,
         "validation_recipients_only": True,
