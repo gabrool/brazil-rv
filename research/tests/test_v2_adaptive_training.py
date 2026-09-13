@@ -52,6 +52,52 @@ def test_optimizer_routes_gru_biases_norms_and_transferred_parameters():
         assert group["lr"] == pytest.approx(3e-5 if name in transferred else 1e-4)
 
 
+def test_unexposed_family_encoders_are_not_lr_suppressed():
+    from types import SimpleNamespace
+    import numpy as np
+    from brazil_rv.v2.characteristic_model import (
+        CharacteristicConfig,
+        CharacteristicModel,
+    )
+    from brazil_rv.v2.round7_training import (
+        unexposed_families,
+        transferred_parameter_names,
+    )
+
+    class Store:
+        def read(self, name, rows):
+            if name == "active":
+                return np.ones((len(rows), 2), bool)
+            # Known ages count as exposure even without a usable value.
+            return np.full((len(rows), 2, 1), 2 if "events" in name else -1)
+
+    data = SimpleNamespace(store=Store(), date_indices=np.arange(3))
+    preparation = SimpleNamespace(
+        families={n: SimpleNamespace(support=(0,)) for n in ("lending", "events")}
+    )
+    cold = unexposed_families(data, preparation)
+    assert cold == ["lending"]
+    model = CharacteristicModel(
+        CharacteristicConfig(family_counts=(("lending", 1), ("events", 1)))
+    )
+    transferred = transferred_parameter_names(model, cold)
+    optimizer = recipe_optimizer(
+        model,
+        cuda=False,
+        learning_rate=1e-4,
+        transferred=transferred,
+        transferred_multiplier=0.3,
+    )
+    groups = {id(p): g for g in optimizer.param_groups for p in g["params"]}
+    assert all(
+        groups[id(p)]["lr"] == 1e-4 for p in model.families["lending"].parameters()
+    )
+    assert all(
+        groups[id(p)]["lr"] == pytest.approx(3e-5)
+        for p in model.families["events"].parameters()
+    )
+
+
 @pytest.mark.parametrize("adaptive", [False, True])
 def test_probe_restores_state_optimizer_and_rng(adaptive):
     from brazil_rv.v2.characteristic_model import (

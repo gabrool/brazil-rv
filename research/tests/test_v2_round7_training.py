@@ -165,6 +165,7 @@ def test_selected_fit_resume_and_scoring_are_identical(
             "seed": 11,
             "contract": {
                 "pretrain_key": pretrain_key(cell),
+                "unexposed_families": [],
                 "preprocessing": {
                     "families": {},
                     "diagnostic": None,

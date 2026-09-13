@@ -19,7 +19,7 @@ from brazil_rv.modeling.engine import _soft_spearman_group_losses
 
 from .artifacts import sha256_file, write_json_atomic
 from .characteristic_model import CharacteristicModel
-from .contract import HORIZONS, RAW_PATIENCE_SCHEMA, TARGET_NEUTRALIZATION_TIE_POLICY
+from .contract import HORIZONS, TARGET_NEUTRALIZATION_TIE_POLICY
 from .data import V2DailyDataset, stage_name_count
 from .model import DailyMultiHorizonModel
 from .normalization import average_ranks
@@ -360,6 +360,32 @@ def sequential_batches(count, size=16):
     ]
 
 
+def unexposed_families(dataset, preparation):
+    """No P value or known-age exposure: such encoders have no learned mapping."""
+    result = []
+    for family, scaler in preparation.families.items():
+        if any(scaler.support):
+            continue
+        exposed = False
+        for start in range(0, len(dataset.date_indices), 128):
+            rows = dataset.date_indices[start : start + 128]
+            ages = dataset.store.read(f"sidecar_{family}_age_sessions", rows)
+            if np.any((ages >= 0) & dataset.store.read("active", rows)[..., None]):
+                exposed = True
+                break
+        if not exposed:
+            result.append(family)
+    return result
+
+
+def transferred_parameter_names(model, unexposed):
+    """Wholly cold family encoders use full F LR; preserve learned shared tensors."""
+    prefixes = tuple(f"families.{name}." for name in unexposed)
+    return tuple(
+        name for name, _ in model.named_parameters() if not name.startswith(prefixes)
+    )
+
+
 def train(
     store_root,
     output,
@@ -415,10 +441,11 @@ def train(
             if parent is None or parent_sha256 != sha256_file(parent):
                 raise ValueError("F requires a hash-bound compatible Stage-P parent")
             parent_payload = torch.load(parent, map_location="cpu", weights_only=True)
-            if parent_payload.get("schema") == CHECKPOINT_SCHEMA:
-                parent_preprocessing = Round7Preprocessing.from_payload(
-                    parent_payload["contract"]["preprocessing"]
-                )
+            if parent_payload.get("schema") != CHECKPOINT_SCHEMA:
+                raise ValueError("candidate F requires a selected compatible P parent")
+            parent_preprocessing = Round7Preprocessing.from_payload(
+                parent_payload["contract"]["preprocessing"]
+            )
         preparation = Round7Preprocessing.fit(
             training, split_common=split_common, parent=parent_preprocessing
         )
@@ -475,6 +502,7 @@ def train(
             "rho": rho,
             "loss": loss_kind,
             "preprocessing": preparation.payload(),
+            "unexposed_families": unexposed_families(training, preparation),
             "target_group_tie_policy": TARGET_NEUTRALIZATION_TIE_POLICY,
             "fit_target_window": fit_window.tolist(),
             "access": {
@@ -497,27 +525,22 @@ def train(
             payload = parent_payload
             if payload["stage"] != "P" or payload["seed"] != seed:
                 raise ValueError("parent stage/seed differs")
-            if payload.get("schema") == CHECKPOINT_SCHEMA:
-                parent_contract = payload["contract"]
-                if (
-                    parent_contract["pretrain_key"] != pretrain_key(cell)
-                    or parent_contract["config"] != asdict(config)
-                    or parent_contract["store_manifest_sha256"]
-                    != contract["store_manifest_sha256"]
-                ):
-                    raise ValueError("parent graph/input/store contract differs")
-            else:
-                # Only S0-slow inherits the explicitly registered old-recipe P.
-                if (
-                    pretrain_key(cell) != "s0_slow"
-                    or payload.get("schema") != RAW_PATIENCE_SCHEMA
-                    or payload.get("transfer_chronology_clean") is not True
-                    or payload["input_contract"]["training"]["store"]["manifest_sha256"]
-                    != contract["store_manifest_sha256"]
-                ):
-                    raise ValueError("old-recipe parent is not repaired-store S0")
+            parent_contract = payload["contract"]
+            if (
+                parent_contract["pretrain_key"] != pretrain_key(cell)
+                or parent_contract["config"] != asdict(config)
+                or parent_contract["store_manifest_sha256"]
+                != contract["store_manifest_sha256"]
+            ):
+                raise ValueError("parent graph/input/store contract differs")
             model.load_state_dict(payload["model_state_dict"], strict=True)
-        transferred = tuple(dict(model.named_parameters())) if stage == "F" else ()
+        transferred = (
+            transferred_parameter_names(
+                model, parent_payload["contract"]["unexposed_families"]
+            )
+            if stage == "F"
+            else ()
+        )
         contract["transferred_parameters"] = list(transferred)
         optimizer = recipe_optimizer(
             model,

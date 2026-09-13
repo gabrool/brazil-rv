@@ -30,6 +30,11 @@ decay .01; every module-owned bias and normalization parameter has zero decay.
 Dropout remains .1. Transferred parameter names are explicit; the F multiplier
 is .3 for the common recipe, with a 1.0 calibration bridge. New parameters use
 the full LR. Exact SAM restoration and identical two-pass RNG are required.
+An encoder with neither a valid value nor a known age anywhere in P's fit
+population is wholly unexposed and uses full F LR, despite its parameters being
+present in the parent file. Preserve its initialization; do not discard other
+families' learned representations. Partially exposed encoders and shared fusion
+tensors retain their transferred rate. Record these names and exposure evidence.
 
 Compile objective and model with the existing full-graph path where measured
 beneficial. CUDA uses BF16 autocast with FP32 parameters, optimizer state,

@@ -28,14 +28,27 @@ passed P/F2/F14 for S0, C1, TE and TL with 60 sessions and all sampled active
 names. BF16 forward discrepancy was 0.56–1.20% of the FP32 score standard
 deviation; actual adaptive optimizer steps were finite. Evidence is at
 the source-bound [CPU evidence](v2_post_data_cpu_engineering.json).
-No financial trajectory or evaluation scoring has begun. Provider inventory
-was empty when checked; no instance launched yet.
+No financial trajectory or evaluation scoring has begun. Exact GH200 instance
+`7eed8bef79944d619ab42818b4978022` launched at 23:11:04 UTC and is active at
+`192.222.58.84`. The repaired-store delta was recovered with all file hashes
+verified. CUDA acceptance runs in user unit `brazil-rv-post-data-a`; after the
+first dispatch was stopped on SSH logout, user lingering was enabled and the
+unit restarted. Require its result JSON and successful exit, not just an
+inactive unit. Operational continuation is recorded at
+`C:/quant-data/b3/interim/post_data_20260913/CONTINUE.md`.
 
 Early-stop and score-attachment integration checks now also pass: an imposed
 declining selection curve stops at epoch 3 and retains epoch 1; later scoring
 reuses that fit. Explicit runner continuation preserves logs and requires the
 trainer to validate the saved contract. Obsolete fixed-budget launcher call
 sites are removed; historical result/path readers remain.
+
+Final transfer review also separates wholly unexposed P family encoders from
+learned transferred parameters. No valid value AND no known-age exposure in P
+means full F LR; known-age-only and partially exposed encoders retain their
+learned mappings. Shared fusion tensors remain transferred. This avoids
+suppressing genuinely newly available families by the .3 transfer multiplier.
+Twenty targeted adaptive-training/selection/resume tests pass after this change.
 
 Acceptance still required: final review;
 full-path CUDA AMP/compile engineering measurements;
