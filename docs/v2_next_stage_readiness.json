@@ -1,0 +1,141 @@
+{
+  "actual_array_files_verified": 105,
+  "all_retained_fields_zero_support_loss": true,
+  "canonical_pointer": {
+    "path": "docs\\v2_data_inputs.json",
+    "sha256": "4def088252627fd1082a29a4f9df539e941dcab266b018217f856e6d78259b13"
+  },
+  "exact_correction_evidence_files_verified": 151,
+  "financial_family_verified": {
+    "path": "D:\\quant-data\\b3\\interim\\data_repair_20260913T184500Z\\financial_family_e884836cf8bd\\manifest.json",
+    "sha256": "0dc0076550c8cd3e3d89f1b00fc2fce48de69b721f3a18dff4dd9823edf30f37"
+  },
+  "forward_capture": false,
+  "heldout_access": false,
+  "model_changes": false,
+  "non_blocking_cleanup": [
+    {
+      "file": "research/src/brazil_rv/v2/feature_spec.py",
+      "finding": "Magnitude formula strings retain obsolete percentile-clipping text. Executable transform and consumer use the accepted unclipped path."
+    },
+    {
+      "file": "research/src/brazil_rv/v2/feature_spec.py",
+      "finding": "Legacy sidecar_fundamentals_native specification/test and earlier Round7 construction paths remain in source. The accepted store and current all-family configuration do not enable the duplicate family."
+    }
+  ],
+  "prior_cpu_acceptance_stages": [
+    {
+      "fold": "pretrain_internal",
+      "forward_checks": [
+        {
+          "active_names_retained": 340,
+          "bf16_finite": true,
+          "fp32_finite": true,
+          "graph": "s0",
+          "score_shape": [
+            3,
+            160,
+            1,
+            5
+          ]
+        },
+        {
+          "active_names_retained": 340,
+          "bf16_finite": true,
+          "fp32_finite": true,
+          "graph": "c1",
+          "score_shape": [
+            3,
+            160,
+            1,
+            3
+          ]
+        }
+      ],
+      "stage": "P"
+    },
+    {
+      "fold": "F2",
+      "forward_checks": [
+        {
+          "active_names_retained": 410,
+          "bf16_finite": true,
+          "fp32_finite": true,
+          "graph": "s0",
+          "score_shape": [
+            3,
+            144,
+            1,
+            5
+          ]
+        },
+        {
+          "active_names_retained": 410,
+          "bf16_finite": true,
+          "fp32_finite": true,
+          "graph": "c1",
+          "score_shape": [
+            3,
+            144,
+            1,
+            3
+          ]
+        }
+      ],
+      "stage": "F"
+    },
+    {
+      "fold": "F14",
+      "forward_checks": [
+        {
+          "active_names_retained": 577,
+          "bf16_finite": true,
+          "fp32_finite": true,
+          "graph": "s0",
+          "score_shape": [
+            3,
+            256,
+            1,
+            5
+          ]
+        },
+        {
+          "active_names_retained": 577,
+          "bf16_finite": true,
+          "fp32_finite": true,
+          "graph": "c1",
+          "score_shape": [
+            3,
+            256,
+            1,
+            3
+          ]
+        }
+      ],
+      "stage": "F"
+    }
+  ],
+  "protected_arrays_identical_to_parent": 73,
+  "readiness": "Ready for next-stage engineering and controlled development experiments; numerical data closure confirmed, with documented source limits and minor metadata/legacy cleanup. New runner/parents/baseline must bind this store.",
+  "review_git_commit": "be1701c9210348bb4cbd3b654c34d00fe29ed37f",
+  "review_sources": [
+    {
+      "path": "docs\\v2_POST_ROUND7_PIPELINE_AUDIT.md",
+      "sha256": "3386c0ddff92ee6cbb64a5eb0b6c7f0f93686bcbdeeccf13bad058a24eea45b6"
+    },
+    {
+      "path": "C:\\Users\\gabri\\Downloads\\v2_round7_postmortem_pipeline_audit.md",
+      "sha256": "2fb1035c8117b5d88904e0bcd4b0e2107048df81c292b3c6bf2b0deb4e2ab186"
+    }
+  ],
+  "scope": "Fresh artifact and source-evidence integrity check plus current code review; previously passed tests/CPU acceptance referenced, not rerun. No fitting or evaluation-score selection.",
+  "source_capital_corrections": 27,
+  "source_currency_corrections": 43,
+  "store": {
+    "manifest_sha256": "61149d43a23fc55fcd92b43aaa4e74d747fbdf62f852bedbbbdb2cf18281f3cc",
+    "root": "C:\\quant-data\\b3\\processed\\v2_data_store_2d59b9d_20260913T211700Z"
+  },
+  "target_bucket_assignment_changes": 0,
+  "unresolved_original_pdf_count": 86,
+  "verified_at_utc": "2026-09-13T22:08:28.386342+00:00"
+}
