@@ -19,6 +19,16 @@ and the unchanged boundary: no fits, new alpha conclusion or held-out access.
 Historical Round-7 checkpoints/results retain their original store and code;
 they must not be silently evaluated with the new preprocessing.
 
+The user authorized stages A–C of the [post-data research plan](docs/v2_POST_DATA_RESEARCH_PLAN.md):
+selection-aware training/ASAM engineering, bounded fit/selection calibration,
+and a fresh four-fold, three-seed architecture/family screen. Follow
+[the registration](research/preregistrations/v2_post_data.md) and
+[stage acceptance state](docs/v2_post_data_progress.md). The incumbent S0 keeps
+its accepted recipe; candidate comparisons bind current repaired inputs and
+fresh compatible parents. Historical fixed-budget Round-7 launching entrypoints
+are retired; their sealed results and original Git implementation remain intact.
+Stages D–F, new forward capture and 2025/2026 consumer reads remain outside this work.
+
 Round 7 and its separately frozen temporal pathway extension are complete. Both
 retain A0 (repaired-store S0) as the research comparator; no new architecture
 qualified for replacement. The six-seed continuous book is descriptive and retains

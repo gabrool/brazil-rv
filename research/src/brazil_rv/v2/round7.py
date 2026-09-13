@@ -102,7 +102,9 @@ def configuration(cell, names):
         )
     return CharacteristicConfig(
         family_counts=tuple((n, len(v)) for n, v in sorted(families.items())),
-        common_field_count=len(common) + (3 if common else 0),
+        common_field_count=(len(common) + (3 if common else 0))
+        if cell.get("film", True)
+        else 0,
         temporal=cell["graph"] != "c1_no_gru",
         context="attention" if cell["graph"] == "c1_attention" else "pool",
         members=8 if cell["graph"] == "c1_tabm" else 1,

@@ -91,6 +91,11 @@ class CrossStockContext(nn.Module):
         else:
             raise ValueError("context must be pool or attention")
 
+    def initialize_attention(self):
+        if self.kind == "attention":
+            nn.init.xavier_uniform_(self.qkv.weight)
+            nn.init.xavier_uniform_(self.output.weight)
+
     def forward(self, values, active):
         if self.kind == "attention":
             b, n, _ = values.shape
@@ -194,7 +199,7 @@ class CharacteristicModel(nn.Module):
         self.head = nn.Linear(config.width, len(config.horizons))
         self.apply(_initialize_module)
         for module in self.modules():
-            if isinstance(module, PeerAttention):
+            if isinstance(module, (PeerAttention, CrossStockContext)):
                 module.initialize_attention()
         if self.film is not None:
             nn.init.zeros_(self.film[-1].weight)

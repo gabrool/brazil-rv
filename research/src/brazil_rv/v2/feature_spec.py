@@ -542,22 +542,22 @@ _ROUND5_FORMULAS: dict[str, tuple[str, str, Transform]] = {
     ),
     "return_1_over_vol_20": (
         "volatility_scaled_log_return",
-        "exact one-session decision-causal wealth log return / Yang-Zhang-20, ending t-1; parent validity; consumer fit-only 0.5/99.5 percentile clipping",
+        "exact one-session decision-causal wealth log return / Yang-Zhang-20, ending t-1; parent validity; consumer fit-only median/IQR and smooth asinh; no clipping",
         "precomputed_native",
     ),
     "daily_vol_20_raw": (
         "daily_decimal_volatility",
-        "decision-causal wealth Yang-Zhang-20 ending t-1, minimum 16/20 and parent validity; consumer fit-only 0.5/99.5 percentile clipping",
+        "decision-causal wealth Yang-Zhang-20 ending t-1, minimum 16/20 and parent validity; consumer fit-only median/IQR and smooth asinh; no clipping",
         "precomputed_native",
     ),
     "log_traded_value_20": (
         "log_brl",
-        "log(mean BRL turnover over exact 20 sessions ending t-1); parent activity validity; consumer fit-only 0.5/99.5 percentile clipping",
+        "log(mean BRL turnover over exact 20 sessions ending t-1); parent activity validity; consumer fit-only median/IQR and smooth asinh; no clipping",
         "precomputed_native",
     ),
     "economic_beta_60": (
         "unitless_slope",
-        "causal economic BOVA11 OLS slope, minimum40/60 observed pairs through t-1, Blume0.67*beta+0.33 and original[-1,3] bound; consumer fit-only percentile clipping",
+        "causal economic BOVA11 OLS slope, minimum40/60 observed pairs through t-1, Blume0.67*beta+0.33 and original[-1,3] bound; consumer fit-only median/IQR and smooth asinh; no clipping",
         "precomputed_native",
     ),
     **{
@@ -729,21 +729,7 @@ def feature_specs(
         units, formula = _semantic_definition(family, name)
         suffix = name.split("_", 1)[1] if family == "sidecar_rebalance" else name
         round5 = _ROUND5_FORMULAS.get(name) if family.startswith("sidecar_") else None
-        if family == "sidecar_fundamentals_native":
-            transform = "precomputed_native"
-            clip = None
-            if name == "book_to_market":
-                units, formula = (
-                    "log_ratio",
-                    "natural log of positive receipt-known book equity / PIT market capitalization",
-                )
-            elif name == "earnings_negative_flag":
-                units, formula = (
-                    "flag",
-                    "one when valid signed earnings_yield_ttm is negative; zero otherwise",
-                )
-            formula += "; legacy stored log field; smooth fit-only conditioning at the model boundary"
-        elif name in {"earnings_negative_flag", "incomplete_latest_statement_flag"}:
+        if name in {"earnings_negative_flag", "incomplete_latest_statement_flag"}:
             transform = "binary"
             clip = None
         elif round5 is not None:

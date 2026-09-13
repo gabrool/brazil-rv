@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import argparse
 import importlib.util
 import json
 import sys
@@ -13,25 +12,12 @@ from pathlib import Path
 import numpy as np
 import polars as pl
 
-from .artifacts import sha256_file, write_json_atomic
-from .contract import DEVELOPMENT_END, FINETUNE_START, PRETRAIN_END
-from .round5_cvm import normalized, rad_rows
+from .artifacts import sha256_file
+from .contract import DEVELOPMENT_END
+from .round5_cvm import normalized
 from .round5_derived import bind
-from .round5_store import align_family
-from .store import open_store_for_samples, peak_rss_bytes
 
 PROJECT = Path(__file__).resolve().parents[4]
-NATIVE_FIELDS = (
-    "earnings_yield_ttm",
-    "book_to_market",
-    "gross_profitability",
-    "liabilities_to_assets",
-    "accruals_to_assets",
-    "revenue_growth_yoy",
-    "sue",
-    "log_market_cap",
-    "earnings_negative_flag",
-)
 CONTINUATION_CODES = frozenset({"06", "07", "08"})
 UNIT_WORDS = ("desdobramento", "grupamento", "bonificacao", "conversao", "conversoes")
 
@@ -52,26 +38,6 @@ def registered_sources():
     if sha256_file(family_manifest) != cvm["sha256"]:
         raise ValueError("CVM family identity differs from accepted pointer")
     return root, manifest, family_manifest, accepted
-
-
-def native_fundamentals(frame: pl.DataFrame) -> pl.DataFrame:
-    """Preserve signed physical values and receipt ages before fit-only scaling."""
-    earnings = pl.col("earnings_yield_ttm")
-    return frame.with_columns(
-        pl.when(pl.col("book_to_market") > 0)
-        .then(pl.col("book_to_market").log())
-        .otherwise(None)
-        .alias("book_to_market"),
-        pl.when(earnings.is_finite())
-        .then((earnings < 0).cast(pl.Float64))
-        .otherwise(None)
-        .alias("earnings_negative_flag"),
-        pl.col("earnings_yield_ttm_age_sessions").alias(
-            "earnings_negative_flag_age_sessions"
-        ),
-    ).select(
-        "date", "isin", *NATIVE_FIELDS, *(f"{n}_age_sessions" for n in NATIVE_FIELDS)
-    )
 
 
 def corroborate_u2(
@@ -276,113 +242,3 @@ def continued_quotes(manifest, dates, isins, active, output):
         "sources": sources,
         "data": bind(output / "continued_quotes.parquet"),
     }
-
-
-def audit(output: Path):
-    root, manifest, family_manifest, accepted = registered_sources()
-    output.mkdir(parents=True, exist_ok=False)
-    axis = np.load(root / "date_index.npy", allow_pickle=False)
-    rows = np.arange(len(axis))
-    samples = rows[
-        (axis <= np.datetime64(PRETRAIN_END)) | (axis >= np.datetime64(FINETUNE_START))
-    ]
-    store, access = open_store_for_samples(
-        root, samples, purpose="training", history_lookbacks=60, history_end_offsets=0
-    )
-    try:
-        dates, isins = store.dates.astype(object).tolist(), store.isins
-        active = store.read("active", rows)
-
-        def table(name):
-            return pl.read_parquet(root / manifest["tables"][name]["path"])
-
-        family = json.loads(family_manifest.read_text(encoding="utf-8"))
-        cvm_root = Path(family["source_root"])
-        identity = pl.read_parquet(family_manifest.parent / "identity.parquet")
-        filings = rad_rows(cvm_root)
-        u2 = corroborate_u2(
-            table("corporate_actions_verified_terms"),
-            table("corporate_actions_provider_observations"),
-            identity,
-            filings,
-            store.dates,
-            isins,
-            store.read("distribution_change_mask", rows),
-        )
-        write_json_atomic(output / "u2_events.json", u2)
-        prints = continued_quotes(manifest, dates, isins, active, output)
-        source = pl.read_parquet(family_manifest.parent / "fundamentals.parquet")
-        native = native_fundamentals(source)
-        native.write_parquet(output / "fundamentals_native.parquet")
-        values, valid, ages = align_family(native, dates, isins, NATIVE_FIELDS)
-        original_fields = manifest["feature_names"]["sidecar_fundamentals"]
-        original_mask = store.read("sidecar_fundamentals_valid", rows)
-        support = []
-        for f, name in enumerate(NATIVE_FIELDS):
-            old_name = (
-                "earnings_yield_ttm" if name == "earnings_negative_flag" else name
-            )
-            old = original_mask[..., original_fields.index(old_name)]
-            physical = valid[..., f] & active
-            sparse = physical.sum(axis=1) < 20
-            support.append(
-                {
-                    "field": name,
-                    "valid_active_name_days": int(physical.sum()),
-                    "previously_suppressed_active_name_days": int(
-                        (physical & ~old).sum()
-                    ),
-                    "suppressed_on_less_than_20_name_dates": int(
-                        (physical & ~old & sparse[:, None]).sum()
-                    ),
-                }
-            )
-        write_json_atomic(output / "native_support.json", support)
-        report = {
-            "schema": "BRAZIL_RV_ROUND7_SOURCE_AUDIT_V1",
-            "base_store": accepted["store"],
-            "cvm_family_manifest": bind(family_manifest),
-            "access": access.payload(),
-            "u2_candidates": len(u2),
-            "u2_reclassified": sum(
-                r["classification"] == "large_move_no_action" for r in u2
-            ),
-            "u2_events": bind(output / "u2_events.json"),
-            "continued_prints": prints,
-            "native_family": bind(output / "fundamentals_native.parquet"),
-            "native_support": support,
-            "peak_rss_bytes": peak_rss_bytes(),
-            "scores_read": False,
-            "status": "source_audit_complete_foreign_clock_and_store_pending",
-        }
-        if report["peak_rss_bytes"] > 8 * 1024**3:
-            raise MemoryError("Round-7 preflight exceeded 8 GiB")
-        write_json_atomic(output / "manifest.json", report)
-        return report
-    finally:
-        store.close()
-
-
-def main():
-    parser = argparse.ArgumentParser()
-    parser.add_argument("command", choices=["audit"])
-    parser.add_argument("--output", required=True, type=Path)
-    args = parser.parse_args()
-    report = audit(args.output)
-    print(
-        json.dumps(
-            {
-                k: report[k]
-                for k in (
-                    "status",
-                    "u2_candidates",
-                    "u2_reclassified",
-                    "peak_rss_bytes",
-                )
-            }
-        )
-    )
-
-
-if __name__ == "__main__":
-    main()

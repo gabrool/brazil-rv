@@ -1,0 +1,54 @@
+# Post-data stages A–C progress
+
+Reference: [accepted plan](v2_POST_DATA_RESEARCH_PLAN.md) and
+[implementation registration](../research/preregistrations/v2_post_data.md).
+
+## Stage A — in progress
+
+Implemented selection from epoch 1 with fixed-schedule patience, ASAM,
+module-owned bias/norm routing, explicit transferred names/LR, and exact selected
+checkpoint scoring. Unconditional late averaging is removed from the current
+characteristic trainer; the incumbent's separate recipe is preserved. Historical
+Round-7 orchestration is reproducible from its original Git commit, not through
+the changed current trainer CLI.
+
+Bounded diagnostics restore weights, optimizer moments and RNG, and record
+per-module activation/gradient/update scale, FiLM gamma/beta, sampled attention
+entropy/logits and peer bypass sensitivity. No hooks enter compiled training.
+The new program binds current inputs and declares the B/C roster and parent
+reuse before scoring. The old native-fundamentals construction command, builder,
+specification and tests are removed; shared source-audit helpers remain. Current
+magnitude formulas describe the uncapped smooth transform. Sealed manifests
+retain their original bytes; the runtime preprocessing contract is unchanged.
+
+Local targeted checks pass: 27 training/ASAM/resume/runner checks, 37
+architecture/specification/source checks, and 16 program/preprocessing/runner
+checks (these groups overlap; not a unique test count). Real-input CPU acceptance
+passed P/F2/F14 for S0, C1, TE and TL with 60 sessions and all sampled active
+names. BF16 forward discrepancy was 0.56–1.20% of the FP32 score standard
+deviation; actual adaptive optimizer steps were finite. Evidence is at
+the source-bound [CPU evidence](v2_post_data_cpu_engineering.json).
+No financial trajectory or evaluation scoring has begun. Provider inventory
+was empty when checked; no instance launched yet.
+
+Early-stop and score-attachment integration checks now also pass: an imposed
+declining selection curve stops at epoch 3 and retains epoch 1; later scoring
+reuses that fit. Explicit runner continuation preserves logs and requires the
+trainer to validate the saved contract. Obsolete fixed-budget launcher call
+sites are removed; historical result/path readers remain.
+
+Acceptance still required: final review;
+full-path CUDA AMP/compile engineering measurements;
+re-read the reference plan and record A's closure before calibration.
+
+## Stage B — pending
+
+Unseen-date full-model teachers, then fit/selection-only financial calibration.
+Freeze screen settings/roster before evaluation-score access. Re-read the plan
+and record the evidence for B's completion before C.
+
+## Stage C — pending
+
+Fresh incumbent/common-recipe and GRU/early/late comparisons, then repaired
+family and FiLM contrasts on four folds and three seeds. Recover artifacts,
+publish a combined report, and close the exact paid instance.

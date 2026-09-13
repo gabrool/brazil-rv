@@ -5,6 +5,7 @@ import threading
 import time
 from pathlib import Path
 from types import SimpleNamespace
+from dataclasses import replace
 
 import pytest
 
@@ -89,6 +90,34 @@ def test_completed_trajectory_is_verified_and_skipped(tmp_path, monkeypatch) -> 
     outcomes = launcher.run_many((job,), max_parallel=1)
 
     assert outcomes[0].status == "skipped_completed"
+
+
+@pytest.mark.parametrize("epoch_checkpoint", [False, True])
+def test_explicit_continuation_preserves_logs_and_runs_trainer_validation(
+    tmp_path, monkeypatch, epoch_checkpoint
+):
+    job = replace(
+        _job(tmp_path, 0), resume=True, expected_manifest={"scoring_complete": True}
+    )
+    job.run_dir.mkdir()
+    job.stdout_path.write_bytes(b"previous output\n")
+    if epoch_checkpoint:
+        (job.run_dir / "resume.pt").write_bytes(b"trainer-owned checkpoint")
+    else:
+        _write_completed_manifest(list(job.command))
+
+    def finish(command, **kwargs):
+        _write_completed_manifest(command)
+        value = json.loads(job.manifest_path.read_text())
+        value["scoring_complete"] = True
+        job.manifest_path.write_text(json.dumps(value))
+        kwargs["stdout"].write(b"continued\n")
+        return SimpleNamespace(returncode=0)
+
+    monkeypatch.setattr(launcher.subprocess, "run", finish)
+    result = launcher.run_many((job,), max_parallel=1)
+    assert result[0].status == "completed"
+    assert job.stdout_path.read_bytes() == b"previous output\ncontinued\n"
 
 
 def test_incomplete_existing_root_aborts_before_launch(tmp_path, monkeypatch) -> None:

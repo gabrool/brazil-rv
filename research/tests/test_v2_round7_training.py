@@ -7,7 +7,7 @@ from torch import nn
 
 from brazil_rv.v2.round7 import calibrate_budget
 from brazil_rv.v2.round7_training import (
-    TailAverage,
+    TrainingRecipe,
     daily_primary_ic,
     learning_rate_fraction,
     member_loss,
@@ -67,20 +67,11 @@ def test_foreach_sam_matches_reference_and_exactly_restores_on_failure():
         torch.testing.assert_close(parameter, before[name], rtol=0, atol=0)
 
 
-def test_tail_average_has_no_initial_weight_and_decay_excludes_norm_bias():
+def test_decay_excludes_norm_bias():
     m = nn.Sequential(nn.Linear(1, 1), nn.LayerNorm(1))
     optimizer = recipe_optimizer(m, cuda=False)
     assert optimizer.param_groups[0]["params"] == [m[0].weight]
     assert len(optimizer.param_groups[1]["params"]) == 3
-    tail = TailAverage()
-    with torch.no_grad():
-        m[0].weight.fill_(2.0)
-    tail.update(m)
-    with torch.no_grad():
-        m[0].weight.fill_(4.0)
-    tail.update(m)
-    assert tail.state["0.weight"].item() == 3.0
-    assert tail.count == 2
 
 
 def test_budget_and_learning_rate_endpoints_are_fixed_without_evaluation_scores():
@@ -115,7 +106,7 @@ def test_three_head_export_never_fabricates_short_horizon_predictions():
 
 
 @pytest.mark.parametrize("cell_name", ["B3", "GE", "TE"])
-def test_fixed_fit_resume_and_tail_scoring_are_identical(
+def test_selected_fit_resume_and_scoring_are_identical(
     tmp_path, monkeypatch, cell_name
 ):
     import json
@@ -133,7 +124,7 @@ def test_fixed_fit_resume_and_tail_scoring_are_identical(
     factory().dataset.store.close()
     selection_loader.dataset.store.close()
     manifest = json.loads((root / "manifest.json").read_text())
-    manifest["metadata"]["round7_repair"] = {"synthetic_fixture": True}
+    manifest["metadata"]["data_repair"] = {"synthetic_fixture": True}
     root = write_fixture_store(
         tmp_path / "round7_fixture",
         dates=np.load(root / "date_index.npy") + np.timedelta64(2922, "D"),
@@ -164,8 +155,6 @@ def test_fixed_fit_resume_and_tail_scoring_are_identical(
         **next(c for c in (*CELLS, *PATHWAY_CELLS) if c["cell"] == cell_name),
         "inputs": "slow",
     }
-    if cell_name != "B3":
-        monkeypatch.setattr(training, "PATHWAY_CELLS", (cell,))
     config = configuration(cell, manifest["feature_names"])
     torch.manual_seed(22)
     parent = tmp_path / "parent.pt"
@@ -191,7 +180,8 @@ def test_fixed_fit_resume_and_tail_scoring_are_identical(
         parent,
     )
     options = dict(
-        cell_name=cell_name,
+        cell=cell,
+        recipe=TrainingRecipe(patience=9),
         stage="F",
         fold="F1",
         seed=11,
@@ -201,6 +191,7 @@ def test_fixed_fit_resume_and_tail_scoring_are_identical(
         device=torch.device("cpu"),
         compiled=False,
         export_scores=True,
+        diagnostics=False,
     )
     full = tmp_path / "full"
     training.train(root, full, **options)
@@ -217,9 +208,11 @@ def test_fixed_fit_resume_and_tail_scoring_are_identical(
         training.train(root, resumed, **options)
     monkeypatch.setattr(training, "write_json_atomic", original)
     training.train(root, resumed, **options)
-    a = torch.load(full / "tail_average.pt", weights_only=True)
-    b = torch.load(resumed / "tail_average.pt", weights_only=True)
-    assert a["tail_count"] == b["tail_count"] == 2
+    a = torch.load(full / "selected.pt", weights_only=True)
+    b = torch.load(resumed / "selected.pt", weights_only=True)
+    assert a["epoch"] == b["epoch"]
+    history = json.loads((full / "history.json").read_text())
+    assert a["epoch"] == [r["epoch"] for r in history if r["selected"]][-1]
     for key, value in a["model_state_dict"].items():
         torch.testing.assert_close(value, b["model_state_dict"][key], atol=0, rtol=0)
     for filename in (
@@ -232,6 +225,35 @@ def test_fixed_fit_resume_and_tail_scoring_are_identical(
             np.load(full / "scores" / filename), np.load(resumed / "scores" / filename)
         )
     assert training.train(root, resumed, **options)["status"] == "completed"
+
+    if cell_name == "B3":
+        selection_calls = 0
+        original_readout = training.selection_readout
+
+        def declining_selection(model, loader, *args, **kwargs):
+            nonlocal selection_calls
+            value = original_readout(model, loader, *args, **kwargs)
+            if np.array_equal(loader.dataset.date_indices, selection):
+                value["mean_ic"] = 0.04 - 0.01 * selection_calls
+                selection_calls += 1
+            return value
+
+        monkeypatch.setattr(training, "selection_readout", declining_selection)
+        stopped = tmp_path / "early_stop"
+        stopped_options = {
+            **options,
+            "recipe": TrainingRecipe(patience=2),
+            "export_scores": False,
+        }
+        result = training.train(root, stopped, **stopped_options)
+        assert result["epochs_completed"] == 3 and result["selected_epoch"] == 1
+        assert result["stop_reason"] == "patience"
+        assert not (stopped / "scores").exists()
+        result = training.train(
+            root, stopped, **{**stopped_options, "export_scores": True}
+        )
+        assert result["scoring_complete"] is True
+        assert result["epochs_completed"] == 3
 
 
 def test_corrector_purge_and_sequential_batches_keep_all_permitted_dates():

@@ -4,14 +4,12 @@ from __future__ import annotations
 
 import argparse
 import json
-import sys
-import subprocess
 from dataclasses import asdict
 from pathlib import Path
 
 from .artifacts import sha256_file, write_json_atomic
 from .characteristic_model import CharacteristicModel
-from .contract import DEVELOPMENT_FOLDS, RUN_MANY_PLAN_SCHEMA
+from .contract import DEVELOPMENT_FOLDS
 from .data_roots import resolve_external_root
 from .research_rounds import _git_identity
 from .round7 import (
@@ -20,12 +18,9 @@ from .round7 import (
     SCREEN_FOLDS,
     SEEDS,
     configuration,
-    pretrain_key,
 )
 from .round7_data import PROJECT
-from .round7_program import read, pretraining, trajectory
-from .round7_program import parent_binding
-from .round6 import training_command as old_training_command
+from .round7_program import read
 from .round7_seed_audit import run as omission_audit
 
 ORDER = tuple(c["cell"] for c in PATHWAY_CELLS)
@@ -241,191 +236,19 @@ def finalize(decision, six=None, omissions=None):
     }
 
 
-def plan(root, phase, parallel):
-    design = read(root / "frozen_design.json")
-    if design["implementation"]["commit"] != _git_identity()["commit"]:
-        raise ValueError("extension code differs from freeze")
-    original = original_at(design)
-    evidence = read(root / "gpu_engineering.json")
-    if (
-        evidence["device"] != "cuda"
-        or evidence["store_manifest_sha256"] != design["store"]["manifest_sha256"]
-        or {r["cell"] for r in evidence["results"] if r["passed"]} != set(ORDER)
-    ):
-        raise ValueError("all four extension graphs require CUDA acceptance")
-    if read(root / "pathway_acceptance.json")["status"] != "passed":
-        raise ValueError("pathway-specific correctness acceptance required")
-    budget = 60 if phase == "pretrain" else read(original / "budget.json")["B"]
-    cells = {c["cell"]: c for c in (*CELLS, *PATHWAY_CELLS)}
-    if phase == "pretrain":
-        tasks = [(c, "P", "pretrain_internal", s) for c in ORDER for s in SEEDS]
-    elif phase == "screen":
-        tasks = [(c, "F", f, s) for c in ORDER for f in SCREEN_FOLDS for s in SEEDS]
-    elif phase == "confirmation":
-        selected = read(root / "advancement.json")["cells"]
-        tasks = (
-            [
-                (c, "F", f, s)
-                for c in [*selected, "B4"]
-                for f in DEVELOPMENT_FOLDS
-                if f not in SCREEN_FOLDS
-                for s in SEEDS
-            ]
-            if selected
-            else []
-        )
-    elif phase in ("six_seed_p", "six_seed_f"):
-        decision = read(root / "confirmation_leader.json")
-        selected = (
-            decision["extension_cells"] + [decision["reference"]]
-            if decision["eligible"]
-            else []
-        )
-        tasks = (
-            [(c, "P", "pretrain_internal", s) for c in selected for s in (61, 79, 97)]
-            if phase == "six_seed_p"
-            else [
-                (c, "F", f, s)
-                for c in selected
-                for f in DEVELOPMENT_FOLDS
-                for s in (61, 79, 97)
-            ]
-        )
-    else:
-        raise ValueError("unknown extension phase")
-    jobs = []
-    for name, stage, fold, seed in tasks:
-        cell = cells[name]
-        fit_root, checkout, executable = root, PROJECT, sys.executable
-        if name not in ORDER:
-            # Supplementary references use the original frozen engine and
-            # directory, preserving exact compatibility and completed work.
-            fit_root, checkout = original, PROJECT.with_name("b3-quant")
-            actual = subprocess.check_output(
-                ["git", "rev-parse", "HEAD"], cwd=checkout, text=True
-            ).strip()
-            if (
-                actual
-                != read(original / "frozen_design.json")["implementation"]["commit"]
-            ):
-                raise ValueError("original reference checkout differs from its freeze")
-            executable = (
-                str(checkout / "research/.venv/bin/python")
-                if sys.platform != "win32"
-                else sys.executable
-            )
-            source = (
-                pretraining(original, cell, seed)
-                if stage == "P"
-                else trajectory(original, name, fold, seed)
-            )
-            if (source / "run_manifest.json").exists():
-                if read(source / "run_manifest.json")["status"] != "completed":
-                    raise ValueError("reference trajectory is incomplete")
-                continue
-        output = (
-            pretraining(fit_root, cell, seed)
-            if stage == "P"
-            else trajectory(fit_root, name, fold, seed)
-        )
-        parent, digest = None, None
-        if stage == "F":
-            parent, digest = parent_binding(fit_root, cell, seed)
-        epochs = 60 if stage == "P" else budget
-        command = [
-            executable,
-            "-m",
-            "brazil_rv.v2.round7_training",
-            "--store",
-            str(resolve_external_root(design["store"]["root"])[0]),
-            "--output",
-            str(output),
-            "--cell",
-            name,
-            "--stage",
-            stage,
-            "--fold",
-            fold,
-            "--seed",
-            str(seed),
-            "--epochs",
-            str(epochs),
-        ]
-        if parent:
-            command += [
-                "--parent",
-                str(parent),
-                "--parent-sha256",
-                digest,
-                "--export-scores",
-            ]
-        expected = {
-            "status": "completed",
-            "stage": stage,
-            "contract": {
-                "pretrain_key": pretrain_key(cell),
-                "epochs": epochs,
-                "parent_sha256": digest,
-            },
-            "compiled_graphs": {"training": 1, "selection": 1},
-        }
-        if name == "A0" or (stage == "P" and pretrain_key(cell) == "s0_slow"):
-            base = read(original / "frozen_design.json")
-            base["store"]["root"] = str(resolve_external_root(base["store"]["root"])[0])
-            command = old_training_command(
-                base, output, "S0", seed, fold, stage, checkpoint=parent, digest=digest
-            )
-            command[0] = executable
-            expected = {
-                "status": "completed",
-                "stage": stage,
-                "compiled_graphs": {"training": 1, "selection": 1, "total": 2},
-                "transfer_chronology_clean": True,
-            }
-            if stage == "F":
-                expected["scoring_complete"] = True
-        jobs.append(
-            {
-                "name": f"{name}_{stage}_{fold}_{seed}",
-                "seed": seed,
-                "fold": fold,
-                "run_dir": str(output),
-                "cwd": str(checkout),
-                "command": command,
-                "expected_manifest": expected,
-            }
-        )
-    result = {
-        "schema": RUN_MANY_PLAN_SCHEMA,
-        "phase": phase,
-        "max_parallel": parallel,
-        "jobs": jobs,
-        "frozen_design_sha256": sha256_file(root / "frozen_design.json"),
-    }
-    path = root / f"plan_{phase}.json"
-    if path.exists():
-        raise FileExistsError(path)
-    write_json_atomic(path, result)
-    return {"jobs": len(jobs), "plan": str(path)}
-
-
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "action",
-        choices=("register", "freeze", "plan", "advance", "select", "finalize"),
+        choices=("register", "freeze", "advance", "select", "finalize"),
     )
     parser.add_argument("--root", type=Path)
     parser.add_argument("--original", type=Path)
-    parser.add_argument("--phase")
-    parser.add_argument("--parallel", type=int, default=3)
     args = parser.parse_args()
     if args.action == "register":
         result = register()
     elif args.action == "freeze":
         result = freeze(args.root, args.original)
-    elif args.action == "plan":
-        result = plan(args.root, args.phase, args.parallel)
     elif args.action == "advance":
         result = advance(read(args.root / "pathway_screen_result.json"))
         path = args.root / "advancement.json"

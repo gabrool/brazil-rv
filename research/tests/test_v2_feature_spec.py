@@ -286,21 +286,3 @@ def test_native_fast_registry_binds_order_formulas_and_identity_transform() -> N
     assert feature_schema_sha256(specs) != feature_schema_sha256(
         (replace(specs[0], formula="different"), *specs[1:])
     )
-
-
-def test_native_fundamentals_preserve_sparse_signed_observations():
-    from brazil_rv.v2.round7_data import NATIVE_FIELDS
-
-    specs = feature_specs("sidecar_fundamentals_native", NATIVE_FIELDS)
-    assert all(
-        s.transform == "precomputed_native" and s.minimum_support == 1 for s in specs
-    )
-    values = np.asarray([[[-0.03, -2.0, 0.2, 1.2, -0.1, -0.4, -2.0, 16.0, 1.0]]])
-    valid = np.ones_like(values, dtype=bool)
-    output = np.zeros_like(values, dtype=np.float32)
-    output_valid = np.zeros_like(valid)
-    transform_feature_panel_into(
-        values, valid, np.ones((1, 1), bool), specs, output, output_valid
-    )
-    np.testing.assert_allclose(output, values)
-    assert output_valid.all()

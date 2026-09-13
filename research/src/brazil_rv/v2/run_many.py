@@ -24,6 +24,7 @@ class TrajectoryJob:
     command: tuple[str, ...]
     cwd: Path | None = None
     expected_manifest: Mapping[str, object] | None = None
+    resume: bool = False
 
     @property
     def manifest_path(self) -> Path:
@@ -142,6 +143,15 @@ def _preflight(
         if job.seed not in V1_READ_SEEDS:
             raise ValueError("trajectory seed differs from the accepted v1 read roster")
         if job.run_dir.exists():
+            if job.resume and (
+                (job.run_dir / "resume.pt").is_file()
+                or job.manifest_path.is_file()
+                and not _contains(_read_json(job.manifest_path), _expected(job))
+            ):
+                # Only an explicitly resumable trainer may validate and continue
+                # its own hash-bound epoch or attach scores to a completed fit.
+                pending.append(job)
+                continue
             if not job.run_dir.is_dir() or not job.manifest_path.is_file():
                 raise FileExistsError(
                     f"existing trajectory root is incomplete and will not be reused: "
@@ -154,8 +164,9 @@ def _preflight(
 
 
 def _run_one(job: TrajectoryJob) -> TrajectoryOutcome:
-    job.run_dir.mkdir(parents=True, exist_ok=False)
-    with job.stdout_path.open("xb") as stdout, job.stderr_path.open("xb") as stderr:
+    job.run_dir.mkdir(parents=True, exist_ok=job.resume)
+    mode = "ab" if job.resume else "xb"
+    with job.stdout_path.open(mode) as stdout, job.stderr_path.open(mode) as stderr:
         completed = subprocess.run(
             list(job.command),
             cwd=job.cwd,
@@ -260,6 +271,7 @@ def load_plan(path: Path) -> tuple[tuple[TrajectoryJob, ...], int]:
                 command=tuple(command),
                 cwd=(None if raw_job.get("cwd") is None else Path(str(raw_job["cwd"]))),
                 expected_manifest=expected,
+                resume=bool(raw_job.get("resume", False)),
             )
         )
     return tuple(jobs), int(payload.get("max_parallel", 1))

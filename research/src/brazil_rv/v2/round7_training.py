@@ -1,4 +1,4 @@
-"""Fixed-budget Round-7 recipe, independent member losses and uniform tail weights."""
+"""Selection-aware characteristic training with independent member rank losses."""
 
 from __future__ import annotations
 
@@ -6,7 +6,7 @@ import argparse
 import json
 import math
 import time
-from dataclasses import asdict
+from dataclasses import asdict, dataclass
 from functools import partial
 from pathlib import Path
 
@@ -24,7 +24,7 @@ from .data import V2DailyDataset, stage_name_count
 from .model import DailyMultiHorizonModel
 from .normalization import average_ranks
 from .research_rounds import _git_identity
-from .round7 import CELLS, PATHWAY_CELLS, configuration, pretrain_key
+from .round7 import configuration, pretrain_key
 from .round7_preprocessing import Round7Preprocessing
 from .train import (
     DateBatchSampler,
@@ -39,7 +39,19 @@ from .train import (
     set_deterministic_seed,
 )
 
-CHECKPOINT_SCHEMA = "BRAZIL_RV_ROUND7_CHECKPOINT_V1"
+CHECKPOINT_SCHEMA = "BRAZIL_RV_SELECTED_CHECKPOINT_V1"
+
+
+@dataclass(frozen=True)
+class TrainingRecipe:
+    learning_rate: float = 1e-4
+    rho: float | None = 0.125
+    adaptive: bool = False
+    eta: float = 0.01
+    transferred_multiplier: float = 0.3
+    schedule_epochs: int = 60
+    patience: int = 5
+    minimum_improvement: float = 0.0001
 
 
 def member_loss(scores, targets, mask, *, kind="soft_spearman"):
@@ -73,25 +85,39 @@ def member_loss(scores, targets, mask, *, kind="soft_spearman"):
     return (losses.sum(dim=0) / groups.sum(dim=0).clamp_min(1)).mean()
 
 
-def recipe_optimizer(model, *, cuda):
-    """One peak LR for all layers; LayerNorm and every bias have zero decay."""
-    no_decay = {
-        id(p)
-        for module in model.modules()
-        if isinstance(module, nn.LayerNorm)
-        for p in module.parameters(recurse=False)
-    }
-    decay, excluded = [], []
-    for name, parameter in model.named_parameters():
-        (
-            excluded if name.endswith("bias") or id(parameter) in no_decay else decay
-        ).append(parameter)
+def recipe_optimizer(
+    model, *, cuda, learning_rate=3e-4, transferred=(), transferred_multiplier=1.0
+):
+    """Module-owned bias/norm exclusions and explicit transferred LR groups."""
+    from .train import _parameter_owners
+
+    owners = _parameter_owners(model)
+    transferred = frozenset(transferred)
+    named = dict(model.named_parameters())
+    if transferred - named.keys():
+        raise ValueError("transferred parameter names differ from the model")
+    routed = {}
+    for name, parameter in named.items():
+        if not parameter.requires_grad:
+            continue
+        module, attribute = owners[id(parameter)]
+        excluded = attribute.startswith("bias") or isinstance(
+            module, (nn.LayerNorm, nn.RMSNorm)
+        )
+        multiplier = transferred_multiplier if name in transferred else 1.0
+        routed.setdefault((excluded, multiplier), []).append(parameter)
     return torch.optim.AdamW(
         [
-            {"params": decay, "weight_decay": 0.01},
-            {"params": excluded, "weight_decay": 0.0},
+            {
+                "params": parameters,
+                "weight_decay": 0.0 if excluded else 0.01,
+                "lr": learning_rate * multiplier,
+                "lr_multiplier": multiplier,
+                "adaptive": not excluded,
+            }
+            for (excluded, multiplier), parameters in routed.items()
         ],
-        lr=3e-4,
+        lr=learning_rate,
         fused=cuda,
     )
 
@@ -105,8 +131,41 @@ def learning_rate_fraction(update, total_updates):
     return 0.05 + 0.95 * 0.5 * (1.0 + math.cos(math.pi * progress))
 
 
-def optimizer_step(model, optimizer, closure, rho):
-    """Exact-restore SAM with reused dropout RNG; None means one-pass AdamW."""
+def sam_perturbations(optimizer, rho, *, adaptive=False, eta=0.01):
+    """L2 SAM/ASAM: epsilon=rho*T²g/||Tg||; norm/bias metric is identity."""
+    if not adaptive:
+        used = [
+            p
+            for group in optimizer.param_groups
+            for p in group["params"]
+            if p.grad is not None
+        ]
+        gradients = [p.grad for p in used]
+        norm = torch.linalg.vector_norm(torch.stack(torch._foreach_norm(gradients)))
+        return used, torch._foreach_mul(gradients, rho / norm.clamp_min(1e-12)), norm
+    used, metric, gradients = [], [], []
+    for group in optimizer.param_groups:
+        for parameter in group["params"]:
+            if parameter.grad is None:
+                continue
+            used.append(parameter)
+            metric.append(
+                parameter.detach().abs().add(eta)
+                if adaptive and group["adaptive"]
+                else torch.ones_like(parameter)
+            )
+            gradients.append(parameter.grad)
+    weighted = torch._foreach_mul(gradients, metric)
+    norm = torch.linalg.vector_norm(torch.stack(torch._foreach_norm(weighted)))
+    perturbations = torch._foreach_mul(weighted, metric)
+    torch._foreach_mul_(perturbations, rho / norm.clamp_min(1e-12))
+    return used, perturbations, norm
+
+
+def optimizer_step(
+    model, optimizer, closure, rho, *, adaptive=False, eta=0.01, diagnostics=None
+):
+    """Exact-restore SAM/ASAM with reused RNG; None means one-pass AdamW."""
     parameters = [p for p in model.parameters() if p.requires_grad]
     optimizer.zero_grad(set_to_none=True)
     start_rng = _rng_state() if rho is not None else None
@@ -115,17 +174,22 @@ def optimizer_step(model, optimizer, closure, rho):
     first_norm = torch.nn.utils.clip_grad_norm_(
         parameters, float("inf"), error_if_nonfinite=True
     )
+    if diagnostics is not None:
+        diagnostics["clean_gradient_norm"] = float(first_norm)
     if rho is None:
-        torch.nn.utils.clip_grad_norm_(parameters, 1.0, error_if_nonfinite=True)
+        descent_norm = torch.nn.utils.clip_grad_norm_(
+            parameters, 1.0, error_if_nonfinite=True
+        )
+        if diagnostics is not None:
+            diagnostics["descent_gradient_norm"] = float(descent_norm)
         optimizer.step()
         return float(loss.detach()), 0.0
-    used = [p for p in parameters if p.grad is not None]
+    used, perturbations, metric_norm = sam_perturbations(
+        optimizer, rho, adaptive=adaptive, eta=eta
+    )
     originals = [p.detach().clone() for p in used]
     try:
         with torch.no_grad():
-            perturbations = torch._foreach_mul(
-                [p.grad for p in used], rho / (first_norm + 1e-12)
-            )
             torch._foreach_add_(used, perturbations)
         optimizer.zero_grad(set_to_none=True)
         _restore_rng(start_rng)
@@ -134,26 +198,21 @@ def optimizer_step(model, optimizer, closure, rho):
     finally:
         with torch.no_grad():
             torch._foreach_copy_(used, originals)
-    torch.nn.utils.clip_grad_norm_(parameters, 1.0, error_if_nonfinite=True)
+    descent_norm = torch.nn.utils.clip_grad_norm_(
+        parameters, 1.0, error_if_nonfinite=True
+    )
+    if diagnostics is not None:
+        diagnostics.update(
+            descent_gradient_norm=float(descent_norm),
+            metric_gradient_norm=float(metric_norm),
+            perturbation_norm=float(
+                torch.linalg.vector_norm(
+                    torch.stack(torch._foreach_norm(perturbations))
+                )
+            ),
+        )
     optimizer.step()
     return float(loss.detach()), float((second - loss).detach())
-
-
-class TailAverage:
-    def __init__(self):
-        self.count = 0
-        self.state = {}
-
-    def update(self, model):
-        self.count += 1
-        for name, value in model.state_dict().items():
-            value = value.detach().cpu()
-            if name not in self.state:
-                self.state[name] = value.clone()
-            elif value.is_floating_point():
-                self.state[name].add_((value - self.state[name]) / self.count)
-            else:
-                self.state[name] = value.clone()
 
 
 def model_batch(cpu_batch, device):
@@ -305,33 +364,25 @@ def train(
     store_root,
     output,
     *,
-    cell_name,
+    cell,
     stage,
     fold,
     seed,
-    epochs,
+    epochs=60,
+    recipe=TrainingRecipe(),
     parent=None,
     parent_sha256=None,
     device=None,
     compiled=True,
-    calibration=False,
     export_scores=False,
+    diagnostics=True,
 ):
     code = _git_identity()
-    cell = next(c for c in (*CELLS, *PATHWAY_CELLS) if c["cell"] == cell_name)
-    if cell["recipe"] != "R":
-        raise ValueError("A0 uses the unchanged Round-6 training path")
-    if stage == "P":
-        if pretrain_key(cell) == "s0_slow":
-            raise ValueError("S0-slow Stage P must use the registered old recipe")
-        epochs, rho, loss_kind = 60, 0.05, "soft_spearman"
-    else:
-        rho, loss_kind = cell["rho"], cell.get("loss", "soft_spearman")
-    if calibration and (stage != "F" or cell_name != "B4" or epochs != 60):
-        raise ValueError("calibration is the fixed 60-epoch B4 experiment")
+    cell_name = cell["cell"]
+    rho, loss_kind = recipe.rho, "soft_spearman"
     manifest = json.loads((store_root / "manifest.json").read_text(encoding="utf-8"))
-    if "round7_repair" not in manifest["metadata"]:
-        raise ValueError("Round-7 training requires the repaired store")
+    if "data_repair" not in manifest["metadata"]:
+        raise ValueError("training requires the accepted post-data store")
     config = configuration(cell, manifest["feature_names"])
     characteristic = cell["graph"] != "s0"
     horizons = config.horizons if characteristic else HORIZONS
@@ -392,6 +443,21 @@ def train(
             collate_fn=collator,
             pin_memory=device.type == "cuda",
         )
+        probe_indices = np.unique(
+            np.linspace(0, len(training) - 1, min(64, len(training)), dtype=int)
+        )
+        probe_loader = DataLoader(
+            training,
+            batch_sampler=[
+                probe_indices[b].tolist()
+                for b in sequential_batches(len(probe_indices))
+            ],
+            collate_fn=collator,
+            pin_memory=device.type == "cuda",
+        )
+        diagnostic_batch = model_batch(
+            collator([training[int(i)] for i in probe_indices[[0, -1]]]), device
+        )
         contract = {
             "code": code,
             "store_manifest_sha256": sha256_file(store_root / "manifest.json"),
@@ -401,6 +467,11 @@ def train(
             "fold": fold,
             "seed": seed,
             "epochs": epochs,
+            "recipe": asdict(recipe),
+            "cell": cell,
+            "selection_policy": "raw_checkpoint; earlier ties; fixed-schedule patience from epoch 1",
+            "probe_date_indices": fit[probe_indices].tolist(),
+            "module_diagnostics": diagnostics,
             "rho": rho,
             "loss": loss_kind,
             "preprocessing": preparation.payload(),
@@ -430,6 +501,7 @@ def train(
                 parent_contract = payload["contract"]
                 if (
                     parent_contract["pretrain_key"] != pretrain_key(cell)
+                    or parent_contract["config"] != asdict(config)
                     or parent_contract["store_manifest_sha256"]
                     != contract["store_manifest_sha256"]
                 ):
@@ -445,8 +517,17 @@ def train(
                 ):
                     raise ValueError("old-recipe parent is not repaired-store S0")
             model.load_state_dict(payload["model_state_dict"], strict=True)
-        optimizer = recipe_optimizer(model, cuda=device.type == "cuda")
-        tail = TailAverage()
+        transferred = tuple(dict(model.named_parameters())) if stage == "F" else ()
+        contract["transferred_parameters"] = list(transferred)
+        optimizer = recipe_optimizer(
+            model,
+            cuda=device.type == "cuda",
+            learning_rate=recipe.learning_rate,
+            transferred=transferred,
+            transferred_multiplier=recipe.transferred_multiplier,
+        )
+        best_ic, best_epoch, stale = -float("inf"), 0, 0
+        module_diagnostics = []
         start_epoch, history = 1, []
         previous_compilation_sessions = []
         resume_path = output / "resume.pt"
@@ -467,6 +548,23 @@ def train(
                 != finished["score_manifest_sha256"]
             ):
                 raise ValueError("completed score manifest changed")
+            if export_scores and not finished.get("score_manifest_sha256"):
+                from .round7_score import score
+
+                score(
+                    store_root,
+                    output / "selected.pt",
+                    output / "scores",
+                    expected_sha256=finished["artifacts"]["selected.pt"],
+                    compiled=compiled,
+                    device=device,
+                    fixed_name_count=width,
+                )
+                finished["score_manifest_sha256"] = sha256_file(
+                    output / "scores/score_manifest.json"
+                )
+                finished["scoring_complete"] = True
+                write_json_atomic(output / "run_manifest.json", finished)
             return finished
         if resume_path.exists():
             payload = torch.load(resume_path, map_location=device, weights_only=True)
@@ -476,12 +574,13 @@ def train(
                 raise ValueError("resume differs from the frozen training contract")
             model.load_state_dict(payload["model_state_dict"])
             optimizer.load_state_dict(payload["optimizer_state_dict"])
-            tail.state = {k: v.cpu() for k, v in payload["tail_state"].items()}
-            tail.count, history, start_epoch = (
-                payload["tail_count"],
-                payload["history"],
-                payload["epoch"] + 1,
+            history, start_epoch = payload["history"], payload["epoch"] + 1
+            best_ic, best_epoch, stale = (
+                payload["best_ic"],
+                payload["best_epoch"],
+                payload["stale"],
             )
+            module_diagnostics = payload["module_diagnostics"]
             checkpoint = {
                 k: payload[k]
                 for k in (
@@ -521,29 +620,62 @@ def train(
         )
         training_forward = compile_forward(objective) if compiled else objective
         forward_model = compile_forward(model) if compiled else model
-        total_updates = epochs * len(train_loader)
+        total_updates = recipe.schedule_epochs * len(train_loader)
         train_graphs = selection_graphs = 0
         run_start = time.perf_counter()
+
+        def diagnostic(label):
+            from .training_diagnostics import probe
+
+            if diagnostics:
+                module_diagnostics.append(
+                    {
+                        "state": label,
+                        **probe(
+                            model,
+                            optimizer,
+                            diagnostic_batch,
+                            characteristic=characteristic,
+                            horizons=horizons,
+                            rho=rho,
+                            adaptive=recipe.adaptive,
+                            eta=recipe.eta,
+                        ),
+                    }
+                )
+
+        if start_epoch == 1:
+            diagnostic("initial")
         for epoch in range(start_epoch, epochs + 1):
+            if stale >= recipe.patience:
+                break
             epoch_start = time.perf_counter()
             model.train()
             sampler.set_epoch(epoch)
-            losses, gaps = [], []
+            losses, gaps, clipped = [], [], []
             for batch_number, cpu_batch in enumerate(train_loader):
-                lr = 3e-4 * learning_rate_fraction(
+                lr = recipe.learning_rate * learning_rate_fraction(
                     (epoch - 1) * len(train_loader) + batch_number, total_updates
                 )
                 for group in optimizer.param_groups:
-                    group["lr"] = lr
+                    group["lr"] = lr * group["lr_multiplier"]
                 batch = model_batch(cpu_batch, device)
 
                 before = _unique_compiled_graphs()
+                step_diagnostics = {}
                 loss, gap = optimizer_step(
-                    model, optimizer, lambda: training_forward(batch), rho
+                    model,
+                    optimizer,
+                    lambda: training_forward(batch),
+                    rho,
+                    adaptive=recipe.adaptive,
+                    eta=recipe.eta,
+                    diagnostics=step_diagnostics,
                 )
                 train_graphs += _unique_compiled_graphs() - before
                 losses.append(loss)
                 gaps.append(gap)
+                clipped.append(step_diagnostics["descent_gradient_norm"] > 1.0)
             before = _unique_compiled_graphs()
             readout = selection_readout(
                 forward_model,
@@ -552,35 +684,39 @@ def train(
                 characteristic=characteristic,
                 model_horizons=horizons,
             )
-            fit_readout = None
-            if calibration or epoch == epochs:
-                # Diagnostics must not shift future dropout RNG or date visits.
-                rng = _rng_state()
-                try:
-                    fit_readout = selection_readout(
-                        forward_model,
-                        clean_fit_loader,
-                        device,
-                        characteristic=characteristic,
-                        model_horizons=horizons,
-                    )
-                finally:
-                    _restore_rng(rng)
+            rng = _rng_state()
+            try:
+                fit_readout = selection_readout(
+                    forward_model,
+                    probe_loader,
+                    device,
+                    characteristic=characteristic,
+                    model_horizons=horizons,
+                )
+            finally:
+                _restore_rng(rng)
             selection_graphs += _unique_compiled_graphs() - before
-            if epoch > epochs - math.ceil(epochs / 4):
-                tail.update(model)
+            improved = readout["mean_ic"] > best_ic + recipe.minimum_improvement
+            if improved:
+                best_ic, best_epoch, stale = readout["mean_ic"], epoch, 0
+            else:
+                stale += 1
             record = {
                 "epoch": epoch,
                 "training_loss": float(np.mean(losses)),
                 "sam_gap": float(np.mean(gaps)),
                 "selection": readout,
-                "clean_fit": fit_readout,
+                "clean_fit_probe": fit_readout,
+                "gradient_clip_fraction": float(np.mean(clipped)),
+                "selected": improved,
                 "updates": len(losses),
                 "seconds": time.perf_counter() - epoch_start,
                 "final_learning_rate": lr,
             }
             history.append(record)
-            state = {k: v.detach().cpu() for k, v in model.state_dict().items()}
+            if epoch in (1, 3):
+                diagnostic(f"epoch_{epoch}")
+            state = {k: v.detach().cpu().clone() for k, v in model.state_dict().items()}
             checkpoint = {
                 "schema": CHECKPOINT_SCHEMA,
                 "stage": stage,
@@ -591,14 +727,25 @@ def train(
                 "model_state_dict": state,
             }
             _atomic_torch_save(output / "epochs" / f"epoch_{epoch:03d}.pt", checkpoint)
+            if improved:
+                _atomic_torch_save(
+                    output / "selected.pt",
+                    {
+                        **checkpoint,
+                        "selection_ic": best_ic,
+                        "optimizer_state_dict": optimizer.state_dict(),
+                    },
+                )
             rng, cuda_rng = _rng_state()
             _atomic_torch_save(
                 resume_path,
                 {
                     **checkpoint,
                     "optimizer_state_dict": optimizer.state_dict(),
-                    "tail_count": tail.count,
-                    "tail_state": tail.state,
+                    "best_ic": best_ic,
+                    "best_epoch": best_epoch,
+                    "stale": stale,
+                    "module_diagnostics": module_diagnostics,
                     "history": history,
                     "cpu_rng": rng,
                     "cuda_rng": cuda_rng,
@@ -629,23 +776,45 @@ def train(
                 ),
                 flush=True,
             )
-        _atomic_torch_save(
-            output / "tail_average.pt",
+        terminal_readout = selection_readout(
+            forward_model,
+            clean_fit_loader,
+            device,
+            characteristic=characteristic,
+            model_horizons=horizons,
+        )
+        selected = torch.load(
+            output / "selected.pt", map_location=device, weights_only=True
+        )
+        model.load_state_dict(selected["model_state_dict"])
+        selected_fit = selection_readout(
+            forward_model,
+            clean_fit_loader,
+            device,
+            characteristic=characteristic,
+            model_horizons=horizons,
+        )
+        optimizer.load_state_dict(selected["optimizer_state_dict"])
+        diagnostic("selected")
+        write_json_atomic(
+            output / "diagnostics.json",
             {
-                **checkpoint,
-                "model_state_dict": tail.state,
-                "tail_epochs": math.ceil(epochs / 4),
-                "tail_count": tail.count,
+                "module_probes": module_diagnostics,
+                "selected_clean_fit": selected_fit,
+                "terminal_clean_fit": terminal_readout,
             },
         )
         report = {
-            "schema": "BRAZIL_RV_ROUND7_FIT_V1",
+            "schema": "BRAZIL_RV_SELECTED_FIT_V1",
             "status": "completed",
             "seed": seed,
             "fold": fold,
             "stage": stage,
             "contract": contract,
-            "epochs_completed": epochs,
+            "epochs_completed": len(history),
+            "selected_epoch": best_epoch,
+            "selection_ic": best_ic,
+            "stop_reason": "patience" if stale >= recipe.patience else "ceiling",
             "compiled_graphs": {
                 "training": max(
                     [
@@ -665,7 +834,7 @@ def train(
                 *previous_compilation_sessions,
                 {
                     "start_epoch": start_epoch,
-                    "end_epoch": epochs,
+                    "end_epoch": len(history),
                     "training": train_graphs,
                     "selection": selection_graphs,
                 },
@@ -677,8 +846,9 @@ def train(
             "artifacts": {
                 str(p.relative_to(output)): sha256_file(p)
                 for p in [
-                    output / "tail_average.pt",
+                    output / "selected.pt",
                     output / "history.json",
+                    output / "diagnostics.json",
                     *sorted((output / "epochs").glob("*.pt")),
                 ]
             },
@@ -688,9 +858,9 @@ def train(
 
             score(
                 store_root,
-                output / "tail_average.pt",
+                output / "selected.pt",
                 output / "scores",
-                expected_sha256=report["artifacts"]["tail_average.pt"],
+                expected_sha256=report["artifacts"]["selected.pt"],
                 compiled=compiled,
                 device=device,
                 reusable_models=(model, forward_model),
@@ -699,6 +869,7 @@ def train(
             report["score_manifest_sha256"] = sha256_file(
                 output / "scores/score_manifest.json"
             )
+            report["scoring_complete"] = True
         write_json_atomic(output / "run_manifest.json", report)
         # A sealed fit resumes from its hash-checked artifacts. The large transient
         # optimizer/RNG checkpoint is useful only while training is incomplete.
@@ -713,31 +884,29 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--store", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
-    parser.add_argument(
-        "--cell",
-        choices=[c["cell"] for c in (*CELLS, *PATHWAY_CELLS) if c["recipe"] == "R"],
-        required=True,
-    )
+    parser.add_argument("--cell-spec", type=Path, required=True)
+    parser.add_argument("--recipe", type=Path, required=True)
     parser.add_argument("--stage", choices=("P", "F"), required=True)
     parser.add_argument("--fold", default="pretrain_internal")
     parser.add_argument("--seed", type=int, required=True)
     parser.add_argument("--epochs", type=int, required=True)
     parser.add_argument("--parent", type=Path)
     parser.add_argument("--parent-sha256")
-    parser.add_argument("--calibration", action="store_true")
+    parser.add_argument("--eager", action="store_true")
     parser.add_argument("--export-scores", action="store_true")
     args = parser.parse_args()
     train(
         args.store,
         args.output,
-        cell_name=args.cell,
+        cell=json.loads(args.cell_spec.read_text(encoding="utf-8")),
+        recipe=TrainingRecipe(**json.loads(args.recipe.read_text(encoding="utf-8"))),
         stage=args.stage,
         fold=args.fold,
         seed=args.seed,
         epochs=args.epochs,
         parent=args.parent,
         parent_sha256=args.parent_sha256,
-        calibration=args.calibration,
+        compiled=not args.eager,
         export_scores=args.export_scores,
     )
 

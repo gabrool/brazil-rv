@@ -3,32 +3,7 @@ from datetime import date, datetime, timedelta
 import numpy as np
 import polars as pl
 
-from brazil_rv.v2.round7_data import NATIVE_FIELDS, corroborate_u2, native_fundamentals
-
-
-def test_native_fields_retain_negative_sparse_values_and_source_ages():
-    fields = [n for n in NATIVE_FIELDS if n != "earnings_negative_flag"]
-    frame = pl.DataFrame(
-        {
-            "date": [date(2020, 1, 2), date(2020, 1, 3)],
-            "isin": ["A", "A"],
-            **{n: [-0.2, 0.5] for n in fields},
-            **{n + "_age_sessions": [3.0, 4.0] for n in fields},
-        }
-    )
-    result = native_fundamentals(frame)
-    assert result["earnings_yield_ttm"].to_list() == [-0.2, 0.5]
-    assert result["earnings_negative_flag"].to_list() == [1.0, 0.0]
-    assert result["book_to_market"].to_list()[0] is None
-    assert np.isclose(result["book_to_market"][1], np.log(0.5))
-    assert result["earnings_negative_flag_age_sessions"].to_list() == [3.0, 4.0]
-    mutated = frame.with_columns(
-        pl.when(pl.col("date") > date(2020, 1, 2))
-        .then(100.0)
-        .otherwise(pl.col("earnings_yield_ttm"))
-        .alias("earnings_yield_ttm")
-    )
-    assert native_fundamentals(mutated).head(1).equals(result.head(1))
+from brazil_rv.v2.round7_data import corroborate_u2
 
 
 def test_u2_requires_relevant_nearby_evidence_and_retains_cash_terms():

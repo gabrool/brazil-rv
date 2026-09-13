@@ -1,4 +1,4 @@
-"""Export tail-averaged Round-7 scores on the canonical five-horizon container."""
+"""Export selected characteristic scores on the canonical five-horizon container."""
 
 from __future__ import annotations
 
@@ -54,12 +54,8 @@ def score(
     if payload["schema"] != CHECKPOINT_SCHEMA or payload["stage"] != "F":
         raise ValueError("Round-7 scoring requires a registered F checkpoint")
     contract = payload["contract"]
-    expected_tail = (contract["epochs"] + 3) // 4
-    if (
-        payload.get("tail_count") != expected_tail
-        or payload.get("tail_epochs") != expected_tail
-    ):
-        raise ValueError("registered scores require the complete uniform tail average")
+    if "selection_ic" not in payload:
+        raise ValueError("scoring requires the selection-bound checkpoint")
     if contract["store_manifest_sha256"] != sha256_file(store_root / "manifest.json"):
         raise ValueError("scoring store differs from training")
     if output.exists():

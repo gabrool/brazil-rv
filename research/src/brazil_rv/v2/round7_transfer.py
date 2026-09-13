@@ -15,10 +15,10 @@ from .round7_data import PROJECT
 
 def pack(output):
     accepted = json.loads(
-        (PROJECT / "docs/v2_round7_inputs.json").read_text(encoding="utf-8")
+        (PROJECT / "docs/v2_data_inputs.json").read_text(encoding="utf-8")
     )
     base = json.loads(
-        (PROJECT / "docs/v2_round6_inputs.json").read_text(encoding="utf-8")
+        (PROJECT / "docs/v2_round7_inputs.json").read_text(encoding="utf-8")
     )
     source, _ = resolve_external_root(accepted["store"]["root"])
     previous, _ = resolve_external_root(base["store"]["root"])

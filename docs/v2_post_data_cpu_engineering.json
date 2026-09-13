@@ -1,0 +1,308 @@
+{
+  "checks": [
+    {
+      "active_names": 263,
+      "amp_error_over_fp32_std": 0.007239485625177622,
+      "cell": "S0_common",
+      "collation_seconds": 0.07449740002630278,
+      "dates": [
+        459,
+        918
+      ],
+      "eager": {
+        "graphs": 0,
+        "losses": [
+          1.024568796157837
+        ],
+        "peak_cuda_bytes": 0,
+        "step_seconds": [
+          0.4369927999796346
+        ]
+      },
+      "fold": "pretrain_internal",
+      "lookback": 60,
+      "padded_names": 160,
+      "stage": "P"
+    },
+    {
+      "active_names": 263,
+      "amp_error_over_fp32_std": 0.010790952481329441,
+      "cell": "C1_all",
+      "collation_seconds": 0.07449740002630278,
+      "dates": [
+        459,
+        918
+      ],
+      "eager": {
+        "graphs": 0,
+        "losses": [
+          1.0508099794387817
+        ],
+        "peak_cuda_bytes": 0,
+        "step_seconds": [
+          0.23784560000058264
+        ]
+      },
+      "fold": "pretrain_internal",
+      "lookback": 60,
+      "padded_names": 160,
+      "stage": "P"
+    },
+    {
+      "active_names": 263,
+      "amp_error_over_fp32_std": 0.005692292470484972,
+      "cell": "TE_slow",
+      "collation_seconds": 0.07449740002630278,
+      "dates": [
+        459,
+        918
+      ],
+      "eager": {
+        "graphs": 0,
+        "losses": [
+          1.0147761106491089
+        ],
+        "peak_cuda_bytes": 0,
+        "step_seconds": [
+          0.9499100000248291
+        ]
+      },
+      "fold": "pretrain_internal",
+      "lookback": 60,
+      "padded_names": 160,
+      "stage": "P"
+    },
+    {
+      "active_names": 263,
+      "amp_error_over_fp32_std": 0.005627429112792015,
+      "cell": "TL_slow",
+      "collation_seconds": 0.07449740002630278,
+      "dates": [
+        459,
+        918
+      ],
+      "eager": {
+        "graphs": 0,
+        "losses": [
+          1.0121214389801025
+        ],
+        "peak_cuda_bytes": 0,
+        "step_seconds": [
+          0.4856236000196077
+        ]
+      },
+      "fold": "pretrain_internal",
+      "lookback": 60,
+      "padded_names": 160,
+      "stage": "P"
+    },
+    {
+      "active_names": 246,
+      "amp_error_over_fp32_std": 0.00738241383805871,
+      "cell": "S0_common",
+      "collation_seconds": 0.058254700037650764,
+      "dates": [
+        1754,
+        1890
+      ],
+      "eager": {
+        "graphs": 0,
+        "losses": [
+          0.9735606908798218
+        ],
+        "peak_cuda_bytes": 0,
+        "step_seconds": [
+          0.15955620002932847
+        ]
+      },
+      "fold": "F2",
+      "lookback": 60,
+      "padded_names": 144,
+      "stage": "F"
+    },
+    {
+      "active_names": 246,
+      "amp_error_over_fp32_std": 0.012020384892821312,
+      "cell": "C1_all",
+      "collation_seconds": 0.058254700037650764,
+      "dates": [
+        1754,
+        1890
+      ],
+      "eager": {
+        "graphs": 0,
+        "losses": [
+          1.0018166303634644
+        ],
+        "peak_cuda_bytes": 0,
+        "step_seconds": [
+          0.22979399998439476
+        ]
+      },
+      "fold": "F2",
+      "lookback": 60,
+      "padded_names": 144,
+      "stage": "F"
+    },
+    {
+      "active_names": 246,
+      "amp_error_over_fp32_std": 0.006520741153508425,
+      "cell": "TE_slow",
+      "collation_seconds": 0.058254700037650764,
+      "dates": [
+        1754,
+        1890
+      ],
+      "eager": {
+        "graphs": 0,
+        "losses": [
+          1.007534384727478
+        ],
+        "peak_cuda_bytes": 0,
+        "step_seconds": [
+          0.8155080000287853
+        ]
+      },
+      "fold": "F2",
+      "lookback": 60,
+      "padded_names": 144,
+      "stage": "F"
+    },
+    {
+      "active_names": 246,
+      "amp_error_over_fp32_std": 0.006058541126549244,
+      "cell": "TL_slow",
+      "collation_seconds": 0.058254700037650764,
+      "dates": [
+        1754,
+        1890
+      ],
+      "eager": {
+        "graphs": 0,
+        "losses": [
+          1.003703236579895
+        ],
+        "peak_cuda_bytes": 0,
+        "step_seconds": [
+          0.3973165999632329
+        ]
+      },
+      "fold": "F2",
+      "lookback": 60,
+      "padded_names": 144,
+      "stage": "F"
+    },
+    {
+      "active_names": 378,
+      "amp_error_over_fp32_std": 0.006967414636164904,
+      "cell": "S0_common",
+      "collation_seconds": 0.08278599998448044,
+      "dates": [
+        2250,
+        2882
+      ],
+      "eager": {
+        "graphs": 0,
+        "losses": [
+          0.9691489338874817
+        ],
+        "peak_cuda_bytes": 0,
+        "step_seconds": [
+          0.25168159999884665
+        ]
+      },
+      "fold": "F14",
+      "lookback": 60,
+      "padded_names": 256,
+      "stage": "F"
+    },
+    {
+      "active_names": 378,
+      "amp_error_over_fp32_std": 0.008494007401168346,
+      "cell": "C1_all",
+      "collation_seconds": 0.08278599998448044,
+      "dates": [
+        2250,
+        2882
+      ],
+      "eager": {
+        "graphs": 0,
+        "losses": [
+          1.0713695287704468
+        ],
+        "peak_cuda_bytes": 0,
+        "step_seconds": [
+          0.3430831999867223
+        ]
+      },
+      "fold": "F14",
+      "lookback": 60,
+      "padded_names": 256,
+      "stage": "F"
+    },
+    {
+      "active_names": 378,
+      "amp_error_over_fp32_std": 0.0067086294293403625,
+      "cell": "TE_slow",
+      "collation_seconds": 0.08278599998448044,
+      "dates": [
+        2250,
+        2882
+      ],
+      "eager": {
+        "graphs": 0,
+        "losses": [
+          0.9999523162841797
+        ],
+        "peak_cuda_bytes": 0,
+        "step_seconds": [
+          1.9268756000092253
+        ]
+      },
+      "fold": "F14",
+      "lookback": 60,
+      "padded_names": 256,
+      "stage": "F"
+    },
+    {
+      "active_names": 378,
+      "amp_error_over_fp32_std": 0.006218528840690851,
+      "cell": "TL_slow",
+      "collation_seconds": 0.08278599998448044,
+      "dates": [
+        2250,
+        2882
+      ],
+      "eager": {
+        "graphs": 0,
+        "losses": [
+          0.9971041679382324
+        ],
+        "peak_cuda_bytes": 0,
+        "step_seconds": [
+          0.727351900015492
+        ]
+      },
+      "fold": "F14",
+      "lookback": 60,
+      "padded_names": 256,
+      "stage": "F"
+    }
+  ],
+  "device": "cpu",
+  "evaluation_scores_read": false,
+  "heldout_access": false,
+  "source_hashes_lf": {
+    "characteristic_model.py": "25b83342d571fd08c4262116614ec178c453c7a01baff522cad090b42073ca1b",
+    "post_data_engineering.py": "0fcc7055e5494da9f8be887b79c9f9c34b28218306df6f0092f87c1ee6309b66",
+    "round7_training.py": "656c8dc9574783bbc2e0f4b6806104b7af7ea582aebc5185c3d5cb69b8f90676",
+    "temporal_pathway.py": "f417822e3ecbcbfc190803fc22a39d1a212e7aa3ea0c44cce4bfb4d500f26074",
+    "training_diagnostics.py": "e74a4339a3bb9be085dc118fb42d12d9c8ed5d8b347a9c9c1125e498b8f75e57"
+  },
+  "status": "passed",
+  "store": {
+    "manifest_sha256": "61149d43a23fc55fcd92b43aaa4e74d747fbdf62f852bedbbbdb2cf18281f3cc",
+    "root": "C:\\quant-data\\b3\\processed\\v2_data_store_2d59b9d_20260913T211700Z"
+  },
+  "torch": "2.13.0+cu126"
+}
