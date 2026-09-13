@@ -10,9 +10,9 @@ from .artifacts import sha256_file, write_json_atomic
 from .contract import (
     DEVELOPMENT_END,
     DEVELOPMENT_FOLDS,
-    DEVELOPMENT_START,
+    FINETUNE_START,
     PRETRAIN_END,
-    PRETRAIN_START,
+    STORE_START,
     REGISTERED_PRIMARY_TARGET,
     REGISTERED_PRIMARY_TARGET_MASK,
 )
@@ -36,11 +36,11 @@ def access_samples(dates):
     """Embargo sessions may supply history but never diagnostic target samples."""
     return np.flatnonzero(
         (
-            (dates >= np.datetime64(PRETRAIN_START))
+            (dates >= np.datetime64(STORE_START))
             & (dates <= np.datetime64(PRETRAIN_END))
         )
         | (
-            (dates >= np.datetime64(DEVELOPMENT_START))
+            (dates >= np.datetime64(FINETUNE_START))
             & (dates <= np.datetime64(DEVELOPMENT_END))
         )
     )
