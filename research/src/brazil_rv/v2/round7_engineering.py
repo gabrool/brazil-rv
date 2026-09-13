@@ -142,9 +142,12 @@ def run(store_root, output, *, device, cells, maximum_steps=120):
             )
             precision = None
             if device.type == "cuda":
-                model.eval()
+                # cuDNN GRU backward requires training mode. Replay dropout RNG
+                # so the precision comparison uses identical stochastic masks.
+                model.train()
                 gradients, losses = [], []
                 for bf16 in (False, True):
+                    torch.manual_seed(11)
                     objective.cuda = bf16
                     model.zero_grad(set_to_none=True)
                     loss = objective(batch)
@@ -163,7 +166,7 @@ def run(store_root, output, *, device, cells, maximum_steps=120):
                     gradients[0], gradients[1], dim=0
                 )
                 precision = {
-                    "mode": "evaluation-mode loss and gradients; identical fixed inputs/weights",
+                    "mode": "training-mode loss and gradients; identical inputs/weights/dropout RNG",
                     "fp32_loss": losses[0],
                     "bf16_loss": losses[1],
                     "gradient_cosine": float(cosine),
