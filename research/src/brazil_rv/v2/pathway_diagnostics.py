@@ -8,7 +8,11 @@ import polars as pl
 
 from .artifacts import sha256_file, write_json_atomic
 from .contract import (
+    DEVELOPMENT_END,
     DEVELOPMENT_FOLDS,
+    DEVELOPMENT_START,
+    PRETRAIN_END,
+    PRETRAIN_START,
     REGISTERED_PRIMARY_TARGET,
     REGISTERED_PRIMARY_TARGET_MASK,
 )
@@ -26,6 +30,20 @@ from .train import _cli_stage_indices
 from .validate_pipeline import _window_target_mask
 
 ALPHAS = (0.0001, 0.001, 0.01, 0.1, 1.0)
+
+
+def access_samples(dates):
+    """Embargo sessions may supply history but never diagnostic target samples."""
+    return np.flatnonzero(
+        (
+            (dates >= np.datetime64(PRETRAIN_START))
+            & (dates <= np.datetime64(PRETRAIN_END))
+        )
+        | (
+            (dates >= np.datetime64(DEVELOPMENT_START))
+            & (dates <= np.datetime64(DEVELOPMENT_END))
+        )
+    )
 
 
 def leave_one_out(values, known, members):
@@ -198,7 +216,7 @@ def run(root, output):
     indices = np.arange(manifest["axes"]["date_count"])
     store, access = open_store_for_samples(
         store_root,
-        indices,
+        access_samples(np.load(store_root / "date_index.npy", allow_pickle=False)),
         purpose="evaluation",
         history_lookbacks=60,
         history_end_offsets=0,

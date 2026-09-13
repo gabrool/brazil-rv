@@ -1,11 +1,19 @@
 import numpy as np
 
 from brazil_rv.v2.pathway_diagnostics import (
+    access_samples,
     fit_ridge,
     leave_one_out,
     peer_features,
     transform,
 )
+
+
+def test_access_grants_embargo_only_as_history_and_excludes_heldout():
+    dates = np.array(
+        ["2016-06-30", "2016-07-01", "2016-07-18", "2025-01-02"], dtype="datetime64[D]"
+    )
+    np.testing.assert_array_equal(access_samples(dates), [0, 2])
 
 
 def test_peer_means_exclude_self_and_unknown_observations():
