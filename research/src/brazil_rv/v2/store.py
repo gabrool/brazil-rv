@@ -29,7 +29,7 @@ from .contract import (
     TARGET_NEUTRALIZATION_VOL_GROUPS,
 )
 from .feature_spec import FeatureSpec, feature_schema_sha256
-from .normalization import midrank_unit_interval
+from .normalization import average_ranks, midrank_unit_interval
 from .splits import (
     PREREGISTRATION_ROOT,
     AccessLedger,
@@ -136,13 +136,12 @@ def characteristic_neutral_targets(
     def equal_count_groups(
         values: NDArray[np.float64], count: int
     ) -> NDArray[np.int64]:
-        order = np.argsort(values, kind="stable")
-        groups = np.empty(values.size, dtype=np.int64)
-        groups[order] = np.minimum(
-            np.arange(values.size, dtype=np.int64) * count // values.size,
-            count - 1,
-        )
-        return groups
+        # Equal characteristics must share a group. Breaking boundary ties by
+        # security-axis order makes the label depend on the input permutation.
+        # With distinct values these zero-based midranks reproduce equal counts.
+        return np.minimum(
+            average_ranks(values) * count // values.size, count - 1
+        ).astype(np.int64)
 
     output = np.zeros(returns.shape, dtype=np.float32)
     output_valid = np.zeros(returns.shape, dtype=np.bool_)

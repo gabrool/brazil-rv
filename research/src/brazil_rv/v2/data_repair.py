@@ -26,7 +26,11 @@ from .corporate_actions import (
 )
 from .data_foundation import panel_from_daily, prepare_cash_equities
 from .decision_clock import load_session_schedule, next_session_decision_cutoffs
-from .contract import DEVELOPMENT_END, FEATURE_AGE_CONTRACT
+from .contract import (
+    DEVELOPMENT_END,
+    FEATURE_AGE_CONTRACT,
+    TARGET_NEUTRALIZATION_TIE_POLICY,
+)
 from .feature_spec import (
     FeatureSpec,
     feature_schema_sha256,
@@ -376,6 +380,7 @@ def build_store(repair_root: Path, output: Path):
     metadata = copy.deepcopy(original["metadata"])
     metadata["implementation_git_commit"] = _git_identity()["commit"]
     metadata["feature_age_contract"] = dict(FEATURE_AGE_CONTRACT)
+    metadata["target_group_tie_policy"] = TARGET_NEUTRALIZATION_TIE_POLICY
     metadata["sidecar_capabilities"].pop("fundamentals_native", None)
     specifications = [
         FeatureSpec(**s)
@@ -476,16 +481,39 @@ def build_store(repair_root: Path, output: Path):
                     path = Path(record["path"])
                     if sha256_file(path) != record["sha256"]:
                         raise ValueError("oddlot source differs")
+                    schedule_record = next(
+                        s
+                        for s in original["sources"]
+                        if Path(s.get("path", "")).name
+                        == "b3_session_schedule_reconstructed_v1.csv"
+                    )
+                    if (
+                        sha256_file(Path(schedule_record["path"]))
+                        != schedule_record["sha256"]
+                    ):
+                        raise ValueError("oddlot calendar source differs")
+                    archive = pl.read_parquet(path)
+                    start = archive["source_trade_date"].min()
+                    calendar = [
+                        s.trade_date
+                        for s in load_session_schedule(Path(schedule_record["path"]))
+                        if start <= s.trade_date <= DEVELOPMENT_END
+                    ]
+                    # Rebuild on the source calendar, then crop the output.
+                    # Cropping first silently deletes the 2009 lag-5 warmup.
                     frame = derive_known_archive_features(
-                        pl.read_parquet(path), dates, isins, group="oddlot"
+                        archive, calendar, isins, group="oddlot"
                     )
                     panel = materialize_known_archive(
-                        frame, dates, isins, group="oddlot"
+                        frame, calendar, isins, group="oddlot"
                     )
                     if panel.feature_names != field_names:
                         raise ValueError("oddlot field order differs")
-                    raw, mask, ages = panel.values, panel.valid, panel.age_sessions
-                    del frame, panel
+                    rows = np.searchsorted(np.asarray(calendar), dates)
+                    raw, mask, ages = (
+                        a[rows] for a in (panel.values, panel.valid, panel.age_sessions)
+                    )
+                    del archive, frame, panel
                 else:
                     raise ValueError(f"missing physical source for {short}")
                 values = staging.create_array(family + "_values", raw.shape, np.float32)

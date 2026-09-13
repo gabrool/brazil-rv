@@ -19,7 +19,7 @@ from brazil_rv.modeling.engine import _soft_spearman_group_losses
 
 from .artifacts import sha256_file, write_json_atomic
 from .characteristic_model import CharacteristicModel
-from .contract import HORIZONS, RAW_PATIENCE_SCHEMA
+from .contract import HORIZONS, RAW_PATIENCE_SCHEMA, TARGET_NEUTRALIZATION_TIE_POLICY
 from .data import V2DailyDataset, stage_name_count
 from .model import DailyMultiHorizonModel
 from .normalization import average_ranks
@@ -404,6 +404,7 @@ def train(
             "rho": rho,
             "loss": loss_kind,
             "preprocessing": preparation.payload(),
+            "target_group_tie_policy": TARGET_NEUTRALIZATION_TIE_POLICY,
             "fit_target_window": fit_window.tolist(),
             "access": {
                 "training": training.access_ledger.payload(),

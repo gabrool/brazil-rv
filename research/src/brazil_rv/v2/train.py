@@ -55,6 +55,7 @@ from .contract import (
     PRETRAIN_END,
     RAW_PATIENCE_SCHEMA,
     REGISTERED_PRIMARY_TARGET_MASK,
+    TARGET_NEUTRALIZATION_TIE_POLICY,
     SOFT_RANK_TEMPERATURE,
     STORE_START,
     TRAINING_STAGE_SCHEMA,
@@ -1277,6 +1278,7 @@ def _loader_input_payload(
                     else None,
                 },
                 "target": {
+                    "group_tie_policy": TARGET_NEUTRALIZATION_TIE_POLICY,
                     "value_array": str(getattr(candidate, "primary_target_name", "")),
                     "validity_array": str(
                         getattr(candidate, "primary_target_mask_name", "")

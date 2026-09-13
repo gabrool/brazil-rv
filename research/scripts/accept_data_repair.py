@@ -13,6 +13,11 @@ from brazil_rv.v2.characteristic_model import CharacteristicModel
 from brazil_rv.v2.data import V2DailyDataset, stage_name_count
 from brazil_rv.v2.data_repair import parent_store
 from brazil_rv.v2.model import DailyMultiHorizonModel
+from brazil_rv.v2.normalization import average_ranks
+from brazil_rv.v2.contract import (
+    TARGET_NEUTRALIZATION_FEATURES,
+    TARGET_NEUTRALIZATION_TIE_POLICY,
+)
 from brazil_rv.v2.round7 import configuration
 from brazil_rv.v2.round7_preprocessing import Round7Preprocessing
 from brazil_rv.v2.round7_training import forward
@@ -86,6 +91,49 @@ families = tuple(
 )
 assert "fundamentals_native" not in families
 assert len(manifest["feature_names"]["sidecar_magnitudes"]) == 4
+assert (
+    manifest["metadata"]["target_group_tie_policy"] == TARGET_NEUTRALIZATION_TIE_POLICY
+)
+# Inspect the complete development population, without reading return values.
+# If group assignments are identical, the label projection itself is unchanged.
+slow = read("slow_values")
+slow_valid = read("slow_valid")
+z_columns = [
+    manifest["feature_names"]["slow"].index(n) for n in TARGET_NEUTRALIZATION_FEATURES
+]
+z = slow[..., z_columns]
+z_valid = slow_valid[..., z_columns].all(axis=-1) & np.isfinite(z).all(axis=-1)
+sigma, target_valid = read("target_scale_sigma"), read("target_valid")
+tie_changes = []
+date_axis = read("date_index")
+for d in range(len(date_axis)):
+    for h in range(target_valid.shape[-1]):
+        valid = (
+            target_valid[d, :, h]
+            & z_valid[d]
+            & np.isfinite(sigma[d])
+            & (sigma[d] > 1e-8)
+        )
+        if valid.sum() < 40:
+            continue
+        changed = np.zeros(int(valid.sum()), bool)
+        for f, count in ((0, 10), (1, 5)):
+            values = z[d, valid, f]
+            legacy = np.empty(len(values), np.int64)
+            legacy[np.argsort(values, kind="stable")] = (
+                np.arange(len(values)) * count // len(values)
+            )
+            corrected = (average_ranks(values) * count // len(values)).astype(np.int64)
+            changed |= legacy != corrected
+        if changed.any():
+            tie_changes.append(
+                {
+                    "date": str(date_axis[d]),
+                    "horizon_index": h,
+                    "changed_group_names": int(changed.sum()),
+                }
+            )
+del z, z_valid, slow, slow_valid, sigma, target_valid
 torch.set_num_threads(4)
 torch.manual_seed(713)
 parent = None
@@ -229,6 +277,8 @@ acceptance = {
     "protected_arrays_exact": True,
     "slow_masks_exact": True,
     "other_slow_coordinates_exact": True,
+    "target_group_tie_policy": TARGET_NEUTRALIZATION_TIE_POLICY,
+    "target_group_changes": tie_changes,
     "fields": fields,
     "stages": stages,
     "forward_capture": False,

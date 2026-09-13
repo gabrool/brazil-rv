@@ -66,6 +66,9 @@ TARGET_NEUTRALIZATION_FEATURES: Final[tuple[str, ...]] = (
 TARGET_NEUTRALIZATION_VOL_GROUPS: Final[int] = 10
 TARGET_NEUTRALIZATION_BETA_GROUPS: Final[int] = 5
 TARGET_NEUTRALIZATION_MIN_NONLINEAR_NAMES: Final[int] = 40
+TARGET_NEUTRALIZATION_TIE_POLICY: Final[str] = (
+    "zero_based_midrank_bucket_no_identity_tiebreak"
+)
 
 # The M1 grid starts at 10:00. Index 345 is the 15:45 bar. Features consume
 # indices [0, 345); entry is the open of index 345 (minute 346 in one-based

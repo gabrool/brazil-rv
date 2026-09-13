@@ -598,6 +598,37 @@ def test_volatility_decile_only_score_is_null_against_rev4_target() -> None:
         assert abs(np.corrcoef(decile_only_score, target[0, :, horizon])[0, 1]) < 0.01
 
 
+def test_neutral_target_characteristic_ties_are_permutation_invariant() -> None:
+    rng = np.random.default_rng(128)
+    names = 100
+    returns = rng.normal(0, 0.05, (1, names, 5))
+    valid = np.ones_like(returns, dtype=bool)
+    sigma = np.full((1, names), 0.02)
+    # Ties deliberately straddle both volatility and beta bucket boundaries.
+    characteristics = np.column_stack(
+        (
+            np.repeat(np.arange(4), 25),
+            np.tile(np.arange(3), 34)[:names],
+            rng.normal(size=names),
+        )
+    )[None]
+    z_valid = np.ones((1, names), bool)
+    before, before_valid = characteristic_neutral_targets(
+        returns, valid, sigma, characteristics, z_valid
+    )
+    permutation = rng.permutation(names)
+    after, after_valid = characteristic_neutral_targets(
+        returns[:, permutation],
+        valid[:, permutation],
+        sigma[:, permutation],
+        characteristics[:, permutation],
+        z_valid[:, permutation],
+    )
+    inverse = np.argsort(permutation)
+    np.testing.assert_array_equal(after[:, inverse], before)
+    np.testing.assert_array_equal(after_valid[:, inverse], before_valid)
+
+
 def test_characteristic_neutral_target_rejects_bad_fallback_audit_shape() -> None:
     with pytest.raises(ValueError, match="fallback flags"):
         characteristic_neutral_targets(
