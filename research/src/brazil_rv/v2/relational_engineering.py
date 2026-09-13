@@ -52,12 +52,14 @@ def teacher_batch(seed, task, *, count=16, recipients=32, donors=16):
         # Variable universes within a fixed pad, with at least 24 target names.
         active[day, recipients - int(day % 8) : recipients] = False
         active[day, names - int(day % 4) :] = False
-    history = torch.rand(count, names, steps, generator=generator) > 0.05
-    history[..., -1] = True
+    padding = torch.randint(12, (count, names), generator=generator)
+    history = torch.arange(steps)[None, None, :] >= padding[..., None]
+    observed = torch.rand(count, names, steps, generator=generator) > 0.05
+    observed[..., -1] = True
     # Required teacher endpoints are observed, including in sparse histories.
-    history[..., -21] = True
-    history[..., -41] = True
-    valid = history[..., None].expand_as(x) & active[..., None, None]
+    observed[..., -21] = True
+    observed[..., -41] = True
+    valid = (history & observed)[..., None].expand_as(x) & active[..., None, None]
     weights = torch.softmax(
         (queries @ keys.transpose(-1, -2) / 2**0.5).masked_fill(
             ~active[:, None, recipients:], -torch.inf
