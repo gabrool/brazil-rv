@@ -224,6 +224,9 @@ for stage, fold in (("P", "pretrain_internal"), ("F", "F2"), ("F", "F14")):
                 ]
             )
             batch = current.collate(model_samples, fixed_name_count=width)
+            assert int(batch["active_mask"].sum()) == sum(
+                int(active[int(s["date_index"])].sum()) for s in samples
+            )
             for key, value in batch.items():
                 if isinstance(value, torch.Tensor) and (
                     key.startswith("sidecar_") or key.startswith("common_state_")

@@ -39,6 +39,24 @@ def identity(identifier):
 
 def evidence(identifier):
     folder = root / "filing_evidence" / identifier
+    if identifier in {"119569", "83492", "89140"}:
+        extracted = json.loads(
+            (folder / "notes_evidence.json").read_text(encoding="utf-8")
+        )
+        if extracted["status"] != "extracted" or extracted["document"] != identity(
+            identifier
+        ):
+            raise ValueError("Reviewed note PDF is not bound to the accepted filing")
+        for source in extracted["sources"]:
+            if sha256(Path(source["path"])) != source["sha256"]:
+                raise ValueError("Reviewed exact-filing note source changed")
+        return [
+            *extracted["sources"],
+            {
+                "path": str(folder / "notes_evidence.json"),
+                "sha256": sha256(folder / "notes_evidence.json"),
+            },
+        ]
     extracted = json.loads((folder / "evidence.json").read_text(encoding="utf-8"))
     archive = Path(extracted["archive"])
     if sha256(archive) != extracted["archive_sha256"]:
@@ -58,9 +76,80 @@ def evidence(identifier):
 
 
 currency = []
+# Manual review covers image tables and the exact-note fallback. Page numbers
+# refer to the complete filing, except the three explicitly labelled note PDFs.
+manual_currency = {
+    "95273": [
+        {
+            "pages": [37, 66, 70],
+            "basis": "consolidated",
+            "period": "2020-06-30",
+            "note_unit_brl": 1000,
+            "assets": 14759813,
+            "revenue_six_months": 3140616,
+        }
+    ],
+    "95658": [
+        {
+            "pages": [41],
+            "basis": "consolidated",
+            "period": "2020-06-30",
+            "note_unit_brl": 1000,
+            "assets": 7665812,
+            "equity": 2774932,
+            "review": "Image table visually verified: 2T20 current column, R$ milhares.",
+        }
+    ],
+    "98052": [
+        {
+            "pages": [45],
+            "basis": "consolidated",
+            "period": "2020-09-30",
+            "note_unit_brl": 1000,
+            "assets": 8855038,
+            "equity": 3766642,
+        }
+    ],
+    "136788": [
+        {
+            "pages": [48],
+            "basis": "consolidated",
+            "period": "2024-03-31",
+            "note_unit_brl": 1000000,
+            "revenue": 17920,
+            "gross_profit": 1211,
+            "review": "Image table visually verified: R$ millions. Submitted amounts are 17920000 and 1211000 BRL, hence a 1000 correction.",
+        }
+    ],
+    "83492": [
+        {
+            "note_pdf_pages": [1, 57, 58, 71],
+            "basis": "consolidated",
+            "period": "2019-03-31",
+            "note_unit_brl": 1000,
+            "assets": 36263289,
+            "revenue": 3896006,
+            "equity": 16838841,
+        }
+    ],
+    "89140": [
+        {
+            "note_pdf_pages": [1, 42, 46],
+            "basis": "consolidated",
+            "period": "2019-09-30",
+            "note_unit_brl": 1000,
+            "revenue_nine_months": 3537662,
+            "net_income_nine_months": 242142,
+        }
+    ],
+}
+currency_ids.update(manual_currency)
 for identifier in sorted(currency_ids, key=int):
-    proposal = proposals[identifier]
-    matches = proposal["matches"]
+    matches = (
+        manual_currency[identifier]
+        if identifier in manual_currency
+        else proposals[identifier]["matches"]
+    )
     if identifier == "5264":
         matches = [
             m for m in matches if m["page"] == 101
@@ -81,6 +170,60 @@ for identifier in sorted(currency_ids, key=int):
 # Paid-in and treasury counts are reviewed separately. Counts never come from a
 # later filing, a weighted-average EPS denominator, or a guessed 1,000 multiplier.
 capital_decisions = {
+    "15173": (
+        (740465044, 0),
+        (16798400, 0),
+        [125],
+        "Own 2011 capital note separately states paid-in and treasury counts; the front paid-in row is rounded and already net of treasury.",
+    ),
+    "45077": (
+        (122523049, 227024896),
+        (0, 0),
+        [3, 49],
+        "Own 2014 capital note gives exact ON/PN quantities summing to 349547945; front table reports zero treasury.",
+    ),
+    "93071": (
+        (1300015000, 0),
+        (300000, 0),
+        [2, 75],
+        "Own current capital note reports 1300015 thousand paid-in shares and 300 thousand treasury shares; front paid-in row is already net. Preserve the note's reported thousand-share precision.",
+    ),
+    "134881": (
+        (115265345, 0),
+        (20600, 0),
+        [2, 93, 94, 95],
+        "Own current capital rollforward ends at 115265345 paid-in; treasury table reconciles 23627 minus 3027 to 20600. Front table is rounded and omits treasury.",
+    ),
+    "100993": (
+        (133851072, 0),
+        (1157460, 0),
+        [2, 88, 102],
+        "Own year-end shareholder table explicitly labels quantities in units and reconciles 133851072 paid-in and 1157460 treasury after the reverse split. Do not reuse pre-split treasury quantities or rounded front-table values.",
+    ),
+    "104363": (
+        (71500000, 0),
+        (0, 0),
+        [2, 82, 83],
+        "Own current shareholder table in thousands sums 37580+10275+23645=71500 and 100%; issuance arithmetic 54164+17336 also gives 71500. The front 71550 and repeated prose total conflict with these reconciled counts; an earlier paragraph is pre-IPO. Use this filing's reconciled current table, not a later filing.",
+    ),
+    "109881": (
+        (71500000, 0),
+        (0, 0),
+        [2, 84, 85],
+        "Own version-2 current shareholder table in thousands sums 37582+10274+4162+19482=71500; current capital prose agrees. Keep its version-2 receipt.",
+    ),
+    "115422": (
+        (71500000, 0),
+        (0, 0),
+        [2, 92],
+        "Own current shareholder table in thousands sums 37582+4439+29479=71500 with 100% ownership; front table reports zero treasury.",
+    ),
+    "119569": (
+        (2218116370, 0),
+        (0, 0),
+        [16],
+        "Exact-filing NOTE PDF page 16: paid-in rollforward 2373866570 minus 155750200 cancelled shares equals 2218116370. Treasury rollforward 80062600+97687600-22000000-155750200 equals zero. The front table misstates both rows; do not infer treasury from the difference between its erroneous entries.",
+    ),
     "55631": (
         (316684999, 0),
         (9337178, 0),
