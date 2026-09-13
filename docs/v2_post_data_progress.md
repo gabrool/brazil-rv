@@ -69,6 +69,21 @@ Unseen-date full-model teachers, then fit/selection-only financial calibration.
 Freeze screen settings/roster before evaluation-score access. Re-read the plan
 and record the evidence for B's completion before C.
 
+The initial 512-update SAM .125 teachers passed own-history (unseen-date IC
+.9994/.9993, seeds11/29) but failed dynamic peer, lagged and context tasks
+(roughly −.025 to .005). A peer-only 512-update bracket also failed with
+ASAM .2/.5, SAM .05, SAM .125/LR3e-4 and AdamW. These are retained failures,
+not evidence that real financial attention cannot work. Next diagnosis separates
+stock routing from brief temporal-message retrieval with a persistent-message
+control and tests whether a longer independent-date learning budget resolves
+the original task. Neither replaces the original dynamic/lagged gate. Financial
+calibration has not begun. No selection or evaluation alpha claim is available.
+
+The current-store evaluation adapter is implemented while engineering runs:
+unchanged economic-beta array proof, exact score provenance, common-population
+head/composite/target-view diagnostics, seed omission IC and paired 20/60-session
+intervals. Its targeted checks pass; full integration awaits actual scored panels.
+
 ## Stage C — pending
 
 Fresh incumbent/common-recipe and GRU/early/late comparisons, then repaired

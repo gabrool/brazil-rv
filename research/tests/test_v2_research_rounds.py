@@ -741,6 +741,7 @@ def test_evaluation_reconstruction_uses_hash_bound_scores_and_canonical_store(
 
     class FixtureStore:
         manifest = {
+            "arrays": {name: {} for name in arrays},
             "axes": {"date_identity_sha256": inputs.calendar_identity_sha256},
             "feature_names": {
                 "slow": list(SLOW_FEATURES),
@@ -751,6 +752,15 @@ def test_evaluation_reconstruction_uses_hash_bound_scores_and_canonical_store(
                 "schedule_source": inputs.schedule_source,
                 "corporate_action_contract": {
                     "stored_action_arrays": ("retrospective outcome/accounting terms")
+                },
+                "feature_schema": {
+                    "specifications": [
+                        {
+                            "name": "observed_history_age_sessions",
+                            "family": "slow",
+                            "version": "decision_feature_2",
+                        }
+                    ]
                 },
             },
             "sources": [

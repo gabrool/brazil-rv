@@ -27,7 +27,7 @@ from .post_data_program import RECIPES
 from .train import compile_forward, set_deterministic_seed
 
 
-def teacher_batch(seed, task, *, count=16, recipients=32, donors=16):
+def teacher_batch(seed, task, *, count=16, recipients=32, donors=16, persistent=False):
     """Fresh dates: recipients' observable queries address independent donors.
 
     Channels 0:2 carry recipient queries; 2:4 donor keys; 4:6 messages;
@@ -41,6 +41,10 @@ def teacher_batch(seed, task, *, count=16, recipients=32, donors=16):
     queries = torch.randn(count, recipients, 2, generator=generator)
     keys = torch.randn(count, donors, 2, generator=generator)
     messages = torch.randn(count, donors, steps, 2, generator=generator)
+    if persistent:
+        # Isolate stock routing from finding a brief historical message. This
+        # diagnostic does not replace the dynamic/lagged acceptance teachers.
+        messages = messages[..., -1:, :].expand_as(messages)
     regime = torch.randint(2, (count,), generator=generator)
     x[..., :8] = 0
     x[:, :recipients, :, :2] = queries[:, :, None, :]
@@ -120,6 +124,7 @@ def run(
     steps=512,
     cuda=False,
     compiled=False,
+    persistent=False,
 ):
     """Every update sees new dates; validation seeds never occur in training."""
     torch.set_num_threads(6)
@@ -145,7 +150,7 @@ def run(
     prediction_model = compile_forward(model) if compiled else model
 
     def batch(batch_seed, size=16):
-        value = teacher_batch(batch_seed, task, count=size)
+        value = teacher_batch(batch_seed, task, count=size, persistent=persistent)
         if control == "own":
             # Remove donor observations from this control only. The labels still
             # use independently generated donors; there is no own-stock shortcut.
@@ -225,6 +230,7 @@ def run(
         "seconds": time.perf_counter() - start,
         "compiled": compiled,
         "validation_recipients_only": True,
+        "persistent_message_diagnostic": persistent,
         "financial_data_read": False,
         "torch": torch.__version__,
         "source_hashes_lf": {
@@ -258,6 +264,7 @@ def main():
     parser.add_argument("--steps", type=int, default=512)
     parser.add_argument("--cuda", action="store_true")
     parser.add_argument("--compile", action="store_true")
+    parser.add_argument("--persistent", action="store_true")
     args = parser.parse_args()
     run(
         args.output,
@@ -268,6 +275,7 @@ def main():
         steps=args.steps,
         cuda=args.cuda,
         compiled=args.compile,
+        persistent=args.persistent,
     )
 
 

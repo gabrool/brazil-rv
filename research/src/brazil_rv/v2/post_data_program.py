@@ -78,6 +78,9 @@ def freeze(root):
         ),
         "feature_names": manifest["feature_names"],
         "feature_schema_sha256": manifest["feature_schema_sha256"],
+        "economic_source": read(PROJECT / "docs/v2_round7_inputs.json")[
+            "evaluation_design"
+        ],
         "cells": {
             name: {
                 "spec": cell,
@@ -120,6 +123,9 @@ def plan(root, phase, *, max_parallel=2):
     for name, recipe in design["recipes"].items():
         if read(root / "recipes" / f"{name}.json") != recipe:
             raise ValueError("recipe changed after freeze")
+    for name, item in design["cells"].items():
+        if read(root / "specs" / f"{name}.json") != item["spec"]:
+            raise ValueError("cell inputs or graph changed after freeze")
     tasks = []
     if phase == "b_parents":
         tasks = [

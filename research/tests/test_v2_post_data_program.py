@@ -72,6 +72,15 @@ def test_parent_plan_uses_current_pointer_and_only_authorized_calibration(
     registration = tmp_path / "research/preregistrations/v2_post_data.md"
     registration.parent.mkdir(parents=True)
     registration.write_text("frozen research")
+    write_json_atomic(
+        tmp_path / "docs/v2_round7_inputs.json",
+        {
+            "evaluation_design": {
+                "path": "bound/evaluation_design.json",
+                "sha256": "economic_hash",
+            }
+        },
+    )
     root = tmp_path / "run"
     program.freeze(root)
     result = program.plan(root, "b_parents")
@@ -80,6 +89,10 @@ def test_parent_plan_uses_current_pointer_and_only_authorized_calibration(
     assert {job["seed"] for job in payload["jobs"]} == {11, 29}
     assert all("--export-scores" not in job["command"] for job in payload["jobs"])
     assert all(str(store) in job["command"] for job in payload["jobs"])
+    assert all(
+        ("--eager" in job["command"]) == job["name"].startswith("C1")
+        for job in payload["jobs"]
+    )
 
 
 def test_teacher_has_independent_dates_observed_endpoints_and_donor_only_labels():

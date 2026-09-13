@@ -949,10 +949,11 @@ def _folded_bootstrap(
     *,
     replications: int = BOOTSTRAP_REPLICATIONS,
     seed: int = BOOTSTRAP_SEED,
+    block_length: int = BOOTSTRAP_BLOCK,
 ) -> dict[str, object]:
     arrays = tuple(np.asarray(value, dtype=np.float64) for value in values)
     if not arrays or any(
-        value.ndim != 1 or len(value) < BOOTSTRAP_BLOCK for value in arrays
+        value.ndim != 1 or len(value) < block_length for value in arrays
     ):
         raise ValueError("each fold needs at least one bootstrap block")
     finite = np.concatenate(arrays)
@@ -968,7 +969,7 @@ def _folded_bootstrap(
             "finite_bootstrap_replications": 0,
             "undefined_reason": "no_defined_daily_values",
             "replications": replications,
-            "block_length_sessions": BOOTSTRAP_BLOCK,
+            "block_length_sessions": block_length,
             "fold_boundary_preserved": True,
         }
     estimate = float(np.nanmean(finite))
@@ -976,15 +977,15 @@ def _folded_bootstrap(
     sums = np.zeros(replications, dtype=np.float64)
     counts = np.zeros(replications, dtype=np.int64)
     for array in arrays:
-        blocks = math.ceil(len(array) / BOOTSTRAP_BLOCK)
+        blocks = math.ceil(len(array) / block_length)
         starts = generator.integers(
             0,
-            len(array) - BOOTSTRAP_BLOCK + 1,
+            len(array) - block_length + 1,
             size=(replications, blocks),
         )
-        sampled = (
-            starts[..., None] + np.arange(BOOTSTRAP_BLOCK, dtype=np.int64)
-        ).reshape(replications, -1)[:, : len(array)]
+        sampled = (starts[..., None] + np.arange(block_length, dtype=np.int64)).reshape(
+            replications, -1
+        )[:, : len(array)]
         selected = array[sampled]
         sums += np.nansum(selected, axis=1)
         counts += np.isfinite(selected).sum(axis=1)
@@ -1007,7 +1008,7 @@ def _folded_bootstrap(
         "finite_bootstrap_replications": int(finite_draws.size),
         "undefined_reason": undefined_reason,
         "replications": replications,
-        "block_length_sessions": BOOTSTRAP_BLOCK,
+        "block_length_sessions": block_length,
         "fold_boundary_preserved": True,
     }
 
