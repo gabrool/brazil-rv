@@ -72,7 +72,9 @@ def teacher_batch(seed, task, *, count=16, recipients=32, donors=16, persistent=
         -1,
     )
     if task == "own":
-        signal = queries[..., 0] + 0.5 * queries[..., 1]
+        # A historical lookup, with no current-state shortcut. The original
+        # static-query fixture tested current information, not own history.
+        signal = x[:, :recipients, -21, 8] + 0.5 * x[:, :recipients, -41, 9]
     elif task == "peer":
         signal = (weights @ messages[..., -1, :1]).squeeze(-1)
     elif task == "lagged":
@@ -114,6 +116,12 @@ def uniform_peer(self, values, valid):
     return torch.where(valid[..., None], result, 0.0)
 
 
+def fp32_head(self, values):
+    # Bounded precision diagnostic, not a financial model change.
+    with torch.autocast(device_type=values.device.type, enabled=False):
+        return torch.nn.functional.linear(values.float(), self.weight, self.bias)
+
+
 def run(
     output,
     *,
@@ -125,6 +133,7 @@ def run(
     cuda=False,
     compiled=False,
     persistent=False,
+    precision="bf16",
 ):
     """Every update sees new dates; validation seeds never occur in training."""
     torch.set_num_threads(6)
@@ -132,6 +141,8 @@ def run(
     device = torch.device("cuda" if cuda else "cpu")
     config = CharacteristicConfig(temporal_encoder="attention", peer_timing="early")
     model = CharacteristicModel(config).to(device)
+    if precision == "fp32_head":
+        model.head.forward = MethodType(fp32_head, model.head)
     if control == "uniform":
         model.temporal_peer.peer.forward = MethodType(
             uniform_peer, model.temporal_peer.peer
@@ -144,7 +155,7 @@ def run(
         characteristic=True,
         head_indices=[2, 3, 4],
         loss_kind="soft_spearman",
-        cuda=cuda,
+        cuda=cuda and precision != "fp32",
     )
     objective = compile_forward(objective) if compiled else objective
     prediction_model = compile_forward(model) if compiled else model
@@ -169,7 +180,9 @@ def run(
         with torch.no_grad():
             for sample in validation:
                 with torch.autocast(
-                    device_type=device.type, dtype=torch.bfloat16, enabled=cuda
+                    device_type=device.type,
+                    dtype=torch.bfloat16,
+                    enabled=cuda and precision != "fp32",
                 ):
                     scores = (
                         forward(prediction_model, sample, characteristic=True)
@@ -205,6 +218,7 @@ def run(
             rho=rho,
             adaptive=recipe.adaptive,
             eta=recipe.eta,
+            use_bf16=precision != "fp32",
         )
 
     diagnostics = {"initial": diagnostic()}
@@ -257,6 +271,8 @@ def run(
         "compiled": compiled,
         "validation_recipients_only": True,
         "persistent_message_diagnostic": persistent,
+        "precision": precision,
+        "own_task_definition": "observed recipient channels 8 at t-21 and 9 at t-41; current snapshot independent",
         "financial_data_read": False,
         "torch": torch.__version__,
         "source_hashes_lf": {
@@ -291,6 +307,9 @@ def main():
     parser.add_argument("--cuda", action="store_true")
     parser.add_argument("--compile", action="store_true")
     parser.add_argument("--persistent", action="store_true")
+    parser.add_argument(
+        "--precision", choices=("bf16", "fp32_head", "fp32"), default="bf16"
+    )
     args = parser.parse_args()
     run(
         args.output,
@@ -302,6 +321,7 @@ def main():
         cuda=args.cuda,
         compiled=args.compile,
         persistent=args.persistent,
+        precision=args.precision,
     )
 
 

@@ -40,7 +40,18 @@ def _module_norms(model, originals):
     }
 
 
-def probe(model, optimizer, batch, *, characteristic, horizons, rho, adaptive, eta):
+def probe(
+    model,
+    optimizer,
+    batch,
+    *,
+    characteristic,
+    horizons,
+    rho,
+    adaptive,
+    eta,
+    use_bf16=True,
+):
     """One actual two-pass update, then restore model/optimizer/RNG exactly.
 
     Called on two fixed training dates at initialization, early and selected
@@ -80,10 +91,12 @@ def probe(model, optimizer, batch, *, characteristic, horizons, rho, adaptive, e
             # attention matrices or interfere with the fused training operator.
             with torch.no_grad():
                 values, valid = args
-                candidates = torch.nonzero(valid.sum(-1) >= 2).flatten()
-                if not len(candidates):
+                counts = valid.sum(-1)
+                index = int(counts.argmax())
+                if counts[index] < 2:
                     return
-                index = int(candidates[0])
+                # An early left-padding position can have just a few names;
+                # inspect a fully populated slice, not the first nonempty one.
                 values, valid = values[index : index + 1], valid[index : index + 1]
                 names, width = values.shape[-2:]
                 q, k, _ = (
@@ -114,7 +127,9 @@ def probe(model, optimizer, batch, *, characteristic, horizons, rho, adaptive, e
 
     def predict():
         with torch.autocast(
-            device_type=mask.device.type, dtype=torch.bfloat16, enabled=mask.is_cuda
+            device_type=mask.device.type,
+            dtype=torch.bfloat16,
+            enabled=mask.is_cuda and use_bf16,
         ):
             return forward(model, batch, characteristic=characteristic).float()
 
@@ -164,6 +179,27 @@ def probe(model, optimizer, batch, *, characteristic, horizons, rho, adaptive, e
         model.eval()
         with torch.no_grad():
             clean_scores = predict()
+            result["cross_sectional_score_resolution"] = {}
+            population = (
+                batch["active_mask"][..., None]
+                & batch["target_mask"][..., head_indices]
+            )
+            for h, horizon in enumerate(horizons):
+                rows = [
+                    clean_scores[d, population[d, :, h], :, h].mean(-1)
+                    for d in range(len(clean_scores))
+                    if population[d, :, h].sum() >= 2
+                ]
+                if rows:
+                    result["cross_sectional_score_resolution"][str(horizon)] = {
+                        "mean_std": sum(float(x.std()) for x in rows) / len(rows),
+                        "mean_absolute_level": sum(float(x.mean().abs()) for x in rows)
+                        / len(rows),
+                        "mean_unique_fraction": sum(
+                            len(torch.unique(x)) / len(x) for x in rows
+                        )
+                        / len(rows),
+                    }
             peers = [
                 (n, m)
                 for n, m in model.named_modules()

@@ -42,6 +42,11 @@ ranking loss and sensitive reductions. Do not shorten history, omit names,
 reduce model dimensions or relax masks to improve a speed benchmark. Verify
 forward/backward and mask parity, finite cold-module gradients, and actual
 full-fit timing. Keep compilation overhead visible.
+On GH200, materialize the canonical fit/selection tensors once in GPU memory,
+then gather the same date batches. Preserve FP32 values, all masks and ages;
+never refit or approximate preprocessing in the cache. Its finite date scope
+is inherited from the dataset's existing access boundary. Record setup time
+and bytes, and prove exact tensor equivalence before financial dispatch.
 
 Log every epoch's loss, clipping frequency, complete selection and a fixed
 era-spanning clean-fit probe. At selected/terminal states measure full clean-fit

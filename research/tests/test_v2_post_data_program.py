@@ -8,6 +8,7 @@ from brazil_rv.v2.artifacts import sha256_file, write_json_atomic
 from brazil_rv.v2 import post_data_program as program
 from brazil_rv.v2.round7 import configuration
 from brazil_rv.v2.relational_engineering import teacher_batch
+from brazil_rv.v2.round7_training import DateTensorCache
 
 
 def test_matched_early_late_configuration_and_film_isolation():
@@ -104,3 +105,40 @@ def test_teacher_has_independent_dates_observed_endpoints_and_donor_only_labels(
     for i in (-21, -41):
         assert a["slow_feature_mask"][:, 32:, i, 4:6][a["active_mask"][:, 32:]].all()
     assert np.isfinite(a["targets"].numpy()).all()
+
+
+def test_date_cache_preserves_values_masks_ages_and_requested_order():
+    source = teacher_batch(11, "peer", count=5)
+    source["date_index"] = torch.arange(10, 15)
+    cache = DateTensorCache(
+        [
+            {k: v[:2] for k, v in source.items()},
+            {k: v[2:] for k, v in source.items()},
+        ],
+        5,
+        torch.device("cpu"),
+    )
+    order = [4, 1, 0, 3, 2]
+    gathered = cache.gather(order)
+    for key, value in source.items():
+        assert torch.equal(gathered[key], value[order])
+        assert gathered[key].dtype == value.dtype
+    batches = cache.batches([order[:3], order[3:]])
+    assert len(batches) == 2
+    assert torch.equal(
+        torch.cat([b["date_index"] for b in batches]), source["date_index"][order]
+    )
+
+
+def test_own_teacher_requires_observed_historical_inputs():
+    batch = teacher_batch(42, "own", count=2)
+    signal = (
+        batch["slow_features"][:, :32, -21, 8]
+        + 0.5 * batch["slow_features"][:, :32, -41, 9]
+    )
+    for day in range(2):
+        valid = batch["target_mask"][day, :32, 2]
+        expected = signal[day, valid].argsort().argsort().float() / (
+            int(valid.sum()) - 1
+        )
+        torch.testing.assert_close(batch["targets"][day, :32, 2][valid], expected)

@@ -360,6 +360,62 @@ def sequential_batches(count, size=16):
     ]
 
 
+class DateTensorCache:
+    """Canonical preprocessed dates once, then exact date gathers on the GPU.
+
+    No dtype compression, observation pruning or new transformation. The source
+    loader owns PIT/mask/fit-scaler enforcement; only its materialized model
+    tensors and date identities are retained, scoped to this fit process.
+    """
+
+    def __init__(self, source, count, device):
+        start = time.perf_counter()
+        self.tensors = {}
+        offset = 0
+        for cpu in source:
+            batch = model_batch(cpu, device)
+            batch["date_index"] = cpu["date_index"].to(device)
+            size = len(batch["date_index"])
+            if not self.tensors:
+                self.tensors = {
+                    key: torch.empty(
+                        (count, *value.shape[1:]), dtype=value.dtype, device=device
+                    )
+                    for key, value in batch.items()
+                }
+            for key, value in batch.items():
+                self.tensors[key][offset : offset + size].copy_(value)
+            offset += size
+        if offset != count:
+            raise ValueError(
+                "date cache did not consume the complete permitted population"
+            )
+        self.bytes = sum(t.numel() * t.element_size() for t in self.tensors.values())
+        self.seconds = time.perf_counter() - start
+
+    def gather(self, positions):
+        index = torch.as_tensor(
+            positions, dtype=torch.long, device=self.tensors["date_index"].device
+        )
+        return {
+            name: value.index_select(0, index) for name, value in self.tensors.items()
+        }
+
+    def batches(self, sampler):
+        return CachedDateBatches(self, sampler)
+
+
+class CachedDateBatches:
+    def __init__(self, cache, sampler):
+        self.cache, self.sampler = cache, sampler
+
+    def __len__(self):
+        return len(self.sampler)
+
+    def __iter__(self):
+        return (self.cache.gather(positions) for positions in self.sampler)
+
+
 def unexposed_families(dataset, preparation):
     """No P value or known-age exposure: such encoders have no learned mapping."""
     result = []
@@ -482,6 +538,27 @@ def train(
             collate_fn=collator,
             pin_memory=device.type == "cuda",
         )
+        cache_resources = None
+        if device.type == "cuda":
+            # GH200 holds the full finite P/F date sets without re-reading and
+            # re-collating each overlapping 60-session history every epoch.
+            training_cache = DateTensorCache(clean_fit_loader, len(training), device)
+            selection_cache = DateTensorCache(selection_loader, len(selection), device)
+            train_loader = training_cache.batches(sampler)
+            selection_loader = selection_cache.batches(
+                sequential_batches(len(selection))
+            )
+            clean_fit_loader = training_cache.batches(sequential_batches(len(training)))
+            probe_loader = training_cache.batches(
+                [
+                    probe_indices[b].tolist()
+                    for b in sequential_batches(len(probe_indices))
+                ]
+            )
+            cache_resources = {
+                "bytes": training_cache.bytes + selection_cache.bytes,
+                "preparation_seconds": training_cache.seconds + selection_cache.seconds,
+            }
         diagnostic_batch = model_batch(
             collator([training[int(i)] for i in probe_indices[[0, -1]]]), device
         )
@@ -511,6 +588,7 @@ def train(
             },
             "padded_name_count": width,
             "compile": compiled,
+            "date_tensor_cache": device.type == "cuda",
             "parent_sha256": parent_sha256,
         }
         set_deterministic_seed(seed)
@@ -838,6 +916,7 @@ def train(
             "selected_epoch": best_epoch,
             "selection_ic": best_ic,
             "stop_reason": "patience" if stale >= recipe.patience else "ceiling",
+            "date_tensor_cache_resources": cache_resources,
             "compiled_graphs": {
                 "training": max(
                     [

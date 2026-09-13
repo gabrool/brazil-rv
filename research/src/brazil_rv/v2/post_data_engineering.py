@@ -22,6 +22,7 @@ from .round7 import configuration
 from .round7_data import PROJECT
 from .round7_preprocessing import Round7Preprocessing
 from .round7_training import (
+    DateTensorCache,
     TrainingObjective,
     forward,
     model_batch,
@@ -36,7 +37,7 @@ from .train import (
 )
 
 
-def check(output, *, cuda=False):
+def check(output, *, cuda=False, cache_only=False):
     source_hashes = {
         p.name: hashlib.sha256(p.read_bytes().replace(b"\r\n", b"\n")).hexdigest()
         for p in Path(__file__).parent.glob("*.py")
@@ -86,7 +87,7 @@ def check(output, *, cuda=False):
             if stage == "P":
                 parent_preprocessing = preparation
             width = stage_name_count(data)
-            size = 16 if cuda and fold == "F14" else 2
+            size = 16 if cuda and (fold == "F14" or cache_only) else 2
             indices = np.linspace(len(data) // 3, 2 * len(data) // 3, size, dtype=int)
             start = time.perf_counter()
             cpu = preparation.collate(
@@ -94,6 +95,35 @@ def check(output, *, cuda=False):
             )
             batch = model_batch(cpu, device)
             collation_seconds = time.perf_counter() - start
+            if cache_only:
+                cache = DateTensorCache([cpu], size, device)
+                order = list(reversed(range(size)))
+                gathered = cache.gather(order)
+                for key, value in batch.items():
+                    if not torch.equal(gathered[key], value[order]):
+                        raise ValueError(f"cached canonical tensor changed: {key}")
+                if cuda:
+                    torch.cuda.synchronize()
+                start = time.perf_counter()
+                for _ in range(50):
+                    cache.gather(order)
+                if cuda:
+                    torch.cuda.synchronize()
+                results.append(
+                    {
+                        "stage": stage,
+                        "fold": fold,
+                        "dates": fit[indices].tolist(),
+                        "padded_names": width,
+                        "lookback": 60,
+                        "all_model_tensors_exact": True,
+                        "cache_bytes": cache.bytes,
+                        "canonical_collation_seconds": collation_seconds,
+                        "cached_gather_seconds": (time.perf_counter() - start) / 50,
+                    }
+                )
+                del cache, gathered
+                continue
             for name in ("S0_common", "C1_all", "TE_slow", "TL_slow"):
                 if cuda and fold != "F14":
                     continue
@@ -203,6 +233,7 @@ def check(output, *, cuda=False):
         "source_hashes_lf": source_hashes,
         "evaluation_scores_read": False,
         "heldout_access": False,
+        "cache_only": cache_only,
     }
     write_json_atomic(output, report)
     return report
@@ -212,8 +243,9 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--cuda", action="store_true")
+    parser.add_argument("--cache-only", action="store_true")
     args = parser.parse_args()
-    check(args.output, cuda=args.cuda)
+    check(args.output, cuda=args.cuda, cache_only=args.cache_only)
 
 
 if __name__ == "__main__":

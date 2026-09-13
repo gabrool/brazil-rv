@@ -63,13 +63,20 @@ CUDA source hashes bind commit 983b176; the later cold-family transfer-contract
 correction is separately covered by targeted tests and changes no model or
 optimizer numerics. No financial trajectory or evaluation score was read.
 
+A measured input bottleneck is addressed before the first financial fit:
+canonical fit/selection tensors are materialized once on the GPU, retaining
+every FP32 value, mask, age, date and name. Subsequent epochs gather those
+exact dates instead of reconstructing overlapping history on the CPU.
+Twenty-five cache/training/ASAM/selection checks pass. Real CUDA cache parity
+and full-fit resource use still need acceptance before enabling financial work.
+
 ## Stage B — in progress
 
 Unseen-date full-model teachers, then fit/selection-only financial calibration.
 Freeze screen settings/roster before evaluation-score access. Re-read the plan
 and record the evidence for B's completion before C.
 
-The initial 512-update SAM .125 teachers passed own-history (unseen-date IC
+The initial 512-update SAM .125 teachers passed an own-current-state task (unseen-date IC
 .9994/.9993, seeds11/29) but failed dynamic peer, lagged and context tasks
 (roughly −.025 to .005). A peer-only 512-update bracket also failed with
 ASAM .2/.5, SAM .05, SAM .125/LR3e-4 and AdamW. These are retained failures,
@@ -78,6 +85,21 @@ stock routing from brief temporal-message retrieval with a persistent-message
 control and tests whether a longer independent-date learning budget resolves
 the original task. Neither replaces the original dynamic/lagged gate. Financial
 calibration has not begun. No selection or evaluation alpha claim is available.
+
+The original dynamic-peer task learns under ASAM .2 with 4096 fresh-date
+updates (seed11 IC .7783). An independent rerun with restorative module probes
+reproduces it exactly; seed29 is .7827. The lagged/context tasks still fail
+at 4096 updates. Uniform peer control IC is .6860/.7819; own-only is .0204/.0107.
+Thus there is cross-stock learning, but this does not establish superior learned
+attention or historical routing. The original own teacher's query was constant
+through time, so it did not test history. Its corrected definition uses observed
+recipient channels at t-21/t-41, with no current-state shortcut. Next engineering
+diagnosis compares BF16, an FP32 final head, and full FP32 without changing
+history, features, masks, width, loss or optimizer. No financial model precision
+change is made solely on that hypothesis. Larger-LR
+SAM remains near zero; larger-LR AdamW encountered undefined flat predictions,
+which are retained as a failed attempt. The harness now records null IC and
+defined-date counts rather than failing JSON serialization and losing evidence.
 
 The current-store evaluation adapter is implemented while engineering runs:
 unchanged economic-beta array proof, exact score provenance, common-population
