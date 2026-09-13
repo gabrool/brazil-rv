@@ -1030,6 +1030,9 @@ def compile_forward(
 ) -> nn.Module:
     # PyTorch requires the RNN opt-in before Dynamo will capture nn.GRU.
     torch._dynamo.config.allow_rnn = True
+    # Keep Python hyperparameters constant: symbolic float scalars generate a
+    # crashing CPU-copy kernel in the GH200 compiled backward pass.
+    torch._dynamo.config.specialize_float = True
     if backend == "inductor":
         _configure_inductor_compiler()
         # The sparse fast path has a data-dependent present-name count.  CUDA
@@ -1038,6 +1041,10 @@ def compile_forward(
         # finite.  Let Inductor compile that graph but skip CUDA graph capture
         # whenever it detects the dynamic shape.
         torch._inductor.config.triton.cudagraph_skip_dynamic_graphs = True
+        if mode == "max-autotune":
+            # SAM's repeated backward passes fail CUDA graph capture on GH200.
+            # Inductor fusion/autotuning and symbolic batch dimensions remain.
+            mode = "max-autotune-no-cudagraphs"
     options: dict[str, object] = {
         "backend": backend,
         "fullgraph": True,
