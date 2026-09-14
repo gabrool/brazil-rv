@@ -1,12 +1,24 @@
 # Cash-aware portfolio program: continuation state
 
-Status: initial and real-market local engineering passed. Approved launcher
+Status: new GH200 bootstrapped successfully and forecast dispatcher started.
+Exact paid instance: ee625bd03bdc41fd9ba676de6e171511, IP 192.222.51.211.
+Frozen forecast checkout: 49d3c9a53b74277f269c8248c09d65e1cb481dd6.
+Persistent run root:
+/lambda/nfs/brazil-rv-east3/quant-data/b3/processed/model_runs/v2_portfolio_49d3c9a_20260914T143600Z
+Dispatcher PID 5119; log and PID receipt are under model_runs/_ops/ as
+portfolio_20260914T143600Z.log and portfolio_20260914T143600Z.pid.
+External dispatcher /home/ubuntu/run_portfolio_forecasts.py SHA-256:
+a0352bfcad8328425b377bec9c0fd23eef2bd5d116129d4dc15f225dc81a526d.
+Do not start another dispatcher or modify the frozen forecast checkout.
+Bootstrap verified clean 49d3c9a and idle GH200 before dispatch.
+
+Initial and real-market local engineering passed. Approved launcher
 started at 2026-09-14 12:58 UTC from 17465f7, then exited at 13:18:58 UTC when
 its local log could not be written during a temporary full-disk condition.
-No instance had been obtained and no research fit has run. Free space recovered
+No instance had been obtained by that first watcher. Free space recovered
 after the memory-heavy local check ended. The approved launcher was restarted at
-13:28:26 UTC from clean pushed commit 49d3c9a; it is waiting for us-east-3 capacity.
-Only this second watcher is active (local exec session 24373). The first exited.
+13:28:26 UTC from clean pushed commit 49d3c9a; obtained the above instance,
+which became active at 14:32:31 UTC. Both launcher processes have now exited.
 Existing five-minute heartbeat brazil-rv-gh200-launch-monitor is active and bound
 to this program. Do not start a second watcher. Local policy work continues.
 
@@ -18,7 +30,7 @@ docs/v2_post_data_recovery.json and docs/v2_post_data_final_inventory.json.
 ## Acceptance checklist
 
 - [x] Initial local allocation/gradient and causal share/cash accounting acceptance.
-- [ ] Frozen source-bound forecast/cache plan, compatible A–C reuse.
+- [x] Frozen source-bound forecast/cache plan, compatible A–C reuse.
 - [ ] C6 repaired representation bridge, full chronological forecast cache.
 - [ ] Chronological optimizer and three-seed learned policy experiments.
 - [ ] Paired screen/remaining-fold/continuous/cost sensitivity readouts.
@@ -61,3 +73,8 @@ build, then one CPU process per fold loads data once and fits all three seeds.
 Read research/preregistrations/v2_portfolio_policy.md again at each transition.
 Review the registered conditional architecture/objective follow-ups after results;
 completion also requires that decision, full review, recovery and exact shutdown.
+
+Launch correction: first dispatcher PID 4827 exited before any fit because the
+operator precreated its run root for logging; freeze requires a new directory.
+The failed 143500Z directory contains only the error log/PID. Restarted at the
+fresh 143600Z root with logs outside it; frozen design and 105-fit plan exist.
