@@ -310,9 +310,157 @@ def plan(root, *, smoke=False, confirmation=False, max_parallel=2):
     return {"plan": str(destination), "fits": len(jobs)}
 
 
+def cpu_acceptance(root):
+    """Fit-only real-data shape/gradient checks; no forecast experiment or scores."""
+    from functools import partial
+    import time
+
+    from .characteristic_model import CharacteristicModel
+    from .data import V2DailyDataset, stage_name_count
+    from .economic_objective import (
+        EconomicCollator,
+        attach_economic_head,
+        economic_loss,
+    )
+    from .round7_training import TrainingObjective, forward, model_batch
+    from .train import _cli_stage_indices
+
+    torch.set_num_threads(2)
+    frozen = read(root / "phase3/frozen_design.json")
+    store, _ = resolve_external_root(frozen["store"]["root"])
+    fit_rows, _, _, fit_window = _cli_stage_indices(store, "F", "F2")
+    manifest = read(store / "manifest.json")
+    results = {}
+    for arm, cell in CELLS.items():
+        started = time.monotonic()
+        characteristic = arm == "TE_all"
+        config = configuration(cell, manifest["feature_names"])
+        families = tuple(
+            name
+            for name, _ in (
+                config.family_counts
+                if characteristic
+                else config.sidecar_feature_counts
+            )
+        )
+        parent_path = root / "phase3/parents" / arm / "seed_11/selected.pt"
+        if sha256_file(parent_path) != frozen["parents"][arm]["11"]["sha256"]:
+            raise ValueError("CPU acceptance parent changed")
+        parent = torch.load(parent_path, map_location="cpu", weights_only=True)
+        dataset = V2DailyDataset(
+            store,
+            fit_rows,
+            target_window_indices=fit_window,
+            stage="finetune",
+            purpose="training",
+            lookback=60,
+            enabled_sidecars=families,
+            include_intraday=False,
+            include_fast=False,
+            include_common_state=characteristic,
+            compact_names=True,
+        )
+        try:
+            preparation = Round7Preprocessing.fit(
+                dataset,
+                split_common=characteristic,
+                parent=Round7Preprocessing.from_payload(
+                    parent["contract"]["preprocessing"]
+                ),
+            )
+            width = stage_name_count(dataset)
+            collator = EconomicCollator(
+                partial(preparation.collate, fixed_name_count=width),
+                root / "phase3/economic_targets.npz",
+                fit_rows,
+                fit_window,
+                dataset.store.isins,
+            )
+            cpu = collator([dataset[0], dataset[len(dataset) - 1]])
+            batch = model_batch(cpu, torch.device("cpu"))
+            model = (
+                CharacteristicModel(config)
+                if characteristic
+                else DailyMultiHorizonModel(config)
+            )
+            model.load_state_dict(parent["model_state_dict"], strict=True)
+            model.eval()
+            with torch.no_grad():
+                baseline = forward(model, batch, characteristic=characteristic)
+            attach_economic_head(model)
+            with torch.no_grad():
+                current = forward(model, batch, characteristic=characteristic)
+            if not torch.equal(current, baseline):
+                raise ValueError("auxiliary attachment changes the neutral predictor")
+            from .contract import HORIZONS
+
+            horizons = config.horizons if characteristic else HORIZONS
+            objective = TrainingObjective(
+                model,
+                characteristic=characteristic,
+                head_indices=[HORIZONS.index(h) for h in horizons],
+                loss_kind="soft_spearman",
+                cuda=False,
+                economic_weight=0.25,
+            )
+            objective_value = objective(batch)
+            objective_value.backward()
+            head_norm = float(model.economic_head.weight.grad.norm())
+            with torch.no_grad():
+                model.economic_head.weight.add_(
+                    model.economic_head.weight.grad, alpha=-0.01
+                )
+            model.zero_grad(set_to_none=True)
+            _, hidden = forward(
+                model, batch, characteristic=characteristic, return_hidden=True
+            )
+            auxiliary = economic_loss(
+                model.economic_head(hidden).squeeze(-1),
+                batch["economic_target"],
+                batch["economic_mask"],
+            )
+            auxiliary.backward()
+            encoder_norm = float(model.slow_input_projection.weight.grad.norm())
+            if (
+                not np.isfinite(
+                    [head_norm, encoder_norm, float(objective_value.detach())]
+                ).all()
+                or min(head_norm, encoder_norm) <= 0
+            ):
+                raise ValueError("economic auxiliary did not reach the actual encoder")
+            results[arm] = {
+                "parent_sha256": sha256_file(parent_path),
+                "parameters": sum(p.numel() for p in model.parameters()),
+                "probe_date_indices": [int(fit_rows[0]), int(fit_rows[-1])],
+                "lookback": 60,
+                "padded_names": width,
+                "active_names": batch["active_mask"].sum(1).tolist(),
+                "economic_label_counts": batch["economic_mask"].sum(1).tolist(),
+                "objective_value": float(objective_value.detach()),
+                "economic_head_gradient_norm": head_norm,
+                "auxiliary_only_encoder_gradient_norm": encoder_norm,
+                "neutral_initialization_exact": True,
+                "preprocessing": collator.contract,
+                "access": dataset.access_ledger.payload(),
+                "seconds": time.monotonic() - started,
+            }
+        finally:
+            dataset.store.close()
+    output = {
+        "passed": True,
+        "implementation": _git_identity(),
+        "results": results,
+        "scope": "two full eligible cross-sections per architecture, F2 fit only; discard probe updates; no selected fit or evaluation scores",
+        "gpu_compile_amp_acceptance_still_required": True,
+        "heldout_accessed": False,
+    }
+    write_json_atomic(root / "phase3/cpu_acceptance.json", output)
+    return output
+
+
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("command", choices=("prepare", "fit", "plan"))
+    parser.add_argument("command", choices=("prepare", "fit", "plan", "cpu-check"))
     parser.add_argument("--root", type=Path, required=True)
     parser.add_argument("--arm", choices=CELLS)
     parser.add_argument("--fold", choices=DEVELOPMENT_FOLDS)
@@ -324,6 +472,8 @@ def main():
     args = parser.parse_args()
     if args.command == "prepare":
         prepare(args.root)
+    elif args.command == "cpu-check":
+        cpu_acceptance(args.root)
     elif args.command == "plan":
         print(
             plan(
