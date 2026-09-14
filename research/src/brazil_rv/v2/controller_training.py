@@ -257,6 +257,8 @@ def run_controller(data, root, arm, fold, seed, kind, binding):
         books[label] = book["summary"]
     manifest = {
         "status": "completed",
+        "seed": seed,
+        "fold": fold,
         "provenance": provenance,
         **result,
         "fallback": fallback,
@@ -273,13 +275,13 @@ def run_controller(data, root, arm, fold, seed, kind, binding):
     return manifest
 
 
-def prepare_references(data, root, arm, binding):
+def prepare_references(data, root, arm, binding, *, folds=None):
     """Matched financial controls with the same refined numerical precision."""
     from brazil_rv.v2.round7 import SCREEN_FOLDS
 
     implementation = _git_identity()
     market = benchmark_excess_returns(data)
-    for fold in SCREEN_FOLDS:
+    for fold in SCREEN_FOLDS if folds is None else folds:
         bounds = windows(root, data, fold)
         fitted = calibrations(data, bounds["fit"], market)
         start, first, stop = (

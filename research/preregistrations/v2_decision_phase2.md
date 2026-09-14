@@ -119,6 +119,17 @@ zero-mean noise only. Preserve the completed post-account-fix attempts as
 `synthetic_nonzero_null`. No financial outcome motivated this correction and
 the model, noise draws, optimizer and acceptance thresholds are unchanged.
 
+After that correction, the small conditional model passed, while the MLP still
+failed the inactivity check. The fixture had only three independent zero-state
+episodes in fit and one each in selection/evaluation, insufficient coverage for
+this claimed behavioral acceptance. Use 1,920 synthetic sessions with randomly
+ordered, balanced four-episode blocks (zero/useful/useful/continuation), 1,152
+fit sessions, 304 selection sessions and 432 evaluation sessions, separated by
+16-session gaps. This is an engineering coverage correction, not financial seed
+expansion. Test the one unique conditional fit and all three MLP initializations
+under the unchanged thirty-epoch recipe; disclose failed attempts and exact
+episode counts. Preserve the original short null-corrected fixture outputs.
+
 ## Financial roster and decisions
 
 Fit TE_all .2 and C6 on F2/F6/F10/F14. S0 remains a deterministic reference from
@@ -146,3 +157,8 @@ branch. Report nominal paired 20/40/60-session circular intervals, seed results,
 fit/selection trajectories, actual exposure/turnover and fallback choices. No
 seed expansion or further real-result-driven controller tuning is authorized by
 this screen. Phase 3 remains separately authorized even if this phase fails.
+
+For executable gates, a material seed reversal means a seed's mean paired net
+or utility is below -0.25 bps/day. The candidate without fallback is the primary
+gate; fallback improvements alone do not establish controller learning. The
+three-of-four rule becomes at least 75% of folds in the ten-fold confirmation.

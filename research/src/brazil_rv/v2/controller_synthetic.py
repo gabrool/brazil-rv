@@ -37,10 +37,13 @@ def synthetic_data(seed=201, days=640, names=32):
     """
     rng = np.random.default_rng(seed)
     signal, regime, cost = np.zeros((days, names)), np.zeros(days), np.zeros(days)
+    states = np.concatenate(
+        [rng.permutation([0.0, 1.0, 1.0, -1.0]) for _ in range((days + 63) // 64)]
+    )
     for start in range(0, days, 16):
         stop = min(start + 16, days)
         signal[start:stop] = rng.permutation(np.linspace(-1, 1, names))
-        regime[start:stop] = rng.choice([0.0, 1.0, 1.0, -1.0])
+        regime[start:stop] = states[start // 16]
         cost[start:stop] = rng.choice([0.02, 0.02, 3.0])
     noise = rng.normal(0, 0.004, (days, names))
     returns = np.zeros_like(signal)
@@ -196,11 +199,11 @@ def behavioral_account_checks(data, model, rows):
 def run_synthetic(root, *, seed=11, kind="reliability", recipe=RECIPE):
     torch.set_num_threads(1)
     torch.manual_seed(seed)
-    data, regime, cost = synthetic_data()
+    data, regime, cost = synthetic_data(days=1920)
     bounds = {
-        "fit": np.arange(384),
-        "selection": np.arange(400, 480),
-        "evaluation": np.arange(496, 640),
+        "fit": np.arange(1152),
+        "selection": np.arange(1168, 1472),
+        "evaluation": np.arange(1488, 1920),
     }
     calibration = Calibration(np.zeros(3), np.ones(3), np.full(3, 0.001 / 3), 0.0)
     model = OpportunityPolicy(data, calibration, bounds["fit"], kind=kind)
@@ -264,6 +267,13 @@ def run_synthetic(root, *, seed=11, kind="reliability", recipe=RECIPE):
         "behavioral_account_checks": behavior,
         "independent_evaluation_dates": len(rows),
         "synthetic_data_seed": 201,
+        "episodes_by_split": {
+            split: {
+                str(state): int(np.count_nonzero(regime[indices][::16] == state))
+                for state in (-1, 0, 1)
+            }
+            for split, indices in bounds.items()
+        },
         "not_a_financial_result": True,
     }
     write_json_atomic(output / "acceptance.json", result)
