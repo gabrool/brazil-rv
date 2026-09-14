@@ -190,6 +190,6 @@ publish a combined report, and close the exact paid instance.
 The complete roster and chosen recipes are frozen before evaluation access.
 Use six isolated jobs for C to fill preparation/compilation gaps: measured
 F14 peak allocated memory is about10.44GB per candidate, so six fit within
-the97.9GB GPU. This changes only concurrency, not seeds, data, batch size,
+the 97,871 MiB (95.6 GiB) GPU. This changes only concurrency, not seeds, data, batch size,
 model width, precision or the selected training recipe. Monitor actual use.
 The remote training checkout remains368fbf7 while local report commits advance.

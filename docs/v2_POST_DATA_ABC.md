@@ -42,7 +42,7 @@ The pooled-context attention initialization is now consistent with the explicit 
 
 The candidate trainer materializes each finite fit/selection population's canonical FP32/bool model tensors once on the GPU. Epochs gather exactly the registered dates instead of repeatedly reconstructing overlapping histories on the CPU. [GPU cache acceptance](v2_post_data_cuda_cache_engineering.json) proves exact tensor equality for P/F2/F14, including reordered gathers and masks/ages. F14 cached gathering took .69 ms versus 228 ms for canonical collation/transfer. This is an input-stage result, not a whole-fit speedup. No lookback, name, feature, precision of cached inputs or model width was reduced.
 
-Targeted acceptance covers adaptive perturbation/restoration, RNG-preserving diagnostics, bias/LR routing, early selection, exact score attachment, preprocessing and cache parity. Earlier test groups overlap and should not be added into an artificial total. Stage A was checked against the reference plan after implementation and again after the cache amendment. Financial jobs run four processes on the GH200; independent C book folds also run in four processes while every individual ledger remains chronological.
+Targeted acceptance covers adaptive perturbation/restoration, RNG-preserving diagnostics, bias/LR routing, early selection, exact score attachment, preprocessing and cache parity. Earlier test groups overlap and should not be added into an artificial total. Stage A was checked against the reference plan after implementation and again after the cache amendment. Stage B financial jobs ran four processes on the GH200; Stage C uses six. Independent C book folds run in four processes while every individual ledger remains chronological.
 
 ## Stage B engineering: what learned, what failed
 
@@ -110,7 +110,7 @@ Selected temporal/peer parameters receive nonzero updates. Attention peer-bypass
 
 BF16 score ties prompted a bounded precision readout on all selection dates of the eight selected calibration fits. Score-rank correlation against FP32 exceeded .99984; centered RMS error was .246–.759% of cross-sectional score standard deviation, and the largest selection-IC difference was .000285. An FP32 final head also made only small differences. Eager-versus-registered compiled BF16 selection differences for TE were below .0001. Keep the frozen precision: the observed ties do not justify changing the financial model. The diagnostic's initial dataset-close typo and subsequent successful correction are retained in the log; no training run was changed.
 
-Stage B was verified against the reference plan before Stage C. C uses six isolated jobs, within the measured roughly10.44GB-per-F14-fit allocation and97.9GB GPU capacity, to reduce preparation/compilation gaps. This is a concurrency choice with unchanged batches, histories, names, parameters and recipes.
+Stage B was verified against the reference plan before Stage C. C uses six isolated jobs, within the measured roughly 10.44 GB per F14 fit and 97,871 MiB (95.6 GiB) GPU capacity, to reduce preparation/compilation gaps. This is a concurrency choice with unchanged batches, histories, names, parameters and recipes.
 
 ## Stage C financial results and closure
 
