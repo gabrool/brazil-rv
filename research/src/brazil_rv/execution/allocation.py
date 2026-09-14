@@ -125,6 +125,7 @@ def allocate(
     lower: Tensor,
     upper: Tensor,
     config: AllocationConfig = AllocationConfig(),
+    forecast_uncertainty: Tensor | None = None,
 ) -> Tensor:
     """Allocate a compact stock-plus-hedge vector; residual capital is cash.
 
@@ -181,6 +182,16 @@ def allocate(
             torch.zeros(1, dtype=torch.float64),
         )
     )
+    if forecast_uncertainty is not None:
+        uncertainty = forecast_uncertainty.to(device="cpu", dtype=torch.float64)
+        # Worst-case mean-return adjustment; distinct from return covariance.
+        q = q + torch.cat(
+            (
+                torch.zeros(2 * n, dtype=torch.float64),
+                1e4 * horizon * uncertainty,
+                torch.zeros(1, dtype=torch.float64),
+            )
+        )
     if not torch.isfinite(q).all():
         raise FloatingPointError("allocation preference or borrow cost is non-finite")
     bounds_lower = torch.cat(

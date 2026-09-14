@@ -69,6 +69,48 @@ def test_ridge_is_fit_only_and_does_not_read_crossing_endpoints():
     assert first.intercept == second.intercept
 
 
+def test_benchmark_calibration_removes_common_market_return_without_losing_names():
+    rng = np.random.default_rng(9)
+    ranks = rng.normal(size=(90, 40, 3))
+    valid = np.ones((90, 40), bool)
+    beta = rng.uniform(0.4, 1.6, valid.shape)
+    market = rng.normal(0.02, 0.01, 90)
+    returns = beta * market[:, None]
+    cdi = np.zeros(90)
+    fit = np.arange(70)
+    corrected = fit_calibration(
+        ranks, valid, returns, valid, cdi, fit, benchmark_excess5=market, beta=beta
+    )
+    assert np.max(np.abs(corrected.predict(ranks))) < 1e-12
+    assert corrected.diagnostics["fit_observations"] == 65 * 40
+    market[65:] += 100
+    changed = fit_calibration(
+        ranks, valid, returns, valid, cdi, fit, benchmark_excess5=market, beta=beta
+    )
+    np.testing.assert_array_equal(corrected.coefficient, changed.coefficient)
+    np.testing.assert_array_equal(corrected.covariance, changed.covariance)
+
+
+def test_uncertainty_does_not_treat_duplicate_same_day_stocks_as_independent_dates():
+    rng = np.random.default_rng(19)
+    ranks = rng.normal(size=(100, 12, 3))
+    valid = np.ones((100, 12), bool)
+    returns = 0.002 * ranks[..., 0] + rng.normal(0, 0.03, (100, 1))
+    first = fit_calibration(ranks, valid, returns, valid, np.zeros(100), np.arange(90))
+    second = fit_calibration(
+        np.repeat(ranks, 2, 1),
+        np.repeat(valid, 2, 1),
+        np.repeat(returns, 2, 1),
+        np.repeat(valid, 2, 1),
+        np.zeros(100),
+        np.arange(90),
+    )
+    np.testing.assert_allclose(
+        first.covariance, second.covariance, rtol=1e-9, atol=1e-16
+    )
+    assert first.covariance[0, 0] > 0
+
+
 def test_validity_flags_keep_binary_units_when_fit_values_are_constant():
     data = policy_fixture()
     data.static[:10, :, [6, 7, 12]] = 1.0

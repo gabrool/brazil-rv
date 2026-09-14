@@ -5,12 +5,27 @@ Reference registration: research/preregistrations/v2_decision_research.md.
 
 ## Current state
 
-Phase 1 implementation in progress. Reviewed PROJECT_CONTEXT and postmortem
-section 13. Main starts from d682962. Existing portfolio results remain sealed.
-Three sealed 699,471,732-byte PolicyData caches can be copied from persistent
-storage with the user-provided temporary S3 credentials in process environment.
-Do not persist those credentials. No paid instance has been launched for this
-program. Local free space initially C:4.85GB / D:1.32GB; avoid duplicate caches.
+Phase 1 ready for numerical reproduction and financial readouts. Reviewed
+PROJECT_CONTEXT and postmortem section13. Main started from d682962; registration
+is committed at 60dc9a2. Existing portfolio results remain sealed. Run root:
+`C:/quant-data/b3/processed/model_runs/v2_decision_60dc9a2_20260914T212110Z`.
+All nine copied cache/metadata files match the sealed recovery inventory's
+SHA-256, including three 699,471,732-byte PolicyData files. Temporary S3
+credentials were process-only. Lambda ETags were not MD5 hashes; rclone's MD5
+comparison was disabled and replaced by exact sealed SHA-256 verification.
+No paid instance has been launched for this program. Initial local free space
+C:4.85GB / D:1.32GB; avoid duplicate caches.
+
+Implemented coherent benchmark residuals using decision-time beta, one-regressor
+equal-rank control, block-cluster forecast uncertainty and QP absolute-exposure
+penalty, plus stock-only attribution. Deterministic calibration has its own small
+inference class; it avoids executing an identically zero MLP. Original MLP remains
+the stateful control and inherits the same economic mapping. Circular 40-session
+bootstrap replaces the underweighted-boundary implementation, with 20/60
+sensitivities. Ruff passes; 38 targeted allocation/account/causality/readout/source
+tests pass. Fit-only F2 calibration check reproduces original 8.0525483-bps
+intercept and yields 2.4206585-bps benchmark-residual intercept; no financial
+evaluation has yet been interpreted.
 
 ## Phase 1 acceptance
 

@@ -7,7 +7,15 @@ import torch
 from brazil_rv.execution.allocation import AllocationConfig, allocate
 
 
-def solve(mu, previous=None, *, config=AllocationConfig(), cap=0.05, borrow=0.0):
+def solve(
+    mu,
+    previous=None,
+    *,
+    config=AllocationConfig(),
+    cap=0.05,
+    borrow=0.0,
+    uncertainty=None,
+):
     n = len(mu)
     return allocate(
         mu,
@@ -19,6 +27,7 @@ def solve(mu, previous=None, *, config=AllocationConfig(), cap=0.05, borrow=0.0)
         lower=torch.full((n,), -cap, dtype=torch.float64),
         upper=torch.full((n,), cap, dtype=torch.float64),
         config=config,
+        forecast_uncertainty=uncertainty,
     )
 
 
@@ -76,6 +85,13 @@ def test_higher_cost_reduces_turnover_without_minimum_gross():
     base = solve(mu).abs().sum()
     costly = solve(mu, config=replace(AllocationConfig(), cost_bps=8)).abs().sum()
     assert costly < base
+
+
+def test_forecast_uncertainty_can_choose_cash_without_changing_return_risk():
+    mu = torch.tensor([0.00011, -0.00011], dtype=torch.float64)
+    assert solve(mu).abs().sum() > 0.001
+    protected = solve(mu, uncertainty=torch.full_like(mu, 0.0002))
+    assert protected.abs().sum() < 1e-7
 
 
 @pytest.mark.parametrize("status", [2, 7])

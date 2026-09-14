@@ -7,19 +7,18 @@ import torch
 from brazil_rv.execution.portfolio_policy import PreferenceModel, exact_replay
 from brazil_rv.v2.portfolio_inputs import Calibration
 from brazil_rv.v2.portfolio_readouts import interval, save_book, verify_book
-from brazil_rv.v2.research_rounds import _folded_bootstrap
 from test_portfolio_policy import policy_fixture
 
 
-def test_fast_block_intervals_match_the_registered_draws():
-    rng = np.random.default_rng(9)
-    arrays = [rng.normal(1, 40, n) for n in (121, 126, 123, 127)]
-    original = _folded_bootstrap(
-        arrays, replications=10_000, seed=20260914, block_length=20
-    )
-    fast = interval(arrays)
-    for key in ("estimate", "lower_95", "upper_95"):
-        assert fast[key] == pytest.approx(original[key], abs=1e-12)
+@pytest.mark.parametrize("length", [20, 40, 60])
+def test_boundary_payoff_is_not_systematically_underweighted(length):
+    values = np.r_[np.zeros(119), 120.0]
+    result = interval([values], block_length=length)
+    assert result["estimate"] == 1.0
+    assert result["resample_mean"] == pytest.approx(1.0, abs=0.05)
+    assert result["circular"]
+    constant = interval([np.full(123, 7.0)], block_length=length)
+    assert constant["lower_95"] == constant["upper_95"] == 7.0
 
 
 def test_model_roll_does_not_change_prior_decisions_and_book_reconciles(tmp_path):

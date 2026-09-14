@@ -125,25 +125,61 @@ class PolicyData:
         )
 
 
-class PreferenceModel(nn.Module):
-    """Zero residual starts exactly at the fit-only calibrated optimizer."""
+class CalibratedPolicy(nn.Module):
+    """Fit-only economic mapping; no unused neural computation at inference."""
 
-    def __init__(self, data, calibration, fit_rows):
+    def __init__(self, calibration, *, uncertainty_scale=0.0):
         super().__init__()
-        values = data.static[fit_rows][data.valid[fit_rows]]
-        mean = values.mean(0, dtype=np.float64)
-        scale = np.maximum(values.std(0, dtype=np.float64), 1e-4)
-        # Validity flags keep their natural 0/1 units. Fitting on eligible rows
-        # makes current validity constant; z-scoring would turn a held name's
-        # first missing score into a spurious -10,000 input.
-        mean[[6, 7, 12]] = 0.0
-        scale[[6, 7, 12]] = 1.0
-        self.register_buffer("mean", torch.tensor(mean, dtype=torch.float32))
-        self.register_buffer("scale", torch.tensor(scale, dtype=torch.float32))
         self.register_buffer("rank_mean", tensor(calibration.mean))
         self.register_buffer("rank_scale", tensor(calibration.scale))
         self.register_buffer("coefficient", tensor(calibration.coefficient))
         self.register_buffer("intercept", tensor(calibration.intercept))
+        self.equal_rank = len(calibration.coefficient) == 1
+        self.uncertainty_scale = uncertainty_scale
+        self.register_buffer(
+            "coefficient_covariance",
+            tensor(calibration.covariance)
+            if calibration.covariance is not None
+            else torch.zeros((len(calibration.mean) + 1,) * 2, dtype=torch.float64),
+            persistent=False,
+        )
+
+    def forward(self, static, state, ranks):
+        if self.equal_rank:
+            ranks = ranks.mean(-1, keepdim=True)
+        return (
+            ranks - self.rank_mean
+        ) / self.rank_scale @ self.coefficient + self.intercept
+
+    def forecast_uncertainty(self, ranks):
+        if not self.uncertainty_scale:
+            return None
+        if self.equal_rank:
+            ranks = ranks.mean(-1, keepdim=True)
+        features = torch.cat(
+            (
+                torch.ones_like(ranks[..., :1]),
+                (ranks - self.rank_mean) / self.rank_scale,
+            ),
+            -1,
+        )
+        variance = (features @ self.coefficient_covariance * features).sum(-1)
+        return self.uncertainty_scale * variance.clamp_min(0).sqrt()
+
+
+class PreferenceModel(CalibratedPolicy):
+    """Zero residual starts exactly at the fit-only calibrated optimizer."""
+
+    def __init__(self, data, calibration, fit_rows, *, uncertainty_scale=0.0):
+        super().__init__(calibration, uncertainty_scale=uncertainty_scale)
+        values = data.static[fit_rows][data.valid[fit_rows]]
+        mean = values.mean(0, dtype=np.float64)
+        scale = np.maximum(values.std(0, dtype=np.float64), 1e-4)
+        # Eligible fitting rows make validity constant. Keep 0/1 units so a
+        # held name's first missing score does not become a -10,000 input.
+        mean[[6, 7, 12]], scale[[6, 7, 12]] = 0.0, 1.0
+        self.register_buffer("mean", torch.tensor(mean, dtype=torch.float32))
+        self.register_buffer("scale", torch.tensor(scale, dtype=torch.float32))
         self.network = nn.Sequential(
             nn.Linear(len(mean) + 10, 32),
             nn.SiLU(),
@@ -155,9 +191,7 @@ class PreferenceModel(nn.Module):
         nn.init.zeros_(self.network[-1].bias)
 
     def forward(self, static, state, ranks):
-        base = (
-            ranks - self.rank_mean
-        ) / self.rank_scale @ self.coefficient + self.intercept
+        base = super().forward(static, state, ranks)
         features = torch.cat(((static - self.mean) / self.scale, state.float()), -1)
         return base + 0.001 * self.network(features).squeeze(-1).double()
 
@@ -240,6 +274,7 @@ def decide(
     # No separate directional BOVA forecast is invented. The hedge is chosen
     # jointly for risk, financing and costs, with zero assumed daily excess alpha.
     preference = torch.cat((pref, pref.new_zeros(1)))
+    uncertainty = model.forecast_uncertainty(tensor(data.ranks[day, names]))
     chosen = allocate(
         preference,
         previous,
@@ -250,6 +285,9 @@ def decide(
         lower=lower,
         upper=upper,
         config=allocation,
+        forecast_uncertainty=None
+        if uncertainty is None
+        else torch.cat((uncertainty, uncertainty.new_zeros(1))),
     )
     return torch.zeros_like(weights).scatter(0, torch.as_tensor(ids), chosen)
 
@@ -260,15 +298,18 @@ def account_decision(data, model, account, day, *, allocation=AllocationConfig()
     )
     held = account.shares[:-1].detach().numpy() != 0
     age = tensor(np.where(held, day - account.entry_day[:-1], 0))
-    adverse = torch.where(
-        torch.as_tensor(held),
-        account.weights[:-1].sign()
-        * (
-            (account.shares[:-1] * account.marks[:-1]).abs()
-            - account.cost_basis[:-1]
-        ),
-        0,
-    ) / account.nav
+    adverse = (
+        torch.where(
+            torch.as_tensor(held),
+            account.weights[:-1].sign()
+            * (
+                (account.shares[:-1] * account.marks[:-1]).abs()
+                - account.cost_basis[:-1]
+            ),
+            0,
+        )
+        / account.nav
+    )
     return decide(
         data,
         model,
@@ -345,12 +386,20 @@ def ledger_arguments(data, start, stop):
     return arguments
 
 
-def exact_replay(data, model, start, stop, *, config=None, targets=None):
+def exact_replay(
+    data,
+    model,
+    start,
+    stop,
+    *,
+    config=None,
+    targets=None,
+    allocation=AllocationConfig(),
+):
     """Independent ledger, same decision function; final boundary liquidates once."""
     inputs = data.inputs
     config = policy_ledger_config() if config is None else config
     # Stress scenarios change realized costs, not the frozen policy's estimate.
-    allocation = AllocationConfig()
     arguments = ledger_arguments(data, start, stop)
     chosen = []
     prior_weights = []

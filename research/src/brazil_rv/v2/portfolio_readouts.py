@@ -225,9 +225,7 @@ def save_book(output, data, result, targets, previous, start, first, provenance)
             if records:
                 pl.DataFrame(
                     _serialise_records(records), infer_schema_length=None
-                ).write_parquet(
-                    output / f"{label}.parquet", compression="zstd"
-                )
+                ).write_parquet(output / f"{label}.parquet", compression="zstd")
     record = {
         "status": "completed",
         "provenance": provenance,
@@ -258,25 +256,27 @@ def verify_book(path, provenance):
 
 
 @lru_cache(maxsize=32)
-def block_draws(lengths):
+def block_draws(lengths, block_length):
     generator = np.random.default_rng(20260914)
     return tuple(
-        generator.integers(0, length - 20 + 1, size=(10_000, (length + 19) // 20))
+        generator.integers(
+            0, length, size=(10_000, (length + block_length - 1) // block_length)
+        )
         for length in lengths
     )
 
 
-def interval(arrays):
-    """Same 10,000 registered block draws, using prefix sums rather than copies."""
+def interval(arrays, *, block_length=40):
+    """Paired circular blocks give boundary observations equal expected weight."""
     arrays = tuple(np.asarray(a, dtype=float) for a in arrays)
     lengths = tuple(len(a) for a in arrays)
-    if min(lengths) < 20 or not all(np.isfinite(a).all() for a in arrays):
+    if min(lengths) < block_length or not all(np.isfinite(a).all() for a in arrays):
         raise ValueError("economic intervals need finite daily values and full blocks")
     draws = np.zeros(10_000)
-    for a, starts in zip(arrays, block_draws(lengths)):
-        prefix = np.r_[0.0, np.cumsum(a)]
-        sizes = np.full(starts.shape[1], 20)
-        sizes[-1] = len(a) - 20 * (len(sizes) - 1)
+    for a, starts in zip(arrays, block_draws(lengths, block_length)):
+        prefix = np.r_[0.0, np.cumsum(np.r_[a, a[:block_length]])]
+        sizes = np.full(starts.shape[1], block_length)
+        sizes[-1] = len(a) - block_length * (len(sizes) - 1)
         draws += (prefix[starts + sizes] - prefix[starts]).sum(1)
     draws /= sum(lengths)
     return {
@@ -284,7 +284,9 @@ def interval(arrays):
         "lower_95": float(np.quantile(draws, 0.025)),
         "upper_95": float(np.quantile(draws, 0.975)),
         "replications": 10_000,
-        "block_length_sessions": 20,
+        "block_length_sessions": block_length,
+        "circular": True,
+        "resample_mean": float(draws.mean()),
         "fold_boundary_preserved": True,
         "observations": sum(lengths),
     }
@@ -470,7 +472,7 @@ def summarize(root):
         "status": "completed",
         "heldout_accessed": False,
         "forward_capture": False,
-        "bootstrap": "paired 20-session blocks within folds; nominal development inference",
+        "bootstrap": "paired circular 40-session blocks within folds; nominal development inference",
         "source_books": {},
     }
     base_books = {}

@@ -230,32 +230,78 @@ class Calibration:
     scale: np.ndarray
     coefficient: np.ndarray
     intercept: float
+    covariance: np.ndarray | None = None
+    diagnostics: dict | None = None
 
     def predict(self, ranks):
+        if len(self.coefficient) == 1:
+            ranks = ranks.mean(-1, keepdims=True)
         return (ranks - self.mean) / self.scale @ self.coefficient + self.intercept
 
 
-def fit_calibration(ranks, valid, returns5, target_valid, cdi, fit_rows):
+def fit_calibration(
+    ranks,
+    valid,
+    returns5,
+    target_valid,
+    cdi,
+    fit_rows,
+    *,
+    benchmark_excess5=None,
+    beta=None,
+    equal_rank=False,
+):
     """Date-weighted ridge. Both entry and five-session endpoint stay in fit."""
     rows = np.asarray(fit_rows)
     if not len(rows) or not np.all(np.diff(rows) == 1):
         raise ValueError("calibration fit dates must form a chronological window")
     eligible = rows[rows + 5 <= rows[-1]]
     masks = valid[eligible] & target_valid[eligible]
+    cash5 = np.array([np.prod(1 + cdi[t + 1 : t + 6]) - 1 for t in eligible])
+    outcome = returns5[eligible] - cash5[:, None]
+    benchmark_missing = 0
+    if benchmark_excess5 is not None:
+        observed = np.isfinite(benchmark_excess5[eligible])
+        benchmark_missing = int((masks & ~observed[:, None]).sum())
+        masks &= observed[:, None]
+        # Beta is fixed at the original decision, never estimated on its label.
+        outcome = outcome - beta[eligible] * benchmark_excess5[eligible, None]
     count = masks.sum(1)
     if not np.any(count):
         raise ValueError("no within-fit calibration outcomes")
     weights = masks / np.maximum(count[:, None], 1)
     weights /= max(np.count_nonzero(count), 1)
     x = ranks[eligible]
+    if equal_rank:
+        x = x.mean(-1, keepdims=True)
     mean = (weights[..., None] * x).sum((0, 1))
     scale = np.maximum(
         np.sqrt((weights[..., None] * (x - mean) ** 2).sum((0, 1))), 1e-6
     )
     z = (x - mean) / scale
-    cash5 = np.array([np.prod(1 + cdi[t + 1 : t + 6]) - 1 for t in eligible])
-    y = np.where(masks, (returns5[eligible] - cash5[:, None]) / 5, 0)
+    y = np.where(masks, outcome / 5, 0)
     intercept = float((weights * y).sum())
-    lhs = np.einsum("dn,dni,dnj->ij", weights, z, z) + 1e-3 * np.eye(3)
+    gram = np.einsum("dn,dni,dnj->ij", weights, z, z)
+    lhs = gram + 1e-3 * np.eye(x.shape[-1])
     rhs = np.einsum("dn,dni,dn->i", weights, z, y - intercept)
-    return Calibration(mean, scale, np.linalg.solve(lhs, rhs), intercept)
+    coefficient = np.linalg.solve(lhs, rhs)
+    residual = np.where(masks, y - (z @ coefficient + intercept), 0)
+    design = np.concatenate((np.ones((*z.shape[:-1], 1)), z), axis=-1)
+    daily_score = np.einsum("dn,dnk,dn->dk", weights, design, residual)
+    clusters = np.add.reduceat(daily_score, np.arange(0, len(eligible), 20))
+    bread = np.zeros((len(coefficient) + 1, len(coefficient) + 1))
+    bread[0, 0], bread[1:, 1:] = 1.0, lhs
+    inverse = np.linalg.inv(bread)
+    covariance = inverse @ (clusters.T @ clusters) @ inverse.T
+    covariance *= len(clusters) / max(len(clusters) - 1, 1)
+    diagnostics = {
+        "fit_dates": int(np.count_nonzero(count)),
+        "fit_observations": int(masks.sum()),
+        "benchmark_missing_label_observations": benchmark_missing,
+        "ridge_condition_number": float(np.linalg.cond(lhs)),
+        "predictor_correlation": gram.tolist(),
+        "weighted_daily_rmse_bps": float(np.sqrt((weights * residual**2).sum()) * 1e4),
+        "cluster_sessions": 20,
+        "clusters": len(clusters),
+    }
+    return Calibration(mean, scale, coefficient, intercept, covariance, diagnostics)
