@@ -1,11 +1,12 @@
 # Cash-aware portfolio program: continuation state
 
-Status: new GH200 bootstrapped successfully and forecast dispatcher started.
+Status: all 105 new forecast fits and nine preludes completed successfully;
+policy cache preparation and subsequent CPU experiment chain started.
 Exact paid instance: ee625bd03bdc41fd9ba676de6e171511, IP 192.222.51.211.
 Frozen forecast checkout: 49d3c9a53b74277f269c8248c09d65e1cb481dd6.
 Persistent run root:
 /lambda/nfs/brazil-rv-east3/quant-data/b3/processed/model_runs/v2_portfolio_49d3c9a_20260914T143600Z
-Dispatcher PID 5119; log and PID receipt are under model_runs/_ops/ as
+Completed forecast dispatcher PID 5119; log and PID receipt under model_runs/_ops/:
 portfolio_20260914T143600Z.log and portfolio_20260914T143600Z.pid.
 External dispatcher /home/ubuntu/run_portfolio_forecasts.py SHA-256:
 a0352bfcad8328425b377bec9c0fd23eef2bd5d116129d4dc15f225dc81a526d.
@@ -78,3 +79,21 @@ Launch correction: first dispatcher PID 4827 exited before any fit because the
 operator precreated its run root for logging; freeze requires a new directory.
 The failed 143500Z directory contains only the error log/PID. Restarted at the
 fresh 143600Z root with logs outside it; frozen design and 105-fit plan exist.
+
+## CPU policy transition
+
+Forecast completion record: forecast_program_result.json (3 P, 102 F,
+24 reused F, nine preludes). All 114 new run manifests completed.
+Independent clean policy checkout, revision 74c4021:
+/home/ubuntu/portfolio-workspace/quant/b3-quant
+Set BRAZIL_RV_ROOT=/home/ubuntu/portfolio-workspace and PYTHONPATH to its
+research/src; use original forecast research/.venv/bin/python and policy
+checkout data_roots.lambda_us_east_3.json. Original frozen checkout preserved.
+Shell dispatcher PID 61124 started at 2026-09-14T16:52:49Z, child prepare 61126.
+Script: /home/ubuntu/run_portfolio_policies.sh. Log under model_runs/_ops/:
+portfolio_policies_20260914T165400Z.log (filename differs from actual start time).
+Sequential chain: prepare, policies (12 workers), continuous (3), summarize.
+Check this existing chain before any restart. Initial PID 60817 exited during
+import because the separate checkout lacked the required workspace layout;
+fixed layout and explicit root before any policy fitting. Failure log retained
+as portfolio_policies_20260914T165200Z.log. No model or financial contract change.
