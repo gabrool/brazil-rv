@@ -147,6 +147,17 @@ fold processes, retaining chronological replay within each book. Targeted readou
 tests pass; real score integration remains for Stage C. No financial evaluation
 panel has been read.
 
+Financial calibration is now running from clean training commit `368fbf7` in
+`v2_post_data_368fbf7_20260914T004400Z`. All four P parents completed under
+patience: TE seeds11/29 selected epochs34/11 and stopped39/16; C1-all
+seeds11/29 selected4/32 and stopped9/37. Parent cache size was 4.27–4.43 GB
+per process; peak allocated GPU memory was 5.29–5.37 GB. The parent archive
+has been recovered locally and all 137 member files / 636,613,211 original
+bytes verified exactly. The economic rebind also passed, proving all four
+beta arrays unchanged. F calibration remains in progress; do not infer a
+chosen recipe or financial screen winner from partial results. The combined
+[review document](v2_POST_DATA_ABC.md) is explicitly marked work in progress.
+
 ## Stage C — pending
 
 Fresh incumbent/common-recipe and GRU/early/late comparisons, then repaired
