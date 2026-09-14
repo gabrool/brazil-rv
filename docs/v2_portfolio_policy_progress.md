@@ -117,3 +117,29 @@ verified caches and finished in three seconds. Current log under model_runs/_ops
 portfolio_policies_repair_0b34978.log. Old failed chain is gone. Rejected artifacts
 were moved intact into ROOT/rejected_policy_numerics_74c4021. The diagnostic
 uncommitted host edits are stashed; active host checkout is clean committed code.
+
+## Solver continuation
+
+0b34978 gradients stayed finite, but several identical-QP ADMM solves cycled.
+9160b19 adds one fresh rho=.01/adaptive-interval=25 retry on iteration limit,
+without relaxing tolerances or constraints. Two captured failures now converge
+in 1,600/4,625 iterations; the default failed even at 200,000 on one case.
+Five allocation tests pass including retried solution/adjoint agreement.
+Old chain stopped; preserved source policies and all initial books/dispatch in
+ROOT/solver_resume_source_0b34978. One-time source-verified continuation migrated
+129 checkpoint files, including 53 completed fits, retaining original provenance
+and SHA-256 in each artifact. No model or optimizer tensor changed. Exact source
+identity was verified for policy/account/ledger/input/training/readout/batch code;
+only the bounded numerical retry differs. Receipt ROOT/policy_solver_resume.json;
+migration script and captured QPs are stored with the original source archive.
+Do not re-run the one-time migration. Reuse the now-bound checkpoints normally.
+
+Current shell PID 66000, clean policy checkout revision 9160b19. Same phase-chain
+script; current log model_runs/_ops/portfolio_policies_solver_9160b19.log.
+
+Remaining unresolved flags require quantitative review, not blanket dismissal:
+a S0/F2 calibrated selection diagnostic had zero claims/hedge/action uncertainty,
+and 32 tiny residual positions totaling 1.1228e-9 NAV-equivalent notional. This
+triggers strict unresolved_count>0 despite negligible exposure. Preserve raw
+flags/counts and distinguish numerical dust from material unresolved exposure
+in the final review; do not alter live training merely to suppress the flag.
