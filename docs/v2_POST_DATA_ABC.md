@@ -1,6 +1,6 @@
 # Post-data stages A–C: training, relational learning and matched financial screen
 
-**All numerical work for A–C and the user-requested ASAM .5 extension is complete.** This review separates engineering, calibration and matched financial evidence; artifact recovery and shutdown are recorded at the end.
+**A–C and the user-requested ASAM .5 extension are complete, recovered and published. The GH200 is terminated.** This review separates engineering, calibration and matched financial evidence.
 
 ## Purpose and fixed research boundary
 
@@ -252,4 +252,4 @@ The next justified research questions are a matched rich early/late comparison, 
 
 To make room for recovery, an abandoned 1.27 GB synthetic memory-test fixture was identified against its generating test and synthetic price/volume/trade formulas, then removed. Canonical inputs and research checkpoints were preserved. The cleanup receipt is retained with the recovered operations evidence.
 
-Exact-instance shutdown is the remaining operational closure step and will be recorded after provider confirmation.
+[Shutdown evidence](v2_post_data_shutdown.json) confirms termination of the exact research instance `7eed8bef79944d619ab42818b4978022`. Two provider inventory reads found it absent at 03:34:16 and 03:34:52 UTC on 14 September 2026. All code/results had been synchronized at `e917a16` before shutdown; the final closure commit adds only the receipt and documentation. The five-minute heartbeat is paused.
