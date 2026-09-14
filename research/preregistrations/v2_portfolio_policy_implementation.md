@@ -199,3 +199,20 @@ Tighten OSQP absolute/relative tolerances to1e-10 (same as the interior solve);
 retain the2e-6 NAV acceptance and all economic limits. Small per-coordinate
 residuals must not accumulate beyond the joint-budget limit. Preserve all126
 completed models under source-verified numerical continuation; no refits needed.
+
+### Accepted primal/adjoint separation
+
+The global1e-10 OSQP candidate was rejected by captured-QP engineering checks
+before any financial replay. Use Clarabel's1e-10 sparse interior-point result as
+the forward allocation for both training and replay. Inference requires no ADMM
+workspace. When gradients are required, initialize OSQP with the same QP's
+interior primal/dual solution, require fully solved status at1e-8 and agreement
+of all weights within2e-6NAV, then use its native vector adjoint. These are two
+numerical solutions of the same mathematical QP, not different objectives.
+The returned primal still passes the independent2e-6NAV feasibility check.
+Gradient agreement is numerical rather than bitwise; finite-difference tests
+cover preferences and previous inventory. All107 targeted tests pass, including
+rejection of inaccurate adjoint status and inference without OSQP. Remove all
+superseded penalty retries/warm-start guesses. Recheck actual-path accounting
+and32/64 gradients. Continue all126 compatible models with explicit source
+history; no financial tuning or model tensor change is involved.

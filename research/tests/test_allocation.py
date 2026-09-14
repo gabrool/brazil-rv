@@ -79,12 +79,10 @@ def test_higher_cost_reduces_turnover_without_minimum_gross():
 
 
 @pytest.mark.parametrize("status", [2, 7])
-def test_incomplete_solve_retry_preserves_solution_and_adjoint(monkeypatch, status):
+def test_incomplete_adjoint_solve_is_rejected(monkeypatch, status):
     import osqp
 
     mu = torch.tensor([0.00011, -0.00011], dtype=torch.float64, requires_grad=True)
-    expected = solve(mu)
-    expected_gradient = torch.autograd.grad(expected[0], mu)[0]
     original = osqp.OSQP.solve
     calls = 0
 
@@ -97,8 +95,17 @@ def test_incomplete_solve_retry_preserves_solution_and_adjoint(monkeypatch, stat
         return result
 
     monkeypatch.setattr(osqp.OSQP, "solve", first_iteration_limit)
-    actual = solve(mu)
-    actual_gradient = torch.autograd.grad(actual[0], mu)[0]
-    assert calls == 2
-    assert actual.detach().numpy() == pytest.approx(expected.detach().numpy(), abs=1e-7)
-    assert actual_gradient.numpy() == pytest.approx(expected_gradient.numpy(), abs=1e-3)
+    with pytest.raises(FloatingPointError, match="adjoint solve disagrees"):
+        solve(mu)
+    assert calls == 1
+
+
+def test_inference_uses_only_the_accurate_primal_solver(monkeypatch):
+    import osqp
+
+    def no_adjoint_workspace(*args, **kwargs):
+        raise AssertionError("inference must not initialize an adjoint workspace")
+
+    monkeypatch.setattr(osqp.OSQP, "setup", no_adjoint_workspace)
+    result = solve(torch.tensor([0.0001, -0.0001]))
+    assert torch.isfinite(result).all()

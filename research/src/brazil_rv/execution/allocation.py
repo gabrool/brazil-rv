@@ -24,7 +24,7 @@ class AllocationConfig:
     cost_bps: float = 4.0
 
 
-def _interior_point_start(p, q, a, lower, upper):
+def _solve_primal_dual(p, q, a, lower, upper):
     """Solve the identical sparse QP and map cone duals to interval duals."""
     equal = np.isfinite(lower) & (lower == upper)
     high = np.isfinite(upper) & ~equal
@@ -67,11 +67,15 @@ class _SparseQP(torch.autograd.Function):
     """
 
     @staticmethod
-    def forward(ctx, q, lower, upper, p, a, warm_start):
+    def forward(ctx, q, lower, upper, p, a):
         q_np, lower_np, upper_np = (
             value.detach().numpy() for value in (q, lower, upper)
         )
-        for interior_start in (False, True):
+        x, dual = _solve_primal_dual(p, q_np, a, lower_np, upper_np)
+        if any(ctx.needs_input_grad[:3]):
+            # The interior-point solution is the forward allocation. The native
+            # adjoint differentiates the identical QP, checked against that
+            # primal solution; inference does not need this second workspace.
             solver = osqp.OSQP(algebra="builtin")
             solver.setup(
                 P=p,
@@ -80,30 +84,24 @@ class _SparseQP(torch.autograd.Function):
                 l=lower_np,
                 u=upper_np,
                 verbose=False,
-                eps_abs=1e-10,
-                eps_rel=1e-10,
+                eps_abs=1e-8,
+                eps_rel=1e-8,
                 polishing=True,
                 max_iter=20000,
             )
-            if interior_start:
-                x, dual = _interior_point_start(p, q_np, a, lower_np, upper_np)
-                solver.warm_start(x=x, y=dual)
-            else:
-                solver.warm_start(x=warm_start)
+            solver.warm_start(x=x, y=dual)
             result = solver.solve(raise_error=False)
-            # Interior-point primal/dual initialization resolves ADMM cycling
-            # without changing the objective or tolerances. OSQP still verifies
-            # optimality and owns the native derivative workspace.
-            if result.info.status_val not in (2, 7):
-                break
-        if result.info.status_val != 1:
-            raise FloatingPointError(
-                f"allocation {result.info.status}: iterations={result.info.iter}, "
-                f"primal={result.info.prim_res:g}, dual={result.info.dual_res:g}, "
-                f"quadratic_range=({p.diagonal().min():g},{p.diagonal().max():g})"
-            )
-        ctx.solver = solver
-        return torch.from_numpy(result.x)
+            n = (len(x) - 1) // 3
+            if (
+                result.info.status_val != 1
+                or np.max(np.abs(result.x[:n] - x[:n])) > 2e-4
+            ):
+                raise FloatingPointError(
+                    f"allocation adjoint solve disagrees: {result.info.status}, "
+                    f"primal={result.info.prim_res:g}, dual={result.info.dual_res:g}"
+                )
+            ctx.solver = solver
+        return torch.from_numpy(x)
 
     @staticmethod
     def backward(ctx, gradient):
@@ -113,7 +111,7 @@ class _SparseQP(torch.autograd.Function):
         values = tuple(torch.from_numpy(x) for x in (dq, dl, du))
         if not all(torch.isfinite(x).all() for x in values):
             raise FloatingPointError("allocation adjoint is non-finite")
-        return *values, None, None, None
+        return *values, None, None
 
 
 def allocate(
@@ -207,8 +205,6 @@ def allocate(
             ),
         )
     )
-    prior = previous.detach().numpy()
-    warm = np.r_[prior, np.zeros(n), np.abs(prior), beta @ prior]
     # Percent-NAV solver coordinates avoid an ill-scaled epigraph: stock weights
     # are a few percent while objective slopes are several basis points. This
     # is an exact change of units, including adjoints and all bound gradients.
@@ -220,7 +216,6 @@ def allocate(
             bounds_upper * scale,
             p / scale**2,
             a,
-            warm * scale,
         )[:n]
         / scale
     )
