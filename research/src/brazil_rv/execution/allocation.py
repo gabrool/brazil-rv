@@ -42,13 +42,19 @@ class _SparseQP(torch.autograd.Function):
             l=lower.detach().numpy(),
             u=upper.detach().numpy(),
             verbose=False,
-            eps_abs=1e-6,
-            eps_rel=1e-6,
+            eps_abs=1e-8,
+            eps_rel=1e-8,
             max_iter=20000,
             polishing=True,
         )
         solver.warm_start(x=warm_start)
-        result = solver.solve(raise_error=True)
+        result = solver.solve(raise_error=False)
+        if result.info.status_val not in (1, 2):
+            raise FloatingPointError(
+                f"allocation {result.info.status}: iterations={result.info.iter}, "
+                f"primal={result.info.prim_res:g}, dual={result.info.dual_res:g}, "
+                f"quadratic_range=({p.diagonal().min():g},{p.diagonal().max():g})"
+            )
         ctx.solver = solver
         return torch.from_numpy(result.x)
 
@@ -130,6 +136,8 @@ def allocate(
             torch.zeros(1, dtype=torch.float64),
         )
     )
+    if not torch.isfinite(q).all():
+        raise FloatingPointError("allocation preference or borrow cost is non-finite")
     bounds_lower = torch.cat(
         (
             lower,
