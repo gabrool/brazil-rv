@@ -175,3 +175,19 @@ ordinary solve still uses20,000iterations, rare fixed fallback ceiling200,000.
 119completedfits through verified tensor-identical metadata continuation.
 Archive ROOT/solver_resume_source_6b130a8 retains migration and captured TE13 QP;
 current receipt binds6b130a8→6e0ba2a. Remaining fits resume; books regenerated.
+
+## All policy fits complete; final readouts
+
+Current shell75051, policy checkoutcd3916a, log under model_runs/_ops/:
+portfolio_policies_solver_cd3916a.log. ALL126 policy fits are complete and
+preserved (252checkpointfiles). The last failure was S0/F12 cost-sensitivity
+replay, not training. Robust solver fallback now uses Clarabel0.11.1 to solve
+the identical sparse QP and initialize OSQP primal/interval-dual values; OSQP
+still verifies fully solved status and provides the native adjoint. This replaces
+all penalty-grid/fixed-rho retries. All five captured failures solve in8–21ms,
+OSQP refinement25–225iterations, finite adjoints;106 targeted tests pass.
+Only clarabel0.11.1 was added to the host research environment; no Torch changes.
+Archive ROOT/solver_resume_source_6e0ba2a retains original fits/books, migration,
+probe and captured finalQP. Current receipt binds6e0ba2a→cd3916a; tensors unchanged.
+The current phase chain reuses all126 models and regenerates matched fold books,
+then continuous books and summary. No migration should be repeated.
