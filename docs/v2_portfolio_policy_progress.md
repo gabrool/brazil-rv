@@ -155,3 +155,12 @@ ROOT/solver_resume_source_9160b19 (also retains prior migration receipt).
 Current ROOT/policy_solver_resume.json binds9160b19→98c2dbb. Both migration
 scripts/capturedfailures retained. Do not re-run either migration. Same phase
 chain resumes remaining fits and regenerates books under current binding.
+
+Latest continuation: shell70014, clean policy checkout6b130a8, log
+model_runs/_ops/portfolio_policies_solver_6b130a8.log. TE_all/F8 hit OSQP
+status2 (solved inaccurate), which its derivative API rejects. Status2 now
+retries like iteration limit; only fully solved status1 returns. Six allocation
+tests pass, including status2 retry and gradient. Preserved220checkpointfiles
+including99completedfits with unchanged tensors and explicit original source.
+Archive ROOT/solver_resume_source_98c2dbb includes the migration script and
+previous receipt. Current receipt binds98c2dbb→6b130a8. No migrations to rerun.
