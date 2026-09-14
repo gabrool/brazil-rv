@@ -110,3 +110,10 @@ acceptance again passes: NAV max error 1.23e-10, 32/64 gradient cosine .902,
 norm ratio .802. See docs/v2_portfolio_policy_repair_acceptance.json.
 Same S0/F2 fit-only Adam-updated 13 chunks now have gradient norms 13.71–59.14.
 Original CPU chain exited on failure; do not resume its old checkpoints.
+
+Restarted original CPU phase chain at 2026-09-14T17:07:27Z from clean 0b34978.
+Current shell PID 63776; policies parent PID 63788. Preparation reused all three
+verified caches and finished in three seconds. Current log under model_runs/_ops/:
+portfolio_policies_repair_0b34978.log. Old failed chain is gone. Rejected artifacts
+were moved intact into ROOT/rejected_policy_numerics_74c4021. The diagnostic
+uncommitted host edits are stashed; active host checkout is clean committed code.
