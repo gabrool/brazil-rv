@@ -1,0 +1,49 @@
+{
+  "status": "passed",
+  "source": "/lambda/nfs/brazil-rv-east3/quant-data/b3/processed/model_runs/v2_portfolio_49d3c9a_20260914T143600Z",
+  "inventory": "C:\\quant-data\\b3\\processed\\model_runs\\v2_portfolio_49d3c9a_20260914T143600Z\\archives\\inventory.json",
+  "inventory_sha256": "dcbc80a9a2657cdd69deaf5ce0b17b43a7dd17640f65468d585beba361353004",
+  "required_files": 11464,
+  "all_required_members_verified": true,
+  "archives": [
+    {
+      "archive": "/lambda/nfs/brazil-rv-east3/quant-data/b3/processed/model_runs/v2_portfolio_49d3c9a_20260914T143600Z_recovery/forecasts.tar.gz",
+      "bytes": 3185151478,
+      "sha256": "977a3e9882b48c773532a69089b506d7534fc8f2eb086195bd2bdcf8149ba7f6",
+      "files": 2176,
+      "members_verified": true,
+      "local_archive": "C:\\quant-data\\b3\\processed\\model_runs\\v2_portfolio_49d3c9a_20260914T143600Z\\archives\\forecasts.tar.gz",
+      "local_sha256_verified": true,
+      "local_members_verified": true
+    },
+    {
+      "archive": "/lambda/nfs/brazil-rv-east3/quant-data/b3/processed/model_runs/v2_portfolio_49d3c9a_20260914T143600Z_recovery/evidence.tar.gz",
+      "bytes": 852084851,
+      "sha256": "46a918676c9fd72efda61398496c70799d577cbd66fa16da30402223f1c919a4",
+      "files": 4174,
+      "members_verified": true,
+      "local_archive": "C:\\quant-data\\b3\\processed\\model_runs\\v2_portfolio_49d3c9a_20260914T143600Z\\archives\\evidence.tar.gz",
+      "local_sha256_verified": true,
+      "local_members_verified": true
+    },
+    {
+      "archive": "/lambda/nfs/brazil-rv-east3/quant-data/b3/processed/model_runs/v2_portfolio_49d3c9a_20260914T143600Z_recovery/numerical_provenance.tar.gz",
+      "sha256": "fdcde8da5fc51c4eb1985b7fd00bb4fa569198cb3cf3b1e7985a0c7f00a18a4b",
+      "bytes": 30487436,
+      "files": 5114,
+      "members_verified": true,
+      "omitted_local": "Superseded intermediate numerical replay books/bridges only. Full original versions remain hash-verified in persistent numerical_history.tar.gz. All original policy weights, histories, provenance, migrations, failures, scripts, and current final books are retained locally.",
+      "local_archive": "C:\\quant-data\\b3\\processed\\model_runs\\v2_portfolio_49d3c9a_20260914T143600Z\\archives\\numerical_provenance.tar.gz",
+      "local_sha256_verified": true,
+      "local_members_verified": true
+    }
+  ],
+  "persistent_full_history_archive": {
+    "archive": "/lambda/nfs/brazil-rv-east3/quant-data/b3/processed/model_runs/v2_portfolio_49d3c9a_20260914T143600Z_recovery/numerical_history.tar.gz",
+    "bytes": 1686282403,
+    "sha256": "47c0d0f02bd101e59fea24c5eac9ea902f25d7ecc83f775051da4f3633b9982f",
+    "files": 18878,
+    "members_verified": true
+  },
+  "persistent_only": "Reproducible caches and superseded intermediate numerical books/bridges. All final decision artifacts and original model/provenance histories are recovered locally."
+}

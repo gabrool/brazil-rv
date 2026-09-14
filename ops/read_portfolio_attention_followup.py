@@ -10,7 +10,7 @@ import torch
 
 from brazil_rv.v2 import research_rounds as rr
 from brazil_rv.v2.artifacts import sha256_file, write_json_atomic
-from brazil_rv.v2.contract import HORIZONS, TRADED_PRIMARY_HORIZONS
+from brazil_rv.v2.contract import DEVELOPMENT_FOLDS, HORIZONS, TRADED_PRIMARY_HORIZONS
 from brazil_rv.v2.evaluate import _primary_daily_metrics, _primary_population_components
 from brazil_rv.v2.portfolio_program import read
 from brazil_rv.v2.portfolio_readouts import interval, legacy_replay, save_book
@@ -18,7 +18,7 @@ from brazil_rv.v2.portfolio_training import load_data, windows
 from brazil_rv.v2.round7 import SCREEN_FOLDS, SEEDS
 
 
-def run(root, source):
+def run(root, source, *, remaining=False):
     torch.set_num_threads(1)
     design, original = (
         read(root / "frozen_design.json"),
@@ -28,7 +28,12 @@ def run(root, source):
         raise ValueError("source design changed")
     data, binding = load_data(source, "TE_all")
     results = {}
-    for fold in SCREEN_FOLDS:
+    folds = (
+        [f for f in DEVELOPMENT_FOLDS if f not in SCREEN_FOLDS]
+        if remaining
+        else SCREEN_FOLDS
+    )
+    for fold in folds:
         rows = windows(source, data, fold)["evaluation"]
         start, stop = int(rows[0]), int(rows[-1] + 1)
         expected_dates = np.asarray(
@@ -38,12 +43,13 @@ def run(root, source):
         for arm in ("TE_all", "TL_all"):
             members, sources, mask = [], [], None
             for seed in SEEDS:
+                reused = original["reused_fits"]["TE_all"].get(fold, {}).get(str(seed))
                 directory = (
-                    Path(
-                        original["reused_fits"]["TE_all"][fold][str(seed)]["manifest"][
-                            "path"
-                        ]
-                    ).parent
+                    (
+                        Path(reused["manifest"]["path"]).parent
+                        if reused
+                        else source / "forecasters/TE_all" / f"{fold}_seed_{seed}"
+                    )
                     if arm == "TE_all"
                     else root / "fine" / f"{fold}_seed_{seed}"
                 )
@@ -178,7 +184,9 @@ def run(root, source):
         > r["TE_all"]["ensemble"]["book"]["summary"]["mean"]["utility_bps"]
         for r in results.values()
     )
-    summary["point_estimate_gate"] = summary["positive_utility_folds"] >= 3 and all(
+    summary["point_estimate_gate"] = (
+        remaining or summary["positive_utility_folds"] >= 3
+    ) and all(
         summary["paired"]["ensemble"][m]["estimate"] > 0
         for m in ("net_excess_bps", "utility_bps")
     )
@@ -187,12 +195,43 @@ def run(root, source):
         for r in results.values()
         for a in r
     )
-    write_json_atomic(root / "timing_comparison.json", summary)
+    if remaining:
+        summary["all_fourteen_paired"] = {
+            label: {
+                metric: interval(
+                    [
+                        np.asarray(
+                            read(
+                                root / "readouts" / f / "TL_all" / label / "book.json"
+                            )["daily"][metric]
+                        )
+                        - np.asarray(
+                            read(
+                                root / "readouts" / f / "TE_all" / label / "book.json"
+                            )["daily"][metric]
+                        )
+                        for f in DEVELOPMENT_FOLDS
+                    ]
+                )
+                for metric in ("net_excess_bps", "utility_bps")
+            }
+            for label in ("ensemble", *(str(s) for s in SEEDS))
+        }
+    write_json_atomic(
+        root
+        / (
+            "timing_remaining_comparison.json"
+            if remaining
+            else "timing_comparison.json"
+        ),
+        summary,
+    )
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--root", type=Path, required=True)
     parser.add_argument("--source", type=Path, required=True)
+    parser.add_argument("--remaining", action="store_true")
     args = parser.parse_args()
-    run(args.root, args.source)
+    run(args.root, args.source, remaining=args.remaining)

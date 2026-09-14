@@ -255,3 +255,49 @@ TL screen scorer/economic pairing and conditional decision; recovery/hash local
 andpersistent; commit/push; terminate exactee625bd03bdc41fd9ba676de6e171511 and
 verifyabsence twice; pauseheartbeat. Cfree6.54GB,Dfree1.23GB, avoidlargeuncompressed
 localrecovery. Allmainfits/neededfinalartifacts must be recovered, notjustsummary.
+
+## Timing screen passed gate; final remaining-fold confirmation active
+
+TL3P+12F and paired32legacybooks are COMPLETE, no failures. Source screen:
+ROOT_ATT/timing_comparison.json; localruntimecopy same name. Paired ensemble
+TLminusTE net+.2530573bps/day,utility+.2754957,nominal95%utilityCI[-2.50266,4.18438],
+3/4positiveutilityfolds. Ensembleaccountingflagsfalse. All3individualseedmean
+utilitydifferencespositive,butuncertain. Prewritten gate passed: registered
+research/preregistrations/v2_portfolio_attention_confirmation.md at6e75a48 BEFORE
+remainingfits. Shell90930 /home/ubuntu/continue_attention.sh now runs30remainingF
+in6GPUlanes then3existingparentprelude scores. Sameclean62b7e2btrainercheckout;
+external dispatch /home/ubuntu/continue_portfolio_attention.py iscommitted6e75a48.
+Logmodel_runs/_ops/portfolio_attention_confirmation.log. NOmoretrainingextension
+afterthisconfirmation; no learnedpolicy/rawobjective/jointfits. Usergiven45–75min
+estimatefromthistransition, not a guarantee.
+
+Remaining readout implementation: ops/read_portfolio_attention_followup.py
+--remaining computes10matchedempty-startlegacyfolds/3individualseeds+ensemble
+andall14pairedsummary, originalscreenfilesstayunchanged. Needdeployupdatedscript
+outsidefrozencheckoutthenrun. ops/read_portfolio_attention_optimizer.py builds
+fullTLcausalensemblefromprelude+14folds and fits ONLYdeterministiccalibrations;
+14fold+continuous4scenariooptimizerbooks versussealedTE. Needdeploy/run after
+allremainingfits/preludescomplete. Sameexplicit attentionrootenvandoriginalPython.
+
+Mainrecovery COMPLETEandlocallyverified: docs/v2_portfolio_policy_recovery.json.
+11,464requiredmembers matchsourcehashes in3archives under
+C:/quant-data/b3/processed/model_runs/v2_portfolio_49d3c9a_20260914T143600Z/archives.
+Persistent_recovery containsfullnumerical_history.tar.gz includingoldreplaybooks;
+localnumerical_provenance30MBkeepsALLoriginalpolicyweights/histories/migrations/
+scripts/failureswhileomittingduplicatedsupersededbooks/bridges. Cachesremain
+hash-boundpersistentandarefullyreproducible. Cfree~2.96GB aftermainrecovery.
+
+Continuoussettlementaudit15noncashbasebookscomplete, NAVpathsbitidentical,
+noinsolvencyorunresolvedactiondays. Historicalcumulativesettlednotional.383–.694NAV
+over7years exceeds.15diagnosticthreshold;30%haircutsensitivityreducesfinalwealth
+9.3–20.8%relative. This is MATERIAL, separatefromterminaldust. Preserverawflags.
+Persistent auditROOTsuffix_settlement_audit;3armJSONscopiedlocalruntimeS0.json,
+TE_all.json,C6.json. Audit script/home/ubuntu/audit_portfolio_settlements.py.
+
+Draft comprehensive report docs/v2_PORTFOLIO_POLICY_REVIEW.md plus
+docs/v2_portfolio_policy_evidence.json anddocs/v2_portfolio_bridge_evidence.json
+written. Bridge reproducesS0/TEoriginalemptystartscreen EXACTLY;freshC6IC.024503,
+net4.38627bps/day. All14IC S0.026724,TE.026517,C6.029321: originalTEICadvantage
+doesNOTpersistacrossallfolds. Needfinishreportwithremainingattentionresults,
+recovery,sourcehashesandactualshutdown. Suggestedfuturecoherentstock/hedgereturn
+referencecheck is hypothesis only; do NOTsilentlyaddanotherexperiment.
