@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import argparse
+import multiprocessing
+from concurrent.futures import ProcessPoolExecutor
 from dataclasses import replace
 from pathlib import Path
 
@@ -199,111 +201,129 @@ def require_full_primary_scores(mask, active):
         raise ValueError("screen score mask drops a primary-head PIT-active name")
 
 
+def evaluate_fold(root, design, choices, economic, hashes, fold):
+    """Each fold owns its store/context and disjoint output directories."""
+    context = rr._open_ledger_replay(economic)
+    policy, _ = rr.load_selected_policy(
+        Path(economic["execution_policy"]["root"]),
+        expected_result_sha256=economic["execution_policy"]["result_sha256"],
+    )
+    seeds = design["seeds"]
+    try:
+        ix = context.evaluation[fold]
+        active = context.store.read("active", ix)
+        for cell in CELLS:
+            output = root / "aggregates" / cell / fold
+            if _completed(output):
+                if (
+                    read(output / "score_manifest.json")["metadata"]["source_hashes"]
+                    != hashes
+                ):
+                    raise ValueError("aggregate differs from the frozen comparison")
+                require_full_primary_scores(
+                    np.load(output / "score_mask.npy", allow_pickle=False), active
+                )
+                continue
+            if output.exists():
+                raise RuntimeError(f"partial aggregate requires diagnosis: {output}")
+            scores, mask, members, records = ensemble(
+                root,
+                design,
+                choices,
+                cell,
+                fold,
+                seeds,
+                context.store.dates[ix],
+                context.store.isins,
+            )
+            require_full_primary_scores(mask, active)
+            rr._persist_scores(
+                output,
+                {"scores": scores, "score_mask": mask},
+                {
+                    **rr._source_tier_labels(context.store.manifest),
+                    "arm": cell,
+                    "fold": fold,
+                    "seeds": seeds,
+                    "evaluation_date_indices": ix.tolist(),
+                    "trajectories": records,
+                    "source_hashes": hashes,
+                },
+            )
+            evaluated = rr._evaluate(
+                **_context_arguments(context, hashes),
+                indices=ix,
+                scores=scores,
+                score_mask=mask,
+                fold=fold,
+                output=output / "evaluation.json",
+                execution_policy=policy,
+                settle_terminal_residuals=True,
+            )
+            write_json_atomic(output / "alignment.json", alignment(evaluated.inputs))
+
+            def primary(values):
+                local = replace(evaluated.inputs, scores=values)
+                daily = _primary_daily_metrics(
+                    *_primary_population_components(local, TRADED_PRIMARY_HORIZONS),
+                    local.dates,
+                    TRADED_PRIMARY_HORIZONS,
+                )[1]
+                return [float(x) if np.isfinite(x) else None for x in daily]
+
+            seed_readouts = {
+                str(s): primary(v) for s, v in zip(seeds, members, strict=True)
+            }
+            omission = {
+                str(s): primary(
+                    rr.rank_average_ensemble(
+                        [m for i, m in enumerate(members) if seeds[i] != s], mask
+                    )
+                )
+                for s in seeds
+            }
+            write_json_atomic(
+                output / "seed_ic.json",
+                {"single_seed": seed_readouts, "omitted_seed": omission},
+            )
+            _finish_cell(output, evaluated, name=cell, fold=fold)
+            print(f"accepted {cell}/{fold}", flush=True)
+    finally:
+        context.store.close()
+
+
 def evaluate(root):
     design, choices = (
         read(root / "frozen_design.json"),
         read(root / "calibration_choice.json"),
     )
     economic = prepare_economics(root)
-    context = rr._open_ledger_replay(economic)
-    policy, _ = rr.load_selected_policy(
-        Path(economic["execution_policy"]["root"]),
-        expected_result_sha256=economic["execution_policy"]["result_sha256"],
-    )
     hashes = {
         "v2_store_manifest": design["store"]["manifest_sha256"],
         "post_data_frozen_design": sha256_file(root / "frozen_design.json"),
         "post_data_calibration_choice": sha256_file(root / "calibration_choice.json"),
     }
-    paths = {cell: {} for cell in CELLS}
     seeds, folds = design["seeds"], design["screen_folds"]
+    paths = {
+        cell: {fold: root / "aggregates" / cell / fold for fold in folds}
+        for cell in CELLS
+    }
+    # Preserve chronological replay within a book; only independent folds run
+    # concurrently. Spawn avoids inheriting initialized numerical thread pools.
+    with ProcessPoolExecutor(
+        max_workers=min(4, len(folds)),
+        mp_context=multiprocessing.get_context("spawn"),
+    ) as executor:
+        futures = [
+            executor.submit(
+                evaluate_fold, root, design, choices, economic, hashes, fold
+            )
+            for fold in folds
+        ]
+        for future in futures:
+            future.result()
+    context = rr._open_ledger_replay(economic)
     try:
-        for fold in folds:
-            ix = context.evaluation[fold]
-            active = context.store.read("active", ix)
-            for cell in CELLS:
-                output = root / "aggregates" / cell / fold
-                paths[cell][fold] = output
-                if _completed(output):
-                    if (
-                        read(output / "score_manifest.json")["metadata"][
-                            "source_hashes"
-                        ]
-                        != hashes
-                    ):
-                        raise ValueError("aggregate differs from the frozen comparison")
-                    require_full_primary_scores(
-                        np.load(output / "score_mask.npy", allow_pickle=False), active
-                    )
-                    continue
-                if output.exists():
-                    raise RuntimeError(
-                        f"partial aggregate requires diagnosis: {output}"
-                    )
-                scores, mask, members, records = ensemble(
-                    root,
-                    design,
-                    choices,
-                    cell,
-                    fold,
-                    seeds,
-                    context.store.dates[ix],
-                    context.store.isins,
-                )
-                require_full_primary_scores(mask, active)
-                rr._persist_scores(
-                    output,
-                    {"scores": scores, "score_mask": mask},
-                    {
-                        **rr._source_tier_labels(context.store.manifest),
-                        "arm": cell,
-                        "fold": fold,
-                        "seeds": seeds,
-                        "evaluation_date_indices": ix.tolist(),
-                        "trajectories": records,
-                        "source_hashes": hashes,
-                    },
-                )
-                evaluated = rr._evaluate(
-                    **_context_arguments(context, hashes),
-                    indices=ix,
-                    scores=scores,
-                    score_mask=mask,
-                    fold=fold,
-                    output=output / "evaluation.json",
-                    execution_policy=policy,
-                    settle_terminal_residuals=True,
-                )
-                write_json_atomic(
-                    output / "alignment.json", alignment(evaluated.inputs)
-                )
-
-                def primary(values):
-                    local = replace(evaluated.inputs, scores=values)
-                    daily = _primary_daily_metrics(
-                        *_primary_population_components(local, TRADED_PRIMARY_HORIZONS),
-                        local.dates,
-                        TRADED_PRIMARY_HORIZONS,
-                    )[1]
-                    return [float(x) if np.isfinite(x) else None for x in daily]
-
-                seed_readouts = {
-                    str(s): primary(v) for s, v in zip(seeds, members, strict=True)
-                }
-                omission = {
-                    str(s): primary(
-                        rr.rank_average_ensemble(
-                            [m for i, m in enumerate(members) if seeds[i] != s], mask
-                        )
-                    )
-                    for s in seeds
-                }
-                write_json_atomic(
-                    output / "seed_ic.json",
-                    {"single_seed": seed_readouts, "omitted_seed": omission},
-                )
-                _finish_cell(output, evaluated, name=cell, fold=fold)
-                print(f"accepted {cell}/{fold}", flush=True)
         requested = {(cell, "S0") for cell in CELLS if cell != "S0"}
         requested |= {
             ("TE_slow", "TL_slow"),

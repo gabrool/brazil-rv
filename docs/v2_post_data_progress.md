@@ -126,6 +126,27 @@ unchanged economic-beta array proof, exact score provenance, common-population
 head/composite/target-view diagnostics, seed omission IC and paired 20/60-session
 intervals. Its targeted checks pass; full integration awaits actual scored panels.
 
+The engineering gate is now accepted with an explicit limitation, after
+re-reading reference section 6.3. Corrected own-history IC is .9951/.9968;
+dynamic same-time peer IC is .7783/.7827. Jointly supervised lagged IC is
+.9475/.9557 versus uniform -.0110/.3438 and own-only -.0278 (seed11).
+Joint context IC is .8601/.8573 after the disclosed 8192-update diagnosis;
+both current (.7587/.7541) and historical (.9616/.9513) regimes learn.
+Uniform context is .0131/.0135; own-only at4096 is -.0002 (seed11).
+Original unlabelled lagged/context failures remain failures. This evidence
+permits financial calibration; it does not certify unlabelled market-history
+learning, every optimizer recipe, universal attention superiority or alpha.
+The [54-attempt record](v2_post_data_engineering_attempts.json) includes rosters,
+source hashes, all failures, and 178 recovered files with exact hashes
+(44,516,079 bytes). Confirmation terminal weights are retained for rescore.
+
+Stage B financial work is still pending at this commit. Its fixed four-parent,
+44-finetune roster will run with four isolated jobs; inspect actual cache memory,
+complete-fit time and curves before closing B. C readouts now use four independent
+fold processes, retaining chronological replay within each book. Targeted readout
+tests pass; real score integration remains for Stage C. No financial evaluation
+panel has been read.
+
 ## Stage C — pending
 
 Fresh incumbent/common-recipe and GRU/early/late comparisons, then repaired

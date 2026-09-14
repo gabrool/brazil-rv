@@ -83,6 +83,17 @@ and uniform on seeds 11/29 at 4096, and corrected own-history seed 29 at 4096.
 The longer context schedule is a disclosed engineering adaptation. Preserve
 terminal weights for later diagnostics; no financial target or model changes.
 
+Engineering disposition before any financial fitting: accept the demonstrated
+**conditional** capability, with all 54 attempts retained. ASAM .2 learns true
+own history and dynamic peers across two seeds. With joint donor supervision,
+lagged IC is .9475/.9557 and context IC .8601/.8573; both context regimes learn
+on both seeds. Context uniform controls are .0131/.0135, lagged uniform controls
+are -.0110/.3438, and the joint own-only controls remain near zero. The original
+unlabelled lagged/context tasks remain failures. This permits the registered
+financial calibration/screen, not a claim of universal routing ability or a
+guarantee for every optimizer recipe. Do not select the financial optimizer
+using synthetic IC or replace actual financial labels with teacher supervision.
+
 Financial calibration uses P and F fit/selection only, initially F2/F14 and
 seeds 11/29, on early-attention slow and C1-all representatives. The primary
 bracket is LR 1e-4 with SAM .125 and ASAM .2/.5. Add a matched SAM .125 LR 3e-4
@@ -139,3 +150,5 @@ Report each cell versus S0, S0_common versus S0, TE_slow versus TL_slow and
 C1_slow, and family/FiLM increments within each architecture. These are
 descriptive development screens with nominal intervals, not multiplicity-
 adjusted confirmatory claims. No winner automatically triggers stages D–F.
+Book readouts run in four independent fold processes; chronological operations
+inside each book, sources, masks, costs and paired metrics are unchanged.

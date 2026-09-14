@@ -3,6 +3,7 @@
     {
       "artifact_sha256": "3eeb02cb4c754d5ab4628f768815707cc6b8e83829938ab0c9e88a5fdce1fd62",
       "control": "full",
+      "donor_supervision": false,
       "file": "asam20_full_4096_False.json",
       "last_IC": 0.778311744617976,
       "last_recorded_update": 4096,
@@ -11,6 +12,7 @@
       "peak_update": 4032,
       "persistent_message_diagnostic": false,
       "phase": "teacher_budget_diagnosis",
+      "precision": "bf16",
       "recipe": {
         "adaptive": true,
         "eta": 0.01,
@@ -32,11 +34,14 @@
       },
       "status": "completed",
       "task": "peer",
-      "task_qualification": null
+      "task_qualification": null,
+      "terminal_checkpoint": null,
+      "validation_by_regime": null
     },
     {
       "artifact_sha256": "312c9fe1263967969e3dbbad72ed4d2c305927d6848e84ea60a50ad01a4cddb1",
       "control": "adamw",
+      "donor_supervision": false,
       "file": "sam125_adamw_512_True.json",
       "last_IC": -0.06702574318322434,
       "last_recorded_update": 512,
@@ -45,6 +50,7 @@
       "peak_update": 0,
       "persistent_message_diagnostic": true,
       "phase": "teacher_budget_diagnosis",
+      "precision": "bf16",
       "recipe": {
         "adaptive": false,
         "eta": 0.01,
@@ -66,11 +72,14 @@
       },
       "status": "completed",
       "task": "peer",
-      "task_qualification": null
+      "task_qualification": null,
+      "terminal_checkpoint": null,
+      "validation_by_regime": null
     },
     {
       "artifact_sha256": "abe1e5a49c7dcc5a2c5412c9ea84a58b3dea595f79a4f9d7b839f7775fc74a84",
       "control": "full",
+      "donor_supervision": false,
       "file": "sam125_full_512_True.json",
       "last_IC": -0.025164027294979317,
       "last_recorded_update": 512,
@@ -79,6 +88,7 @@
       "peak_update": 0,
       "persistent_message_diagnostic": true,
       "phase": "teacher_budget_diagnosis",
+      "precision": "bf16",
       "recipe": {
         "adaptive": false,
         "eta": 0.01,
@@ -100,11 +110,14 @@
       },
       "status": "completed",
       "task": "peer",
-      "task_qualification": null
+      "task_qualification": null,
+      "terminal_checkpoint": null,
+      "validation_by_regime": null
     },
     {
       "artifact_sha256": "2313a1832c3cf94e63f1b5e03cba502e8cb370c53fb7a2b9dbe8833f93013329",
       "control": "adamw",
+      "donor_supervision": false,
       "file": "sam125_lr3_adamw_4096_False.json",
       "last_IC": 0.022052092809038915,
       "last_recorded_update": 768,
@@ -113,17 +126,21 @@
       "peak_update": 704,
       "persistent_message_diagnostic": false,
       "phase": "teacher_budget_diagnosis",
+      "precision": "bf16",
       "recipe": null,
       "rho": null,
       "seed": 11,
       "source_hashes_lf": null,
       "status": "failed_undefined_IC_serialization; raw attempt retained",
       "task": "peer",
-      "task_qualification": null
+      "task_qualification": null,
+      "terminal_checkpoint": null,
+      "validation_by_regime": null
     },
     {
       "artifact_sha256": "e05519d40f816cbedb149cdcff6f090310096c30c2d05ba16dedf5476e6b7dce",
       "control": "full",
+      "donor_supervision": false,
       "file": "sam125_lr3_full_4096_False.json",
       "last_IC": -0.00682071071994111,
       "last_recorded_update": 4096,
@@ -132,6 +149,7 @@
       "peak_update": 704,
       "persistent_message_diagnostic": false,
       "phase": "teacher_budget_diagnosis",
+      "precision": "bf16",
       "recipe": {
         "adaptive": false,
         "eta": 0.01,
@@ -153,11 +171,430 @@
       },
       "status": "completed",
       "task": "peer",
-      "task_qualification": null
+      "task_qualification": null,
+      "terminal_checkpoint": null,
+      "validation_by_regime": null
+    },
+    {
+      "artifact_sha256": "99d66923ecce9faa3d2d521b9690e96920b14315a6ea8779f82fe39a2c4cfd46",
+      "control": "full",
+      "donor_supervision": true,
+      "file": "context_full_11.json",
+      "last_IC": 0.8601481373401609,
+      "last_recorded_update": 8192,
+      "log_sha256": "677b831d87b5e54e014a7e6334d2bc6af5c8a00a046c114023fe95c2e40830cc",
+      "peak_IC": 0.8692672954526359,
+      "peak_update": 5248,
+      "persistent_message_diagnostic": false,
+      "phase": "teacher_confirmation",
+      "precision": "bf16",
+      "recipe": {
+        "adaptive": true,
+        "eta": 0.01,
+        "learning_rate": 0.0001,
+        "minimum_improvement": 0.0001,
+        "patience": 5,
+        "rho": 0.2,
+        "schedule_epochs": 60,
+        "transferred_multiplier": 0.3
+      },
+      "rho": 0.2,
+      "seed": 11,
+      "source_hashes_lf": {
+        "characteristic_model.py": "25b83342d571fd08c4262116614ec178c453c7a01baff522cad090b42073ca1b",
+        "post_data_program.py": "7bfedeeea5214a8391bc1844eb7c375b5e8e3e73d91d3436aa68b32053e1ce15",
+        "relational_engineering.py": "a261c29aacb507d6dbccad283230e80f2bf68ed18173dbeac882e3c9485c1346",
+        "round7_training.py": "3b70083f7f204073f71f3255e162d6ba935319bb75b0b81080326c87636a7426",
+        "temporal_pathway.py": "f417822e3ecbcbfc190803fc22a39d1a212e7aa3ea0c44cce4bfb4d500f26074"
+      },
+      "status": "completed",
+      "task": "context",
+      "task_qualification": null,
+      "terminal_checkpoint": {
+        "file": "context_full_11.pt",
+        "sha256": "d794953704b6083589664ec133b6f9ad73d4e4d69179a9690a26b5cd0aad0a12"
+      },
+      "validation_by_regime": {
+        "0": {
+          "dates": 64,
+          "defined_dates": 64,
+          "ic": 0.7586929694250064
+        },
+        "1": {
+          "dates": 64,
+          "defined_dates": 64,
+          "ic": 0.9616033052553155
+        }
+      }
+    },
+    {
+      "artifact_sha256": "ecb56158ea50c10a85ed167557f0a94d2fa9a8ff2022724b5492e3a339be1eb3",
+      "control": "full",
+      "donor_supervision": true,
+      "file": "context_full_29.json",
+      "last_IC": 0.8572996947863254,
+      "last_recorded_update": 8192,
+      "log_sha256": "2ca58f27fddc031ae6b0119b22898d25823182010c5355e53297783c4594c882",
+      "peak_IC": 0.8603114004845668,
+      "peak_update": 7424,
+      "persistent_message_diagnostic": false,
+      "phase": "teacher_confirmation",
+      "precision": "bf16",
+      "recipe": {
+        "adaptive": true,
+        "eta": 0.01,
+        "learning_rate": 0.0001,
+        "minimum_improvement": 0.0001,
+        "patience": 5,
+        "rho": 0.2,
+        "schedule_epochs": 60,
+        "transferred_multiplier": 0.3
+      },
+      "rho": 0.2,
+      "seed": 29,
+      "source_hashes_lf": {
+        "characteristic_model.py": "25b83342d571fd08c4262116614ec178c453c7a01baff522cad090b42073ca1b",
+        "post_data_program.py": "7bfedeeea5214a8391bc1844eb7c375b5e8e3e73d91d3436aa68b32053e1ce15",
+        "relational_engineering.py": "a261c29aacb507d6dbccad283230e80f2bf68ed18173dbeac882e3c9485c1346",
+        "round7_training.py": "3b70083f7f204073f71f3255e162d6ba935319bb75b0b81080326c87636a7426",
+        "temporal_pathway.py": "f417822e3ecbcbfc190803fc22a39d1a212e7aa3ea0c44cce4bfb4d500f26074"
+      },
+      "status": "completed",
+      "task": "context",
+      "task_qualification": null,
+      "terminal_checkpoint": {
+        "file": "context_full_29.pt",
+        "sha256": "00333bb4519f9f1a63ce00d40b1944af2ed379d7c644db99d588260282634ab5"
+      },
+      "validation_by_regime": {
+        "0": {
+          "dates": 61,
+          "defined_dates": 61,
+          "ic": 0.7540969385446964
+        },
+        "1": {
+          "dates": 67,
+          "defined_dates": 67,
+          "ic": 0.9512604131555698
+        }
+      }
+    },
+    {
+      "artifact_sha256": "42fa5c3d0a4b55d42d4fc3bf4fc5cd808741e855ca459757dd39dae043e0939b",
+      "control": "uniform",
+      "donor_supervision": true,
+      "file": "context_uniform_11.json",
+      "last_IC": 0.013083302254851693,
+      "last_recorded_update": 8192,
+      "log_sha256": "f49edf652b814618224f5ad5277a2e903bdcf10f7dedaf029fb52923d4460ddf",
+      "peak_IC": 0.08761539097706485,
+      "peak_update": 1792,
+      "persistent_message_diagnostic": false,
+      "phase": "teacher_confirmation",
+      "precision": "bf16",
+      "recipe": {
+        "adaptive": true,
+        "eta": 0.01,
+        "learning_rate": 0.0001,
+        "minimum_improvement": 0.0001,
+        "patience": 5,
+        "rho": 0.2,
+        "schedule_epochs": 60,
+        "transferred_multiplier": 0.3
+      },
+      "rho": 0.2,
+      "seed": 11,
+      "source_hashes_lf": {
+        "characteristic_model.py": "25b83342d571fd08c4262116614ec178c453c7a01baff522cad090b42073ca1b",
+        "post_data_program.py": "7bfedeeea5214a8391bc1844eb7c375b5e8e3e73d91d3436aa68b32053e1ce15",
+        "relational_engineering.py": "a261c29aacb507d6dbccad283230e80f2bf68ed18173dbeac882e3c9485c1346",
+        "round7_training.py": "3b70083f7f204073f71f3255e162d6ba935319bb75b0b81080326c87636a7426",
+        "temporal_pathway.py": "f417822e3ecbcbfc190803fc22a39d1a212e7aa3ea0c44cce4bfb4d500f26074"
+      },
+      "status": "completed",
+      "task": "context",
+      "task_qualification": null,
+      "terminal_checkpoint": {
+        "file": "context_uniform_11.pt",
+        "sha256": "886191cd8d17b622e17e9bb9e8442c58aad9d0c0e5dc8bf1db0fcd7fefdfffc6"
+      },
+      "validation_by_regime": {
+        "0": {
+          "dates": 64,
+          "defined_dates": 64,
+          "ic": 0.015664401913108653
+        },
+        "1": {
+          "dates": 64,
+          "defined_dates": 64,
+          "ic": 0.01050220259659474
+        }
+      }
+    },
+    {
+      "artifact_sha256": "118c5e42c8db455460ed046ac70096b5f9a64d623f4ae4cd0899e958a35c8453",
+      "control": "uniform",
+      "donor_supervision": true,
+      "file": "context_uniform_29.json",
+      "last_IC": 0.01347982543163474,
+      "last_recorded_update": 8192,
+      "log_sha256": "485c9ea5ca0814da5587b5053814d03408d9f44b846fe8439ea2a4d2b53125be",
+      "peak_IC": 0.06731942092674201,
+      "peak_update": 1984,
+      "persistent_message_diagnostic": false,
+      "phase": "teacher_confirmation",
+      "precision": "bf16",
+      "recipe": {
+        "adaptive": true,
+        "eta": 0.01,
+        "learning_rate": 0.0001,
+        "minimum_improvement": 0.0001,
+        "patience": 5,
+        "rho": 0.2,
+        "schedule_epochs": 60,
+        "transferred_multiplier": 0.3
+      },
+      "rho": 0.2,
+      "seed": 29,
+      "source_hashes_lf": {
+        "characteristic_model.py": "25b83342d571fd08c4262116614ec178c453c7a01baff522cad090b42073ca1b",
+        "post_data_program.py": "7bfedeeea5214a8391bc1844eb7c375b5e8e3e73d91d3436aa68b32053e1ce15",
+        "relational_engineering.py": "a261c29aacb507d6dbccad283230e80f2bf68ed18173dbeac882e3c9485c1346",
+        "round7_training.py": "3b70083f7f204073f71f3255e162d6ba935319bb75b0b81080326c87636a7426",
+        "temporal_pathway.py": "f417822e3ecbcbfc190803fc22a39d1a212e7aa3ea0c44cce4bfb4d500f26074"
+      },
+      "status": "completed",
+      "task": "context",
+      "task_qualification": null,
+      "terminal_checkpoint": {
+        "file": "context_uniform_29.pt",
+        "sha256": "7030c4fbae327170d5b0653f82b46f3976d83bb9581c5e7e2afaed1bf98befae"
+      },
+      "validation_by_regime": {
+        "0": {
+          "dates": 61,
+          "defined_dates": 61,
+          "ic": 0.018430246520221846
+        },
+        "1": {
+          "dates": 67,
+          "defined_dates": 67,
+          "ic": 0.00897272563456289
+        }
+      }
+    },
+    {
+      "artifact_sha256": "818bacdbd4114a03aa2339fda116667aebc8821bf9c517a4218cdb87a5f838c3",
+      "control": "full",
+      "donor_supervision": true,
+      "file": "lagged_full_29.json",
+      "last_IC": 0.9556859863026752,
+      "last_recorded_update": 4096,
+      "log_sha256": "a414af7f181047a4f2ff9c8c56b14977b2744fba1651480a6c7f5c1dd9584123",
+      "peak_IC": 0.9587584036098764,
+      "peak_update": 3904,
+      "persistent_message_diagnostic": false,
+      "phase": "teacher_confirmation",
+      "precision": "bf16",
+      "recipe": {
+        "adaptive": true,
+        "eta": 0.01,
+        "learning_rate": 0.0001,
+        "minimum_improvement": 0.0001,
+        "patience": 5,
+        "rho": 0.2,
+        "schedule_epochs": 60,
+        "transferred_multiplier": 0.3
+      },
+      "rho": 0.2,
+      "seed": 29,
+      "source_hashes_lf": {
+        "characteristic_model.py": "25b83342d571fd08c4262116614ec178c453c7a01baff522cad090b42073ca1b",
+        "post_data_program.py": "7bfedeeea5214a8391bc1844eb7c375b5e8e3e73d91d3436aa68b32053e1ce15",
+        "relational_engineering.py": "a261c29aacb507d6dbccad283230e80f2bf68ed18173dbeac882e3c9485c1346",
+        "round7_training.py": "3b70083f7f204073f71f3255e162d6ba935319bb75b0b81080326c87636a7426",
+        "temporal_pathway.py": "f417822e3ecbcbfc190803fc22a39d1a212e7aa3ea0c44cce4bfb4d500f26074"
+      },
+      "status": "completed",
+      "task": "lagged",
+      "task_qualification": null,
+      "terminal_checkpoint": {
+        "file": "lagged_full_29.pt",
+        "sha256": "6b66014e31d31863b691515dfd71c1fae66f1e0a4e67ee401b1eea12c70f82e0"
+      },
+      "validation_by_regime": {
+        "0": {
+          "dates": 61,
+          "defined_dates": 61,
+          "ic": 0.9580044723826955
+        },
+        "1": {
+          "dates": 67,
+          "defined_dates": 67,
+          "ic": 0.9535751258417614
+        }
+      }
+    },
+    {
+      "artifact_sha256": "468fe764687a03d18be472e140521fb09f894569ec93b209bac260b312047636",
+      "control": "uniform",
+      "donor_supervision": true,
+      "file": "lagged_uniform_11.json",
+      "last_IC": -0.010996293400295273,
+      "last_recorded_update": 4096,
+      "log_sha256": "e7a5f2ab46cc047bde1c6b9628471b66d23b8f4a3abbb8597bd8f3bb3b1da896",
+      "peak_IC": 0.07085430722380698,
+      "peak_update": 384,
+      "persistent_message_diagnostic": false,
+      "phase": "teacher_confirmation",
+      "precision": "bf16",
+      "recipe": {
+        "adaptive": true,
+        "eta": 0.01,
+        "learning_rate": 0.0001,
+        "minimum_improvement": 0.0001,
+        "patience": 5,
+        "rho": 0.2,
+        "schedule_epochs": 60,
+        "transferred_multiplier": 0.3
+      },
+      "rho": 0.2,
+      "seed": 11,
+      "source_hashes_lf": {
+        "characteristic_model.py": "25b83342d571fd08c4262116614ec178c453c7a01baff522cad090b42073ca1b",
+        "post_data_program.py": "7bfedeeea5214a8391bc1844eb7c375b5e8e3e73d91d3436aa68b32053e1ce15",
+        "relational_engineering.py": "a261c29aacb507d6dbccad283230e80f2bf68ed18173dbeac882e3c9485c1346",
+        "round7_training.py": "3b70083f7f204073f71f3255e162d6ba935319bb75b0b81080326c87636a7426",
+        "temporal_pathway.py": "f417822e3ecbcbfc190803fc22a39d1a212e7aa3ea0c44cce4bfb4d500f26074"
+      },
+      "status": "completed",
+      "task": "lagged",
+      "task_qualification": null,
+      "terminal_checkpoint": {
+        "file": "lagged_uniform_11.pt",
+        "sha256": "114796f0fe4bc07fa9cee5dbcd57199430320764e76016d74d18a1bb5c802809"
+      },
+      "validation_by_regime": {
+        "0": {
+          "dates": 64,
+          "defined_dates": 64,
+          "ic": -0.032927098924229306
+        },
+        "1": {
+          "dates": 64,
+          "defined_dates": 64,
+          "ic": 0.010934512123638763
+        }
+      }
+    },
+    {
+      "artifact_sha256": "8acdccfb8802a974a4bc9979446dabbeed58f6f8ec31d8cfde8c49b5a2d5e9ec",
+      "control": "uniform",
+      "donor_supervision": true,
+      "file": "lagged_uniform_29.json",
+      "last_IC": 0.3437970403627306,
+      "last_recorded_update": 4096,
+      "log_sha256": "5ca8d7e8f00b89b31b3ef569743e16ea6e213b25dbe1990b594a580ac78b90e3",
+      "peak_IC": 0.3437970403627306,
+      "peak_update": 4096,
+      "persistent_message_diagnostic": false,
+      "phase": "teacher_confirmation",
+      "precision": "bf16",
+      "recipe": {
+        "adaptive": true,
+        "eta": 0.01,
+        "learning_rate": 0.0001,
+        "minimum_improvement": 0.0001,
+        "patience": 5,
+        "rho": 0.2,
+        "schedule_epochs": 60,
+        "transferred_multiplier": 0.3
+      },
+      "rho": 0.2,
+      "seed": 29,
+      "source_hashes_lf": {
+        "characteristic_model.py": "25b83342d571fd08c4262116614ec178c453c7a01baff522cad090b42073ca1b",
+        "post_data_program.py": "7bfedeeea5214a8391bc1844eb7c375b5e8e3e73d91d3436aa68b32053e1ce15",
+        "relational_engineering.py": "a261c29aacb507d6dbccad283230e80f2bf68ed18173dbeac882e3c9485c1346",
+        "round7_training.py": "3b70083f7f204073f71f3255e162d6ba935319bb75b0b81080326c87636a7426",
+        "temporal_pathway.py": "f417822e3ecbcbfc190803fc22a39d1a212e7aa3ea0c44cce4bfb4d500f26074"
+      },
+      "status": "completed",
+      "task": "lagged",
+      "task_qualification": null,
+      "terminal_checkpoint": {
+        "file": "lagged_uniform_29.pt",
+        "sha256": "620cc2228fa982e92b3325043c29b717d823c2331c636fb0179eff34cee3df85"
+      },
+      "validation_by_regime": {
+        "0": {
+          "dates": 61,
+          "defined_dates": 61,
+          "ic": 0.3029461523700315
+        },
+        "1": {
+          "dates": 67,
+          "defined_dates": 67,
+          "ic": 0.38098963987847184
+        }
+      }
+    },
+    {
+      "artifact_sha256": "1de316d1b7b4dbe6b8a6a7bcae2b5d59b0dd67631e64d5b7db9a6d558906282f",
+      "control": "full",
+      "donor_supervision": false,
+      "file": "own_full_29.json",
+      "last_IC": 0.9968366966923627,
+      "last_recorded_update": 4096,
+      "log_sha256": "09c30f4d9e913187ba11ebb717cd890629ae6543edc0aa434a978331ee1c0bce",
+      "peak_IC": 0.9970910461908493,
+      "peak_update": 3584,
+      "persistent_message_diagnostic": false,
+      "phase": "teacher_confirmation",
+      "precision": "bf16",
+      "recipe": {
+        "adaptive": true,
+        "eta": 0.01,
+        "learning_rate": 0.0001,
+        "minimum_improvement": 0.0001,
+        "patience": 5,
+        "rho": 0.2,
+        "schedule_epochs": 60,
+        "transferred_multiplier": 0.3
+      },
+      "rho": 0.2,
+      "seed": 29,
+      "source_hashes_lf": {
+        "characteristic_model.py": "25b83342d571fd08c4262116614ec178c453c7a01baff522cad090b42073ca1b",
+        "post_data_program.py": "7bfedeeea5214a8391bc1844eb7c375b5e8e3e73d91d3436aa68b32053e1ce15",
+        "relational_engineering.py": "a261c29aacb507d6dbccad283230e80f2bf68ed18173dbeac882e3c9485c1346",
+        "round7_training.py": "3b70083f7f204073f71f3255e162d6ba935319bb75b0b81080326c87636a7426",
+        "temporal_pathway.py": "f417822e3ecbcbfc190803fc22a39d1a212e7aa3ea0c44cce4bfb4d500f26074"
+      },
+      "status": "completed",
+      "task": "own",
+      "task_qualification": "observed recipient channels 8 at t-21 and 9 at t-41; current snapshot independent",
+      "terminal_checkpoint": {
+        "file": "own_full_29.pt",
+        "sha256": "4277e09b23089f4ea0551e1db24eeee88438db2a2acd85195d2e5134f5d9db41"
+      },
+      "validation_by_regime": {
+        "0": {
+          "dates": 61,
+          "defined_dates": 61,
+          "ic": 0.9969185584573036
+        },
+        "1": {
+          "dates": 67,
+          "defined_dates": 67,
+          "ic": 0.9967621658317449
+        }
+      }
     },
     {
       "artifact_sha256": "bfcd35572f10ece0a001ddce7bf36ada6092a791772e718df13bc7e36477e1d1",
       "control": "full",
+      "donor_supervision": false,
       "file": "context_asam20_full_11.json",
       "last_IC": -0.01567411361338922,
       "last_recorded_update": 4096,
@@ -166,6 +603,7 @@
       "peak_update": 128,
       "persistent_message_diagnostic": false,
       "phase": "teacher_gate",
+      "precision": "bf16",
       "recipe": {
         "adaptive": true,
         "eta": 0.01,
@@ -187,11 +625,14 @@
       },
       "status": "completed",
       "task": "context",
-      "task_qualification": null
+      "task_qualification": null,
+      "terminal_checkpoint": null,
+      "validation_by_regime": null
     },
     {
       "artifact_sha256": "308633c9a96662be168e0418d59c7fb94684398be91561d7ef9ed7249108fd32",
       "control": "full",
+      "donor_supervision": false,
       "file": "context_asam20_full_29.json",
       "last_IC": -0.008356214680196497,
       "last_recorded_update": 4096,
@@ -200,6 +641,7 @@
       "peak_update": 0,
       "persistent_message_diagnostic": false,
       "phase": "teacher_gate",
+      "precision": "bf16",
       "recipe": {
         "adaptive": true,
         "eta": 0.01,
@@ -221,11 +663,14 @@
       },
       "status": "completed",
       "task": "context",
-      "task_qualification": null
+      "task_qualification": null,
+      "terminal_checkpoint": null,
+      "validation_by_regime": null
     },
     {
       "artifact_sha256": "40463072543673fd5b8e1e2babaef80ddec45a8b7aa4ec374e9817679dd9364f",
       "control": "full",
+      "donor_supervision": false,
       "file": "lagged_asam20_full_11.json",
       "last_IC": -0.024139270680785297,
       "last_recorded_update": 4096,
@@ -234,6 +679,7 @@
       "peak_update": 0,
       "persistent_message_diagnostic": false,
       "phase": "teacher_gate",
+      "precision": "bf16",
       "recipe": {
         "adaptive": true,
         "eta": 0.01,
@@ -255,11 +701,14 @@
       },
       "status": "completed",
       "task": "lagged",
-      "task_qualification": null
+      "task_qualification": null,
+      "terminal_checkpoint": null,
+      "validation_by_regime": null
     },
     {
       "artifact_sha256": "59c4a685302b7ced4be99ea4224a129ef50304f3baf260d6d4e89d31cc7884a3",
       "control": "full",
+      "donor_supervision": false,
       "file": "lagged_asam20_full_29.json",
       "last_IC": -0.01666372042032524,
       "last_recorded_update": 4096,
@@ -268,6 +717,7 @@
       "peak_update": 128,
       "persistent_message_diagnostic": false,
       "phase": "teacher_gate",
+      "precision": "bf16",
       "recipe": {
         "adaptive": true,
         "eta": 0.01,
@@ -289,11 +739,14 @@
       },
       "status": "completed",
       "task": "lagged",
-      "task_qualification": null
+      "task_qualification": null,
+      "terminal_checkpoint": null,
+      "validation_by_regime": null
     },
     {
       "artifact_sha256": "690b172cff84f54e6c4686e5980deb0bbf3bbbe18053bdb369340223c287e95a",
       "control": "full",
+      "donor_supervision": false,
       "file": "own_asam20_full_11.json",
       "last_IC": 0.9996219461786445,
       "last_recorded_update": 4096,
@@ -302,6 +755,7 @@
       "peak_update": 3968,
       "persistent_message_diagnostic": false,
       "phase": "teacher_gate",
+      "precision": "bf16",
       "recipe": {
         "adaptive": true,
         "eta": 0.01,
@@ -323,11 +777,14 @@
       },
       "status": "completed",
       "task": "own",
-      "task_qualification": "old own fixture is current-state-only, not historical retrieval"
+      "task_qualification": "old own fixture is current-state-only, not historical retrieval",
+      "terminal_checkpoint": null,
+      "validation_by_regime": null
     },
     {
       "artifact_sha256": "355544f6588e472c514f9e54fc2e798168c60d6f750d557460007d50d4d8ad53",
       "control": "full",
+      "donor_supervision": false,
       "file": "own_asam20_full_29.json",
       "last_IC": 0.9995294926604579,
       "last_recorded_update": 4096,
@@ -336,6 +793,7 @@
       "peak_update": 3840,
       "persistent_message_diagnostic": false,
       "phase": "teacher_gate",
+      "precision": "bf16",
       "recipe": {
         "adaptive": true,
         "eta": 0.01,
@@ -357,11 +815,14 @@
       },
       "status": "completed",
       "task": "own",
-      "task_qualification": "old own fixture is current-state-only, not historical retrieval"
+      "task_qualification": "old own fixture is current-state-only, not historical retrieval",
+      "terminal_checkpoint": null,
+      "validation_by_regime": null
     },
     {
       "artifact_sha256": "b231354bda8a48250dc102112f27130ec3723f82e69076fdd7285b3f9690251a",
       "control": "full",
+      "donor_supervision": false,
       "file": "peer_asam20_full_11.json",
       "last_IC": 0.778311744617976,
       "last_recorded_update": 4096,
@@ -370,6 +831,7 @@
       "peak_update": 4032,
       "persistent_message_diagnostic": false,
       "phase": "teacher_gate",
+      "precision": "bf16",
       "recipe": {
         "adaptive": true,
         "eta": 0.01,
@@ -391,11 +853,14 @@
       },
       "status": "completed",
       "task": "peer",
-      "task_qualification": null
+      "task_qualification": null,
+      "terminal_checkpoint": null,
+      "validation_by_regime": null
     },
     {
       "artifact_sha256": "d146060c627fa4c2d8812825f8e18a6c692fe8f6ce86df75bbd143a52f2dddbb",
       "control": "full",
+      "donor_supervision": false,
       "file": "peer_asam20_full_29.json",
       "last_IC": 0.7827059931741396,
       "last_recorded_update": 4096,
@@ -404,6 +869,7 @@
       "peak_update": 3840,
       "persistent_message_diagnostic": false,
       "phase": "teacher_gate",
+      "precision": "bf16",
       "recipe": {
         "adaptive": true,
         "eta": 0.01,
@@ -425,11 +891,14 @@
       },
       "status": "completed",
       "task": "peer",
-      "task_qualification": null
+      "task_qualification": null,
+      "terminal_checkpoint": null,
+      "validation_by_regime": null
     },
     {
       "artifact_sha256": "ad1ac826f8bc86b4937e3c8e83f07abb37deba0110614c4f7b9b3ccd66c1b1cb",
       "control": "own",
+      "donor_supervision": false,
       "file": "peer_asam20_own_11.json",
       "last_IC": 0.020410499519020686,
       "last_recorded_update": 4096,
@@ -438,6 +907,7 @@
       "peak_update": 704,
       "persistent_message_diagnostic": false,
       "phase": "teacher_gate",
+      "precision": "bf16",
       "recipe": {
         "adaptive": true,
         "eta": 0.01,
@@ -459,11 +929,14 @@
       },
       "status": "completed",
       "task": "peer",
-      "task_qualification": null
+      "task_qualification": null,
+      "terminal_checkpoint": null,
+      "validation_by_regime": null
     },
     {
       "artifact_sha256": "3aa543c3f1e9147c700935b4d31bc49f3072b820882d0810eaea0335ce2916ab",
       "control": "own",
+      "donor_supervision": false,
       "file": "peer_asam20_own_29.json",
       "last_IC": 0.010673541311736114,
       "last_recorded_update": 4096,
@@ -472,6 +945,7 @@
       "peak_update": 384,
       "persistent_message_diagnostic": false,
       "phase": "teacher_gate",
+      "precision": "bf16",
       "recipe": {
         "adaptive": true,
         "eta": 0.01,
@@ -493,11 +967,14 @@
       },
       "status": "completed",
       "task": "peer",
-      "task_qualification": null
+      "task_qualification": null,
+      "terminal_checkpoint": null,
+      "validation_by_regime": null
     },
     {
       "artifact_sha256": "4b6fd67b4d389f27990c36995c97027d829af3a8434f7175b94f3dbd2a175a14",
       "control": "uniform",
+      "donor_supervision": false,
       "file": "peer_asam20_uniform_11.json",
       "last_IC": 0.6860168087958134,
       "last_recorded_update": 4096,
@@ -506,6 +983,7 @@
       "peak_update": 4096,
       "persistent_message_diagnostic": false,
       "phase": "teacher_gate",
+      "precision": "bf16",
       "recipe": {
         "adaptive": true,
         "eta": 0.01,
@@ -527,11 +1005,14 @@
       },
       "status": "completed",
       "task": "peer",
-      "task_qualification": null
+      "task_qualification": null,
+      "terminal_checkpoint": null,
+      "validation_by_regime": null
     },
     {
       "artifact_sha256": "d1f4dcfac6de76ddc5da70fa01ef7d02cbb2d3ddedd4ae1ef897ebc51cec4473",
       "control": "uniform",
+      "donor_supervision": false,
       "file": "peer_asam20_uniform_29.json",
       "last_IC": 0.7819245453720539,
       "last_recorded_update": 4096,
@@ -540,6 +1021,7 @@
       "peak_update": 3840,
       "persistent_message_diagnostic": false,
       "phase": "teacher_gate",
+      "precision": "bf16",
       "recipe": {
         "adaptive": true,
         "eta": 0.01,
@@ -561,11 +1043,14 @@
       },
       "status": "completed",
       "task": "peer",
-      "task_qualification": null
+      "task_qualification": null,
+      "terminal_checkpoint": null,
+      "validation_by_regime": null
     },
     {
       "artifact_sha256": "2014d004529fd463eea52a2fd87c13b343c37f050aab814a9e59be78f4908097",
       "control": "full",
+      "donor_supervision": false,
       "file": "peer_asam50_full_11.json",
       "last_IC": 0.3634304656001345,
       "last_recorded_update": 4096,
@@ -574,6 +1059,7 @@
       "peak_update": 2304,
       "persistent_message_diagnostic": false,
       "phase": "teacher_gate",
+      "precision": "bf16",
       "recipe": {
         "adaptive": true,
         "eta": 0.01,
@@ -595,11 +1081,14 @@
       },
       "status": "completed",
       "task": "peer",
-      "task_qualification": null
+      "task_qualification": null,
+      "terminal_checkpoint": null,
+      "validation_by_regime": null
     },
     {
       "artifact_sha256": "8a5d1877177a399b828760ad361f84021dea9530b4f131a3ac15815555d2f0ee",
       "control": "full",
+      "donor_supervision": false,
       "file": "peer_sam125_full_11.json",
       "last_IC": -0.0104598052825575,
       "last_recorded_update": 4096,
@@ -608,6 +1097,7 @@
       "peak_update": 3328,
       "persistent_message_diagnostic": false,
       "phase": "teacher_gate",
+      "precision": "bf16",
       "recipe": {
         "adaptive": false,
         "eta": 0.01,
@@ -629,11 +1119,14 @@
       },
       "status": "completed",
       "task": "peer",
-      "task_qualification": null
+      "task_qualification": null,
+      "terminal_checkpoint": null,
+      "validation_by_regime": null
     },
     {
       "artifact_sha256": "762e6b00288ba8674c26b10cabb86f5006b3543cfb26ef1ef3575a9327a83b6f",
       "control": "full",
+      "donor_supervision": false,
       "file": "peer_sam125_full_29.json",
       "last_IC": 0.03286726007395735,
       "last_recorded_update": 4096,
@@ -642,6 +1135,7 @@
       "peak_update": 0,
       "persistent_message_diagnostic": false,
       "phase": "teacher_gate",
+      "precision": "bf16",
       "recipe": {
         "adaptive": false,
         "eta": 0.01,
@@ -663,11 +1157,166 @@
       },
       "status": "completed",
       "task": "peer",
-      "task_qualification": null
+      "task_qualification": null,
+      "terminal_checkpoint": null,
+      "validation_by_regime": null
+    },
+    {
+      "artifact_sha256": "9aed17dd084f4b5043dea14dfd6502d7f05e42a86e7ef64f6be3f56d213c7c3f",
+      "control": "full",
+      "donor_supervision": true,
+      "file": "context_full.json",
+      "last_IC": 0.34031188659122913,
+      "last_recorded_update": 4096,
+      "log_sha256": "7ef498b3f8e536e175185751666753e3a200ea495600dd26821e21c64f501ee1",
+      "peak_IC": 0.3650908312055636,
+      "peak_update": 3072,
+      "persistent_message_diagnostic": false,
+      "phase": "teacher_joint",
+      "precision": "bf16",
+      "recipe": {
+        "adaptive": true,
+        "eta": 0.01,
+        "learning_rate": 0.0001,
+        "minimum_improvement": 0.0001,
+        "patience": 5,
+        "rho": 0.2,
+        "schedule_epochs": 60,
+        "transferred_multiplier": 0.3
+      },
+      "rho": 0.2,
+      "seed": 11,
+      "source_hashes_lf": {
+        "characteristic_model.py": "25b83342d571fd08c4262116614ec178c453c7a01baff522cad090b42073ca1b",
+        "post_data_program.py": "7bfedeeea5214a8391bc1844eb7c375b5e8e3e73d91d3436aa68b32053e1ce15",
+        "relational_engineering.py": "f931c924c5c57156971fe054de40022fbf41f249b893979ad6be6110f24dcf30",
+        "round7_training.py": "3b70083f7f204073f71f3255e162d6ba935319bb75b0b81080326c87636a7426",
+        "temporal_pathway.py": "f417822e3ecbcbfc190803fc22a39d1a212e7aa3ea0c44cce4bfb4d500f26074"
+      },
+      "status": "completed",
+      "task": "context",
+      "task_qualification": null,
+      "terminal_checkpoint": null,
+      "validation_by_regime": null
+    },
+    {
+      "artifact_sha256": "39cda7a13029b6a908b2ed8e19a08122ac72ce817f386be46cb54cf2dd01dc95",
+      "control": "own",
+      "donor_supervision": true,
+      "file": "context_own.json",
+      "last_IC": -0.0002389549766982288,
+      "last_recorded_update": 4096,
+      "log_sha256": "415dc56445253a8bcb00945e342e24677550709033cb4bad1670b13407f158b2",
+      "peak_IC": 0.0763899051499641,
+      "peak_update": 768,
+      "persistent_message_diagnostic": false,
+      "phase": "teacher_joint",
+      "precision": "bf16",
+      "recipe": {
+        "adaptive": true,
+        "eta": 0.01,
+        "learning_rate": 0.0001,
+        "minimum_improvement": 0.0001,
+        "patience": 5,
+        "rho": 0.2,
+        "schedule_epochs": 60,
+        "transferred_multiplier": 0.3
+      },
+      "rho": 0.2,
+      "seed": 11,
+      "source_hashes_lf": {
+        "characteristic_model.py": "25b83342d571fd08c4262116614ec178c453c7a01baff522cad090b42073ca1b",
+        "post_data_program.py": "7bfedeeea5214a8391bc1844eb7c375b5e8e3e73d91d3436aa68b32053e1ce15",
+        "relational_engineering.py": "f931c924c5c57156971fe054de40022fbf41f249b893979ad6be6110f24dcf30",
+        "round7_training.py": "3b70083f7f204073f71f3255e162d6ba935319bb75b0b81080326c87636a7426",
+        "temporal_pathway.py": "f417822e3ecbcbfc190803fc22a39d1a212e7aa3ea0c44cce4bfb4d500f26074"
+      },
+      "status": "completed",
+      "task": "context",
+      "task_qualification": null,
+      "terminal_checkpoint": null,
+      "validation_by_regime": null
+    },
+    {
+      "artifact_sha256": "9f2b3d98cf9e71b00c18343f5b3c0af1e7c9e8e845e97e704cdfc9eac533a168",
+      "control": "full",
+      "donor_supervision": true,
+      "file": "lagged_full.json",
+      "last_IC": 0.9474787621696701,
+      "last_recorded_update": 4096,
+      "log_sha256": "f0e68ff971223bdc4e1e8f37319e6f37edef30c0815aa2a140a23f813fefe6d5",
+      "peak_IC": 0.9482139516368577,
+      "peak_update": 3968,
+      "persistent_message_diagnostic": false,
+      "phase": "teacher_joint",
+      "precision": "bf16",
+      "recipe": {
+        "adaptive": true,
+        "eta": 0.01,
+        "learning_rate": 0.0001,
+        "minimum_improvement": 0.0001,
+        "patience": 5,
+        "rho": 0.2,
+        "schedule_epochs": 60,
+        "transferred_multiplier": 0.3
+      },
+      "rho": 0.2,
+      "seed": 11,
+      "source_hashes_lf": {
+        "characteristic_model.py": "25b83342d571fd08c4262116614ec178c453c7a01baff522cad090b42073ca1b",
+        "post_data_program.py": "7bfedeeea5214a8391bc1844eb7c375b5e8e3e73d91d3436aa68b32053e1ce15",
+        "relational_engineering.py": "f931c924c5c57156971fe054de40022fbf41f249b893979ad6be6110f24dcf30",
+        "round7_training.py": "3b70083f7f204073f71f3255e162d6ba935319bb75b0b81080326c87636a7426",
+        "temporal_pathway.py": "f417822e3ecbcbfc190803fc22a39d1a212e7aa3ea0c44cce4bfb4d500f26074"
+      },
+      "status": "completed",
+      "task": "lagged",
+      "task_qualification": null,
+      "terminal_checkpoint": null,
+      "validation_by_regime": null
+    },
+    {
+      "artifact_sha256": "15f8ebe1aa365771d2ebc3b6eefe3980f8361d0fa9ace09010f15f433bb38ae7",
+      "control": "own",
+      "donor_supervision": true,
+      "file": "lagged_own.json",
+      "last_IC": -0.027790608579710767,
+      "last_recorded_update": 4096,
+      "log_sha256": "4e64a63bd53531d66d8d46e1cb3e219b9a3c499b22a66b56edde377264fe7153",
+      "peak_IC": 0.07060528127380308,
+      "peak_update": 384,
+      "persistent_message_diagnostic": false,
+      "phase": "teacher_joint",
+      "precision": "bf16",
+      "recipe": {
+        "adaptive": true,
+        "eta": 0.01,
+        "learning_rate": 0.0001,
+        "minimum_improvement": 0.0001,
+        "patience": 5,
+        "rho": 0.2,
+        "schedule_epochs": 60,
+        "transferred_multiplier": 0.3
+      },
+      "rho": 0.2,
+      "seed": 11,
+      "source_hashes_lf": {
+        "characteristic_model.py": "25b83342d571fd08c4262116614ec178c453c7a01baff522cad090b42073ca1b",
+        "post_data_program.py": "7bfedeeea5214a8391bc1844eb7c375b5e8e3e73d91d3436aa68b32053e1ce15",
+        "relational_engineering.py": "f931c924c5c57156971fe054de40022fbf41f249b893979ad6be6110f24dcf30",
+        "round7_training.py": "3b70083f7f204073f71f3255e162d6ba935319bb75b0b81080326c87636a7426",
+        "temporal_pathway.py": "f417822e3ecbcbfc190803fc22a39d1a212e7aa3ea0c44cce4bfb4d500f26074"
+      },
+      "status": "completed",
+      "task": "lagged",
+      "task_qualification": null,
+      "terminal_checkpoint": null,
+      "validation_by_regime": null
     },
     {
       "artifact_sha256": "a03e0da763c733eb344ba0b32af979c82364ca6bb819b900a2dbf419ad13ff2c",
       "control": "full",
+      "donor_supervision": false,
       "file": "asam20_full.json",
       "last_IC": -0.06238171290403187,
       "last_recorded_update": 512,
@@ -676,6 +1325,7 @@
       "peak_update": 0,
       "persistent_message_diagnostic": false,
       "phase": "teacher_optimizer_diagnosis",
+      "precision": "bf16",
       "recipe": {
         "adaptive": true,
         "eta": 0.01,
@@ -697,11 +1347,14 @@
       },
       "status": "completed",
       "task": "peer",
-      "task_qualification": null
+      "task_qualification": null,
+      "terminal_checkpoint": null,
+      "validation_by_regime": null
     },
     {
       "artifact_sha256": "be68ca916d81b85ed6c7fa21f3e8ef7284b0383fb87c7e3fafd958dab771e825",
       "control": "full",
+      "donor_supervision": false,
       "file": "asam50_full.json",
       "last_IC": -0.016553907979159906,
       "last_recorded_update": 512,
@@ -710,6 +1363,7 @@
       "peak_update": 0,
       "persistent_message_diagnostic": false,
       "phase": "teacher_optimizer_diagnosis",
+      "precision": "bf16",
       "recipe": {
         "adaptive": true,
         "eta": 0.01,
@@ -731,11 +1385,14 @@
       },
       "status": "completed",
       "task": "peer",
-      "task_qualification": null
+      "task_qualification": null,
+      "terminal_checkpoint": null,
+      "validation_by_regime": null
     },
     {
       "artifact_sha256": "dec41f65cba18a7e5cb7f4d93f36aacd94a92b7b85ceb87ee9085ea332009773",
       "control": "full",
+      "donor_supervision": false,
       "file": "sam05_full.json",
       "last_IC": -0.023094250677756202,
       "last_recorded_update": 512,
@@ -744,6 +1401,7 @@
       "peak_update": 0,
       "persistent_message_diagnostic": false,
       "phase": "teacher_optimizer_diagnosis",
+      "precision": "bf16",
       "recipe": {
         "adaptive": false,
         "eta": 0.01,
@@ -765,11 +1423,14 @@
       },
       "status": "completed",
       "task": "peer",
-      "task_qualification": null
+      "task_qualification": null,
+      "terminal_checkpoint": null,
+      "validation_by_regime": null
     },
     {
       "artifact_sha256": "4ec12f8e3bc6008c9a732397f854ce59d199b96a5d6b13affedc6c2913f81419",
       "control": "adamw",
+      "donor_supervision": false,
       "file": "sam125_adamw.json",
       "last_IC": -0.0658431704081267,
       "last_recorded_update": 512,
@@ -778,6 +1439,7 @@
       "peak_update": 0,
       "persistent_message_diagnostic": false,
       "phase": "teacher_optimizer_diagnosis",
+      "precision": "bf16",
       "recipe": {
         "adaptive": false,
         "eta": 0.01,
@@ -799,11 +1461,14 @@
       },
       "status": "completed",
       "task": "peer",
-      "task_qualification": null
+      "task_qualification": null,
+      "terminal_checkpoint": null,
+      "validation_by_regime": null
     },
     {
       "artifact_sha256": "8f0b50e24b7a60d41871aee95e46cb2b36902c025b640810a3d1d0320bafeb0b",
       "control": "full",
+      "donor_supervision": false,
       "file": "sam125_lr3_full.json",
       "last_IC": -0.022201512165559753,
       "last_recorded_update": 512,
@@ -812,6 +1477,7 @@
       "peak_update": 0,
       "persistent_message_diagnostic": false,
       "phase": "teacher_optimizer_diagnosis",
+      "precision": "bf16",
       "recipe": {
         "adaptive": false,
         "eta": 0.01,
@@ -833,11 +1499,356 @@
       },
       "status": "completed",
       "task": "peer",
-      "task_qualification": null
+      "task_qualification": null,
+      "terminal_checkpoint": null,
+      "validation_by_regime": null
+    },
+    {
+      "artifact_sha256": "c05f9280c462cfc6ee8858f3623c41ac4cd5bfff0b79e5dc61612a99f10452f3",
+      "control": "full",
+      "donor_supervision": false,
+      "file": "lagged_fp32.json",
+      "last_IC": -0.024519979296358435,
+      "last_recorded_update": 4096,
+      "log_sha256": "193203e4b32a3ca264ea6dc4fe523236ef9da52e7c24795dd752065f04fa5506",
+      "peak_IC": -0.009477100159566744,
+      "peak_update": 0,
+      "persistent_message_diagnostic": false,
+      "phase": "teacher_precision",
+      "precision": "fp32",
+      "recipe": {
+        "adaptive": true,
+        "eta": 0.01,
+        "learning_rate": 0.0001,
+        "minimum_improvement": 0.0001,
+        "patience": 5,
+        "rho": 0.2,
+        "schedule_epochs": 60,
+        "transferred_multiplier": 0.3
+      },
+      "rho": 0.2,
+      "seed": 11,
+      "source_hashes_lf": {
+        "characteristic_model.py": "25b83342d571fd08c4262116614ec178c453c7a01baff522cad090b42073ca1b",
+        "post_data_program.py": "7bfedeeea5214a8391bc1844eb7c375b5e8e3e73d91d3436aa68b32053e1ce15",
+        "relational_engineering.py": "d235cd899356aa45f78150f283de467605aab275cd76000e3640fba533f77acc",
+        "round7_training.py": "3b70083f7f204073f71f3255e162d6ba935319bb75b0b81080326c87636a7426",
+        "temporal_pathway.py": "f417822e3ecbcbfc190803fc22a39d1a212e7aa3ea0c44cce4bfb4d500f26074"
+      },
+      "status": "completed",
+      "task": "lagged",
+      "task_qualification": null,
+      "terminal_checkpoint": null,
+      "validation_by_regime": null
+    },
+    {
+      "artifact_sha256": "b3f3ed0571c95ad9783ea7773ad6c7d2e1b9b165de3d8b85cc96aa12867e100b",
+      "control": "full",
+      "donor_supervision": false,
+      "file": "lagged_fp32_head.json",
+      "last_IC": -0.023851325310476974,
+      "last_recorded_update": 4096,
+      "log_sha256": "70eb96caa953500f907de9d63529a4a278f167ef3594391b75fb5fbba9111fdc",
+      "peak_IC": -0.009903149078448019,
+      "peak_update": 0,
+      "persistent_message_diagnostic": false,
+      "phase": "teacher_precision",
+      "precision": "fp32_head",
+      "recipe": {
+        "adaptive": true,
+        "eta": 0.01,
+        "learning_rate": 0.0001,
+        "minimum_improvement": 0.0001,
+        "patience": 5,
+        "rho": 0.2,
+        "schedule_epochs": 60,
+        "transferred_multiplier": 0.3
+      },
+      "rho": 0.2,
+      "seed": 11,
+      "source_hashes_lf": {
+        "characteristic_model.py": "25b83342d571fd08c4262116614ec178c453c7a01baff522cad090b42073ca1b",
+        "post_data_program.py": "7bfedeeea5214a8391bc1844eb7c375b5e8e3e73d91d3436aa68b32053e1ce15",
+        "relational_engineering.py": "d235cd899356aa45f78150f283de467605aab275cd76000e3640fba533f77acc",
+        "round7_training.py": "3b70083f7f204073f71f3255e162d6ba935319bb75b0b81080326c87636a7426",
+        "temporal_pathway.py": "f417822e3ecbcbfc190803fc22a39d1a212e7aa3ea0c44cce4bfb4d500f26074"
+      },
+      "status": "completed",
+      "task": "lagged",
+      "task_qualification": null,
+      "terminal_checkpoint": null,
+      "validation_by_regime": null
+    },
+    {
+      "artifact_sha256": "aaeea81928e93782a2c362cee0088f9734c496a518bd755a3986e43beba37258",
+      "control": "full",
+      "donor_supervision": false,
+      "file": "own_bf16.json",
+      "last_IC": 0.9951136482687348,
+      "last_recorded_update": 4096,
+      "log_sha256": "b353e5f07f030966cff01416598fc926b33ac34c9df5776bd5f87faf961827b7",
+      "peak_IC": 0.9961344592259573,
+      "peak_update": 3264,
+      "persistent_message_diagnostic": false,
+      "phase": "teacher_precision",
+      "precision": "bf16",
+      "recipe": {
+        "adaptive": true,
+        "eta": 0.01,
+        "learning_rate": 0.0001,
+        "minimum_improvement": 0.0001,
+        "patience": 5,
+        "rho": 0.2,
+        "schedule_epochs": 60,
+        "transferred_multiplier": 0.3
+      },
+      "rho": 0.2,
+      "seed": 11,
+      "source_hashes_lf": {
+        "characteristic_model.py": "25b83342d571fd08c4262116614ec178c453c7a01baff522cad090b42073ca1b",
+        "post_data_program.py": "7bfedeeea5214a8391bc1844eb7c375b5e8e3e73d91d3436aa68b32053e1ce15",
+        "relational_engineering.py": "d235cd899356aa45f78150f283de467605aab275cd76000e3640fba533f77acc",
+        "round7_training.py": "3b70083f7f204073f71f3255e162d6ba935319bb75b0b81080326c87636a7426",
+        "temporal_pathway.py": "f417822e3ecbcbfc190803fc22a39d1a212e7aa3ea0c44cce4bfb4d500f26074"
+      },
+      "status": "completed",
+      "task": "own",
+      "task_qualification": "observed recipient channels 8 at t-21 and 9 at t-41; current snapshot independent",
+      "terminal_checkpoint": null,
+      "validation_by_regime": null
+    },
+    {
+      "artifact_sha256": "a05eef3de6a35a4da16ae9dd2b7c06d458caa48a36d39d53339279955b5ce7ce",
+      "control": "full",
+      "donor_supervision": false,
+      "file": "own_fp32.json",
+      "last_IC": 0.9949318362733225,
+      "last_recorded_update": 4096,
+      "log_sha256": "0073bf8ee07806d663535facda0d9353dda14b2e5fa418c7bbe99a3153590ab9",
+      "peak_IC": 0.9960008799248146,
+      "peak_update": 1408,
+      "persistent_message_diagnostic": false,
+      "phase": "teacher_precision",
+      "precision": "fp32",
+      "recipe": {
+        "adaptive": true,
+        "eta": 0.01,
+        "learning_rate": 0.0001,
+        "minimum_improvement": 0.0001,
+        "patience": 5,
+        "rho": 0.2,
+        "schedule_epochs": 60,
+        "transferred_multiplier": 0.3
+      },
+      "rho": 0.2,
+      "seed": 11,
+      "source_hashes_lf": {
+        "characteristic_model.py": "25b83342d571fd08c4262116614ec178c453c7a01baff522cad090b42073ca1b",
+        "post_data_program.py": "7bfedeeea5214a8391bc1844eb7c375b5e8e3e73d91d3436aa68b32053e1ce15",
+        "relational_engineering.py": "d235cd899356aa45f78150f283de467605aab275cd76000e3640fba533f77acc",
+        "round7_training.py": "3b70083f7f204073f71f3255e162d6ba935319bb75b0b81080326c87636a7426",
+        "temporal_pathway.py": "f417822e3ecbcbfc190803fc22a39d1a212e7aa3ea0c44cce4bfb4d500f26074"
+      },
+      "status": "completed",
+      "task": "own",
+      "task_qualification": "observed recipient channels 8 at t-21 and 9 at t-41; current snapshot independent",
+      "terminal_checkpoint": null,
+      "validation_by_regime": null
+    },
+    {
+      "artifact_sha256": "78a52d48cf8741fbc0a35be4fcba29aa452bb1559fb0543286655d82ee77adb2",
+      "control": "full",
+      "donor_supervision": false,
+      "file": "own_fp32_head.json",
+      "last_IC": 0.9953015486472365,
+      "last_recorded_update": 4096,
+      "log_sha256": "8fc6dcf74a244b4efe176cc25ef64263b00f9d031bef9525a661158bcbc8eac1",
+      "peak_IC": 0.9961535803784569,
+      "peak_update": 3264,
+      "persistent_message_diagnostic": false,
+      "phase": "teacher_precision",
+      "precision": "fp32_head",
+      "recipe": {
+        "adaptive": true,
+        "eta": 0.01,
+        "learning_rate": 0.0001,
+        "minimum_improvement": 0.0001,
+        "patience": 5,
+        "rho": 0.2,
+        "schedule_epochs": 60,
+        "transferred_multiplier": 0.3
+      },
+      "rho": 0.2,
+      "seed": 11,
+      "source_hashes_lf": {
+        "characteristic_model.py": "25b83342d571fd08c4262116614ec178c453c7a01baff522cad090b42073ca1b",
+        "post_data_program.py": "7bfedeeea5214a8391bc1844eb7c375b5e8e3e73d91d3436aa68b32053e1ce15",
+        "relational_engineering.py": "d235cd899356aa45f78150f283de467605aab275cd76000e3640fba533f77acc",
+        "round7_training.py": "3b70083f7f204073f71f3255e162d6ba935319bb75b0b81080326c87636a7426",
+        "temporal_pathway.py": "f417822e3ecbcbfc190803fc22a39d1a212e7aa3ea0c44cce4bfb4d500f26074"
+      },
+      "status": "completed",
+      "task": "own",
+      "task_qualification": "observed recipient channels 8 at t-21 and 9 at t-41; current snapshot independent",
+      "terminal_checkpoint": null,
+      "validation_by_regime": null
+    },
+    {
+      "artifact_sha256": "0cef56020bfa32059b24e1febce367e0f155aa1ee1d63053cf138925f06b3741",
+      "control": "full",
+      "donor_supervision": false,
+      "file": "asam20_full_0.0003.json",
+      "last_IC": 0.0014666795870506488,
+      "last_recorded_update": 4096,
+      "log_sha256": "94d4e8cfa0aa2f2bc9b6dfd695ea84f55ef981b3072f332ea58303e1ac3d0a50",
+      "peak_IC": 0.01258800154019482,
+      "peak_update": 1536,
+      "persistent_message_diagnostic": false,
+      "phase": "teacher_routing",
+      "precision": "bf16",
+      "recipe": {
+        "adaptive": true,
+        "eta": 0.01,
+        "learning_rate": 0.0003,
+        "minimum_improvement": 0.0001,
+        "patience": 5,
+        "rho": 0.2,
+        "schedule_epochs": 60,
+        "transferred_multiplier": 0.3
+      },
+      "rho": 0.2,
+      "seed": 11,
+      "source_hashes_lf": {
+        "characteristic_model.py": "25b83342d571fd08c4262116614ec178c453c7a01baff522cad090b42073ca1b",
+        "post_data_program.py": "7bfedeeea5214a8391bc1844eb7c375b5e8e3e73d91d3436aa68b32053e1ce15",
+        "relational_engineering.py": "979a2b73b00523ccad69316882132ad46c6bb962190666bee4b6ac8a5c9332f1",
+        "round7_training.py": "3b70083f7f204073f71f3255e162d6ba935319bb75b0b81080326c87636a7426",
+        "temporal_pathway.py": "f417822e3ecbcbfc190803fc22a39d1a212e7aa3ea0c44cce4bfb4d500f26074"
+      },
+      "status": "completed",
+      "task": "lagged",
+      "task_qualification": null,
+      "terminal_checkpoint": null,
+      "validation_by_regime": null
+    },
+    {
+      "artifact_sha256": "cc7cfe55e76bcae835d0c9d086a5b262bfbb66cc8aadcdc01a89dce1e209c174",
+      "control": "no_current_core",
+      "donor_supervision": false,
+      "file": "asam20_no_current_core_0.0001.json",
+      "last_IC": -0.007695438176428462,
+      "last_recorded_update": 4096,
+      "log_sha256": "d3da0fd6d0e636eea0ba9d76065da2d6ee59992452109a8fc377ad7b6cabc257",
+      "peak_IC": 0.010557068415545115,
+      "peak_update": 64,
+      "persistent_message_diagnostic": false,
+      "phase": "teacher_routing",
+      "precision": "bf16",
+      "recipe": {
+        "adaptive": true,
+        "eta": 0.01,
+        "learning_rate": 0.0001,
+        "minimum_improvement": 0.0001,
+        "patience": 5,
+        "rho": 0.2,
+        "schedule_epochs": 60,
+        "transferred_multiplier": 0.3
+      },
+      "rho": 0.2,
+      "seed": 11,
+      "source_hashes_lf": {
+        "characteristic_model.py": "25b83342d571fd08c4262116614ec178c453c7a01baff522cad090b42073ca1b",
+        "post_data_program.py": "7bfedeeea5214a8391bc1844eb7c375b5e8e3e73d91d3436aa68b32053e1ce15",
+        "relational_engineering.py": "979a2b73b00523ccad69316882132ad46c6bb962190666bee4b6ac8a5c9332f1",
+        "round7_training.py": "3b70083f7f204073f71f3255e162d6ba935319bb75b0b81080326c87636a7426",
+        "temporal_pathway.py": "f417822e3ecbcbfc190803fc22a39d1a212e7aa3ea0c44cce4bfb4d500f26074"
+      },
+      "status": "completed",
+      "task": "lagged",
+      "task_qualification": null,
+      "terminal_checkpoint": null,
+      "validation_by_regime": null
+    },
+    {
+      "artifact_sha256": "af72f1af4930d30f46e9877c775faee2f70f5250fbc571695fe7047e1195610c",
+      "control": "full",
+      "donor_supervision": false,
+      "file": "sam05_full_0.0001.json",
+      "last_IC": -0.005004825452675804,
+      "last_recorded_update": 4096,
+      "log_sha256": "d19f7b1b0d9b456c4ed13188431ed21d9f8a5365c7f19339c220184903d423a2",
+      "peak_IC": -0.004244681190144673,
+      "peak_update": 3200,
+      "persistent_message_diagnostic": false,
+      "phase": "teacher_routing",
+      "precision": "bf16",
+      "recipe": {
+        "adaptive": false,
+        "eta": 0.01,
+        "learning_rate": 0.0001,
+        "minimum_improvement": 0.0001,
+        "patience": 5,
+        "rho": 0.05,
+        "schedule_epochs": 60,
+        "transferred_multiplier": 0.3
+      },
+      "rho": 0.05,
+      "seed": 11,
+      "source_hashes_lf": {
+        "characteristic_model.py": "25b83342d571fd08c4262116614ec178c453c7a01baff522cad090b42073ca1b",
+        "post_data_program.py": "7bfedeeea5214a8391bc1844eb7c375b5e8e3e73d91d3436aa68b32053e1ce15",
+        "relational_engineering.py": "979a2b73b00523ccad69316882132ad46c6bb962190666bee4b6ac8a5c9332f1",
+        "round7_training.py": "3b70083f7f204073f71f3255e162d6ba935319bb75b0b81080326c87636a7426",
+        "temporal_pathway.py": "f417822e3ecbcbfc190803fc22a39d1a212e7aa3ea0c44cce4bfb4d500f26074"
+      },
+      "status": "completed",
+      "task": "lagged",
+      "task_qualification": null,
+      "terminal_checkpoint": null,
+      "validation_by_regime": null
+    },
+    {
+      "artifact_sha256": "60bb539c094dade079ac4b23af750eaabeb7f878fed74b9a460aa1ea11b6b758",
+      "control": "adamw",
+      "donor_supervision": false,
+      "file": "sam125_adamw_0.0001.json",
+      "last_IC": 0.006306076349758739,
+      "last_recorded_update": 4096,
+      "log_sha256": "4ab205bce152dfec33b1b192c1b6299f2b5d298fe3dfc2d0b978b8ee7db0820c",
+      "peak_IC": 0.06434554518416488,
+      "peak_update": 1472,
+      "persistent_message_diagnostic": false,
+      "phase": "teacher_routing",
+      "precision": "bf16",
+      "recipe": {
+        "adaptive": false,
+        "eta": 0.01,
+        "learning_rate": 0.0001,
+        "minimum_improvement": 0.0001,
+        "patience": 5,
+        "rho": 0.125,
+        "schedule_epochs": 60,
+        "transferred_multiplier": 0.3
+      },
+      "rho": null,
+      "seed": 11,
+      "source_hashes_lf": {
+        "characteristic_model.py": "25b83342d571fd08c4262116614ec178c453c7a01baff522cad090b42073ca1b",
+        "post_data_program.py": "7bfedeeea5214a8391bc1844eb7c375b5e8e3e73d91d3436aa68b32053e1ce15",
+        "relational_engineering.py": "979a2b73b00523ccad69316882132ad46c6bb962190666bee4b6ac8a5c9332f1",
+        "round7_training.py": "3b70083f7f204073f71f3255e162d6ba935319bb75b0b81080326c87636a7426",
+        "temporal_pathway.py": "f417822e3ecbcbfc190803fc22a39d1a212e7aa3ea0c44cce4bfb4d500f26074"
+      },
+      "status": "completed",
+      "task": "lagged",
+      "task_qualification": null,
+      "terminal_checkpoint": null,
+      "validation_by_regime": null
     },
     {
       "artifact_sha256": "c0f4aa5d890714177dabfc9ea3eb1baddf1a6072a8627c1f1fd09a9fd4f57681",
       "control": "full",
+      "donor_supervision": false,
       "file": "context_11.json",
       "last_IC": -0.008590673820381027,
       "last_recorded_update": 512,
@@ -846,6 +1857,7 @@
       "peak_update": 128,
       "persistent_message_diagnostic": false,
       "phase": "teachers_sam125",
+      "precision": "bf16",
       "recipe": {
         "adaptive": false,
         "eta": 0.01,
@@ -867,11 +1879,14 @@
       },
       "status": "completed",
       "task": "context",
-      "task_qualification": null
+      "task_qualification": null,
+      "terminal_checkpoint": null,
+      "validation_by_regime": null
     },
     {
       "artifact_sha256": "aee06a8e20ea7ad2499059c23853acf0e9712ce0c383f8a569c52971b8161c90",
       "control": "full",
+      "donor_supervision": false,
       "file": "context_29.json",
       "last_IC": 0.0025076231779221463,
       "last_recorded_update": 512,
@@ -880,6 +1895,7 @@
       "peak_update": 0,
       "persistent_message_diagnostic": false,
       "phase": "teachers_sam125",
+      "precision": "bf16",
       "recipe": {
         "adaptive": false,
         "eta": 0.01,
@@ -901,11 +1917,14 @@
       },
       "status": "completed",
       "task": "context",
-      "task_qualification": null
+      "task_qualification": null,
+      "terminal_checkpoint": null,
+      "validation_by_regime": null
     },
     {
       "artifact_sha256": "8223b007be411b4c934a21541d41822b6cc9bf595b0649f6d8a255886ac7415c",
       "control": "full",
+      "donor_supervision": false,
       "file": "lagged_11.json",
       "last_IC": -0.022490562148182524,
       "last_recorded_update": 512,
@@ -914,6 +1933,7 @@
       "peak_update": 0,
       "persistent_message_diagnostic": false,
       "phase": "teachers_sam125",
+      "precision": "bf16",
       "recipe": {
         "adaptive": false,
         "eta": 0.01,
@@ -935,11 +1955,14 @@
       },
       "status": "completed",
       "task": "lagged",
-      "task_qualification": null
+      "task_qualification": null,
+      "terminal_checkpoint": null,
+      "validation_by_regime": null
     },
     {
       "artifact_sha256": "d97a7e1cef3df0c7459a3b86b164f5bcf672c8838fe8402303694937aac3c239",
       "control": "full",
+      "donor_supervision": false,
       "file": "lagged_29.json",
       "last_IC": -0.002847378082378402,
       "last_recorded_update": 512,
@@ -948,6 +1971,7 @@
       "peak_update": 192,
       "persistent_message_diagnostic": false,
       "phase": "teachers_sam125",
+      "precision": "bf16",
       "recipe": {
         "adaptive": false,
         "eta": 0.01,
@@ -969,11 +1993,14 @@
       },
       "status": "completed",
       "task": "lagged",
-      "task_qualification": null
+      "task_qualification": null,
+      "terminal_checkpoint": null,
+      "validation_by_regime": null
     },
     {
       "artifact_sha256": "4d111ec93fdb47f595b565745ecfefc265c2868f151e586b58a8e200a26f0e60",
       "control": "full",
+      "donor_supervision": false,
       "file": "own_11.json",
       "last_IC": 0.9994477267955298,
       "last_recorded_update": 512,
@@ -982,6 +2009,7 @@
       "peak_update": 512,
       "persistent_message_diagnostic": false,
       "phase": "teachers_sam125",
+      "precision": "bf16",
       "recipe": {
         "adaptive": false,
         "eta": 0.01,
@@ -1003,11 +2031,14 @@
       },
       "status": "completed",
       "task": "own",
-      "task_qualification": "old own fixture is current-state-only, not historical retrieval"
+      "task_qualification": "old own fixture is current-state-only, not historical retrieval",
+      "terminal_checkpoint": null,
+      "validation_by_regime": null
     },
     {
       "artifact_sha256": "8e3862da6861022f1882475e1c4b81598769897f523564e24cc6819a3ec57055",
       "control": "full",
+      "donor_supervision": false,
       "file": "own_29.json",
       "last_IC": 0.9992502301111903,
       "last_recorded_update": 512,
@@ -1016,6 +2047,7 @@
       "peak_update": 512,
       "persistent_message_diagnostic": false,
       "phase": "teachers_sam125",
+      "precision": "bf16",
       "recipe": {
         "adaptive": false,
         "eta": 0.01,
@@ -1037,11 +2069,14 @@
       },
       "status": "completed",
       "task": "own",
-      "task_qualification": "old own fixture is current-state-only, not historical retrieval"
+      "task_qualification": "old own fixture is current-state-only, not historical retrieval",
+      "terminal_checkpoint": null,
+      "validation_by_regime": null
     },
     {
       "artifact_sha256": "2da6e86613e886e74c9dc9cb057986a9fb3352c7ca201c714ac35a90a8fe1d8b",
       "control": "full",
+      "donor_supervision": false,
       "file": "peer_11.json",
       "last_IC": -0.024641964410744198,
       "last_recorded_update": 512,
@@ -1050,6 +2085,7 @@
       "peak_update": 0,
       "persistent_message_diagnostic": false,
       "phase": "teachers_sam125",
+      "precision": "bf16",
       "recipe": {
         "adaptive": false,
         "eta": 0.01,
@@ -1071,11 +2107,14 @@
       },
       "status": "completed",
       "task": "peer",
-      "task_qualification": null
+      "task_qualification": null,
+      "terminal_checkpoint": null,
+      "validation_by_regime": null
     },
     {
       "artifact_sha256": "f133e5a286591d964b2152271b86699147e9c48ae3f2f8e1d2ccf0778f5493da",
       "control": "full",
+      "donor_supervision": false,
       "file": "peer_29.json",
       "last_IC": 0.00517977632417204,
       "last_recorded_update": 512,
@@ -1084,6 +2123,7 @@
       "peak_update": 0,
       "persistent_message_diagnostic": false,
       "phase": "teachers_sam125",
+      "precision": "bf16",
       "recipe": {
         "adaptive": false,
         "eta": 0.01,
@@ -1105,19 +2145,396 @@
       },
       "status": "completed",
       "task": "peer",
-      "task_qualification": null
+      "task_qualification": null,
+      "terminal_checkpoint": null,
+      "validation_by_regime": null
     }
   ],
-  "conclusion": "ASAM .2 learns same-time peer information, but uniform control also performs well; lagged/context fail. New true-own-history and precision checks remain separate unfinished runs. No attention gate or alpha acceptance.",
+  "conclusion": "Full ASAM .2 model learns true own-history (.9951/.9968) and dynamic same-time peer (.7783/.7827). Pure unlabelled donor lagged/context fail: precision and current-core bypass do not resolve this. With identical inputs/recipient targets and added donor own-signal supervision, lagged learns (.9475/.9557 versus uniform -.0110/.3438 and own-only -.0278 on seed11). Joint context learns both regimes on both seeds (.8601/.8573 overall; current .7587/.7541, historical .9616/.9513; uniform .0131/.0135 overall; own-only -.0002 at4096 seed11). Accept this conditional full-model learning capability as sufficient to proceed to registered financial calibration. Do not call the pure unlabelled task passed, universal attention success, or financial alpha. SAM controls did not achieve the ASAM toy results. Budgets and supervision changes are post-hoc diagnoses disclosed in the registration; all54 attempts retained.",
   "evaluation_scores_read": false,
   "financial_fits_started": false,
   "forward_capture": false,
   "heldout_access": false,
   "recovery": {
-    "bytes": 677620,
-    "inventory_sha256": "b0e80132a928e10f2c1ce1d6cc1ed5fd2df4dd30c80997541554624a4f3078d4",
+    "bytes": 44516079,
+    "inventory_sha256": "b10c3b672761cb59588985e28a1f5d4f28fb1b8c6d5c6132e2f34ef2d635b96e",
     "local_root": "C:\\quant-data\\b3\\interim\\post_data_20260913\\engineering_recovered",
-    "verified_files": 103
+    "verified_files": 178
   },
-  "status": "stage_B_engineering_in_progress_not_accepted"
+  "rosters": {
+    "teacher_budget_diagnosis": {
+      "payload": {
+        "commit": "636d294",
+        "runs": [
+          [
+            "sam125",
+            "full",
+            512,
+            true
+          ],
+          [
+            "sam125",
+            "adamw",
+            512,
+            true
+          ],
+          [
+            "sam125_lr3",
+            "full",
+            4096,
+            false
+          ],
+          [
+            "sam125_lr3",
+            "adamw",
+            4096,
+            false
+          ],
+          [
+            "asam20",
+            "full",
+            4096,
+            false
+          ]
+        ],
+        "seed": 11,
+        "task": "peer"
+      },
+      "sha256": "9ae94fc655a6e4aeb2ebbedb0bae67ff84ff28faabc271ca0d38fa33ae55a392"
+    },
+    "teacher_confirmation": {
+      "payload": {
+        "commit": "9bd4b83b8ee8c630ca0c6a51f632aee37acc9b89",
+        "max_parallel": 4,
+        "recipe": "asam20",
+        "runs": [
+          [
+            "context",
+            "full",
+            11,
+            8192,
+            true
+          ],
+          [
+            "context",
+            "full",
+            29,
+            8192,
+            true
+          ],
+          [
+            "context",
+            "uniform",
+            11,
+            8192,
+            true
+          ],
+          [
+            "context",
+            "uniform",
+            29,
+            8192,
+            true
+          ],
+          [
+            "lagged",
+            "full",
+            29,
+            4096,
+            true
+          ],
+          [
+            "lagged",
+            "uniform",
+            11,
+            4096,
+            true
+          ],
+          [
+            "lagged",
+            "uniform",
+            29,
+            4096,
+            true
+          ],
+          [
+            "own",
+            "full",
+            29,
+            4096,
+            false
+          ]
+        ]
+      },
+      "sha256": "cf11e699b8885e8921e46f31471adb463ffc3af2a458e9437f822985e13b7950"
+    },
+    "teacher_gate": {
+      "payload": {
+        "commit": "f939f19",
+        "max_parallel": 4,
+        "runs": [
+          [
+            "own",
+            "asam20",
+            "full",
+            11
+          ],
+          [
+            "own",
+            "asam20",
+            "full",
+            29
+          ],
+          [
+            "peer",
+            "asam20",
+            "full",
+            11
+          ],
+          [
+            "peer",
+            "asam20",
+            "full",
+            29
+          ],
+          [
+            "lagged",
+            "asam20",
+            "full",
+            11
+          ],
+          [
+            "lagged",
+            "asam20",
+            "full",
+            29
+          ],
+          [
+            "context",
+            "asam20",
+            "full",
+            11
+          ],
+          [
+            "context",
+            "asam20",
+            "full",
+            29
+          ],
+          [
+            "peer",
+            "asam20",
+            "own",
+            11
+          ],
+          [
+            "peer",
+            "asam20",
+            "own",
+            29
+          ],
+          [
+            "peer",
+            "asam20",
+            "uniform",
+            11
+          ],
+          [
+            "peer",
+            "asam20",
+            "uniform",
+            29
+          ],
+          [
+            "peer",
+            "sam125",
+            "full",
+            11
+          ],
+          [
+            "peer",
+            "sam125",
+            "full",
+            29
+          ],
+          [
+            "peer",
+            "asam50",
+            "full",
+            11
+          ]
+        ],
+        "updates": 4096
+      },
+      "sha256": "a7d5638f8916872ca60546f53ffcfac0e679e730098813a3b308063fd661e763"
+    },
+    "teacher_joint": {
+      "payload": {
+        "commit": "be28259",
+        "donor_supervision": true,
+        "max_parallel": 4,
+        "recipe": "asam20",
+        "runs": [
+          [
+            "lagged",
+            "full"
+          ],
+          [
+            "lagged",
+            "own"
+          ],
+          [
+            "context",
+            "full"
+          ],
+          [
+            "context",
+            "own"
+          ]
+        ],
+        "seed": 11,
+        "updates": 4096
+      },
+      "sha256": "d926ec914af0f2da27cc89d5ab92c16e2256032fe3883028e5c53cdb4e2772e7"
+    },
+    "teacher_optimizer_diagnosis": {
+      "payload": {
+        "commit": "16bdcf3",
+        "runs": [
+          [
+            "asam20",
+            "full"
+          ],
+          [
+            "asam50",
+            "full"
+          ],
+          [
+            "sam125_lr3",
+            "full"
+          ],
+          [
+            "sam05",
+            "full"
+          ],
+          [
+            "sam125",
+            "adamw"
+          ]
+        ],
+        "seed": 11,
+        "task": "peer",
+        "updates": 512
+      },
+      "sha256": "ab52bb3b55b41676b7a5c7ba286fec9d698756f005fcad8205bbbb822f487f5d"
+    },
+    "teacher_precision": {
+      "payload": {
+        "commit": "ba45f25",
+        "max_parallel": 3,
+        "recipe": "asam20",
+        "runs": [
+          [
+            "own",
+            "bf16"
+          ],
+          [
+            "own",
+            "fp32_head"
+          ],
+          [
+            "own",
+            "fp32"
+          ],
+          [
+            "lagged",
+            "fp32_head"
+          ],
+          [
+            "lagged",
+            "fp32"
+          ]
+        ],
+        "seed": 11,
+        "updates": 4096
+      },
+      "sha256": "c385443331e50d415037aceed8971b8a2fd4548aad873968662a889958d8aa4c"
+    },
+    "teacher_routing": {
+      "payload": {
+        "commit": "e19c1d1",
+        "max_parallel": 4,
+        "runs": [
+          [
+            "asam20",
+            "no_current_core",
+            0.0001
+          ],
+          [
+            "asam20",
+            "full",
+            0.0003
+          ],
+          [
+            "sam05",
+            "full",
+            0.0001
+          ],
+          [
+            "sam125",
+            "adamw",
+            0.0001
+          ]
+        ],
+        "seed": 11,
+        "task": "lagged",
+        "updates": 4096
+      },
+      "sha256": "f38bca7684bc4c41782f7cf3c87bca1130c7e31c9eadd62263002549cce60da1"
+    },
+    "teachers_sam125": {
+      "payload": {
+        "commit": "16bdcf3",
+        "control": "full",
+        "recipe": "sam125",
+        "runs": [
+          [
+            "own",
+            11
+          ],
+          [
+            "own",
+            29
+          ],
+          [
+            "peer",
+            11
+          ],
+          [
+            "peer",
+            29
+          ],
+          [
+            "lagged",
+            11
+          ],
+          [
+            "lagged",
+            29
+          ],
+          [
+            "context",
+            11
+          ],
+          [
+            "context",
+            29
+          ]
+        ],
+        "updates": 512
+      },
+      "sha256": "ce544d45c5a1cd27df7fbeb911f8fc8e0e8ea273194027e25329a09a5f071007"
+    }
+  },
+  "status": "engineering_gate_accepted_with_explicit_joint_supervision_qualification"
 }
