@@ -212,3 +212,46 @@ Archives solver_resume_source_cd3916a and solver_resume_source_693f549 retain
 migration scripts;693f549 produced no financial replay. Current receipt binds
 693f549→cf84b62. Do not repeat any migration. Current chain reuses all126 models
 for matched fold, continuous and sensitivity readouts, then summarizes.
+
+## Main program complete; conditional timing screen launched
+
+All42 fold comparisons and3 continuous comparisons completed without failure.
+Main summary ROOT/portfolio_comparison.json completed2026-09-14T18:42:04Z.
+Local copies of this and postrun_audit.json are in the Lambda runtime directory.
+Across14folds net CDI-excess bps/day (legacy / optimizer / learned seed mean):
+C6 5.7564 /4.6122 /3.2468; S0 3.5195 /-.7926 /-1.8835;
+TE_all3.9040 /2.6104 /2.1624. No new policy meets own-legacy advancement.
+Preserve all results, including negative ones.753 actual account files have
+maximum terminal marked stock fraction1.965e-9NAV, no terminal hedge/claims or
+unpriced holdings; these tiny residues explain some raw unresolved flags, but
+historical settlements/action uncertainty STILL REQUIRE REVIEW.48/126 policy
+fits select epoch0. Do not erase raw economics_unresolved flags.
+
+Conditional timing trigger accepted and preregistered BEFORE new fits in
+research/preregistrations/v2_portfolio_attention_followup.md, commit62b7e2b.
+TL_all differs from TE_all only by late peer timing, originalsam125 compatible
+parents (3), matchedASAM.2 screen F fits (12), seeds11/29/47, fullhistory/input/
+capacity and existing60epochtraining. Remaining-fold continuation only on
+registered positive paired screen gate. No joint training trigger; raw-target
+auxiliary deferred because current evidence doesn't isolate that bottleneck.
+
+New independent checkout /home/ubuntu/attention-workspace/quant/b3-quant at
+62b7e2b; prior policy checkout cf84b62 and forecast checkout49d3c9a stay unchanged.
+ROOT_ATT=/lambda/nfs/brazil-rv-east3/quant-data/b3/processed/model_runs/
+v2_portfolio_attention_62b7e2b_20260914T191200Z (join these two lines).
+Shell81353 /home/ubuntu/run_attention_followup.sh; log inmodel_runs/_ops/
+portfolio_attention_62b7e2b.log. Uses original research Python, explicit
+BRAZIL_RV_ROOT=/home/ubuntu/attention-workspace and checkout data roots/PYTHONPATH.
+ops/run_portfolio_attention_followup.py chains3P(max6)then12F(max6), scores exported.
+Do not launch another instance. Finish comparisons/recovery/report while these
+fits run. User informed earlier1–2hwrap-up excludes this triggered extra training.
+Need verify initial fits healthy and estimate from measured throughput.
+
+Audit script /home/ubuntu/audit_portfolio_outputs.py (copy also runtime local)
+reads existing book accounts/policy manifests only; ROOT/postrun_audit.json
+contains753summaries+terminalpositions and126policyhistories/calibrations.
+Still needed: historical unresolved/settlement audit; comprehensive LLM report;
+TL screen scorer/economic pairing and conditional decision; recovery/hash local
+andpersistent; commit/push; terminate exactee625bd03bdc41fd9ba676de6e171511 and
+verifyabsence twice; pauseheartbeat. Cfree6.54GB,Dfree1.23GB, avoidlargeuncompressed
+localrecovery. Allmainfits/neededfinalartifacts must be recovered, notjustsummary.
