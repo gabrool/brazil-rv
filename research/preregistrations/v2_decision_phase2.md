@@ -149,6 +149,19 @@ least three quarters of folds, in addition to the benchmark gates.
 
 ## Financial roster and decisions
 
+Engineering admission amendment before financial dispatch: the conditional model
+passes all registered behavior checks. The standalone MLP fails the inactivity
+criterion, and the staged residual remains seed-dependent: seed 11 retains the
+accepted conditional model at epoch zero; seed 29 selects epoch 10 but reduces
+zero-state gross by only 16.8%, below the registered 25% requirement. This is
+partial exposure reduction, not evidence that it cannot trade profitably.
+The MLP does not pass admission across the three fixed seeds. Preserve all seed
+results and close that branch at the learning gate rather than tuning further.
+Run the eight unique conditional financial fits only. The 24 planned MLP fits
+are explicitly not dispatched because their engineering prerequisite failed.
+This does not block Phase 3. The roster below records the originally intended
+comparison and remains the conditional continuation contract if applicable.
+
 Fit TE_all .2 and C6 on F2/F6/F10/F14. S0 remains a deterministic reference from
 Phase 1; this is not a third large controller campaign. Keep seeds 11/29/47 for
 the stateful model and the same three-seed frozen forecast input for every cell.

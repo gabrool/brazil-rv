@@ -121,6 +121,23 @@ def adapt_c6_parent(source, destination, digest, seed, store_manifest, store_sha
             "prediction_max_abs_error": 0.0,
         },
     }
+    if destination.exists():
+        saved = torch.load(destination, map_location="cpu", weights_only=True)
+        if (
+            saved["contract"]["parent_adaptation"] != contract["parent_adaptation"]
+            or saved["contract"]["config"] != contract["config"]
+        ):
+            raise ValueError("existing adapted parent has a different contract")
+        if any(
+            not torch.equal(value, saved["model_state_dict"][key])
+            for key, value in model.state_dict().items()
+        ):
+            raise ValueError("existing adapted parent tensors differ")
+        return {
+            "path": str(destination),
+            "sha256": sha256_file(destination),
+            "adaptation": contract["parent_adaptation"],
+        }
     destination.parent.mkdir(parents=True, exist_ok=True)
     save_checkpoint(
         destination,
