@@ -117,6 +117,15 @@ def alignment(inputs):
     common = outcome & scored
     composite, composite_valid = _economics_signal(inputs)
     series = {"primary_neutral_target_ic": primary}
+    for lag in (1, 5):
+        persistence = np.full(len(inputs.dates), np.nan)
+        for day in range(lag, len(inputs.dates)):
+            persistence[day] = _spearman(
+                composite[day],
+                composite[day - lag],
+                composite_valid[day] & composite_valid[day - lag],
+            )
+        series[f"composite_persistence_{lag}"] = persistence
     for j, horizon in enumerate(horizons):
         series[f"D{horizon}_neutral_ic_common"] = heads[:, j]
         series[f"D{horizon}_composite_neutral_ic_common"] = np.asarray(
@@ -182,6 +191,14 @@ def intervals(values):
     }
 
 
+def require_full_primary_scores(mask, active):
+    indexes = [HORIZONS.index(h) for h in TRADED_PRIMARY_HORIZONS]
+    if not np.array_equal(
+        mask[..., indexes], np.broadcast_to(active[..., None], (*active.shape, 3))
+    ):
+        raise ValueError("screen score mask drops a primary-head PIT-active name")
+
+
 def evaluate(root):
     design, choices = (
         read(root / "frozen_design.json"),
@@ -203,6 +220,7 @@ def evaluate(root):
     try:
         for fold in folds:
             ix = context.evaluation[fold]
+            active = context.store.read("active", ix)
             for cell in CELLS:
                 output = root / "aggregates" / cell / fold
                 paths[cell][fold] = output
@@ -214,6 +232,9 @@ def evaluate(root):
                         != hashes
                     ):
                         raise ValueError("aggregate differs from the frozen comparison")
+                    require_full_primary_scores(
+                        np.load(output / "score_mask.npy", allow_pickle=False), active
+                    )
                     continue
                 if output.exists():
                     raise RuntimeError(
@@ -229,6 +250,7 @@ def evaluate(root):
                     context.store.dates[ix],
                     context.store.isins,
                 )
+                require_full_primary_scores(mask, active)
                 rr._persist_scores(
                     output,
                     {"scores": scores, "score_mask": mask},
@@ -292,7 +314,11 @@ def evaluate(root):
             ("TE_family", "TE_slow"),
             ("TE_all", "TE_family"),
         }
-        pairs = {}
+        pairs, paired_alignment = {}, {}
+        alignments = {
+            c: {f: read(p / "alignment.json") for f, p in locations.items()}
+            for c, locations in paths.items()
+        }
         for left, right in sorted(requested):
             key = f"{left}_minus_{right}"
             paired_readouts(
@@ -308,6 +334,18 @@ def evaluate(root):
                 )
                 for metric in audits[folds[0]]
             }
+            # Every arm emits all active primary-head scores (checked above).
+            # These stored alignments therefore share exact outcome populations.
+            paired_alignment[key] = {
+                metric: intervals(
+                    [
+                        np.asarray(alignments[left][f]["series"][metric], float)
+                        - np.asarray(alignments[right][f]["series"][metric], float)
+                        for f in folds
+                    ]
+                )
+                for metric in alignments[left][folds[0]]["series"]
+            }
         result = {
             "status": "completed",
             "source_hashes": hashes,
@@ -315,11 +353,9 @@ def evaluate(root):
             "seeds": seeds,
             "readouts": {c: candidate_readout(p) for c, p in paths.items()},
             "paired_registered_intervals": pairs,
+            "paired_traded_head_alignment": paired_alignment,
             "auxiliary_readout_intervals": "historical helpers use 20 sessions, 10000 draws, seed20260815; registered paired intervals above use seed20260913 and 20/60 blocks",
-            "alignment": {
-                c: {f: read(p / "alignment.json") for f, p in locations.items()}
-                for c, locations in paths.items()
-            },
+            "alignment": alignments,
             "seed_dispersion": {
                 c: {f: read(p / "seed_ic.json") for f, p in locations.items()}
                 for c, locations in paths.items()

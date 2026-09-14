@@ -114,6 +114,13 @@ engineering controls; no architecture or financial recipe is changed on an
 unverified hypothesis. The first 33 completed/failed attempts and all 103 files
 are [recorded and hash-verified locally](v2_post_data_engineering_attempts.json).
 
+ASAM .2/LR3e-4, SAM .05, ordinary AdamW and a no-current-core control also
+fail the original lagged task (IC −.008 to .006). Next is the explicitly
+registered donor-supervision comparison: exactly unchanged features and
+recipient targets, added own-signal labels only for donor stocks, and
+recipient-only unseen-date evaluation with a control bypassing both stock
+mixers. This is a teacher-design diagnosis, not a financial model amendment.
+
 The current-store evaluation adapter is implemented while engineering runs:
 unchanged economic-beta array proof, exact score provenance, common-population
 head/composite/target-view diagnostics, seed omission IC and paired 20/60-session

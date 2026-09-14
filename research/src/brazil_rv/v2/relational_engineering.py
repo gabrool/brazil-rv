@@ -27,7 +27,16 @@ from .post_data_program import RECIPES
 from .train import compile_forward, set_deterministic_seed
 
 
-def teacher_batch(seed, task, *, count=16, recipients=32, donors=16, persistent=False):
+def teacher_batch(
+    seed,
+    task,
+    *,
+    count=16,
+    recipients=32,
+    donors=16,
+    persistent=False,
+    donor_supervision=False,
+):
     """Fresh dates: recipients' observable queries address independent donors.
 
     Channels 0:2 carry recipient queries; 2:4 donor keys; 4:6 messages;
@@ -90,11 +99,27 @@ def teacher_batch(seed, task, *, count=16, recipients=32, donors=16, persistent=
         raise ValueError("unknown relational teacher")
     targets = torch.zeros(count, names, 5)
     target_mask = torch.zeros_like(targets, dtype=torch.bool)
-    for day in range(count):
-        included = torch.nonzero(active[day, :recipients]).flatten()
-        ranks = signal[day, included].argsort().argsort().float()
-        targets[day, included] = (ranks / (len(included) - 1))[:, None]
-        target_mask[day, included] = True
+    signals = [(0, signal)]
+    if donor_supervision:
+        # Same inputs and recipient targets. Only add donors' own-observed
+        # signal labels, as a controlled test of temporal credit assignment.
+        if task == "own":
+            own_signal = x[:, recipients:, -21, 8] + 0.5 * x[:, recipients:, -41, 9]
+        elif task == "peer":
+            own_signal = messages[..., -1, 0]
+        elif task == "lagged":
+            own_signal = messages[..., -21, 0] + 0.5 * messages[..., -41, 1]
+        else:
+            own_signal = message
+        signals.append((recipients, own_signal))
+    for offset, values in signals:
+        for day in range(count):
+            included = torch.nonzero(
+                active[day, offset : offset + values.shape[1]]
+            ).flatten()
+            ranks = values[day, included].argsort().argsort().float()
+            targets[day, included + offset] = (ranks / (len(included) - 1))[:, None]
+            target_mask[day, included + offset] = True
     return {
         "slow_features": torch.where(valid, x, 0.0),
         "slow_feature_mask": valid,
@@ -128,6 +153,17 @@ def no_current_core(self, values):
     return values.new_zeros((*values.shape[:-1], self[-1].normalized_shape[0]))
 
 
+def own_peer(self, values, valid):
+    return torch.where(valid[..., None], self.output_norm(values), 0.0)
+
+
+def own_context(self, values, active):
+    zeros = torch.zeros_like(values)
+    return torch.where(
+        active[..., None], self.output(torch.cat((values, zeros, zeros), -1)), 0.0
+    )
+
+
 def run(
     output,
     *,
@@ -141,6 +177,7 @@ def run(
     persistent=False,
     precision="bf16",
     learning_rate=None,
+    donor_supervision=False,
 ):
     """Every update sees new dates; validation seeds never occur in training."""
     torch.set_num_threads(6)
@@ -156,6 +193,11 @@ def run(
         model.temporal_peer.peer.forward = MethodType(
             uniform_peer, model.temporal_peer.peer
         )
+    if control == "own" and donor_supervision:
+        model.temporal_peer.peer.forward = MethodType(
+            own_peer, model.temporal_peer.peer
+        )
+        model.context.forward = MethodType(own_context, model.context)
     recipe = RECIPES[recipe_name]
     if learning_rate is not None:
         recipe = replace(recipe, learning_rate=learning_rate)
@@ -172,8 +214,14 @@ def run(
     prediction_model = compile_forward(model) if compiled else model
 
     def batch(batch_seed, size=16):
-        value = teacher_batch(batch_seed, task, count=size, persistent=persistent)
-        if control == "own":
+        value = teacher_batch(
+            batch_seed,
+            task,
+            count=size,
+            persistent=persistent,
+            donor_supervision=donor_supervision,
+        )
+        if control == "own" and not donor_supervision:
             # Remove donor observations from this control only. The labels still
             # use independently generated donors; there is no own-stock shortcut.
             value["slow_features"][:, 32:] = 0
@@ -200,11 +248,13 @@ def run(
                         .float()
                         .mean(2)
                     )
+                recipient_mask = sample["target_mask"][..., 2:].clone()
+                recipient_mask[:, 32:] = False
                 values.extend(
                     daily_primary_ic(
                         scores.cpu().numpy(),
                         sample["targets"][..., 2:].cpu().numpy(),
-                        sample["target_mask"][..., 2:].cpu().numpy(),
+                        recipient_mask.cpu().numpy(),
                         sample["active_mask"].cpu().numpy(),
                     )
                 )
@@ -281,6 +331,10 @@ def run(
         "seconds": time.perf_counter() - start,
         "compiled": compiled,
         "validation_recipients_only": True,
+        "donor_supervision": donor_supervision,
+        "own_control": "bypass both stock mixers, preserve donor own inputs/labels"
+        if donor_supervision
+        else "remove donor observations",
         "persistent_message_diagnostic": persistent,
         "precision": precision,
         "own_task_definition": "observed recipient channels 8 at t-21 and 9 at t-41; current snapshot independent",
@@ -321,6 +375,7 @@ def main():
     parser.add_argument("--cuda", action="store_true")
     parser.add_argument("--compile", action="store_true")
     parser.add_argument("--persistent", action="store_true")
+    parser.add_argument("--donor-supervision", action="store_true")
     parser.add_argument(
         "--precision", choices=("bf16", "fp32_head", "fp32"), default="bf16"
     )
@@ -337,6 +392,7 @@ def main():
         persistent=args.persistent,
         precision=args.precision,
         learning_rate=args.learning_rate,
+        donor_supervision=args.donor_supervision,
     )
 
 

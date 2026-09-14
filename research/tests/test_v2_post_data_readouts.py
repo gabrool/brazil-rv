@@ -2,9 +2,10 @@ from datetime import date, timedelta
 from types import SimpleNamespace
 
 import numpy as np
+import pytest
 
 from brazil_rv.v2 import research_rounds as rr
-from brazil_rv.v2.post_data_readouts import alignment
+from brazil_rv.v2.post_data_readouts import alignment, require_full_primary_scores
 
 
 def test_longer_blocks_keep_fold_boundaries_and_missing_dates():
@@ -47,5 +48,20 @@ def test_alignment_compares_heads_and_target_views_on_shared_names():
     assert result["populations"]["common_scored_outcomes"] == [31, 32]
     assert result["populations"]["same_target_view_outcomes"] == [31, 32]
     assert result["populations"]["individual_head_outcomes"][0] == [32, 32, 31]
-    for series in result["series"].values():
-        np.testing.assert_allclose(series, [1, 1])
+    for name, series in result["series"].items():
+        if name == "composite_persistence_1":
+            assert series == [None, 1.0]
+        elif name == "composite_persistence_5":
+            assert series == [None, None]
+        else:
+            np.testing.assert_allclose(series, [1, 1])
+
+
+def test_primary_population_check_allows_absent_untrained_heads_only():
+    active = np.ones((2, 32), bool)
+    mask = np.ones((2, 32, 5), bool)
+    mask[..., :2] = False
+    require_full_primary_scores(mask, active)
+    mask[0, 0, 2] = False
+    with pytest.raises(ValueError, match="PIT-active"):
+        require_full_primary_scores(mask, active)

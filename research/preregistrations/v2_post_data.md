@@ -64,6 +64,17 @@ relational learning from shortcuts. AdamW is an optimization diagnostic.
 Keep all failed attempts. A failed engineering gate requires diagnosis, not
 silent substitution of component-only acceptance.
 
+Engineering diagnosis after the original label-free-donor task failed: compare
+the identical inputs and recipient targets with donors additionally supervised
+on their own observed signal. Recipient validation remains on new dates and
+uses only recipient labels. The own-only control bypasses both stock mixers
+while preserving the donors' own information and supervision. This separates
+joint temporal learning from requiring wholly unlabelled source stocks to learn
+history through indirect gradients alone. Preserve the original failures and
+the post-hoc nature of this diagnosis. A joint-task pass establishes that
+conditional capability only; it cannot certify learning from unlabelled market
+histories or justify a financial architecture/optimizer change by itself.
+
 Financial calibration uses P and F fit/selection only, initially F2/F14 and
 seeds 11/29, on early-attention slow and C1-all representatives. The primary
 bracket is LR 1e-4 with SAM .125 and ASAM .2/.5. Add a matched SAM .125 LR 3e-4

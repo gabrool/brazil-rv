@@ -142,3 +142,18 @@ def test_own_teacher_requires_observed_historical_inputs():
             int(valid.sum()) - 1
         )
         torch.testing.assert_close(batch["targets"][day, :32, 2][valid], expected)
+
+
+def test_donor_supervision_preserves_all_inputs_and_recipient_labels():
+    for task in ("peer", "lagged", "context"):
+        original = teacher_batch(42, task, count=2)
+        added = teacher_batch(42, task, count=2, donor_supervision=True)
+        for key in original:
+            if key not in ("targets", "target_mask"):
+                assert torch.equal(original[key], added[key])
+        assert torch.equal(original["targets"][:, :32], added["targets"][:, :32])
+        assert torch.equal(
+            original["target_mask"][:, :32], added["target_mask"][:, :32]
+        )
+        assert not original["target_mask"][:, 32:].any()
+        assert added["target_mask"][:, 32:].any()
