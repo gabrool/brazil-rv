@@ -35,7 +35,8 @@ def _solve_primal_dual(p, q, a, lower, upper):
     settings = clarabel.DefaultSettings()
     settings.verbose = False
     settings.max_threads = 1
-    settings.tol_gap_abs = settings.tol_gap_rel = settings.tol_feas = 1e-10
+    settings.tol_gap_abs = settings.tol_gap_rel = 1e-12
+    settings.tol_feas = 1e-10
     result = clarabel.DefaultSolver(
         p,
         q,
@@ -87,18 +88,17 @@ class _SparseQP(torch.autograd.Function):
                 eps_abs=1e-8,
                 eps_rel=1e-8,
                 polishing=True,
-                max_iter=20000,
+                max_iter=100000,
             )
             solver.warm_start(x=x, y=dual)
             result = solver.solve(raise_error=False)
             n = (len(x) - 1) // 3
-            if (
-                result.info.status_val != 1
-                or np.max(np.abs(result.x[:n] - x[:n])) > 2e-4
-            ):
+            weight_difference = np.max(np.abs(result.x[:n] - x[:n]))
+            if result.info.status_val != 1 or weight_difference > 2e-4:
                 raise FloatingPointError(
                     f"allocation adjoint solve disagrees: {result.info.status}, "
-                    f"primal={result.info.prim_res:g}, dual={result.info.dual_res:g}"
+                    f"primal={result.info.prim_res:g}, dual={result.info.dual_res:g}, "
+                    f"weight_difference_percent_NAV={weight_difference:g}"
                 )
             ctx.solver = solver
         return torch.from_numpy(x)

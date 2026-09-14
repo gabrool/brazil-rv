@@ -24,6 +24,7 @@ from brazil_rv.execution.portfolio_policy import (
 )
 from .artifacts import sha256_file, write_json_atomic
 from .contract import ALLOWED_SEEDS, DEVELOPMENT_FOLDS, HORIZONS
+from .data_roots import resolve_external_root
 from .portfolio_inputs import build_forecast_cache, fit_calibration, open_policy_inputs
 from .portfolio_program import ARMS, PROJECT, read
 from .research_rounds import _git_identity, _fold_indices
@@ -106,9 +107,8 @@ def load_data(root, arm):
 
 def windows(root, data, fold):
     design = read(root / "frozen_design.json")
-    dates = np.load(
-        Path(design["store"]["root"]) / "date_index.npy", allow_pickle=False
-    )
+    store_root, _ = resolve_external_root(design["store"]["root"])
+    dates = np.load(store_root / "date_index.npy", allow_pickle=False)
     fit, selection, evaluation, _, _ = _fold_indices(dates)
     start = int(data.inputs.session_indices[0])
     result = {

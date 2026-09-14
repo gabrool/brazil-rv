@@ -166,6 +166,13 @@ class CalibratedPolicy(nn.Module):
         variance = (features @ self.coefficient_covariance * features).sum(-1)
         return self.uncertainty_scale * variance.clamp_min(0).sqrt()
 
+    def preference_for(self, data, day, names, state):
+        return self(
+            torch.from_numpy(data.static[day, names]),
+            state,
+            tensor(data.ranks[day, names]),
+        )
+
 
 class PreferenceModel(CalibratedPolicy):
     """Zero residual starts exactly at the fit-only calibrated optimizer."""
@@ -242,6 +249,9 @@ def decide(
     allocation=AllocationConfig(),
 ):
     """Compact exactly to available or held names, preserving all real inventory."""
+    if model is None:
+        # Cash fallback requests liquidation through the same actual-fill ledger.
+        return torch.zeros_like(weights)
     stock = weights[:-1]
     names = np.flatnonzero(allowed | (stock.detach().numpy() != 0))
     ids = np.r_[names, len(stock)]
@@ -266,11 +276,7 @@ def decide(
         data.beta[day],
         data.volatility[day],
     )[names]
-    pref = model(
-        torch.from_numpy(data.static[day, names]),
-        features,
-        tensor(data.ranks[day, names]),
-    )
+    pref = model.preference_for(data, day, names, features)
     # No separate directional BOVA forecast is invented. The hedge is chosen
     # jointly for risk, financing and costs, with zero assumed daily excess alpha.
     preference = torch.cat((pref, pref.new_zeros(1)))
