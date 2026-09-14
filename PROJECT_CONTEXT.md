@@ -2,6 +2,15 @@
 
 Last verified: 2026-09-14.
 
+The user has authorized **Phases 1–3** of the
+[decision-model postmortem](docs/v2_PORTFOLIO_DECISION_POSTMORTEM.md#13-recommended-next-program-small-questions-in-an-efficient-order):
+coherent frozen-forecast allocation, controller learnability/reliability, and a
+magnitude-aware auxiliary forecasting objective. Follow the
+[registration](research/preregistrations/v2_decision_research.md) and
+[phase acceptance record](docs/v2_decision_progress.md); reread the postmortem
+after each phase. This extends the earlier scope statements below, without
+authorizing Phase 4, forward capture or 2025/2026 consumer reads.
+
 The [cash-aware portfolio program](research/preregistrations/v2_portfolio_policy.md)
 and its registered rich-attention timing confirmation are complete; see the
 [review and results](docs/v2_PORTFOLIO_POLICY_REVIEW.md). No new controller passes
