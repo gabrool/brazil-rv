@@ -1,9 +1,9 @@
-# Post-data stages Aâ€“C progress
+# Post-data stages A–C progress
 
 Reference: [accepted plan](v2_POST_DATA_RESEARCH_PLAN.md) and
 [implementation registration](../research/preregistrations/v2_post_data.md).
 
-## Stage A â€” accepted
+## Stage A — accepted
 
 Implemented selection from epoch 1 with fixed-schedule patience, ASAM,
 module-owned bias/norm routing, explicit transferred names/LR, and exact selected
@@ -25,7 +25,7 @@ Local targeted checks pass: 27 training/ASAM/resume/runner checks, 37
 architecture/specification/source checks, and 16 program/preprocessing/runner
 checks (these groups overlap; not a unique test count). Real-input CPU acceptance
 passed P/F2/F14 for S0, C1, TE and TL with 60 sessions and all sampled active
-names. BF16 forward discrepancy was 0.56â€“1.20% of the FP32 score standard
+names. BF16 forward discrepancy was 0.56–1.20% of the FP32 score standard
 deviation; actual adaptive optimizer steps were finite. Evidence is at
 the source-bound [CPU evidence](v2_post_data_cpu_engineering.json).
 No financial trajectory or evaluation scoring has begun. Exact GH200 instance
@@ -50,14 +50,14 @@ learned mappings. Shared fusion tensors remain transferred. This avoids
 suppressing genuinely newly available families by the .3 transfer multiplier.
 Twenty targeted adaptive-training/selection/resume tests pass after this change.
 
-Acceptance closed after re-reading the reference plan's sections 4â€“6 and 9.
+Acceptance closed after re-reading the reference plan's sections 4–6 and 9.
 The [CUDA evidence](v2_post_data_cuda_engineering.json) passed on full F14
-16-date, 256-slot, 60-session batches: BF16 discrepancies were 0.57â€“0.76%
+16-date, 256-slot, 60-session batches: BF16 discrepancies were 0.57–0.76%
 of FP32 score standard deviation; complete ASAM updates stayed finite.
 Compiled steady-state TE/TL steps were about 23.5/18.1 ms versus eager
-49.8/38.7 ms. GRU C1 was about 88 ms eager and 91â€“107 ms compiled; it and
+49.8/38.7 ms. GRU C1 was about 88 ms eager and 91–107 ms compiled; it and
 common-recipe S0 will use eager BF16. TE/TL retain compilation. First compile
-costs (48â€“193 seconds) remain visible; these are batch timings, not fit ETAs.
+costs (48–193 seconds) remain visible; these are batch timings, not fit ETAs.
 The recorded CUDA memory is process high-water, not isolated per-model memory.
 CUDA source hashes bind commit 983b176; the later cold-family transfer-contract
 correction is separately covered by targeted tests and changes no model or
@@ -74,7 +74,7 @@ F14 canonical collation/transfer was 228 ms versus .69 ms per cached gather;
 this is an input-stage comparison, not a complete-fit speedup. The plan was
 re-read after this A efficiency amendment. Full-fit resources remain to measure.
 
-## Stage B â€” accepted
+## Stage B — accepted
 
 Unseen-date full-model teachers, then fit/selection-only financial calibration.
 Freeze screen settings/roster before evaluation-score access. Re-read the plan
@@ -82,7 +82,7 @@ and record the evidence for B's completion before C.
 
 The initial 512-update SAM .125 teachers passed an own-current-state task (unseen-date IC
 .9994/.9993, seeds11/29) but failed dynamic peer, lagged and context tasks
-(roughly âˆ’.025 to .005). A peer-only 512-update bracket also failed with
+(roughly −.025 to .005). A peer-only 512-update bracket also failed with
 ASAM .2/.5, SAM .05, SAM .125/LR3e-4 and AdamW. These are retained failures,
 not evidence that real financial attention cannot work. Next diagnosis separates
 stock routing from brief temporal-message retrieval with a persistent-message
@@ -107,7 +107,7 @@ defined-date counts rather than failing JSON serialization and losing evidence.
 
 The corrected own-history task passes under BF16, FP32 head and full FP32
 (about .995). The lagged peer task fails under all three precisions (about
-âˆ’.024), so low precision does not explain that failure. Next bounded diagnosis
+−.024), so low precision does not explain that failure. Next bounded diagnosis
 isolates the duplicate current-state MLP and compares ASAM's LR bridge,
 weaker SAM and one-pass optimization on the original lagged task. These are
 engineering controls; no architecture or financial recipe is changed on an
@@ -115,7 +115,7 @@ unverified hypothesis. The first 33 completed/failed attempts and all 103 files
 are [recorded and hash-verified locally](v2_post_data_engineering_attempts.json).
 
 ASAM .2/LR3e-4, SAM .05, ordinary AdamW and a no-current-core control also
-fail the original lagged task (IC âˆ’.008 to .006). Next is the explicitly
+fail the original lagged task (IC −.008 to .006). Next is the explicitly
 registered donor-supervision comparison: exactly unchanged features and
 recipient targets, added own-signal labels only for donor stocks, and
 recipient-only unseen-date evaluation with a control bypassing both stock
@@ -150,8 +150,8 @@ panel has been read.
 Financial calibration is now running from clean training commit `368fbf7` in
 `v2_post_data_368fbf7_20260914T004400Z`. All four P parents completed under
 patience: TE seeds11/29 selected epochs34/11 and stopped39/16; C1-all
-seeds11/29 selected4/32 and stopped9/37. Parent cache size was 4.27â€“4.43 GB
-per process; peak allocated GPU memory was 5.29â€“5.37 GB. The parent archive
+seeds11/29 selected4/32 and stopped9/37. Parent cache size was 4.27–4.43 GB
+per process; peak allocated GPU memory was 5.29–5.37 GB. The parent archive
 has been recovered locally and all 137 member files / 636,613,211 original
 bytes verified exactly. The economic rebind also passed, proving all four
 beta arrays unchanged. F calibration remains in progress; do not infer a
@@ -169,23 +169,23 @@ to conceal with longer training. Increasing the transfer LR does not improve
 the matched F14 mean for either lane.
 
 The temporal and peer modules have finite nonzero selected-state updates;
-peer bypass changes scores, with sampled normalized peer entropy .760â€“.973
+peer bypass changes scores, with sampled normalized peer entropy .760–.973
 under the chosen attention recipe. FiLM is active, with selected gamma RMS
-.187â€“.692. These are functional diagnostics, not evidence of useful alpha.
+.187–.692. These are functional diagnostics, not evidence of useful alpha.
 A selected-state precision check covers all eight chosen calibration fits
 and all selection dates: BF16-versus-FP32 score-rank correlations exceed
-.99984, centered RMS discrepancies are .246â€“.759% of cross-sectional score
+.99984, centered RMS discrepancies are .246–.759% of cross-sectional score
 spread, and the largest selection-IC difference is .000285. Keep the frozen
 BF16 precision. The check initially hit a dataset-close typo; the original
 failure log is retained, then the corrected diagnostic completed. No fit,
 recipe or evaluation score changed. B's end-to-end 4P+44F runner took
-29m20s (00:44:00â€“01:13:20 UTC); subsequent audit/recovery time is separate.
+29m20s (00:44:00–01:13:20 UTC); subsequent audit/recovery time is separate.
 
-## Stage C â€” accepted, including the user-requested .5 extension
+## Stage C — accepted, including the user-requested .5 extension
 
 All 27 P and 188 distinct F fits completed across the combined program. C has
 156 scored fits, 13 cells and 52 accepted books. The reference plan was revisited
-after completion; no Dâ€“F work or held-out access was added. TE_all .2 has the
+after completion; no D–F work or held-out access was added. TE_all .2 has the
 strongest observed IC (.027103 versus S0 .018849); economic superiority is not
 established. Slow early attention does not beat matched late attention. The .5
 extension reduces rich TE_all IC; both radii remain in the report. See

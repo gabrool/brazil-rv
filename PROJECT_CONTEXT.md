@@ -1,6 +1,6 @@
 # Brazil-RV project context
 
-Last verified: 2026-09-13.
+Last verified: 2026-09-14.
 
 The post-Round-7 **data-only repair is accepted** for new development research.
 Resolve [the canonical data pointer](docs/v2_data_inputs.json); the new store is
