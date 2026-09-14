@@ -132,14 +132,25 @@ def run(root, source, *, remaining=False):
                     view.inputs, TRADED_PRIMARY_HORIZONS
                 )
                 head, ic, _ = _primary_daily_metrics(
-                    *components, view.inputs.dates, TRADED_PRIMARY_HORIZONS
+                    *(v[start:stop] for v in components),
+                    view.inputs.dates[start:stop],
+                    TRADED_PRIMARY_HORIZONS,
                 )
+                if arm == "TE_all" and label == "ensemble":
+                    reference_ic = np.asarray(
+                        read(source / "bridge/TE_all" / fold / "forecast.json")[
+                            "neutral_ic"
+                        ],
+                        dtype=float,
+                    )
+                    if not np.allclose(
+                        ic, reference_ic, atol=1e-12, rtol=0, equal_nan=True
+                    ):
+                        raise ValueError("sealed reference IC changed")
                 audit = {
-                    "head_ic": np.nanmean(head[start:stop], axis=0).tolist(),
-                    "mean_ic": float(np.nanmean(ic[start:stop])),
-                    "daily_ic": [
-                        float(v) if np.isfinite(v) else None for v in ic[start:stop]
-                    ],
+                    "head_ic": np.nanmean(head, axis=0).tolist(),
+                    "mean_ic": float(np.nanmean(ic)),
+                    "daily_ic": [float(v) if np.isfinite(v) else None for v in ic],
                     "settlement_fraction_sum": float(
                         result.terminal_settlement_notional_fraction_nav.sum()
                     ),
