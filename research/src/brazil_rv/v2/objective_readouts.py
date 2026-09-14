@@ -446,17 +446,109 @@ def summarize(root, *, confirmation=False):
     return output
 
 
+def evaluate_continuous(root, arm):
+    """One account across all fourteen new forecast blocks; no P&L splicing."""
+    torch.set_num_threads(1)
+    if arm not in read(root / "phase3/screen_summary.json")["survivors"]:
+        raise ValueError("continuous confirmation requires an admitted architecture")
+    data, binding = load_data(root, arm)
+    blocks = {
+        fold: windows(root, data, fold)["evaluation"] for fold in DEVELOPMENT_FOLDS
+    }
+    rows = np.concatenate(list(blocks.values()))
+    if not np.all(np.diff(rows) == 1):
+        raise ValueError("continuous new forecasts must cover every intervening date")
+    mappings = {
+        fold: read(root / "phase3/mappings" / f"{fold}.json") for fold in blocks
+    }
+    models = {
+        int(day): CalibratedPolicy(calibration(mappings[fold]["arms"][arm]))
+        for fold, block in blocks.items()
+        for day in block
+    }
+    for variant in VARIANTS:
+        panels = {member: [] for member in MEMBERS}
+        masks, sources = [], {}
+        for fold, block in blocks.items():
+            values, _, valid, source = read_panel(root, data, arm, variant, fold, block)
+            for member in MEMBERS:
+                panels[member].append(values[member])
+            masks.append(valid)
+            sources[fold] = {
+                "forecasts": source,
+                "mapping_sha256": sha256_file(
+                    root / "phase3/mappings" / f"{fold}.json"
+                ),
+            }
+        common = np.concatenate(masks)
+        for member in MEMBERS:
+            output = root / "phase3/continuous" / arm / variant / member
+            provenance = {
+                "implementation": _git_identity(),
+                "scenario": "base",
+                "policy": "equal_rank",
+                "economic_cache_binding": binding,
+                "arm": arm,
+                "variant": variant,
+                "member": member,
+                "sources": sources,
+                "inventory": "one initial cash account; actual inventory survives fold model changes; one final liquidation",
+            }
+            if (output / "book.json").exists():
+                verify_book(output, provenance)
+                continue
+            view = rank_view(data, rows, np.concatenate(panels[member]), common)
+            result, targets, previous = exact_replay(
+                view, models, int(rows[0]), int(rows[-1] + 1)
+            )
+            save_book(
+                output,
+                view,
+                result,
+                targets,
+                previous,
+                int(rows[0]),
+                int(rows[0]),
+                provenance,
+            )
+    contrasts = {}
+    for member in MEMBERS:
+        books = {
+            v: checked_book(root / "phase3/continuous" / arm / v / member)
+            for v in VARIANTS
+        }
+        contrasts[member] = {
+            metric: {
+                str(b): interval(
+                    [paired(books["economic"], books["neutral"], metric)],
+                    block_length=b,
+                )
+                for b in (20, 40, 60)
+            }
+            for metric in ("net_excess_bps", "utility_bps")
+        }
+    write_json_atomic(
+        root / "phase3/continuous" / arm / "comparison.json",
+        {"contrasts": contrasts, "heldout_accessed": False},
+    )
+
+
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("command", choices=("mappings", "evaluate", "summarize"))
+    parser.add_argument(
+        "command", choices=("mappings", "evaluate", "summarize", "continuous")
+    )
     parser.add_argument("--root", type=Path, required=True)
     parser.add_argument("--fold", choices=DEVELOPMENT_FOLDS)
     parser.add_argument("--confirmation", action="store_true")
+    parser.add_argument("--arm", choices=ARMS)
     args = parser.parse_args()
     if args.command == "mappings":
         prepare_mappings(args.root, confirmation=args.confirmation)
     elif args.command == "evaluate":
         evaluate_fold(args.root, args.fold, confirmation=args.confirmation)
+    elif args.command == "continuous":
+        evaluate_continuous(args.root, args.arm)
     else:
         result = summarize(args.root, confirmation=args.confirmation)
         print({k: v for k, v in result.items() if k != "cells"})
