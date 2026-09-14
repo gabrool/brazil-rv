@@ -7,6 +7,7 @@ from pathlib import Path
 import sys
 
 import numpy as np
+import torch
 
 from .artifacts import sha256_file, write_json_atomic
 from .contract import ALLOWED_SEEDS, DEVELOPMENT_FOLDS, RUN_MANY_PLAN_SCHEMA
@@ -248,14 +249,144 @@ def summarize(root, *, confirmation=False):
     return output
 
 
+def confirmation_references(root):
+    from .controller_training import prepare_references
+    from .portfolio_training import load_data
+
+    torch.set_num_threads(1)
+    arms = sorted(
+        {a for a, _ in read(root / "phase2/screen_summary.json")["survivors"]}
+    )
+    folds = tuple(f for f in DEVELOPMENT_FOLDS if f not in SCREEN_FOLDS)
+    for arm in arms:
+        data, binding = load_data(root, arm)
+        prepare_references(data, root, arm, binding, folds=folds)
+
+
+def continuous(root, arm):
+    """One carried account and causal fallback across all confirmed controllers."""
+    from brazil_rv.execution.opportunity_policy import OpportunityPolicy
+    from brazil_rv.execution.portfolio_policy import CalibratedPolicy, exact_replay
+    from .controller_context import load_context
+    from .decision_program import benchmark_excess_returns, calibrations
+    from .portfolio_readouts import save_book
+    from .portfolio_training import load_data, windows
+
+    if [arm, "reliability"] not in read(root / "phase2/screen_summary.json")[
+        "survivors"
+    ]:
+        raise ValueError("continuous controller replay requires a screen survivor")
+    torch.set_num_threads(1)
+    data, binding = load_data(root, arm)
+    data = load_context(root, arm, data, binding)
+    bounds = {fold: windows(root, data, fold) for fold in DEVELOPMENT_FOLDS}
+    models = {
+        name: {}
+        for name in ("candidate", "fallback", "benchmark", "equal_rank", "cash")
+    }
+    sources = {}
+    start = int(bounds["F1"]["selection"][-1] + 1)
+    first = int(bounds["F1"]["evaluation"][0])
+    stop = int(bounds[DEVELOPMENT_FOLDS[-1]]["evaluation"][-1] + 1)
+    market = benchmark_excess_returns(data)
+    for fold, window in bounds.items():
+        path = policy_path(root, arm, fold, "reliability", 11)
+        record = read(path / "run_manifest.json")
+        if (
+            record["status"] != "completed"
+            or sha256_file(path / "selected.pt") != record["selected_sha256"]
+        ):
+            raise ValueError("continuous controller source is incomplete or changed")
+        fitted = calibrations(data, window["fit"], market)
+        model = OpportunityPolicy(
+            data, fitted["benchmark"], window["fit"], kind="reliability"
+        )
+        checkpoint = torch.load(
+            path / "selected.pt", weights_only=True, map_location="cpu"
+        )
+        model.load_state_dict(checkpoint["model_state_dict"], strict=True)
+        model.eval()
+        benchmark = CalibratedPolicy(fitted["benchmark"]).eval()
+        equal = CalibratedPolicy(fitted["equal_rank"]).eval()
+        fallback = {"cash": None, "benchmark": benchmark, "learned": model}[
+            record["fallback"]
+        ]
+        selected = {
+            "candidate": model,
+            "fallback": fallback,
+            "benchmark": benchmark,
+            "equal_rank": equal,
+            "cash": None,
+        }
+        begin = start if fold == "F1" else int(window["evaluation"][0])
+        for label, policy in selected.items():
+            models[label].update(
+                {day: policy for day in range(begin, int(window["evaluation"][-1] + 1))}
+            )
+        sources[fold] = {
+            "manifest_sha256": sha256_file(path / "run_manifest.json"),
+            "fallback": record["fallback"],
+        }
+    if list(models["candidate"]) != list(range(start, stop)):
+        raise ValueError("continuous controller dates have a missing block")
+    for label, policies in models.items():
+        output = root / "phase2/continuous" / arm / label
+        provenance = {
+            "implementation": _git_identity(),
+            "policy_data_sha256": binding,
+            "sources": sources,
+            "scenario": "base",
+            "policy": label,
+            "inventory": "one account; causal model/fallback switches; one terminal liquidation",
+        }
+        if (output / "book.json").exists():
+            verify_book(output, provenance)
+        else:
+            result, targets, previous = exact_replay(data, policies, start, stop)
+            save_book(output, data, result, targets, previous, start, first, provenance)
+    books = {
+        label: checked_book(root / "phase2/continuous" / arm / label)
+        for label in models
+    }
+    contrasts = {
+        policy: {
+            reference: {
+                metric: {
+                    str(b): interval(
+                        [paired(books[policy], books[reference], metric)],
+                        block_length=b,
+                    )
+                    for b in (20, 40, 60)
+                }
+                for metric in METRICS
+            }
+            for reference in ("benchmark", "equal_rank", "cash")
+        }
+        for policy in ("candidate", "fallback")
+    }
+    write_json_atomic(
+        root / "phase2/continuous" / arm / "comparison.json",
+        {"contrasts": contrasts, "heldout_accessed": False},
+    )
+
+
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("command", choices=("plan", "summarize"))
+    parser.add_argument(
+        "command", choices=("plan", "summarize", "references", "continuous")
+    )
     parser.add_argument("--root", type=Path, required=True)
     parser.add_argument("--confirmation", action="store_true")
     parser.add_argument("--max-parallel", type=int, default=6)
     parser.add_argument("--kind", choices=KINDS)
+    parser.add_argument("--arm", choices=ARMS)
     args = parser.parse_args()
+    if args.command == "references":
+        confirmation_references(args.root)
+        return
+    if args.command == "continuous":
+        continuous(args.root, args.arm)
+        return
     result = (
         plan(
             args.root,
