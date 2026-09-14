@@ -160,6 +160,16 @@ is preserved. Never delete completed fits to make a launcher restart work.
 Epoch resumes require the actual recorded source commit; completed fits from
 earlier commits remain valid under their own provenance and numerical comparisons.
 
+If Phase 2 has a screen survivor, `controller_program references` prepares only
+its ten additional chronological references. Follow with `controller_program
+plan --kind reliability --confirmation --max-parallel 2`, run the generated
+`phase2/confirmation_reliability_plan.json`, and `controller_program summarize
+--confirmation`. `controller_program continuous --arm <SURVIVOR>` then loads all
+fourteen saved conditional checkpoints and executes candidate/fallback/reference
+accounts with actual inventory across fold changes. This path has a synthetic
+checkpoint-loading and cash-liquidation regression. No survivor means these
+conditional tasks are not triggered.
+
 ## GPU restart when the user resumes it
 
 First verify clean committed `main` and push. Do not change training code while
