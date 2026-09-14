@@ -5,6 +5,7 @@ import numpy as np
 import pytest
 
 from brazil_rv.v2 import research_rounds as rr
+from brazil_rv.v2.execution_policy import ExecutionPolicy, traded_signal
 from brazil_rv.v2.post_data_readouts import (
     alignment,
     require_full_primary_scores,
@@ -40,7 +41,8 @@ def test_longer_blocks_keep_fold_boundaries_and_missing_dates():
     assert result["finite_observations"] == 120
 
 
-def test_alignment_compares_heads_and_target_views_on_shared_names():
+@pytest.mark.parametrize("registered_policy", [False, True])
+def test_alignment_compares_heads_and_target_views_on_shared_names(registered_policy):
     shape = (2, 32, 5)
     values = np.broadcast_to(np.arange(32)[None, :, None], shape).astype(float).copy()
     masks = np.ones(shape, bool)
@@ -58,12 +60,20 @@ def test_alignment_compares_heads_and_target_views_on_shared_names():
         shareholder_target_mask=masks,
         price_midrank_targets=values,
         price_target_mask=masks,
-        execution_policy=None,
+        execution_policy=ExecutionPolicy(theta=0.25, horizons=(3, 5, 10))
+        if registered_policy
+        else None,
     )
+    if registered_policy:
+        inputs.score_mask[..., :2] = False
+        inputs.scores[..., :2] = np.nan
     result = alignment(inputs)
     assert result["populations"]["common_scored_outcomes"] == [31, 32]
     assert result["populations"]["same_target_view_outcomes"] == [31, 32]
     assert result["populations"]["individual_head_outcomes"][0] == [32, 32, 31]
+    if registered_policy:
+        _, valid = traded_signal(inputs, inputs.execution_policy)
+        assert result["populations"]["score_available_to_book"] == valid.sum(1).tolist()
     for name, series in result["series"].items():
         if name == "composite_persistence_1":
             assert series == [None, 1.0]

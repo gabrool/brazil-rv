@@ -21,6 +21,7 @@ from .evaluate import (
     _spearman,
 )
 from .hedge_beta import build_hedge_beta_sidecar
+from .execution_policy import traded_signal
 from .post_data_program import CELLS, fit_path, read
 from .research_checkpoint import _completed, _context_arguments, _finish_cell
 from .round6 import resolve_file
@@ -126,7 +127,11 @@ def alignment(inputs):
         scores, targets, outcome, scored, inputs.dates, horizons
     )
     common = outcome & scored
-    composite, composite_valid = _economics_signal(inputs)
+    composite, composite_valid = (
+        _economics_signal(inputs)
+        if inputs.execution_policy is None
+        else traded_signal(inputs, inputs.execution_policy)
+    )
     series = {"primary_neutral_target_ic": primary}
     for lag in (1, 5):
         persistence = np.full(len(inputs.dates), np.nan)
