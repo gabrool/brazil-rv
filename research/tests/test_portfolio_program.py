@@ -1,5 +1,6 @@
 import numpy as np
 import pytest
+from pathlib import Path
 
 from brazil_rv.v2.portfolio_program import frozen_fit_roster
 from brazil_rv.v2.score import (
@@ -47,3 +48,21 @@ def test_reused_checkpoint_rejects_changed_inference_dependencies(monkeypatch):
     )
     with pytest.raises(ValueError, match="inference dependency changed"):
         verify_reused_inference_source("b" * 40)
+
+
+def test_auxiliary_checkpoint_rejects_changed_head_implementation(monkeypatch):
+    monkeypatch.setattr(
+        "brazil_rv.v2.score._repository_commit_if_available", lambda: "a" * 40
+    )
+
+    def historical(command, *, cwd):
+        relative = command[-1].split(":", 1)[1]
+        if relative.endswith("economic_objective.py"):
+            return b"changed auxiliary head"
+        return (Path(cwd) / relative).read_bytes()
+
+    monkeypatch.setattr("brazil_rv.v2.score.subprocess.check_output", historical)
+    with pytest.raises(ValueError, match="economic_objective.py"):
+        verify_reused_inference_source(
+            "b" * 40, extra_dependencies=("v2/economic_objective.py",)
+        )

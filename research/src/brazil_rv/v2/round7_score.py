@@ -60,7 +60,10 @@ def score(
         )
     contract = payload["contract"]
     auxiliary = contract.get("economic_auxiliary")
-    inference_source = verify_reused_inference_source(contract["code"]["commit"])
+    inference_source = verify_reused_inference_source(
+        contract["code"]["commit"],
+        extra_dependencies=("v2/economic_objective.py",) if auxiliary else (),
+    )
     if parent_prelude:
         rows = parent_prelude_indices(store_root)
     else:

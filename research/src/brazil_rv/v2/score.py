@@ -55,7 +55,9 @@ class ScoreArtifact:
     checkpoint_sha256: str
 
 
-def verify_reused_inference_source(training_commit: str | None) -> dict[str, object]:
+def verify_reused_inference_source(
+    training_commit: str | None, *, extra_dependencies: tuple[str, ...] = ()
+) -> dict[str, object]:
     """Permit later non-model commits only when the inference dependencies match.
 
     Checkpoint/store/preprocessing hashes remain independently checked. This
@@ -82,7 +84,7 @@ def verify_reused_inference_source(training_commit: str | None) -> dict[str, obj
         "modeling/layers.py",
     ]
     hashes = {}
-    for relative in files:
+    for relative in (*files, *extra_dependencies):
         path = f"research/src/brazil_rv/{relative}"
         historical = subprocess.check_output(
             ["git", "show", f"{training_commit}:{path}"], cwd=root
