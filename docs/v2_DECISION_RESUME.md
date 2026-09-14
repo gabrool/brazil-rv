@@ -9,6 +9,19 @@ HTTP 401 `global/invalid-api-key` at 2026-09-14T22:52:24Z, before billing/launch
 S3 credentials and the Lambda Cloud API credential are different. Do not embed
 either in source, this document, shell history or committed artifacts.
 
+**Checkpoint status: all required CPU work is complete.** Phases 1–2 are closed;
+neither Phase 2 controller advances, so no CPU confirmation fits remain. The
+remaining work is Phase 3 GPU acceptance, 48 matched initial forecasting fits,
+their readout, and only any confirmation triggered by that future screen.
+Do not rerun the eight completed conditional fits or the 24 non-admitted MLP fits.
+
+The verified recovery package is
+`D:/quant-data/b3/processed/model_runs/v2_decision_60dc9a2_20260914T212110Z/archives/decision_cpu_checkpoint.tar.gz`:
+609,216,902 bytes and 4,160 individually verified members. SHA-256:
+`acb32f0f38e75005e3461ff9edaf996ec6b3437eaf3275234f6c289adb9f0b29`.
+It includes all new phase artifacts, failed attempts and source metadata; the
+already recovered original caches are bound by hash and deliberately not duplicated.
+
 ## Read order and authority
 
 1. `C:/Brazil-RV/AGENTS.md` and this repository's `PROJECT_CONTEXT.md`.
@@ -160,7 +173,8 @@ is preserved. Never delete completed fits to make a launcher restart work.
 Epoch resumes require the actual recorded source commit; completed fits from
 earlier commits remain valid under their own provenance and numerical comparisons.
 
-If Phase 2 has a screen survivor, `controller_program references` prepares only
+For completeness, the untriggered Phase 2 continuation is implemented:
+`controller_program references` prepares only
 its ten additional chronological references. Follow with `controller_program
 plan --kind reliability --confirmation --max-parallel 2`, run the generated
 `phase2/confirmation_reliability_plan.json`, and `controller_program summarize
@@ -168,7 +182,7 @@ plan --kind reliability --confirmation --max-parallel 2`, run the generated
 fourteen saved conditional checkpoints and executes candidate/fallback/reference
 accounts with actual inventory across fold changes. This path has a synthetic
 checkpoint-loading and cash-liquidation regression. No survivor means these
-conditional tasks are not triggered.
+conditional tasks are not triggered. That is the final state of this checkpoint.
 
 ## GPU restart when the user resumes it
 
@@ -259,7 +273,8 @@ The existing capacity automation remains paused. There is no forward-capture job
 to restart. The earlier portfolio instance was already terminated before this
 program; do not treat it as the instance for this future launch.
 
-At this checkpoint C: has less than 0.4 GiB free and D: approximately 1.2 GiB.
+During concurrent fits C: briefly had less than 0.4 GiB free. After workers exited
+and the recovery archive was written, C: had approximately 3.0 GiB and D: .66 GiB.
 Do not start a large local extraction blindly. Reuse verified persistent inputs,
 recover compressed artifacts selectively, and check actual free space before
 copying. The CPU checkpoint record identifies the verified local archive; that

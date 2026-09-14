@@ -1,0 +1,139 @@
+{
+  "archive": {
+    "all_members_verified": true,
+    "bytes": 609216902,
+    "location": "local D: recovery copy; not uploaded to S3",
+    "members": 4160,
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\archives\\decision_cpu_checkpoint.tar.gz",
+    "sha256": "acb32f0f38e75005e3461ff9edaf996ec6b3437eaf3275234f6c289adb9f0b29"
+  },
+  "cache_files": {
+    "cache/C6/manifest.json": "251cc1c3f313493d024551d1e17344d8bbf8fbc5d17e918354fd53e54235dc43",
+    "cache/C6/policy_data.json": "a6658313c32b8e2dee63e9247fd7362b69cf69c991a30d90c297960b1070f648",
+    "cache/C6/policy_data.pkl": "857d76f544f0c365ba229011a4df77beb9a501edc9a8b4f855a6d925d43e3cdf",
+    "cache/S0/manifest.json": "db70436421353c1eb6d089db3743d3fa1ea4702f01d2054b373df5a1ee2c8552",
+    "cache/S0/policy_data.json": "c6114c92aa138cde0ebd185954065f65d4fd079b557e1f947dae5559ba9c5b1b",
+    "cache/S0/policy_data.pkl": "2cef07a93beaba60f7589209b08365919b37c253aff10f293a01ad5e37b4c0ef",
+    "cache/TE_all/manifest.json": "1e54d6ddfa6a72e883ee86df9eec08c4b85ad17c4caa39dcad966623d9c7c38c",
+    "cache/TE_all/policy_data.json": "045e6a42780fdb67fccad25203d8a2a17d16040168c9d4d26c5b026146d67c96",
+    "cache/TE_all/policy_data.pkl": "2516fb377bb53c1c00990cd20a90264aa9736d4ff0eefab20ddcb15f69cf9f2f"
+  },
+  "cpu_acceptance_sha256": "e11f875e3a9cf82e862cedcb85816d5ec4d73d797826c10021e781143c6a6e47",
+  "created_utc": "2026-09-14T23:53:42.798044+00:00",
+  "economic_target_sha256": "f66bdafa1e2e8d5d393eeadbfebd9fb5a9549ff3266da50b751da029ecda184a",
+  "financial_training_source_hashes": {
+    "research/src/brazil_rv/execution/allocation.py": "f1a86a9dd750ca42b7e186ccfe58f8acc7d9f2dacd9473d21ce7822bd7a2a8c9",
+    "research/src/brazil_rv/execution/opportunity_policy.py": "10f9b16bbe34ba11e7ca4e2b8e64e4e9e6e0d869bc4fac1a0d49ff5ed26cef1b",
+    "research/src/brazil_rv/execution/portfolio_account.py": "74840153cb1385f43ebf10fe991f98d7c28495ce1521b30cb96509bef7984cbe",
+    "research/src/brazil_rv/execution/portfolio_policy.py": "747d0f5b66a2ab267165c90f8cd12c62b0838d1e39ebf801f5f7fbd4e45f9c00",
+    "research/src/brazil_rv/execution/stateful_ledger.py": "3fb75cb7aa1fff74b328baf255797269573ee04564222f1d65a788b8f8e14a83",
+    "research/src/brazil_rv/v2/controller_context.py": "30ca82fb1effe60fc291181b47790fc01935c0d987724710420322fa016efb03",
+    "research/src/brazil_rv/v2/controller_training.py": "041f89cc41861f09da6951d005b80a7997ef79eef55165154574b99024840381",
+    "research/src/brazil_rv/v2/decision_program.py": "a0621bd9f22c7dac63a5f7c2ec92bf8e76fdcc0363b0bc52419f25f85994f552",
+    "research/src/brazil_rv/v2/portfolio_inputs.py": "4c7e92ea408456e547de5f602e751fd4dc258aef1318a4e206262a2ad75db082",
+    "research/src/brazil_rv/v2/portfolio_training.py": "d209c9a8a53e0a02acb30f0fbea3514c851df558f75be9fcff1c92deda6aba51"
+  },
+  "financial_training_sources_unchanged_since": "030806b",
+  "forward_capture": false,
+  "heldout_accessed": false,
+  "implementation_commit": "d9181d989ab294936b239db88ea92550a705e196",
+  "instructions": "docs/v2_DECISION_RESUME.md",
+  "inventory": {
+    "files": 4167,
+    "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\cpu_checkpoint_inventory.json",
+    "sha256": "0bc0d9408f4a61d5f533c2c79ac6f58726dc491ec4086ee15bb5b0f8bb191fed"
+  },
+  "lambda": "No further attempts authorized for now; last launcher response HTTP 401 before launch",
+  "paid_instance_launched": false,
+  "persistent_cache_source": "/lambda/nfs/brazil-rv-east3/quant-data/b3/processed/model_runs/v2_portfolio_49d3c9a_20260914T143600Z/cache",
+  "phase1": "complete: 315 books; 90 reproduced raw/cash controls",
+  "phase2": "complete: 8 conditional fits; no survivors; 24 MLP fits not admitted",
+  "phase2_screen_sha256": "27f66927da5094b702874cd40d2491f49bb3acd580b3598a7af21888066c1859",
+  "phase3": "CPU engineering prepared; GPU numerical/throughput acceptance and financial fits deferred by user",
+  "phase3_design_sha256": "ccd18e77f9ae10c5f67e601c7f4f6dbc4aadbaae31aa336912bba745d53a0e70",
+  "phase3_parents": {
+    "C6": {
+      "11": {
+        "adaptation": {
+          "prediction_max_abs_error": 0.0,
+          "shared_tensors_exact": true,
+          "source_input_contract_sha256": "d96e42a4ec97dbdb19622885f6dc15710087059bf623862dde81aeefc4072895",
+          "source_sha256": "ebc43d5f174921ce352d1340460aa67101579d20272c12ae8908d8389f557ce7",
+          "zero_initialized": [
+            "sidecar_projections.fundamentals",
+            "sidecar_projections.magnitudes"
+          ]
+        },
+        "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\parents\\C6\\seed_11\\selected.pt",
+        "sha256": "7a0784e35d0c843033053582bab37f21ef7e73c3938dba19eac11a61e595afa3"
+      },
+      "29": {
+        "adaptation": {
+          "prediction_max_abs_error": 0.0,
+          "shared_tensors_exact": true,
+          "source_input_contract_sha256": "d96e42a4ec97dbdb19622885f6dc15710087059bf623862dde81aeefc4072895",
+          "source_sha256": "5e8cdb9ee99e2d126e5291216a3c97dc0bcbe480e7898896d91e2e24752e7322",
+          "zero_initialized": [
+            "sidecar_projections.fundamentals",
+            "sidecar_projections.magnitudes"
+          ]
+        },
+        "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\parents\\C6\\seed_29\\selected.pt",
+        "sha256": "ac5601f512cb7796167721a80f71da62ebbfeeeb57a1e405cc6aca7eca227649"
+      },
+      "47": {
+        "adaptation": {
+          "prediction_max_abs_error": 0.0,
+          "shared_tensors_exact": true,
+          "source_input_contract_sha256": "d96e42a4ec97dbdb19622885f6dc15710087059bf623862dde81aeefc4072895",
+          "source_sha256": "d23ca8d361ffc6b0c7c06f7e761542c0d095506018170eb02edda45251ccbf11",
+          "zero_initialized": [
+            "sidecar_projections.fundamentals",
+            "sidecar_projections.magnitudes"
+          ]
+        },
+        "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\parents\\C6\\seed_47\\selected.pt",
+        "sha256": "4c798435c699467e9eaf504632e7d84dddf2d2d195874ed59ba74b27139d3810"
+      }
+    },
+    "TE_all": {
+      "11": {
+        "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\parents\\TE_all\\seed_11\\selected.pt",
+        "sha256": "51aec0c1f97c2ecec6ca39886dd965e3128799cb2302397e604f0cd6d49ff870"
+      },
+      "29": {
+        "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\parents\\TE_all\\seed_29\\selected.pt",
+        "sha256": "fa97ed82f8c4a1fe46cb961d4d496aa37703b91efd7cbb0d1e86ec2280e99594"
+      },
+      "47": {
+        "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\parents\\TE_all\\seed_47\\selected.pt",
+        "sha256": "cd88921a4cf942a9aa58af2d0b1312205c695351ae7880e77427d9d50bc0c04f"
+      }
+    }
+  },
+  "remaining": {
+    "additional_fits_per_surviving_architecture": 60,
+    "initial_financial_fits": 48,
+    "screen_folds": [
+      "F2",
+      "F6",
+      "F10",
+      "F14"
+    ],
+    "seeds": [
+      11,
+      29,
+      47
+    ],
+    "smoke_epochs": 2,
+    "smoke_fits": 4
+  },
+  "root": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z",
+  "screen_mapping_sha256": {
+    "F10": "33a47496a94d265237db2c263f80e42ae0722ea428bc0ae42607fb18c1ccc85d",
+    "F14": "1bb81ab0ec562ec838d46b8f4e8a1bee73161a3a8ce37a0bcd2316d4c934d38a",
+    "F2": "81fbee139510633a935c3721c187039288f9c77a3f6f3f28868e4947b2fa9663",
+    "F6": "4490beff39e4061b55185f1085a1a8e0c852c8a9cf333a3e9e1b446e4aab44bc"
+  },
+  "status": "verified_cpu_checkpoint_gpu_deferred"
+}
