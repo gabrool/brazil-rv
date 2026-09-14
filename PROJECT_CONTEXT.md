@@ -20,6 +20,11 @@ keep raw flags and sensitivities visible despite negligible terminal dust.
 Recovery and exact-instance closure are recorded in the
 [acceptance state](docs/v2_portfolio_policy_progress.md).
 
+The subsequent [decision-model postmortem](docs/v2_PORTFOLIO_DECISION_POSTMORTEM.md)
+qualifies the portfolio experiment's statistical interpretation and documents
+the stock/hedge return-calibration mismatch. Its audit does not change sealed
+scores, books, models or advancement decisions; proposed follow-ups are not runs.
+
 The post-Round-7 **data-only repair is accepted** for new development research.
 Resolve [the canonical data pointer](docs/v2_data_inputs.json); the new store is
 `v2_data_store_2d59b9d_20260913T211700Z`, manifest SHA-256

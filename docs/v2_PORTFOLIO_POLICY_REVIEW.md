@@ -212,6 +212,17 @@ across families. Selected epoch zero accounts for 14/42 S0, 17/42 TE and 17/42
 C6 fits. Learning is not reliably improving selection, and the nonzero selected
 updates do not translate into aggregate evaluation gains.
 
+**Subsequent audit qualification:** the [decision-model postmortem](v2_PORTFOLIO_DECISION_POSTMORTEM.md#7-a-material-statistical-correction-the-original-intervals-are-not-robust)
+quantifies a substantial boundary-weighting shift in this finite-block sampler.
+Boundary-balanced sensitivities include zero for all three learned-minus-optimizer
+contrasts at 20 and 40 sessions. The point estimates and failed advancement gates
+remain unchanged; statistical inferiority is less firmly supported than these
+original intervals suggest. Selected checkpoints often improve selection utility,
+but those improvements do not transfer into aggregate evaluation gains. The same
+postmortem identifies a stock/hedge calibration mismatch and incomplete
+forecast-reliability inputs; this experiment does not settle the capability of
+learned portfolio control generally.
+
 The continuous-book results support the same controller conclusion:
 
 | Family | Legacy | Optimizer | Learned 11 / 29 / 47 |
