@@ -130,3 +130,23 @@ No QP tolerance or constraint was loosened; monitor convergence after removing
 these pathological preferences. Prior full-batch results are not valid evidence
 for ranking policies. Repeat the actual-path acceptance and targeted regression
 checks, then run the original experiment roster from fresh policy states.
+
+### Identical-QP numerical retry and checkpoint continuation
+
+Default OSQP ADMM occasionally cycles: a captured S0/F2 solve still failed after
+200,000 iterations. A fresh solve with rho .01 and adaptive interval 25 converged
+in 1,600 iterations (~11ms); captured C6/F1 converged in 4,625 (~29ms). Add exactly
+one such retry only on iteration-limit status. Objective, constraints, 20,000
+per-attempt limit, 1e-8 tolerances and independent 2e-6 NAV residual check stay
+unchanged. The successful solver owns the derivative workspace. Infeasibility
+and a second numerical failure still stop. A regression checks retry solution
+and adjoint agreement. This is a solver resolution, not policy retuning.
+
+Resume compatible 0b34978 policy checkpoints after preserving their complete
+original directory and hashes. A one-time metadata migration records each
+original provenance and artifact hash, verifies the policy/account/training/data
+implementations are unchanged, and binds continuation to the retry revision.
+Model and optimizer tensors remain untouched. Completed models are reused with
+explicit origin, incomplete models continue from the last saved epoch; derived
+books are regenerated under the new source binding. Do not migrate checkpoints
+from the rejected 74c4021 state-feature implementation.

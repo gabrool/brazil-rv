@@ -34,21 +34,28 @@ class _SparseQP(torch.autograd.Function):
 
     @staticmethod
     def forward(ctx, q, lower, upper, p, a, warm_start):
-        solver = osqp.OSQP(algebra="builtin")
-        solver.setup(
-            P=p,
-            q=q.detach().numpy(),
-            A=a,
-            l=lower.detach().numpy(),
-            u=upper.detach().numpy(),
-            verbose=False,
-            eps_abs=1e-8,
-            eps_rel=1e-8,
-            max_iter=20000,
-            polishing=True,
-        )
-        solver.warm_start(x=warm_start)
-        result = solver.solve(raise_error=False)
+        for retry in (False, True):
+            solver = osqp.OSQP(algebra="builtin")
+            solver.setup(
+                P=p,
+                q=q.detach().numpy(),
+                A=a,
+                l=lower.detach().numpy(),
+                u=upper.detach().numpy(),
+                verbose=False,
+                eps_abs=1e-8,
+                eps_rel=1e-8,
+                max_iter=20000,
+                polishing=True,
+                **({"rho": 0.01, "adaptive_rho_interval": 25} if retry else {}),
+            )
+            solver.warm_start(x=warm_start)
+            result = solver.solve(raise_error=False)
+            # Some ill-conditioned epigraphs cycle with the default ADMM
+            # penalty. Retry the identical QP at identical tolerances; more
+            # iterations alone did not resolve the captured failure.
+            if result.info.status_val != 7:
+                break
         if result.info.status_val not in (1, 2):
             raise FloatingPointError(
                 f"allocation {result.info.status}: iterations={result.info.iter}, "

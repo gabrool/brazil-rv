@@ -76,3 +76,28 @@ def test_higher_cost_reduces_turnover_without_minimum_gross():
     base = solve(mu).abs().sum()
     costly = solve(mu, config=replace(AllocationConfig(), cost_bps=8)).abs().sum()
     assert costly < base
+
+
+def test_iteration_limit_retry_preserves_solution_and_adjoint(monkeypatch):
+    import osqp
+
+    mu = torch.tensor([0.00011, -0.00011], dtype=torch.float64, requires_grad=True)
+    expected = solve(mu)
+    expected_gradient = torch.autograd.grad(expected[0], mu)[0]
+    original = osqp.OSQP.solve
+    calls = 0
+
+    def first_iteration_limit(self, **kwargs):
+        nonlocal calls
+        result = original(self, **kwargs)
+        calls += 1
+        if calls == 1:
+            result.info.status_val = 7
+        return result
+
+    monkeypatch.setattr(osqp.OSQP, "solve", first_iteration_limit)
+    actual = solve(mu)
+    actual_gradient = torch.autograd.grad(actual[0], mu)[0]
+    assert calls == 2
+    assert actual.detach().numpy() == pytest.approx(expected.detach().numpy(), abs=1e-7)
+    assert actual_gradient.numpy() == pytest.approx(expected_gradient.numpy(), abs=1e-3)
