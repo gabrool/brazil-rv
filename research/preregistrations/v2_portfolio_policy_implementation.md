@@ -173,3 +173,22 @@ raising iteration limits alone with adaptive updates did not solve the cases.
 Remove the intermediate penalty grid rather than accumulating retry branches.
 No economic objective, constraint or derivative convention changes. Continue
 6b130a8 policy tensors with original source and receipt preserved as before.
+
+### Robust sparse interior-point initialization
+
+The last S0/F12 failure occurred in a cost-sensitivity replay (its policy fit
+was already complete). Fixed ADMM rho1 stalled on dual convergence. Replace all
+penalty restarts with one Clarabel0.11.1 sparse interior-point initialization,
+then warm-start a fresh OSQP workspace with its primal and correctly mapped
+interval dual solution. OSQP must still return fully solved at original1e-8
+accuracy before its native derivative is used. Clarabel uses1e-10 feasibility
+and gap tolerances. No objective, risk, accounting or gradient approximation is
+introduced. The cone representation splits finite lower/upper inequalities and
+keeps equality constraints exact. This small dependency resolves a demonstrated
+numerical failure; there is no generic solver framework.
+
+All five captured failures now solve with finite native adjoints in8–21ms;
+OSQP refinement takes25–225iterations.106 targeted tests pass, including forced
+fallback solution/adjoint parity. Retain compatible6e0ba2a checkpoints through
+the documented source/tensor-verified continuation; regenerate bound readouts.
+Reference: https://clarabel.org/stable/python/getting_started_py/ .

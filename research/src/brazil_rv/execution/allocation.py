@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 import numpy as np
+import clarabel
 import osqp
 import torch
 from scipy import sparse
@@ -23,6 +24,39 @@ class AllocationConfig:
     cost_bps: float = 4.0
 
 
+def _interior_point_start(p, q, a, lower, upper):
+    """Solve the identical sparse QP and map cone duals to interval duals."""
+    equal = np.isfinite(lower) & (lower == upper)
+    high = np.isfinite(upper) & ~equal
+    low = np.isfinite(lower) & ~equal
+    constraints = sparse.vstack((a[equal], a[high], -a[low]), format="csc")
+    bounds = np.r_[upper[equal], upper[high], -lower[low]]
+    n_equal, n_high = int(equal.sum()), int(high.sum())
+    settings = clarabel.DefaultSettings()
+    settings.verbose = False
+    settings.max_threads = 1
+    settings.tol_gap_abs = settings.tol_gap_rel = settings.tol_feas = 1e-10
+    result = clarabel.DefaultSolver(
+        p,
+        q,
+        constraints,
+        bounds,
+        [
+            clarabel.ZeroConeT(n_equal),
+            clarabel.NonnegativeConeT(n_high + int(low.sum())),
+        ],
+        settings,
+    ).solve()
+    if result.status != clarabel.SolverStatus.Solved:
+        raise FloatingPointError(f"allocation interior-point solve: {result.status}")
+    z = np.asarray(result.z)
+    dual = np.zeros(len(lower))
+    dual[equal] = z[:n_equal]
+    dual[high] += z[n_equal : n_equal + n_high]
+    dual[low] -= z[n_equal + n_high :]
+    return np.asarray(result.x), dual
+
+
 class _SparseQP(torch.autograd.Function):
     """Only preferences/bounds are learned; use OSQP's native vector adjoint.
 
@@ -34,28 +68,32 @@ class _SparseQP(torch.autograd.Function):
 
     @staticmethod
     def forward(ctx, q, lower, upper, p, a, warm_start):
-        for settings in (
-            {"max_iter": 20000},
-            {"rho": 1.0, "adaptive_rho": False, "max_iter": 200000},
-        ):
+        q_np, lower_np, upper_np = (
+            value.detach().numpy() for value in (q, lower, upper)
+        )
+        for interior_start in (False, True):
             solver = osqp.OSQP(algebra="builtin")
             solver.setup(
                 P=p,
-                q=q.detach().numpy(),
+                q=q_np,
                 A=a,
-                l=lower.detach().numpy(),
-                u=upper.detach().numpy(),
+                l=lower_np,
+                u=upper_np,
                 verbose=False,
                 eps_abs=1e-8,
                 eps_rel=1e-8,
                 polishing=True,
-                **settings,
+                max_iter=20000,
             )
-            solver.warm_start(x=warm_start)
+            if interior_start:
+                x, dual = _interior_point_start(p, q_np, a, lower_np, upper_np)
+                solver.warm_start(x=x, y=dual)
+            else:
+                solver.warm_start(x=warm_start)
             result = solver.solve(raise_error=False)
-            # Some ill-conditioned epigraphs cycle with the default ADMM
-            # penalty updates. Retry with a fixed penalty at the same tolerances;
-            # more iterations with adaptive updates did not resolve cycling.
+            # Interior-point primal/dual initialization resolves ADMM cycling
+            # without changing the objective or tolerances. OSQP still verifies
+            # optimality and owns the native derivative workspace.
             if result.info.status_val not in (2, 7):
                 break
         if result.info.status_val != 1:
