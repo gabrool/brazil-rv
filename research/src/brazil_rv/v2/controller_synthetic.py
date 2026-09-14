@@ -46,6 +46,9 @@ def synthetic_data(seed=201, days=640, names=32):
     returns = np.zeros_like(signal)
     returns[1:] = 0.003 * signal[:-1] * regime[:-1, None] + noise[1:]
     shock_days = np.arange(5, days, 16)
+    # Zero-opportunity episodes contain only unpredictable noise. A systematic
+    # adverse rank shock there would itself be a learnable short opportunity.
+    shock_days = shock_days[regime[shock_days - 1] != 0]
     returns[shock_days] -= 0.02 * signal[shock_days - 1]
     close = 100 * np.cumprod(1 + returns, axis=0)
     dates, day = [], date(2021, 1, 4)

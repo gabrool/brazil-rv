@@ -111,6 +111,14 @@ NAV discrepancy fell from 1.186e-4 to 9.882e-12. A regression covers ignored
 entries, residual inventory and reversals. Preserve the pre-fix synthetic fits
 and retrain them; they do not count as final learning acceptance.
 
+The synthetic generator's original periodic adverse shock also affected its
+nominal zero-alpha episodes. That creates predictable negative rank alpha, so
+requiring inactivity there was not a valid zero-opportunity test. Restrict those
+shocks to the continuation/reversal episodes; zero episodes now have independent
+zero-mean noise only. Preserve the completed post-account-fix attempts as
+`synthetic_nonzero_null`. No financial outcome motivated this correction and
+the model, noise draws, optimizer and acceptance thresholds are unchanged.
+
 ## Financial roster and decisions
 
 Fit TE_all .2 and C6 on F2/F6/F10/F14. S0 remains a deterministic reference from
