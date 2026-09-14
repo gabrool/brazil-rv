@@ -1,8 +1,7 @@
 # Cash-aware portfolio experiment and conditional attention follow-up
 
-Review date: 2026-09-14. The main experiment and the registered rich-attention
-screen and remaining-fold confirmation are complete. Final recovery and paid
-instance shutdown are being verified; see the completion record at the end.
+Completed 2026-09-14. The main experiment, rich-attention screen and remaining-fold
+confirmation, artifact recovery and paid-instance shutdown are complete.
 
 ## What the main experiment establishes
 
@@ -417,5 +416,13 @@ Primary evidence:
 - [Main recovery receipt](v2_portfolio_policy_recovery.json) and
   [attention recovery receipt](v2_portfolio_attention_recovery.json).
 
-All scientific work is complete. GitHub synchronization and exact-instance
-shutdown are the remaining operational closure steps at this report checkpoint.
+All scientific work is complete. Local main, GitHub and the clean host checkout
+matched commit `25443d75ab7f49ebd67f5316a6385a62cf84d623` before shutdown; the
+verified Git bundle is retained locally and on persistent storage. Later closing
+commits only record operational completion and the shutdown evidence.
+
+The exact paid instance `ee625bd03bdc41fd9ba676de6e171511` was submitted for
+termination at 20:02:23 UTC. Lambda inventories independently confirmed it absent
+at 20:04:34.767 UTC and 20:04:43.167 UTC on September 14 (17:04 Brasília time).
+The five-minute monitor is paused. See the [shutdown receipt](v2_portfolio_policy_shutdown.json).
+No further experiment, forward capture or live deployment remains running.

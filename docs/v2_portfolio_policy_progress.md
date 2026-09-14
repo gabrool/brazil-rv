@@ -327,3 +327,17 @@ Remaining ONLY: commit/pushclosingreport; transferverifiedgitbundleandfast-forwa
 originalhostcheckout(ifclean); recordmatchingcodecommit; terminateexactpaidID
 ee625bd03bdc41fd9ba676de6e171511 usingDPAPIprovidercredential; verifyabsencetwice;
 writeclosureevidenceandfinaldocscommit; pauseheartbeat. Noactivecomputeleft.
+
+## CLOSED — 2026-09-14
+
+All authorized work is complete. No experiments or paid instance remain active.
+Scientific code/report commit25443d75ab7f49ebd67f5316a6385a62cf84d623 matched clean
+localmain,GitHub,andhost before shutdown. Verified source bundle retained locally
+andpersistent; SHA256ba76858c877d44a285aa0bc472f3593d325a6810c89d536b6ac747ed79fda0f5.
+Termination of exactee625bd03bdc41fd9ba676de6e171511 requested20:02:23UTC;
+provider inventories confirmedabsence20:04:34.767UTC and20:04:43.167UTC.
+Receipt docs/v2_portfolio_policy_shutdown.json. MonitorPAUSED. Do not restart.
+The final comprehensive LLM review is docs/v2_PORTFOLIO_POLICY_REVIEW.md.
+Laterdocumentationcommitrecordsclosureonly; allscientificsourceswerealready
+pushedandhost-synchronizedbeforetermination. No new controller or architecture
+waspromoted; settlementuncertaintyandnegative/inconclusiveresultsareexplicit.

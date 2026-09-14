@@ -1,0 +1,32 @@
+{
+  "status": "verified_absent_twice",
+  "instance_id": "ee625bd03bdc41fd9ba676de6e171511",
+  "ip": "192.222.51.211",
+  "requested_at_utc": "2026-09-14T20:02:23.103979Z",
+  "synchronized_commit": "25443d75ab7f49ebd67f5316a6385a62cf84d623",
+  "synchronized_bundle_sha256": "ba76858c877d44a285aa0bc472f3593d325a6810c89d536b6ac747ed79fda0f5",
+  "main_required_members_verified": 11464,
+  "attention_required_members_verified": 1829,
+  "absence_observations": [
+    {
+      "at_utc": "2026-09-14T20:03:05.2458965Z",
+      "present": true,
+      "status": "terminating"
+    },
+    {
+      "at_utc": "2026-09-14T20:03:13.6420393Z",
+      "present": true,
+      "status": "terminating"
+    },
+    {
+      "at_utc": "2026-09-14T20:04:34.7672489Z",
+      "present": false,
+      "status": "absent"
+    },
+    {
+      "at_utc": "2026-09-14T20:04:43.1673632Z",
+      "present": false,
+      "status": "absent"
+    }
+  ]
+}
