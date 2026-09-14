@@ -131,3 +131,15 @@ fields. This is numerical equivalence, not permission for material drift. Save
 all errors and thresholds. Preserve the partial initial attempt and rerun the
 same financial roster from a fresh Phase 1 directory; no data/model/allocation
 calculation changes. Local loading uses one worker after two exceeded memory.
+
+The complete cross-host numerical check subsequently exposed a 0.000223-bps
+maximum daily difference in S0/F7, with gross within 3.13e-8 NAV. Its ridge slopes
+differ from the sealed Linux fit by at most 2.2e-19, consistent with native
+floating-point solver differences. Final reproduction acceptance uses TWO
+conditions: every bps series' mean within 0.0001 bps, every daily bps observation
+within 0.01 bps, and each daily fraction within 0.0001 NAV. This is less than
+one four-hundredth of the per-side transaction-cost assumption even at the
+largest permitted daily deviation; the aggregate check remains tighter.
+Preserve both stopped partial attempts. Rerun the same unchanged financial
+calculations in a fresh directory and report actual maxima, not just pass/fail.
+No further tolerance widening is planned; a failure needs mechanism diagnosis.

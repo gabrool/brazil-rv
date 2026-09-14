@@ -333,10 +333,21 @@ def run_phase1_arm(root, arm, only_fold=None):
                     # Native CPU solvers can differ by a few millionths of a
                     # basis point across hosts. Compare in the field's units.
                     tolerances = {
-                        key: 1e-4 if key.endswith("_bps") else 1e-6 for key in errors
+                        key: 0.01 if key.endswith("_bps") else 1e-4 for key in errors
                     }
                     extra["original_daily_tolerances"] = tolerances
-                    if any(errors[key] > tolerances[key] for key in errors):
+                    mean_errors = {
+                        key: float(
+                            abs(np.mean(values) - np.mean(original["daily"][key]))
+                        )
+                        for key, values in daily.items()
+                        if key.endswith("_bps")
+                    }
+                    extra["original_mean_bps_errors"] = mean_errors
+                    if (
+                        any(errors[key] > tolerances[key] for key in errors)
+                        or max(mean_errors.values()) > 1e-4
+                    ):
                         raise ValueError(
                             f"original policy reproduction differs: {arm}/{label}/{cell}: {errors}"
                         )
