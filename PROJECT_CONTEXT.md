@@ -31,6 +31,13 @@ Stages D–F, new forward capture and 2025/2026 consumer reads remain outside th
 The user also authorized the [matched attention ASAM .5 extension](research/preregistrations/v2_post_data_attention_asam50.md)
 alongside .2 for all four attention variants. Preserve the original calibration
 choice; reuse identical parents and compatible B fits, and report both radii.
+The combined numerical program is complete: 27 P, 188 distinct F fits, 13 screen
+cells and 52 accepted books. TE_all .2 has the strongest observed screen IC
+(.027103 versus S0 .018849), with no established paired economic superiority;
+slow early attention does not beat its matched late control. ASAM .5 reduces
+rich TE_all IC. These are nominal development results, not an automatic promotion.
+See [the complete review](docs/v2_POST_DATA_ABC.md) and its source-bound results,
+diagnostic correction and verified recovery. S0 remains the established comparator.
 
 Round 7 and its separately frozen temporal pathway extension are complete. Both
 retain A0 (repaired-store S0) as the research comparator; no new architecture

@@ -1,0 +1,32 @@
+{
+  "authorization": "User explicitly requested attention with .5 in addition to current .2 on 2026-09-13 America/Sao_Paulo",
+  "calibration_choice_sha256": "35c456dc373c5f0e43c30457153383a370289d3a1cfca563266642075ae43d1f",
+  "cells": [
+    "TE_slow",
+    "TL_slow",
+    "TE_family",
+    "TE_all"
+  ],
+  "extension_plan_sha256": "a9f7f726ca2bc7f3701c726ac3b949a62d009088a07d5efa9c92e85e843fba6b",
+  "folds": [
+    "F2",
+    "F6",
+    "F10",
+    "F14"
+  ],
+  "frozen_design_sha256": "d5fecc8496dda7fc0a2b2b51a3e7642bfb2399d7670bc80dcc8391f699f87ed0",
+  "interpretation": "Additional matched development comparison, not a replacement calibration choice or automatic promotion; all other training and book contracts unchanged",
+  "launcher_sha256": "bf98f03acca5e3d66f6a8989f8791337b3367f30730dbdcf83197c1a1e1e628a",
+  "new_fits": 44,
+  "original_screen_plan_sha256": "d8d9f051a06cbc7fbe20fc56d59c03e7c3bd5d6d65e5ebd24ee09bdd31544a1a",
+  "parents": "Same selected SAM .125 parents as the corresponding .2 fits; no new P fits",
+  "recipe": "asam50",
+  "registration_sha256": "3a7d8b3af0b0f5f7f32ab714b338543198b882403d8ac4419d8b709e7241d981",
+  "reused_fits": "TE_slow F2/F14 seeds11/29 from Stage B; score attachment only",
+  "scored_fits": 48,
+  "seeds": [
+    11,
+    29,
+    47
+  ]
+}

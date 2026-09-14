@@ -1,0 +1,109 @@
+{
+  "status": "passed",
+  "all_final_paths_covered_exactly": true,
+  "files": 6796,
+  "raw_bytes": 18571092654,
+  "inventory_sha256": "f9427d68eb45ca049d5daf53ff24f28608c6959e9b276a37a48ac0bd94ee7260",
+  "archive_order_sha256": "a3941e16cfc11a38a81b5dd6bd9159b24c5a42e2c3da8a5b24501e10aa757fbe",
+  "archives_in_restore_order": [
+    {
+      "manifest": "C:\\quant-data\\b3\\processed\\model_runs\\v2_post_data_368fbf7_20260914T004400Z\\archives\\financial_recovery_b_parents.json",
+      "archive": "C:\\quant-data\\b3\\processed\\model_runs\\v2_post_data_368fbf7_20260914T004400Z\\archives\\financial_recovery_b_parents.tar.xz",
+      "archive_sha256": "f9c731be589f02a2983dd1d2eb849c160c2fab8565928dba5c391996a3c5867d",
+      "manifest_sha256": "8fd4de594d3af856e9a200079a2b6fe557c9d72e13785d8cc50a4d53ed64ae18",
+      "verification": "C:\\quant-data\\b3\\processed\\model_runs\\v2_post_data_368fbf7_20260914T004400Z\\archives\\financial_recovery_b_parents.verified.json"
+    },
+    {
+      "manifest": "C:\\quant-data\\b3\\processed\\model_runs\\v2_post_data_368fbf7_20260914T004400Z\\archives\\financial_recovery_b_calibration_01.json",
+      "archive": "C:\\quant-data\\b3\\processed\\model_runs\\v2_post_data_368fbf7_20260914T004400Z\\archives\\financial_recovery_b_calibration_01.tar.xz",
+      "archive_sha256": "36fa87dcae27d37fdc029be9c26b5f3539773dd25efa15e156d87893dc8596f1",
+      "manifest_sha256": "b8a6421eb7bf777f0b2aefc445c87ca584897635f88e3f74b054c3897a31cbf2",
+      "verification": "C:\\quant-data\\b3\\processed\\model_runs\\v2_post_data_368fbf7_20260914T004400Z\\archives\\financial_recovery_b_calibration_01.verified.json"
+    },
+    {
+      "manifest": "C:\\quant-data\\b3\\processed\\model_runs\\v2_post_data_368fbf7_20260914T004400Z\\archives\\financial_recovery_b_calibration_02.json",
+      "archive": "C:\\quant-data\\b3\\processed\\model_runs\\v2_post_data_368fbf7_20260914T004400Z\\archives\\financial_recovery_b_calibration_02.tar.xz",
+      "archive_sha256": "5776f245f57f0ef37f19cc667a07ac401587c4bd9933f918aa6fecb341f31225",
+      "manifest_sha256": "38970f8ae3faf062e7b82c8f2a99a5a1e0d77ff9f3c38f2831db5b3d9766fb04",
+      "verification": "C:\\quant-data\\b3\\processed\\model_runs\\v2_post_data_368fbf7_20260914T004400Z\\archives\\financial_recovery_b_calibration_02.verified.json"
+    },
+    {
+      "manifest": "C:\\quant-data\\b3\\processed\\model_runs\\v2_post_data_368fbf7_20260914T004400Z\\archives\\financial_recovery_b_calibration_03.json",
+      "archive": "C:\\quant-data\\b3\\processed\\model_runs\\v2_post_data_368fbf7_20260914T004400Z\\archives\\financial_recovery_b_calibration_03.tar.xz",
+      "archive_sha256": "5474a6f8f1eaa7dbd16c1c2fe7bb30b36589d1e22841049ec753db276297847b",
+      "manifest_sha256": "d34ec0fd215738e6dfa4e627f7411048c85a99f29509195622d202b21de852b8",
+      "verification": "C:\\quant-data\\b3\\processed\\model_runs\\v2_post_data_368fbf7_20260914T004400Z\\archives\\financial_recovery_b_calibration_03.verified.json"
+    },
+    {
+      "manifest": "C:\\quant-data\\b3\\processed\\model_runs\\v2_post_data_368fbf7_20260914T004400Z\\archives\\financial_recovery_c_parents_01.json",
+      "archive": "C:\\quant-data\\b3\\processed\\model_runs\\v2_post_data_368fbf7_20260914T004400Z\\archives\\financial_recovery_c_parents_01.tar.xz",
+      "archive_sha256": "184f6548f06bc2b2d709dbe249ad4cd93e844c27ed1ec8459c69bc4b252c2c5e",
+      "manifest_sha256": "7fc6d6e6bb908a206c83ea9c54e95abfd2d8abbe728a7bed1f64d666f2991dc8",
+      "verification": "C:\\quant-data\\b3\\processed\\model_runs\\v2_post_data_368fbf7_20260914T004400Z\\archives\\financial_recovery_c_parents_01.verified.json"
+    },
+    {
+      "manifest": "C:\\quant-data\\b3\\processed\\model_runs\\v2_post_data_368fbf7_20260914T004400Z\\archives\\financial_recovery_c_screen_progress_01_01.json",
+      "archive": "C:\\quant-data\\b3\\processed\\model_runs\\v2_post_data_368fbf7_20260914T004400Z\\archives\\financial_recovery_c_screen_progress_01_01.tar.xz",
+      "archive_sha256": "886a96cccdbee472c18e758040241c76a0d39a88eb08915c5a3f5b338dc9b4e5",
+      "manifest_sha256": "2695cb479ddd3eeff416b9ae1a3c457d5781441a8ab309217f6967e04efd2f6e",
+      "verification": "C:\\quant-data\\b3\\processed\\model_runs\\v2_post_data_368fbf7_20260914T004400Z\\archives\\financial_recovery_c_screen_progress_01_01.verified.json"
+    },
+    {
+      "manifest": "C:\\quant-data\\b3\\processed\\model_runs\\v2_post_data_368fbf7_20260914T004400Z\\archives\\financial_recovery_c_screen_progress_02_01.json",
+      "archive": "C:\\quant-data\\b3\\processed\\model_runs\\v2_post_data_368fbf7_20260914T004400Z\\archives\\financial_recovery_c_screen_progress_02_01.tar.xz",
+      "archive_sha256": "81a782beae344ee85630feb6e8280085d88ddb20be2c0237f9dca247ed94c13c",
+      "manifest_sha256": "8a285a9614cc9181e7e120bfb63e720cd34d09d3e23be9f34ac99009be3d66c8",
+      "verification": "C:\\quant-data\\b3\\processed\\model_runs\\v2_post_data_368fbf7_20260914T004400Z\\archives\\financial_recovery_c_screen_progress_02_01.verified.json"
+    },
+    {
+      "manifest": "C:\\quant-data\\b3\\processed\\model_runs\\v2_post_data_368fbf7_20260914T004400Z\\archives\\financial_recovery_c_screen_progress_02_02.json",
+      "archive": "C:\\quant-data\\b3\\processed\\model_runs\\v2_post_data_368fbf7_20260914T004400Z\\archives\\financial_recovery_c_screen_progress_02_02.tar.xz",
+      "archive_sha256": "ae3d816251c4c04e88cf861ebd510ce230a4e9c6f538144dc73b98da501a4d38",
+      "manifest_sha256": "d95f2445ba459e0325e832351c20b94a13dc6bab3e922cf31f3dbada23a95778",
+      "verification": "C:\\quant-data\\b3\\processed\\model_runs\\v2_post_data_368fbf7_20260914T004400Z\\archives\\financial_recovery_c_screen_progress_02_02.verified.json"
+    },
+    {
+      "manifest": "D:\\quant-data\\b3\\processed\\model_runs\\v2_post_data_368fbf7_20260914T004400Z\\archives\\financial_recovery_c_screen_01.json",
+      "archive": "D:\\quant-data\\b3\\processed\\model_runs\\v2_post_data_368fbf7_20260914T004400Z\\archives\\financial_recovery_c_screen_01.tar.xz",
+      "archive_sha256": "ec92782b2a5a5099dfc2278272d3670169e64ff0a4c30bb5a4c8c3fab51bfac8",
+      "manifest_sha256": "1f8cdee1d03766f34bb81209126373b8bba8825075ef7c7066171a9cde9fe435",
+      "verification": "D:\\quant-data\\b3\\processed\\model_runs\\v2_post_data_368fbf7_20260914T004400Z\\archives\\financial_recovery_c_screen_01.verified.json"
+    },
+    {
+      "manifest": "D:\\quant-data\\b3\\processed\\model_runs\\v2_post_data_368fbf7_20260914T004400Z\\archives\\financial_recovery_c_screen_02.json",
+      "archive": "D:\\quant-data\\b3\\processed\\model_runs\\v2_post_data_368fbf7_20260914T004400Z\\archives\\financial_recovery_c_screen_02.tar.xz",
+      "archive_sha256": "1e82b6431613cb67988ac1d36007319f0d3b0dd71252ed0b15e2d0c0a6cea578",
+      "manifest_sha256": "ea59a82b3f9d5ec611a0e47c40a151f4fe5a00836dc5fce6bc14a826dd7a33ea",
+      "verification": "D:\\quant-data\\b3\\processed\\model_runs\\v2_post_data_368fbf7_20260914T004400Z\\archives\\financial_recovery_c_screen_02.verified.json"
+    },
+    {
+      "manifest": "C:\\quant-data\\b3\\processed\\model_runs\\v2_post_data_368fbf7_20260914T004400Z\\archives\\financial_recovery_attention_asam50_01.json",
+      "archive": "C:\\quant-data\\b3\\processed\\model_runs\\v2_post_data_368fbf7_20260914T004400Z\\archives\\financial_recovery_attention_asam50_01.tar.xz",
+      "archive_sha256": "9327c6beb591130c65330db4d3085ed931db9f053b914a46ee60f2447239e253",
+      "manifest_sha256": "be579871beb245ec338228a3a25e60ed65fb2f35c14d0f5953277dffe25d6912",
+      "verification": "C:\\quant-data\\b3\\processed\\model_runs\\v2_post_data_368fbf7_20260914T004400Z\\archives\\financial_recovery_attention_asam50_01.verified.json"
+    },
+    {
+      "manifest": "D:\\quant-data\\b3\\processed\\model_runs\\v2_post_data_368fbf7_20260914T004400Z\\archives\\financial_recovery_attention_asam50_02.json",
+      "archive": "D:\\quant-data\\b3\\processed\\model_runs\\v2_post_data_368fbf7_20260914T004400Z\\archives\\financial_recovery_attention_asam50_02.tar.xz",
+      "archive_sha256": "4a7a6f9462653b94040730587da7a4cbd0e83560328bf817189a14ed1f51d949",
+      "manifest_sha256": "1ba535f2ac020f30ab74f1b375cb7bd1f1846a4b06ad19371a5472b10c64fe33",
+      "verification": "D:\\quant-data\\b3\\processed\\model_runs\\v2_post_data_368fbf7_20260914T004400Z\\archives\\financial_recovery_attention_asam50_02.verified.json"
+    },
+    {
+      "manifest": "D:\\quant-data\\b3\\processed\\model_runs\\v2_post_data_368fbf7_20260914T004400Z\\archives\\financial_recovery_final_01.json",
+      "archive": "D:\\quant-data\\b3\\processed\\model_runs\\v2_post_data_368fbf7_20260914T004400Z\\archives\\financial_recovery_final_01.tar.xz",
+      "archive_sha256": "2766a501ad04dec9fb6fb018336a9dd1067779ae8068558d1a9fa56d7c4d24e9",
+      "manifest_sha256": "98de26019b8fcbf877025543e9cb2446605714f6576f82eecfeb27ddb9962657",
+      "verification": "D:\\quant-data\\b3\\processed\\model_runs\\v2_post_data_368fbf7_20260914T004400Z\\archives\\financial_recovery_final_01.verified.json"
+    }
+  ],
+  "recovery_form": "Lossless locally retained archives; every member verified by the referenced receipts. Apply archives in order to restore the final inventory. No unpacked model mirror is claimed.",
+  "published_result_copies_match_final_inventory": {
+    "docs/v2_post_data_screen_original.json": "screen_result.json",
+    "docs/v2_post_data_screen.json": "screen_with_attention_asam50.json",
+    "docs/v2_post_data_screen_diagnostics.json": "screen_with_attention_asam50_diagnostics.json",
+    "docs/v2_post_data_alignment_repair.json": "diagnostic_repair/verification.json",
+    "docs/v2_post_data_attention_amendment.json": "attention_asam50_amendment.json"
+  }
+}

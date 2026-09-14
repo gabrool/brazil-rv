@@ -181,7 +181,25 @@ failure log is retained, then the corrected diagnostic completed. No fit,
 recipe or evaluation score changed. B's end-to-end 4P+44F runner took
 29m20s (00:44:00–01:13:20 UTC); subsequent audit/recovery time is separate.
 
-## Stage C — in progress
+## Stage C — accepted, including the user-requested .5 extension
+
+All 27 P and 188 distinct F fits completed across the combined program. C has
+156 scored fits, 13 cells and 52 accepted books. The reference plan was revisited
+after completion; no D–F work or held-out access was added. TE_all .2 has the
+strongest observed IC (.027103 versus S0 .018849); economic superiority is not
+established. Slow early attention does not beat matched late attention. The .5
+extension reduces rich TE_all IC; both radii remain in the report. See
+[the combined review](v2_POST_DATA_ABC.md) for uncertainty, seed/era sensitivity,
+training curves, the S0_common ceiling, and settlement/source limitations.
+
+Final audit corrected only policy-composite alignment diagnostics. The initial
+helper used legacy horizons; the actual books already used the correct policy.
+Five targeted tests passed, and the repair verified all 52 books and protected
+score/readout artifacts exactly unchanged. Original diagnostic receipts remain.
+All 6,796 final financial files (18,571,092,654 raw bytes) have been recovered in
+locally verified lossless archives; their chronological union matches the final
+remote inventory exactly. Published JSON copies also match. Exact-instance
+shutdown remains the final operational step.
 
 User-authorized extension: additionally test attention ASAM .5 alongside .2
 for TE_slow, TL_slow, TE_family and TE_all. See
