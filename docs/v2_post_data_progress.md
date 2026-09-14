@@ -74,7 +74,7 @@ F14 canonical collation/transfer was 228 ms versus .69 ms per cached gather;
 this is an input-stage comparison, not a complete-fit speedup. The plan was
 re-read after this A efficiency amendment. Full-fit resources remain to measure.
 
-## Stage B — in progress
+## Stage B — accepted
 
 Unseen-date full-model teachers, then fit/selection-only financial calibration.
 Freeze screen settings/roster before evaluation-score access. Re-read the plan
@@ -158,8 +158,38 @@ beta arrays unchanged. F calibration remains in progress; do not infer a
 chosen recipe or financial screen winner from partial results. The combined
 [review document](v2_POST_DATA_ABC.md) is explicitly marked work in progress.
 
-## Stage C — pending
+Stage B closed after re-reading reference sections 6.3 and 9. All 4 P and
+44 F fits completed without a ceiling hit. The registered rule selects
+ASAM .2 for TE/TL (selection IC .030505; .5 is within the .001 tie band) and
+ASAM .5 for C1 (IC .036144). The selected/terminal full-fit maxima across
+48 runs are .1323/.1536; the previous .8-type trajectory is not reproduced
+in this bounded program. F14 consistently prefers epoch1/2, and its low
+selection IC remains an unresolved modeling/transfer question, not something
+to conceal with longer training. Increasing the transfer LR does not improve
+the matched F14 mean for either lane.
+
+The temporal and peer modules have finite nonzero selected-state updates;
+peer bypass changes scores, with sampled normalized peer entropy .760–.973
+under the chosen attention recipe. FiLM is active, with selected gamma RMS
+.187–.692. These are functional diagnostics, not evidence of useful alpha.
+A selected-state precision check covers all eight chosen calibration fits
+and all selection dates: BF16-versus-FP32 score-rank correlations exceed
+.99984, centered RMS discrepancies are .246–.759% of cross-sectional score
+spread, and the largest selection-IC difference is .000285. Keep the frozen
+BF16 precision. The check initially hit a dataset-close typo; the original
+failure log is retained, then the corrected diagnostic completed. No fit,
+recipe or evaluation score changed. B's end-to-end 4P+44F runner took
+29m20s (00:44:00–01:13:20 UTC); subsequent audit/recovery time is separate.
+
+## Stage C — in progress
 
 Fresh incumbent/common-recipe and GRU/early/late comparisons, then repaired
 family and FiLM contrasts on four folds and three seeds. Recover artifacts,
 publish a combined report, and close the exact paid instance.
+
+The complete roster and chosen recipes are frozen before evaluation access.
+Use six isolated jobs for C to fill preparation/compilation gaps: measured
+F14 peak allocated memory is about10.44GB per candidate, so six fit within
+the97.9GB GPU. This changes only concurrency, not seeds, data, batch size,
+model width, precision or the selected training recipe. Monitor actual use.
+The remote training checkout remains368fbf7 while local report commits advance.

@@ -1,6 +1,6 @@
 # Post-data stages A–C: training, relational learning and matched financial screen
 
-**Work in progress. Stage A and the qualified relational engineering gate are accepted; financial calibration and the matched screen are not yet complete.** This document will be completed with their results and recovery evidence. Do not treat the engineering results below as a financial model ranking.
+**Work in progress. Stages A and B are accepted; Stage C is running.** This document will be completed with the matched financial screen and recovery evidence. Calibration selection IC is not the screen's financial result.
 
 ## Purpose and fixed research boundary
 
@@ -86,8 +86,34 @@ Stage B calibrates TE_slow and C1_all on F2/F14, seeds 11/29, under SAM .125, AS
 
 Stage C uses F2/F6/F10/F14 and seeds 11/29/47: twelve F fits per cell. TE/TL variants share the attention lane's selected recipe; C1 variants share the rich-GRU choice. S0_common retains common SAM .125, and S0 retains its own recipe. The complete A–C financial roster requires 27 P fits and 144 distinct F fits; eight B fits can attach C scores without retraining. No fourth seed or extra development fold is silently added.
 
-## Financial results and stage closure
+Calibration deliberately uses early and late development selection periods, then maps one recipe across the screen. This is a retrospective development comparison, not a claim that the tuned recipe would already have been chosen at each early historical trading date. Features, preprocessing and fitted weights remain bounded to each fold's permitted history; global research selection is a separate source of optimism that a four-fold screen cannot eliminate.
 
-Pending completion of Stage B and Stage C. Final sections will include the deterministic calibration decision, selected/terminal trajectory comparison, fit/selection gaps, module diagnostics, paired IC and book economics, seed/fold and omission sensitivity, resource timing and artifact recovery.
+## Stage B financial result
+
+All 4 P and 44 F runs completed; none hit the 60-epoch ceiling. The complete runner took 29m20s, including initialization, preprocessing, caching, compilation, fitting, selection, diagnostics and sealing. Audit and recovery time are additional. [Calibration choices](v2_post_data_calibration_choice.json), [full trajectories and probes](v2_post_data_calibration_diagnostics.json) and [selected-state precision](v2_post_data_calibration_precision.json) provide the machine-readable evidence.
+
+| F recipe | TE_slow mean selection IC | C1_all mean selection IC |
+| --- | ---: | ---: |
+| SAM .125 | .023561 | .030038 |
+| ASAM .2 | **.030505 — selected** | .033728 |
+| ASAM .5 | .031099 | **.036144 — selected** |
+| SAM .125, LR3e-4 | .022148 | .034140 |
+| SAM .05 | .026627 | .027907 |
+
+Each mean weights the same four fold/seed fits equally. The declared .001 tie band chooses ASAM .2 for attention, even though .5's point estimate is slightly higher. The C1 choice is .5. These are development selection outcomes, not proof of financial improvement or architecture superiority.
+
+For selected attention ASAM .2, mean full clean-fit IC was .068825 at selection and .088723 at termination. For selected C1 ASAM .5 it was .056219/.070841. Across all 48 P/F trajectories the largest selected/terminal full-fit IC was .132271/.153556. The earlier .8-type fit trajectory is not reproduced within this bounded program; this does not isolate ASAM as the only cause or establish that every form of overfitting has been solved. P selections varied from epoch4 to34. F2 selected attention at19/15 and rich GRU at13/22; F14 selected at1/2. Weak F14 selection remains a real diagnostic finding.
+
+The transfer multiplier1.0 bridge has only two F14 fits. For attention, its mean .009080 is below matched SAM .125/.3 transfer's .010812. For C1 it is .006472 versus .006674. It does not support increasing transfer LR and cannot enter the four-fit recipe ranking.
+
+Selected temporal/peer parameters receive nonzero updates. Attention peer-bypass score movement was .431–1.036 of clean score standard deviation across the four selected fits; sampled peer entropy/log-key-count was .760–.973. C1 FiLM gamma RMS was .187–.692. These indicate active routes, not useful financial contribution. Whole-trajectory gradient clipping was at most8.01% under selected TE ASAM .2 and .214% under selected C1 ASAM .5, rather than persistent clipping of every step.
+
+BF16 score ties prompted a bounded precision readout on all selection dates of the eight selected calibration fits. Score-rank correlation against FP32 exceeded .99984; centered RMS error was .246–.759% of cross-sectional score standard deviation, and the largest selection-IC difference was .000285. An FP32 final head also made only small differences. Eager-versus-registered compiled BF16 selection differences for TE were below .0001. Keep the frozen precision: the observed ties do not justify changing the financial model. The diagnostic's initial dataset-close typo and subsequent successful correction are retained in the log; no training run was changed.
+
+Stage B was verified against the reference plan before Stage C. C uses six isolated jobs, within the measured roughly10.44GB-per-F14-fit allocation and97.9GB GPU capacity, to reduce preparation/compilation gaps. This is a concurrency choice with unchanged batches, histories, names, parameters and recipes.
+
+## Stage C financial results and closure
+
+Pending completion of Stage C. Final sections will include paired IC and book economics, seed/fold and omission sensitivity, resource timing and complete artifact recovery.
 
 The economic rebind already passed: all four hedge-beta arrays are exactly unchanged under the repaired-store provenance. Ledger costs, borrow scenarios, execution policy and terminal qualifications remain fixed. C will report per-head and actual book-composite alignment, neutral/scaled/shareholder/price targets on matched populations, and persistence. Paired uncertainty uses within-fold 20-session moving blocks, a 60-session sensitivity, 10,000 draws and seed 20260913. Legacy helper readouts with other head definitions are auxiliary and cannot replace the explicit traded-head comparison. The intervals are nominal development diagnostics, not multiplicity-adjusted confirmation.
