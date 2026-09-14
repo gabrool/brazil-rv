@@ -143,3 +143,15 @@ and 32 tiny residual positions totaling 1.1228e-9 NAV-equivalent notional. This
 triggers strict unresolved_count>0 despite negligible exposure. Preserve raw
 flags/counts and distinguish numerical dust from material unresolved exposure
 in the final review; do not alter live training merely to suppress the flag.
+
+Current continuation supersedes the preceding PID/revision: shell68061, clean
+policy checkout98c2dbb, log model_runs/_ops/portfolio_policies_solver_98c2dbb.log.
+One remaining C6/F1 fit QP cycled at rho .01; captured exact problem converges at
+rho .001 in4,425iterations. Retry is now bounded to default then .01/.001/.1
+(interval25), with unchanged objective/tolerances/constraints. Original9160b19
+chain stopped;185checkpointfiles including85completedfits continued with exact
+model/optimizer tensors and original provenance preserved. Archive:
+ROOT/solver_resume_source_9160b19 (also retains prior migration receipt).
+Current ROOT/policy_solver_resume.json binds9160b19→98c2dbb. Both migration
+scripts/capturedfailures retained. Do not re-run either migration. Same phase
+chain resumes remaining fits and regenerates books under current binding.
