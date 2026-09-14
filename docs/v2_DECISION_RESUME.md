@@ -248,3 +248,10 @@ never terminates instances. Do not leave a paid host waiting for a later review.
 The existing capacity automation remains paused. There is no forward-capture job
 to restart. The earlier portfolio instance was already terminated before this
 program; do not treat it as the instance for this future launch.
+
+At this checkpoint C: has less than 0.4 GiB free and D: approximately 1.2 GiB.
+Do not start a large local extraction blindly. Reuse verified persistent inputs,
+recover compressed artifacts selectively, and check actual free space before
+copying. The CPU checkpoint record identifies the verified local archive; that
+archive is a local recovery copy, not a claim of S3 upload. Existing canonical raw
+data, the repaired store and original source archives remain untouched.
