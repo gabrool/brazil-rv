@@ -158,3 +158,9 @@ original defaults then rho .01/.001/.1, each with interval25 and20,000 iteration
 All attempts solve the identical QP; no objective scaling or regularization is
 introduced. Apply the same source-verified checkpoint continuation from9160b19,
 preserving its archive/receipt and all completed compatible fit tensors.
+
+OSQP's derivative API rejects status2 (solved inaccurate), although the forward
+path previously accepted it. Require status1 before returning any differentiable
+solution; status2 now uses the same bounded restart sequence as iteration limit.
+This strengthens numerical acceptance without changing any economic constraint.
+Continue compatible98c2dbb checkpoints with the same source/tensor verification.

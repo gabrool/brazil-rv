@@ -78,7 +78,8 @@ def test_higher_cost_reduces_turnover_without_minimum_gross():
     assert costly < base
 
 
-def test_iteration_limit_retry_preserves_solution_and_adjoint(monkeypatch):
+@pytest.mark.parametrize("status", [2, 7])
+def test_incomplete_solve_retry_preserves_solution_and_adjoint(monkeypatch, status):
     import osqp
 
     mu = torch.tensor([0.00011, -0.00011], dtype=torch.float64, requires_grad=True)
@@ -92,7 +93,7 @@ def test_iteration_limit_retry_preserves_solution_and_adjoint(monkeypatch):
         result = original(self, **kwargs)
         calls += 1
         if calls == 1:
-            result.info.status_val = 7
+            result.info.status_val = status
         return result
 
     monkeypatch.setattr(osqp.OSQP, "solve", first_iteration_limit)

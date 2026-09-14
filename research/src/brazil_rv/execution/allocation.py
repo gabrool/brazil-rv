@@ -59,9 +59,9 @@ class _SparseQP(torch.autograd.Function):
             # Some ill-conditioned epigraphs cycle with the default ADMM
             # penalty. Retry the identical QP at identical tolerances; more
             # iterations alone did not resolve the captured failure.
-            if result.info.status_val != 7:
+            if result.info.status_val not in (2, 7):
                 break
-        if result.info.status_val not in (1, 2):
+        if result.info.status_val != 1:
             raise FloatingPointError(
                 f"allocation {result.info.status}: iterations={result.info.iter}, "
                 f"primal={result.info.prim_res:g}, dual={result.info.dual_res:g}, "
