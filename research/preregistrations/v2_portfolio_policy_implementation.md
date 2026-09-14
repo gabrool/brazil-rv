@@ -164,3 +164,12 @@ path previously accepted it. Require status1 before returning any differentiable
 solution; status2 now uses the same bounded restart sequence as iteration limit.
 This strengthens numerical acceptance without changing any economic constraint.
 Continue compatible98c2dbb checkpoints with the same source/tensor verification.
+
+The final solver resolution supersedes the adaptive penalty grid: retain the
+ordinary fast solve, then a single fixed rho1, adaptive_rho=False fallback with
+200,000-iteration ceiling. All four captured QPs solve at full1e-8 accuracy in
+3,275–5,050iterations (21–69ms). Adaptive rho updates were the cycling source;
+raising iteration limits alone with adaptive updates did not solve the cases.
+Remove the intermediate penalty grid rather than accumulating retry branches.
+No economic objective, constraint or derivative convention changes. Continue
+6b130a8 policy tensors with original source and receipt preserved as before.

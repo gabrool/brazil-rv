@@ -35,10 +35,8 @@ class _SparseQP(torch.autograd.Function):
     @staticmethod
     def forward(ctx, q, lower, upper, p, a, warm_start):
         for settings in (
-            {},
-            {"rho": 0.01, "adaptive_rho_interval": 25},
-            {"rho": 0.001, "adaptive_rho_interval": 25},
-            {"rho": 0.1, "adaptive_rho_interval": 25},
+            {"max_iter": 20000},
+            {"rho": 1.0, "adaptive_rho": False, "max_iter": 200000},
         ):
             solver = osqp.OSQP(algebra="builtin")
             solver.setup(
@@ -50,15 +48,14 @@ class _SparseQP(torch.autograd.Function):
                 verbose=False,
                 eps_abs=1e-8,
                 eps_rel=1e-8,
-                max_iter=20000,
                 polishing=True,
                 **settings,
             )
             solver.warm_start(x=warm_start)
             result = solver.solve(raise_error=False)
             # Some ill-conditioned epigraphs cycle with the default ADMM
-            # penalty. Retry the identical QP at identical tolerances; more
-            # iterations alone did not resolve the captured failure.
+            # penalty updates. Retry with a fixed penalty at the same tolerances;
+            # more iterations with adaptive updates did not resolve cycling.
             if result.info.status_val not in (2, 7):
                 break
         if result.info.status_val != 1:
