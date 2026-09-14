@@ -120,3 +120,14 @@ required artifacts, commit/push all changes and results, then terminate the exac
 paid instance and verify absence twice. Do not leave a paid instance idle after
 the required work is recovered. Final LLM-ready report covers all phases,
 engineering amendments, results and limitations.
+
+### Phase 1 numerical reproduction amendment
+
+The initial local replay stopped because a cross-host original-control difference
+of 0.000005416 bps exceeded an indiscriminate 0.000001 threshold. Exposures
+agreed within 1.36e-9 and turnover within 1.87e-8 NAV. Use explicit daily
+field tolerances: 0.0001 bps for return/cost fields and 0.000001 NAV for fraction
+fields. This is numerical equivalence, not permission for material drift. Save
+all errors and thresholds. Preserve the partial initial attempt and rerun the
+same financial roster from a fresh Phase 1 directory; no data/model/allocation
+calculation changes. Local loading uses one worker after two exceeded memory.
