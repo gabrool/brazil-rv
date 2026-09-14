@@ -20,7 +20,7 @@ from .data import V2DailyDataset, restore_name_axis, stage_name_count
 from .model import DailyMultiHorizonModel
 from .round7_preprocessing import Round7Preprocessing
 from .round7_training import CHECKPOINT_SCHEMA, forward, model_batch, sequential_batches
-from .score import _array_record
+from .score import _array_record, parent_prelude_indices, verify_reused_inference_source
 from .train import _cli_stage_indices, compile_forward
 
 
@@ -47,13 +47,23 @@ def score(
     device=None,
     reusable_models=None,
     fixed_name_count=None,
+    parent_prelude=False,
 ):
     if sha256_file(checkpoint) != expected_sha256:
         raise ValueError("scoring checkpoint differs from its bound hash")
     payload = torch.load(checkpoint, map_location="cpu", weights_only=True)
-    if payload["schema"] != CHECKPOINT_SCHEMA or payload["stage"] != "F":
-        raise ValueError("Round-7 scoring requires a registered F checkpoint")
+    if payload["schema"] != CHECKPOINT_SCHEMA or payload["stage"] != (
+        "P" if parent_prelude else "F"
+    ):
+        raise ValueError(
+            "scoring checkpoint stage differs from the requested forecast block"
+        )
     contract = payload["contract"]
+    inference_source = verify_reused_inference_source(contract["code"]["commit"])
+    if parent_prelude:
+        rows = parent_prelude_indices(store_root)
+    else:
+        _, _, rows, _ = _cli_stage_indices(store_root, "F", payload["fold"])
     if "selection_ic" not in payload:
         raise ValueError("scoring requires the selection-bound checkpoint")
     if contract["store_manifest_sha256"] != sha256_file(store_root / "manifest.json"):
@@ -64,6 +74,8 @@ def score(
         )
         if existing["checkpoint"]["sha256"] != expected_sha256:
             raise ValueError("existing score panel binds another checkpoint")
+        if existing["dataset"]["date_indices"] != rows.tolist():
+            raise ValueError("existing score panel binds another forecast block")
         for name, record in existing["artifacts"].items():
             if sha256_file(output / name) != record["sha256"]:
                 raise ValueError("existing score array changed")
@@ -79,7 +91,6 @@ def score(
             config.family_counts if characteristic else config.sidecar_feature_counts
         )
     )
-    _, _, rows, _ = _cli_stage_indices(store_root, "F", payload["fold"])
     dataset = V2DailyDataset(
         store_root,
         rows,
@@ -172,11 +183,12 @@ def score(
                     "path": str(checkpoint),
                     "sha256": expected_sha256,
                     "kind": CHECKPOINT_SCHEMA,
-                    "stage": "F",
+                    "stage": payload["stage"],
                     "fold": payload["fold"],
                     "seed": payload["seed"],
                 },
                 "round7_contract": contract,
+                "inference_source": inference_source,
                 "transfer_chronology_clean": True,
                 "feature_schema_sha256": source["metadata"]["feature_schema"]["sha256"],
                 "action_terms_source": source["metadata"]["action_terms_source"],
@@ -221,9 +233,14 @@ def main():
     parser.add_argument("--checkpoint", type=Path, required=True)
     parser.add_argument("--checkpoint-sha256", required=True)
     parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--parent-prelude", action="store_true")
     args = parser.parse_args()
     score(
-        args.store, args.checkpoint, args.output, expected_sha256=args.checkpoint_sha256
+        args.store,
+        args.checkpoint,
+        args.output,
+        expected_sha256=args.checkpoint_sha256,
+        parent_prelude=args.parent_prelude,
     )
 
 

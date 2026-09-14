@@ -2,6 +2,16 @@
 
 Last verified: 2026-09-14.
 
+The user authorized the [cash-aware portfolio program](research/preregistrations/v2_portfolio_policy.md)
+following the [execution reassessment](docs/v2_EXECUTION_REASSESSMENT.md): repaired
+C6 bridge, causal frozen-forecast cache, constrained optimizer and small stateful
+decision-trained policy, then matched development confirmation. Cash may remain
+undeployed and earns historical CDI under the declared ledger assumptions;
+performance is measured above that same cash benchmark. Follow the
+[acceptance state](docs/v2_portfolio_policy_progress.md). This extends the completed
+A–C program without altering its sealed results. No held-out read, forward
+capture, intraday implementation or deployment is authorized by this extension.
+
 The post-Round-7 **data-only repair is accepted** for new development research.
 Resolve [the canonical data pointer](docs/v2_data_inputs.json); the new store is
 `v2_data_store_2d59b9d_20260913T211700Z`, manifest SHA-256

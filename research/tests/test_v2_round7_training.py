@@ -149,6 +149,9 @@ def test_selected_fit_resume_and_scoring_are_identical(
     monkeypatch.setattr(training, "_cli_stage_indices", indices)
     monkeypatch.setattr(scoring, "_cli_stage_indices", indices)
     monkeypatch.setattr(training, "_git_identity", lambda: {"commit": "f" * 40})
+    monkeypatch.setattr(
+        "brazil_rv.v2.score._repository_commit_if_available", lambda: "f" * 40
+    )
     from brazil_rv.v2.round7 import PATHWAY_CELLS, pretrain_key
 
     cell = {

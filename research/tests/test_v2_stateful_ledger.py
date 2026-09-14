@@ -58,6 +58,7 @@ def _run(
     hedge_close: np.ndarray | None = None,
     hedge_annual_borrow_rate: np.ndarray | None = None,
     entry_fill_allowed: np.ndarray | None = None,
+    portfolio_policy=None,
 ) -> StatefulLedgerResult:
     days, names = close.shape
     dates = tuple(date(2024, 1, 2) + timedelta(days=index) for index in range(days))
@@ -80,6 +81,7 @@ def _run(
         cdi_returns=np.zeros(days) if cdi is None else cdi,
         fill_fraction=fill_fraction,
         entry_fill_allowed=entry_fill_allowed,
+        portfolio_policy=portfolio_policy,
         action_terms=no_actions if actions is None else actions,
         action_payment_session=(
             np.full(close.shape, -1, dtype=np.int64)

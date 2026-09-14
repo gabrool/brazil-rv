@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, replace
 from datetime import date
-from typing import Literal, Mapping, Sequence
+from typing import Callable, Literal, Mapping, Sequence
 
 import numpy as np
 from numpy.typing import NDArray
@@ -21,6 +21,7 @@ ExitInstructionCause = Literal[
     "settlement_grace",
     "rank_out_of_retention",
     "terminal",
+    "policy_rebalance",
 ]
 CancellationReason = Literal[
     "band_exit",
@@ -32,6 +33,7 @@ CancellationReason = Literal[
     "risk_net_cap",
     "risk_name_cap",
     "terminal_settlement",
+    "policy_replaced",
 ]
 _CANCELLATION_REASONS: tuple[CancellationReason, ...] = (
     "band_exit",
@@ -43,6 +45,7 @@ _CANCELLATION_REASONS: tuple[CancellationReason, ...] = (
     "risk_net_cap",
     "risk_name_cap",
     "terminal_settlement",
+    "policy_replaced",
 )
 
 TERMINAL_SETTLEMENT_CONVENTION = "last_mark_after_10_sessions"
@@ -51,6 +54,7 @@ EXIT_INSTRUCTION_CAUSE_CODES: dict[ExitInstructionCause, int] = {
     "settlement_grace": 2,
     "rank_out_of_retention": 3,
     "terminal": 4,
+    "policy_rebalance": 5,
 }
 
 
@@ -70,6 +74,7 @@ class LedgerConfig:
     gross_target: float = 2.0
     planned_gross_cap: float = 2.25
     planned_absolute_net_cap: float = 0.20
+    planned_absolute_beta_cap: float = 0.05
     planned_name_weight_cap: float = 0.05
     cost_bps_per_side: float = 4.0
     annual_borrow_rate: float = 0.02
@@ -105,6 +110,7 @@ class LedgerConfig:
         if (
             self.planned_gross_cap <= 0
             or self.planned_absolute_net_cap < 0
+            or self.planned_absolute_beta_cap < 0
             or self.planned_name_weight_cap <= 0
         ):
             raise ValueError("planned risk caps are invalid")
@@ -1184,6 +1190,30 @@ def _book_fill(
     return free_cash, notional
 
 
+@dataclass(frozen=True)
+class PortfolioDecisionState:
+    """Observable pre-fill state; no current-session realization is exposed."""
+
+    day: int
+    weights: NDArray[np.float64]
+    hedge_weight: float
+    free_cash_fraction: float
+    restricted_cash_fraction: float
+    pending_entry_weights: NDArray[np.float64]
+    pending_exit_fractions: NDArray[np.float64]
+    holding_sessions: NDArray[np.int64]
+    marked_return_since_entry: NDArray[np.float64]
+    entry_allowed: NDArray[np.bool_]
+    shortable: NDArray[np.bool_]
+    required_exit: NDArray[np.bool_]
+
+
+@dataclass(frozen=True)
+class PortfolioTarget:
+    weights: NDArray[np.float64]
+    hedge_weight: float = 0.0
+
+
 def simulate_stateful_ledger(
     *,
     dates: Sequence[date],
@@ -1213,6 +1243,7 @@ def simulate_stateful_ledger(
     entry_sizing_volatility: NDArray[np.floating] | None = None,
     capacity_buffer_per_side: int | None = None,
     entry_fill_allowed: NDArray[np.bool_] | None = None,
+    portfolio_policy: Callable[[PortfolioDecisionState], PortfolioTarget] | None = None,
 ) -> StatefulLedgerResult:
     """Run causal close-proxy orders, fills, and a raw signed-share ledger.
 
@@ -1222,6 +1253,9 @@ def simulate_stateful_ledger(
     a retention-only ablation without changing entry quotas.
     An execution-time entry-fill mask can suppress opening fills without changing
     earlier orders, printed exits, or inventory valuation.
+    A portfolio policy replaces only rank/slot intentions. Cash, shares, action
+    claims, financing and observed fills retain the same accounting. Its
+    state is captured before the current session's retrospective observations.
     """
 
     inputs = _validate_inputs(
@@ -1250,6 +1284,8 @@ def simulate_stateful_ledger(
         volatility_balanced_entries=config.volatility_balanced_entries,
         beta_hedge=config.beta_hedge,
     )
+    if portfolio_policy is not None and config.volatility_balanced_entries:
+        raise ValueError("portfolio allocation does not use fixed volatility slots")
     day_count, name_count = inputs.score.shape
     if entry_fill_allowed is not None:
         entry_fill_allowed = np.asarray(entry_fill_allowed, dtype=np.bool_)
@@ -1564,557 +1600,808 @@ def simulate_stateful_ledger(
                     cancel_entry(name, day, "prior_action_unresolved")
                 )
 
-        eligible = (
-            inputs.score_valid[day]
-            & inputs.membership[day]
-            & np.isfinite(inputs.score[day])
-        )
-        entry_eligible = eligible.copy()
-        if config.volatility_balanced_entries:
-            entry_eligible &= np.isfinite(inputs.selection_volatility[day])
-        eligible_names = np.flatnonzero(eligible)
-        order = (
-            eligible_names[np.argsort(inputs.score[day, eligible_names], kind="stable")]
-            if eligible_names.size
-            else eligible_names
-        )
-        ranks = np.full(name_count, -1, dtype=np.int64)
-        ranks[order] = np.arange(order.size)
-        entry_names = np.flatnonzero(entry_eligible)
-        entry_order = (
-            entry_names[np.argsort(inputs.score[day, entry_names], kind="stable")]
-            if entry_names.size
-            else entry_names
-        )
-        k_eff = min(config.k_per_side, len(entry_order) // 2)
-        k_eff_rows.append(k_eff)
-        small_universe = k_eff == 0
-        small_universe_rows.append(small_universe)
-        if config.volatility_balanced_entries:
-            group_eligible = eligible & np.isfinite(inputs.selection_volatility[day])
-            volatility_groups = _equal_count_groups(
-                inputs.selection_volatility[day],
-                group_eligible,
-                config.volatility_group_count,
+        if portfolio_policy is not None:
+            eligible = (
+                inputs.score_valid[day]
+                & inputs.membership[day]
+                & np.isfinite(inputs.score[day])
             )
-            group_sizes = np.bincount(
-                volatility_groups[volatility_groups >= 0],
-                minlength=config.volatility_group_count,
-            )[: config.volatility_group_count]
-            volatility_quota, volatility_buffer = _scaled_group_bands(
-                k_eff=k_eff,
-                buffer=config.buffer_per_side,
-                group_sizes=group_sizes,
-                threshold_multiple=config.small_stratum_scaling_threshold_multiple,
-                capacity_buffer=capacity_buffer_per_side,
+            held = shares != 0.0
+            signed_values = np.where(held, shares * np.nan_to_num(marks), 0.0)
+            weights = signed_values / start_nav
+            ineligible_streak[~held | eligible] = 0
+            ineligible_streak[held & ~eligible] += 1
+            entry_eligible = (
+                eligible
+                & ~decision_unresolved
+                & ~settled_names
+                & np.isfinite(last_observed)
+                & (last_observed > 0.0)
             )
-            # An undersized stratum scales both its quota and buffer.  The
-            # resulting quota sum is therefore the contractual side size for
-            # this session; filling back to the unscaled k would undo the
-            # small-stratum rule through the global spill pass.
-            k_eff = int(volatility_quota.sum())
-            k_eff_rows[-1] = k_eff
-            small_universe = k_eff == 0
-            small_universe_rows[-1] = small_universe
-            group_orders: dict[int, NDArray[np.int64]] = {}
-            long_retention = np.zeros(name_count, dtype=np.bool_)
-            short_retention = np.zeros(name_count, dtype=np.bool_)
-            for group in range(config.volatility_group_count):
-                names = np.flatnonzero(volatility_groups == group)
-                group_order = names[np.argsort(inputs.score[day, names], kind="stable")]
-                group_orders[group] = group_order
-                width = int(volatility_quota[group] + volatility_buffer[group])
-                if width:
-                    short_retention[group_order[:width]] = True
-                    long_retention[group_order[-width:]] = True
-            if np.any(long_retention & short_retention):
-                raise RuntimeError("within-quintile long and short bands overlap")
-            retention = int(np.sum(volatility_quota + volatility_buffer))
-        else:
+            required_exit = (
+                (ineligible_streak > config.ineligible_hold_sessions)
+                | (missing_sessions >= config.settlement_grace_sessions)
+                | settled_names
+            )
+            pending_entry_weights = np.zeros(name_count, dtype=np.float64)
+            pending_exit_fractions = np.zeros(name_count, dtype=np.float64)
+            for name, pending in pending_entries.items():
+                sign = 1.0 if pending.order.side == "buy" else -1.0
+                pending_entry_weights[name] = sign * pending.remaining_size / start_nav
+            for name, pending in pending_exits.items():
+                pending_exit_fractions[name] = pending.remaining_size
+            decision_state = PortfolioDecisionState(
+                day=day,
+                weights=weights.copy(),
+                hedge_weight=hedge_shares * hedge_mark / start_nav
+                if hedge_shares
+                else 0.0,
+                free_cash_fraction=free_cash / start_nav,
+                restricted_cash_fraction=(
+                    restricted_by_name.sum() + hedge_restricted_cash
+                )
+                / start_nav,
+                pending_entry_weights=pending_entry_weights,
+                pending_exit_fractions=pending_exit_fractions,
+                holding_sessions=np.where(held, day - entry_session, 0),
+                marked_return_since_entry=np.where(
+                    held,
+                    np.sign(weights)
+                    * (np.abs(signed_values) / np.maximum(entry_cost_basis, 1e-30) - 1),
+                    0.0,
+                ),
+                entry_allowed=entry_eligible.copy(),
+                shortable=inputs.shortable[day].copy(),
+                required_exit=required_exit,
+            )
+            target = (
+                portfolio_policy(decision_state)
+                if day < day_count - 1
+                else PortfolioTarget(np.zeros(name_count))
+            )
+            desired = np.asarray(target.weights, dtype=np.float64)
+            if desired.shape != weights.shape or not np.isfinite(desired).all():
+                raise ValueError(
+                    "portfolio targets must be finite on the security axis"
+                )
+            if not np.isfinite(target.hedge_weight):
+                raise ValueError("portfolio hedge target is non-finite")
+            tol = 2e-6
+            opening = (
+                (desired * weights < 0) | (np.abs(desired) > np.abs(weights) + tol)
+            ) & (np.abs(desired) > tol)
+            opening_short = desired < np.minimum(weights, 0.0) - tol
+            if np.any(opening & ~entry_eligible) or np.any(
+                opening_short & ~inputs.shortable[day]
+            ):
+                raise ValueError("portfolio requests an unavailable opening trade")
+            if np.any(required_exit & (np.abs(desired) > tol)):
+                raise ValueError("portfolio retains required exits")
+            if (
+                np.abs(desired).sum() + abs(target.hedge_weight)
+                > config.planned_gross_cap + tol
+                or abs(desired.sum() + target.hedge_weight)
+                > config.planned_absolute_net_cap + tol
+                or np.abs(desired).max() > config.planned_name_weight_cap + tol
+                or abs(target.hedge_weight) > config.hedge_notional_cap_nav + tol
+                or (not config.beta_hedge and abs(target.hedge_weight) > tol)
+                or (
+                    config.beta_hedge
+                    and abs(desired @ inputs.hedge_beta[day] + target.hedge_weight)
+                    > config.planned_absolute_beta_cap + tol
+                )
+            ):
+                raise ValueError("portfolio target violates the planned risk budget")
+            # Daily cancel/replace uses actual partial fills. Reversals open
+            # only after their corresponding exit has completely filled.
+            for name in tuple(pending_entries):
+                cancelled_today += int(cancel_entry(name, day, "policy_replaced"))
+            for pending in pending_exits.values():
+                cancellations.append(
+                    pending.cancellation(day, inputs.dates[day], "policy_replaced")
+                )
+            pending_exits.clear()
+            submitted_entries = submitted_exits = 0
+            exit_cause_today = np.zeros(name_count, dtype=np.int8)
+            exit_side_today = np.zeros(name_count, dtype=np.int8)
+            for name in range(name_count):
+                old_weight, new_weight = weights[name], desired[name]
+                reverse = old_weight * new_weight < 0.0
+                reduction = (
+                    abs(old_weight)
+                    if reverse
+                    else max(abs(old_weight) - abs(new_weight), 0.0)
+                )
+                if reduction > 1e-10 and old_weight != 0.0:
+                    pending_exits[name] = submit_order(
+                        day,
+                        name,
+                        "sell" if old_weight > 0 else "buy",
+                        min(1.0, reduction / abs(old_weight)),
+                        float(marks[name]),
+                        "terminal_exit" if day == day_count - 1 else "exit",
+                        None,
+                        position_fraction=True,
+                    )
+                    submitted_exits += 1
+                    exit_cause_today[name] = (
+                        4 if day == day_count - 1 else 1 if required_exit[name] else 5
+                    )
+                    exit_side_today[name] = 1 if old_weight > 0 else -1
+                increase = (
+                    abs(new_weight)
+                    if reverse
+                    else max(abs(new_weight) - abs(old_weight), 0.0)
+                )
+                if increase > 1e-10 and day < day_count - 1:
+                    pending_entries[name] = submit_order(
+                        day,
+                        name,
+                        "buy" if new_weight > 0 else "sell",
+                        increase * start_nav,
+                        float(last_observed[name]),
+                        "entry",
+                        day,
+                    )
+                    submission_nav[name] = start_nav
+                    submitted_entries += 1
+            # Slot fields are inapplicable; policy reporting omits them.
+            k_eff = 0
             volatility_groups = np.full(name_count, -1, dtype=np.int64)
             volatility_quota = np.zeros(config.volatility_group_count, dtype=np.int64)
-            volatility_buffer = np.zeros(config.volatility_group_count, dtype=np.int64)
-            group_sizes = np.zeros(config.volatility_group_count, dtype=np.int64)
-            group_orders = {}
-            long_retention = np.zeros(name_count, dtype=np.bool_)
-            short_retention = np.zeros(name_count, dtype=np.bool_)
-            retention = min(
-                config.k_per_side + config.buffer_per_side,
-                len(order) // 2,
+            group_sizes = volatility_quota.copy()
+            spilled_entries = {
+                "buy": volatility_quota.copy(),
+                "sell": volatility_quota.copy(),
+            }
+            band_exhausted_long = band_exhausted_short = 0
+            blocked_open_long = blocked_open_short = 0
+            k_eff_rows.append(k_eff)
+            small_universe_rows.append(int(entry_eligible.sum()) < 2)
+            retention_rows.append(0)
+            ineligible_score_invalid_rows.append(
+                int((held & ~inputs.score_valid[day]).sum())
             )
-            if retention:
-                long_retention[order[-retention:]] = True
-                short_retention[order[:retention]] = True
-        retention_rows.append(retention)
-
-        if config.cancel_pending_outside_retention:
-            for name, pending in tuple(pending_entries.items()):
-                retained = (
-                    long_retention[name]
-                    if pending.order.side == "buy"
-                    else short_retention[name]
-                )
-                if not retained:
-                    cancelled_today += int(cancel_entry(name, day, "band_exit"))
-
-        signed_values = np.zeros(name_count, dtype=np.float64)
-        held = shares != 0.0
-        ineligible_streak[~held | eligible] = 0
-        ineligible_streak[held & ~eligible] += 1
-        ineligible_score_invalid_rows.append(
-            int((held & ~inputs.score_valid[day]).sum())
-        )
-        ineligible_membership_invalid_rows.append(
-            int((held & ~inputs.membership[day]).sum())
-        )
-        ineligible_score_nonfinite_rows.append(
-            int((held & ~np.isfinite(inputs.score[day])).sum())
-        )
-        signed_values[held] = shares[held] * marks[held]
-        actual_gross, actual_net, actual_name = _risk(signed_values, start_nav)
-        risk_breach = (
-            actual_gross > config.planned_gross_cap + 1e-12
-            or abs(actual_net) > config.planned_absolute_net_cap + 1e-12
-            or actual_name > config.planned_name_weight_cap + 1e-12
-        )
-
-        exit_required: set[int] = set()
-        exit_cause_by_name: dict[int, ExitInstructionCause] = {}
-        for name in np.flatnonzero(held):
-            if not eligible[name]:
-                kept = (
-                    retention > 0
-                    and missing_sessions[name] < config.settlement_grace_sessions
-                    and ineligible_streak[name] <= config.ineligible_hold_sessions
-                )
-            else:
-                kept = (
-                    retention > 0
-                    and missing_sessions[name] < config.settlement_grace_sessions
-                    and (
-                        (
-                            long_retention[name]
-                            if shares[name] > 0.0
-                            else short_retention[name]
-                        )
-                        if config.volatility_balanced_entries
-                        else (
-                            ranks[name] >= len(order) - retention
-                            if shares[name] > 0.0
-                            else ranks[name] < retention
-                        )
-                    )
-                )
-            if not kept:
-                integer_name = int(name)
-                exit_required.add(integer_name)
-                if missing_sessions[name] >= config.settlement_grace_sessions:
-                    exit_cause_by_name[integer_name] = "settlement_grace"
-                elif not eligible[name]:
-                    exit_cause_by_name[integer_name] = "ineligible_hold_exhausted"
-                else:
-                    exit_cause_by_name[integer_name] = "rank_out_of_retention"
-        if day == day_count - 1:
-            exit_required.update(int(name) for name in np.flatnonzero(held))
-            for name, pending in tuple(pending_exits.items()):
-                if pending.remaining_size < 1.0 - 1e-12:
-                    cancellations.append(
-                        pending.cancellation(day, inputs.dates[day], "evaluation_end")
-                    )
-                    del pending_exits[name]
-
-        entries_to_cancel = exit_required & pending_entries.keys()
-        for name in sorted(entries_to_cancel):
-            cancelled_today += int(cancel_entry(name, day, "exit_instruction"))
-
-        exit_cause_today = np.zeros(name_count, dtype=np.int8)
-        exit_side_today = np.zeros(name_count, dtype=np.int8)
-        ineligible_exit_within_hold_today = 0
-        for name in sorted(exit_required):
-            if name in pending_exits or shares[name] == 0.0:
-                continue
-            purpose: OrderPurpose
-            if day == day_count - 1:
-                purpose = "terminal_exit"
-                cause: ExitInstructionCause = "terminal"
-            else:
-                purpose = "exit"
-                cause = exit_cause_by_name[name]
-            if (
-                cause == "ineligible_hold_exhausted"
-                and ineligible_streak[name] <= config.ineligible_hold_sessions
-            ):
-                ineligible_exit_within_hold_today += 1
-            exit_cause_today[name] = EXIT_INSTRUCTION_CAUSE_CODES[cause]
-            exit_side_today[name] = 1 if shares[name] > 0.0 else -1
-            pending_exits[name] = submit_order(
-                day,
-                name,
-                "sell" if shares[name] > 0.0 else "buy",
-                1.0,
-                float(marks[name]),
-                purpose,
-                None,
-                position_fraction=True,
+            ineligible_membership_invalid_rows.append(
+                int((held & ~inputs.membership[day]).sum())
             )
-
-        def projected_signed_values() -> NDArray[np.float64]:
-            projected = signed_values.copy()
-            for name, pending in pending_exits.items():
-                projected[name] -= pending.remaining_size * signed_values[name]
-            for name, pending in pending_entries.items():
-                direction = 1.0 if pending.order.side == "buy" else -1.0
-                projected[name] += direction * pending.remaining_size
-            return projected
-
-        def risk_projected_signed_values() -> NDArray[np.float64]:
-            """Project risk without assuming any still-pending exit will fill."""
-
-            projected = signed_values.copy()
-            for name, pending in pending_entries.items():
-                direction = 1.0 if pending.order.side == "buy" else -1.0
-                projected[name] += direction * pending.remaining_size
-            return projected
-
-        risk_exit_quantity: dict[int, float] = {}
-        risk_trim_gross = 0.0
-        risk_trim_net = 0.0
-        risk_trim_name = 0.0
-
-        def trim_name(
-            projected: NDArray[np.float64], name: int, notional: float
-        ) -> float:
-            if name in pending_exits or shares[name] == 0.0:
-                return 0.0
-            mark = float(marks[name])
-            if not np.isfinite(mark) or mark <= 0.0:
-                return 0.0
-            amount = min(max(float(notional), 0.0), abs(float(projected[name])))
-            quantity = min(amount / mark, abs(float(shares[name])))
-            already = risk_exit_quantity.get(name, 0.0)
-            quantity = min(quantity, abs(float(shares[name])) - already)
-            if quantity <= 1e-12:
-                return 0.0
-            actual = quantity * mark
-            risk_exit_quantity[name] = already + quantity
-            projected[name] += -actual if shares[name] > 0.0 else actual
-            return actual
-
-        def trim_side(
-            projected: NDArray[np.float64], side: OrderSide, notional: float
-        ) -> float:
-            """Plan lowest-conviction partial exits and return reduced notional."""
-
-            remaining = max(float(notional), 0.0)
-            if remaining <= 1e-12:
-                return 0.0
-            candidates = [
-                int(name)
-                for name in np.flatnonzero(
-                    projected > 1e-12 if side == "sell" else projected < -1e-12
-                )
-                if name not in pending_exits and shares[name] != 0.0
-            ]
-            candidates.sort(
-                key=lambda name: (
-                    float(inputs.score[day, name])
-                    if np.isfinite(inputs.score[day, name])
-                    else (-np.inf if side == "sell" else np.inf),
-                    name,
-                ),
-                reverse=side == "buy",
+            ineligible_score_nonfinite_rows.append(
+                int((held & ~np.isfinite(inputs.score[day])).sum())
             )
-            reduced = 0.0
-            for name in candidates:
-                if remaining <= 1e-12:
-                    break
-                actual = trim_name(projected, name, remaining)
-                remaining -= actual
-                reduced += actual
-            return reduced
-
-        if risk_breach and day < day_count - 1:
-            projected = risk_projected_signed_values()
-
-            name_limit = config.planned_name_weight_cap * start_nav
-            for name in np.flatnonzero(np.abs(projected) > name_limit + 1e-12):
-                name = int(name)
-                if name in pending_entries:
-                    cancelled_today += int(cancel_entry(name, day, "risk_name_cap"))
-                    projected = risk_projected_signed_values()
-                    for risk_name, quantity in risk_exit_quantity.items():
-                        direction = -1.0 if shares[risk_name] > 0.0 else 1.0
-                        projected[risk_name] += direction * quantity * marks[risk_name]
-                excess = max(abs(float(projected[name])) - name_limit, 0.0)
-                if excess > 1e-12:
-                    risk_trim_name += trim_name(projected, name, excess)
-
-            projected_gross, _, _ = _risk(projected, start_nav)
-            if projected_gross > config.planned_gross_cap + 1e-12:
-                total_reduction = max(
-                    (projected_gross - config.gross_target) * start_nav, 0.0
-                )
-                long_notional = float(projected[projected > 0.0].sum())
-                short_notional = float(-projected[projected < 0.0].sum())
-                long_excess = max(
-                    long_notional - config.gross_target * start_nav / 2.0, 0.0
-                )
-                short_excess = max(
-                    short_notional - config.gross_target * start_nav / 2.0, 0.0
-                )
-                side_excess = long_excess + short_excess
-                if side_excess <= 1e-12:
-                    long_reduction = (
-                        total_reduction
-                        * long_notional
-                        / (long_notional + short_notional)
-                    )
-                else:
-                    long_reduction = total_reduction * long_excess / side_excess
-                short_reduction = total_reduction - long_reduction
-                risk_trim_gross += trim_side(projected, "sell", long_reduction)
-                risk_trim_gross += trim_side(projected, "buy", short_reduction)
-
-            _, projected_net, _ = _risk(projected, start_nav)
-            if abs(projected_net) > config.planned_absolute_net_cap + 1e-12:
-                heavy_side: OrderSide = "sell" if projected_net > 0.0 else "buy"
-                heavy_entries = [
-                    name
-                    for name, pending in pending_entries.items()
-                    if pending.order.side == ("buy" if heavy_side == "sell" else "sell")
+            blocked_reference_rows.append(0)
+            blocked_gross_rows.append(0)
+            blocked_net_rows.append(0)
+            blocked_name_rows.append(0)
+            submitted_entry_rows.append(submitted_entries)
+            submitted_exit_rows.append(submitted_exits)
+            same_close_replacement_rows.append(0)
+            zero_entry_small_rows.append(0)
+            zero_entry_gross_rows.append(0)
+            zero_entry_net_rows.append(0)
+            zero_entry_name_rows.append(0)
+            zero_entry_reference_rows.append(0)
+            risk_trim_gross_rows.append(0)
+            risk_trim_net_rows.append(0)
+            risk_trim_name_rows.append(0)
+            occupied_after_submission_long_rows.append(0)
+            occupied_after_submission_short_rows.append(0)
+            open_after_submission_long_rows.append(0)
+            open_after_submission_short_rows.append(0)
+            band_candidates_long_rows.append(0)
+            band_candidates_short_rows.append(0)
+            excluded_short_candidate_rows.append(0)
+            band_excluded_unresolved_long_rows.append(0)
+            band_excluded_unresolved_short_rows.append(0)
+            band_excluded_settled_long_rows.append(0)
+            band_excluded_settled_short_rows.append(0)
+            band_without_prior_print_long_rows.append(0)
+            band_without_prior_print_short_rows.append(0)
+            band_exhausted_long_rows.append(0)
+            band_exhausted_short_rows.append(0)
+            blocked_open_long_rows.append(0)
+            blocked_open_short_rows.append(0)
+            exit_ineligible_hold_exhausted_rows.append(
+                int((exit_cause_today == 1).sum())
+            )
+            exit_settlement_rows.append(0)
+            exit_rank_rows.append(0)
+            exit_terminal_rows.append(int((exit_cause_today == 4).sum()))
+            exit_cause_rows.append(exit_cause_today)
+            exit_side_rows.append(exit_side_today)
+            ineligible_exit_within_hold_rows.append(0)
+            net_cap_balanced_rows.append(0)
+            gross_cap_below_target_rows.append(0)
+            name_cap_fresh_rows.append(0)
+        else:
+            eligible = (
+                inputs.score_valid[day]
+                & inputs.membership[day]
+                & np.isfinite(inputs.score[day])
+            )
+            entry_eligible = eligible.copy()
+            if config.volatility_balanced_entries:
+                entry_eligible &= np.isfinite(inputs.selection_volatility[day])
+            eligible_names = np.flatnonzero(eligible)
+            order = (
+                eligible_names[
+                    np.argsort(inputs.score[day, eligible_names], kind="stable")
                 ]
-                heavy_entries.sort(
-                    key=lambda name: (
-                        float(inputs.score[day, name]),
-                        name,
-                    ),
-                    reverse=heavy_side == "buy",
+                if eligible_names.size
+                else eligible_names
+            )
+            ranks = np.full(name_count, -1, dtype=np.int64)
+            ranks[order] = np.arange(order.size)
+            entry_names = np.flatnonzero(entry_eligible)
+            entry_order = (
+                entry_names[np.argsort(inputs.score[day, entry_names], kind="stable")]
+                if entry_names.size
+                else entry_names
+            )
+            k_eff = min(config.k_per_side, len(entry_order) // 2)
+            k_eff_rows.append(k_eff)
+            small_universe = k_eff == 0
+            small_universe_rows.append(small_universe)
+            if config.volatility_balanced_entries:
+                group_eligible = eligible & np.isfinite(
+                    inputs.selection_volatility[day]
                 )
-                target_net = config.planned_absolute_net_cap / 2.0
-                for name in heavy_entries:
-                    if abs(projected_net) <= target_net + 1e-12:
-                        break
-                    cancelled_today += int(cancel_entry(name, day, "risk_net_cap"))
-                    projected = risk_projected_signed_values()
-                    for risk_name, quantity in risk_exit_quantity.items():
-                        direction = -1.0 if shares[risk_name] > 0.0 else 1.0
-                        projected[risk_name] += direction * quantity * marks[risk_name]
-                    _, projected_net, _ = _risk(projected, start_nav)
-                net_reduction = max((abs(projected_net) - target_net) * start_nav, 0.0)
-                risk_trim_net += trim_side(projected, heavy_side, net_reduction)
+                volatility_groups = _equal_count_groups(
+                    inputs.selection_volatility[day],
+                    group_eligible,
+                    config.volatility_group_count,
+                )
+                group_sizes = np.bincount(
+                    volatility_groups[volatility_groups >= 0],
+                    minlength=config.volatility_group_count,
+                )[: config.volatility_group_count]
+                volatility_quota, volatility_buffer = _scaled_group_bands(
+                    k_eff=k_eff,
+                    buffer=config.buffer_per_side,
+                    group_sizes=group_sizes,
+                    threshold_multiple=config.small_stratum_scaling_threshold_multiple,
+                    capacity_buffer=capacity_buffer_per_side,
+                )
+                # An undersized stratum scales both its quota and buffer.  The
+                # resulting quota sum is therefore the contractual side size for
+                # this session; filling back to the unscaled k would undo the
+                # small-stratum rule through the global spill pass.
+                k_eff = int(volatility_quota.sum())
+                k_eff_rows[-1] = k_eff
+                small_universe = k_eff == 0
+                small_universe_rows[-1] = small_universe
+                group_orders: dict[int, NDArray[np.int64]] = {}
+                long_retention = np.zeros(name_count, dtype=np.bool_)
+                short_retention = np.zeros(name_count, dtype=np.bool_)
+                for group in range(config.volatility_group_count):
+                    names = np.flatnonzero(volatility_groups == group)
+                    group_order = names[
+                        np.argsort(inputs.score[day, names], kind="stable")
+                    ]
+                    group_orders[group] = group_order
+                    width = int(volatility_quota[group] + volatility_buffer[group])
+                    if width:
+                        short_retention[group_order[:width]] = True
+                        long_retention[group_order[-width:]] = True
+                if np.any(long_retention & short_retention):
+                    raise RuntimeError("within-quintile long and short bands overlap")
+                retention = int(np.sum(volatility_quota + volatility_buffer))
+            else:
+                volatility_groups = np.full(name_count, -1, dtype=np.int64)
+                volatility_quota = np.zeros(
+                    config.volatility_group_count, dtype=np.int64
+                )
+                volatility_buffer = np.zeros(
+                    config.volatility_group_count, dtype=np.int64
+                )
+                group_sizes = np.zeros(config.volatility_group_count, dtype=np.int64)
+                group_orders = {}
+                long_retention = np.zeros(name_count, dtype=np.bool_)
+                short_retention = np.zeros(name_count, dtype=np.bool_)
+                retention = min(
+                    config.k_per_side + config.buffer_per_side,
+                    len(order) // 2,
+                )
+                if retention:
+                    long_retention[order[-retention:]] = True
+                    short_retention[order[:retention]] = True
+            retention_rows.append(retention)
 
-            for name, quantity in sorted(risk_exit_quantity.items()):
-                quantity = min(quantity, abs(float(shares[name])))
-                if quantity <= 1e-12 or name in pending_exits:
+            if config.cancel_pending_outside_retention:
+                for name, pending in tuple(pending_entries.items()):
+                    retained = (
+                        long_retention[name]
+                        if pending.order.side == "buy"
+                        else short_retention[name]
+                    )
+                    if not retained:
+                        cancelled_today += int(cancel_entry(name, day, "band_exit"))
+
+            signed_values = np.zeros(name_count, dtype=np.float64)
+            held = shares != 0.0
+            ineligible_streak[~held | eligible] = 0
+            ineligible_streak[held & ~eligible] += 1
+            ineligible_score_invalid_rows.append(
+                int((held & ~inputs.score_valid[day]).sum())
+            )
+            ineligible_membership_invalid_rows.append(
+                int((held & ~inputs.membership[day]).sum())
+            )
+            ineligible_score_nonfinite_rows.append(
+                int((held & ~np.isfinite(inputs.score[day])).sum())
+            )
+            signed_values[held] = shares[held] * marks[held]
+            actual_gross, actual_net, actual_name = _risk(signed_values, start_nav)
+            risk_breach = (
+                actual_gross > config.planned_gross_cap + 1e-12
+                or abs(actual_net) > config.planned_absolute_net_cap + 1e-12
+                or actual_name > config.planned_name_weight_cap + 1e-12
+            )
+
+            exit_required: set[int] = set()
+            exit_cause_by_name: dict[int, ExitInstructionCause] = {}
+            for name in np.flatnonzero(held):
+                if not eligible[name]:
+                    kept = (
+                        retention > 0
+                        and missing_sessions[name] < config.settlement_grace_sessions
+                        and ineligible_streak[name] <= config.ineligible_hold_sessions
+                    )
+                else:
+                    kept = (
+                        retention > 0
+                        and missing_sessions[name] < config.settlement_grace_sessions
+                        and (
+                            (
+                                long_retention[name]
+                                if shares[name] > 0.0
+                                else short_retention[name]
+                            )
+                            if config.volatility_balanced_entries
+                            else (
+                                ranks[name] >= len(order) - retention
+                                if shares[name] > 0.0
+                                else ranks[name] < retention
+                            )
+                        )
+                    )
+                if not kept:
+                    integer_name = int(name)
+                    exit_required.add(integer_name)
+                    if missing_sessions[name] >= config.settlement_grace_sessions:
+                        exit_cause_by_name[integer_name] = "settlement_grace"
+                    elif not eligible[name]:
+                        exit_cause_by_name[integer_name] = "ineligible_hold_exhausted"
+                    else:
+                        exit_cause_by_name[integer_name] = "rank_out_of_retention"
+            if day == day_count - 1:
+                exit_required.update(int(name) for name in np.flatnonzero(held))
+                for name, pending in tuple(pending_exits.items()):
+                    if pending.remaining_size < 1.0 - 1e-12:
+                        cancellations.append(
+                            pending.cancellation(
+                                day, inputs.dates[day], "evaluation_end"
+                            )
+                        )
+                        del pending_exits[name]
+
+            entries_to_cancel = exit_required & pending_entries.keys()
+            for name in sorted(entries_to_cancel):
+                cancelled_today += int(cancel_entry(name, day, "exit_instruction"))
+
+            exit_cause_today = np.zeros(name_count, dtype=np.int8)
+            exit_side_today = np.zeros(name_count, dtype=np.int8)
+            ineligible_exit_within_hold_today = 0
+            for name in sorted(exit_required):
+                if name in pending_exits or shares[name] == 0.0:
                     continue
+                purpose: OrderPurpose
+                if day == day_count - 1:
+                    purpose = "terminal_exit"
+                    cause: ExitInstructionCause = "terminal"
+                else:
+                    purpose = "exit"
+                    cause = exit_cause_by_name[name]
+                if (
+                    cause == "ineligible_hold_exhausted"
+                    and ineligible_streak[name] <= config.ineligible_hold_sessions
+                ):
+                    ineligible_exit_within_hold_today += 1
+                exit_cause_today[name] = EXIT_INSTRUCTION_CAUSE_CODES[cause]
+                exit_side_today[name] = 1 if shares[name] > 0.0 else -1
                 pending_exits[name] = submit_order(
                     day,
                     name,
                     "sell" if shares[name] > 0.0 else "buy",
-                    quantity / abs(float(shares[name])),
+                    1.0,
                     float(marks[name]),
-                    "risk_exit",
+                    purpose,
                     None,
                     position_fraction=True,
                 )
 
-        if day == day_count - 1:
-            for name in tuple(pending_entries):
-                cancelled_today += int(cancel_entry(name, day, "evaluation_end"))
+            def projected_signed_values() -> NDArray[np.float64]:
+                projected = signed_values.copy()
+                for name, pending in pending_exits.items():
+                    projected[name] -= pending.remaining_size * signed_values[name]
+                for name, pending in pending_entries.items():
+                    direction = 1.0 if pending.order.side == "buy" else -1.0
+                    projected[name] += direction * pending.remaining_size
+                return projected
 
-        blocked_reference = 0
-        blocked_gross = 0
-        blocked_net = 0
-        blocked_name = 0
-        net_cap_balanced = 0
-        gross_cap_below_target = 0
-        name_cap_fresh = 0
-        submitted_entries = 0
-        same_close_replacements = 0
-        occupied_after_submission_long = min(int((shares > 0.0).sum()), k_eff)
-        occupied_after_submission_short = min(int((shares < 0.0).sum()), k_eff)
-        open_after_submission_long = max(k_eff - occupied_after_submission_long, 0)
-        open_after_submission_short = max(k_eff - occupied_after_submission_short, 0)
-        band_candidates_long = 0
-        band_candidates_short = 0
-        band_excluded_unresolved_long = 0
-        band_excluded_unresolved_short = 0
-        band_excluded_settled_long = 0
-        band_excluded_settled_short = 0
-        band_without_prior_print_long = 0
-        band_without_prior_print_short = 0
-        band_exhausted_long = 0
-        band_exhausted_short = 0
-        blocked_open_long = 0
-        blocked_open_short = 0
-        excluded_short_candidates = 0
-        spilled_entries: dict[OrderSide, NDArray[np.int64]] = {
-            "buy": np.zeros(config.volatility_group_count, dtype=np.int64),
-            "sell": np.zeros(config.volatility_group_count, dtype=np.int64),
-        }
-        if day < day_count - 1 and not small_universe:
-            slot_notional = start_nav * config.gross_target / (2 * config.k_per_side)
-            same_day_exit_names = {
-                name
-                for name, pending in pending_exits.items()
-                if pending.order.decision_session == day
-                and pending.remaining_size >= 1.0 - 1e-12
-            }
-            unavailable = set(np.flatnonzero(shares != 0.0).tolist()) | set(
-                pending_entries
-            )
-            long_occupied = {
-                int(name)
-                for name in np.flatnonzero(shares > 0.0)
-                if int(name) not in same_day_exit_names
-            } | {
-                name
-                for name, pending in pending_entries.items()
-                if pending.order.side == "buy"
-            }
-            short_occupied = {
-                int(name)
-                for name in np.flatnonzero(shares < 0.0)
-                if int(name) not in same_day_exit_names
-            } | {
-                name
-                for name, pending in pending_entries.items()
-                if pending.order.side == "sell"
-            }
-            long_slots = max(k_eff - len(long_occupied), 0)
-            short_slots = max(k_eff - len(short_occupied), 0)
-            if config.volatility_balanced_entries:
-                long_band = []
-                short_band = []
-                for group in range(config.volatility_group_count):
-                    width = int(volatility_quota[group] + volatility_buffer[group])
-                    if width == 0:
-                        continue
-                    group_order = group_orders[group]
-                    long_band.extend(int(name) for name in group_order[-width:][::-1])
-                    short_band.extend(int(name) for name in group_order[:width])
-            else:
-                long_band = [int(name) for name in entry_order[-k_eff:][::-1]]
-                short_band = [
+            def risk_projected_signed_values() -> NDArray[np.float64]:
+                """Project risk without assuming any still-pending exit will fill."""
+
+                projected = signed_values.copy()
+                for name, pending in pending_entries.items():
+                    direction = 1.0 if pending.order.side == "buy" else -1.0
+                    projected[name] += direction * pending.remaining_size
+                return projected
+
+            risk_exit_quantity: dict[int, float] = {}
+            risk_trim_gross = 0.0
+            risk_trim_net = 0.0
+            risk_trim_name = 0.0
+
+            def trim_name(
+                projected: NDArray[np.float64], name: int, notional: float
+            ) -> float:
+                if name in pending_exits or shares[name] == 0.0:
+                    return 0.0
+                mark = float(marks[name])
+                if not np.isfinite(mark) or mark <= 0.0:
+                    return 0.0
+                amount = min(max(float(notional), 0.0), abs(float(projected[name])))
+                quantity = min(amount / mark, abs(float(shares[name])))
+                already = risk_exit_quantity.get(name, 0.0)
+                quantity = min(quantity, abs(float(shares[name])) - already)
+                if quantity <= 1e-12:
+                    return 0.0
+                actual = quantity * mark
+                risk_exit_quantity[name] = already + quantity
+                projected[name] += -actual if shares[name] > 0.0 else actual
+                return actual
+
+            def trim_side(
+                projected: NDArray[np.float64], side: OrderSide, notional: float
+            ) -> float:
+                """Plan lowest-conviction partial exits and return reduced notional."""
+
+                remaining = max(float(notional), 0.0)
+                if remaining <= 1e-12:
+                    return 0.0
+                candidates = [
                     int(name)
-                    for name in entry_order[
-                        : (
-                            len(entry_order) // 2
-                            if config.borrow_source != "uniform"
-                            else k_eff
-                        )
-                    ]
+                    for name in np.flatnonzero(
+                        projected > 1e-12 if side == "sell" else projected < -1e-12
+                    )
+                    if name not in pending_exits and shares[name] != 0.0
                 ]
-            if set(long_band) & set(short_band):
-                raise RuntimeError("long and short entry bands overlap")
-            long_candidates = [
-                name
-                for name in long_band
-                if entry_eligible[name]
-                if name not in unavailable
-                and not decision_unresolved[name]
-                and not settled_names[name]
-            ]
-            short_candidates = [
-                name
-                for name in short_band
-                if entry_eligible[name]
-                if name not in unavailable
-                and not decision_unresolved[name]
-                and not settled_names[name]
-                and inputs.shortable[day, name]
-            ]
-            long_candidates.sort(
-                key=lambda name: (float(inputs.score[day, name]), name), reverse=True
+                candidates.sort(
+                    key=lambda name: (
+                        float(inputs.score[day, name])
+                        if np.isfinite(inputs.score[day, name])
+                        else (-np.inf if side == "sell" else np.inf),
+                        name,
+                    ),
+                    reverse=side == "buy",
+                )
+                reduced = 0.0
+                for name in candidates:
+                    if remaining <= 1e-12:
+                        break
+                    actual = trim_name(projected, name, remaining)
+                    remaining -= actual
+                    reduced += actual
+                return reduced
+
+            if risk_breach and day < day_count - 1:
+                projected = risk_projected_signed_values()
+
+                name_limit = config.planned_name_weight_cap * start_nav
+                for name in np.flatnonzero(np.abs(projected) > name_limit + 1e-12):
+                    name = int(name)
+                    if name in pending_entries:
+                        cancelled_today += int(cancel_entry(name, day, "risk_name_cap"))
+                        projected = risk_projected_signed_values()
+                        for risk_name, quantity in risk_exit_quantity.items():
+                            direction = -1.0 if shares[risk_name] > 0.0 else 1.0
+                            projected[risk_name] += (
+                                direction * quantity * marks[risk_name]
+                            )
+                    excess = max(abs(float(projected[name])) - name_limit, 0.0)
+                    if excess > 1e-12:
+                        risk_trim_name += trim_name(projected, name, excess)
+
+                projected_gross, _, _ = _risk(projected, start_nav)
+                if projected_gross > config.planned_gross_cap + 1e-12:
+                    total_reduction = max(
+                        (projected_gross - config.gross_target) * start_nav, 0.0
+                    )
+                    long_notional = float(projected[projected > 0.0].sum())
+                    short_notional = float(-projected[projected < 0.0].sum())
+                    long_excess = max(
+                        long_notional - config.gross_target * start_nav / 2.0, 0.0
+                    )
+                    short_excess = max(
+                        short_notional - config.gross_target * start_nav / 2.0, 0.0
+                    )
+                    side_excess = long_excess + short_excess
+                    if side_excess <= 1e-12:
+                        long_reduction = (
+                            total_reduction
+                            * long_notional
+                            / (long_notional + short_notional)
+                        )
+                    else:
+                        long_reduction = total_reduction * long_excess / side_excess
+                    short_reduction = total_reduction - long_reduction
+                    risk_trim_gross += trim_side(projected, "sell", long_reduction)
+                    risk_trim_gross += trim_side(projected, "buy", short_reduction)
+
+                _, projected_net, _ = _risk(projected, start_nav)
+                if abs(projected_net) > config.planned_absolute_net_cap + 1e-12:
+                    heavy_side: OrderSide = "sell" if projected_net > 0.0 else "buy"
+                    heavy_entries = [
+                        name
+                        for name, pending in pending_entries.items()
+                        if pending.order.side
+                        == ("buy" if heavy_side == "sell" else "sell")
+                    ]
+                    heavy_entries.sort(
+                        key=lambda name: (
+                            float(inputs.score[day, name]),
+                            name,
+                        ),
+                        reverse=heavy_side == "buy",
+                    )
+                    target_net = config.planned_absolute_net_cap / 2.0
+                    for name in heavy_entries:
+                        if abs(projected_net) <= target_net + 1e-12:
+                            break
+                        cancelled_today += int(cancel_entry(name, day, "risk_net_cap"))
+                        projected = risk_projected_signed_values()
+                        for risk_name, quantity in risk_exit_quantity.items():
+                            direction = -1.0 if shares[risk_name] > 0.0 else 1.0
+                            projected[risk_name] += (
+                                direction * quantity * marks[risk_name]
+                            )
+                        _, projected_net, _ = _risk(projected, start_nav)
+                    net_reduction = max(
+                        (abs(projected_net) - target_net) * start_nav, 0.0
+                    )
+                    risk_trim_net += trim_side(projected, heavy_side, net_reduction)
+
+                for name, quantity in sorted(risk_exit_quantity.items()):
+                    quantity = min(quantity, abs(float(shares[name])))
+                    if quantity <= 1e-12 or name in pending_exits:
+                        continue
+                    pending_exits[name] = submit_order(
+                        day,
+                        name,
+                        "sell" if shares[name] > 0.0 else "buy",
+                        quantity / abs(float(shares[name])),
+                        float(marks[name]),
+                        "risk_exit",
+                        None,
+                        position_fraction=True,
+                    )
+
+            if day == day_count - 1:
+                for name in tuple(pending_entries):
+                    cancelled_today += int(cancel_entry(name, day, "evaluation_end"))
+
+            blocked_reference = 0
+            blocked_gross = 0
+            blocked_net = 0
+            blocked_name = 0
+            net_cap_balanced = 0
+            gross_cap_below_target = 0
+            name_cap_fresh = 0
+            submitted_entries = 0
+            same_close_replacements = 0
+            occupied_after_submission_long = min(int((shares > 0.0).sum()), k_eff)
+            occupied_after_submission_short = min(int((shares < 0.0).sum()), k_eff)
+            open_after_submission_long = max(k_eff - occupied_after_submission_long, 0)
+            open_after_submission_short = max(
+                k_eff - occupied_after_submission_short, 0
             )
-            short_candidates.sort(
-                key=lambda name: (float(inputs.score[day, name]), name)
-            )
-            excluded_short_candidates = sum(
-                entry_eligible[name]
-                and name not in unavailable
-                and not decision_unresolved[name]
-                and not settled_names[name]
-                and not inputs.shortable[day, name]
-                for name in short_band
-            )
-            band_candidates_long = len(long_candidates)
-            band_candidates_short = len(short_candidates)
-            band_excluded_unresolved_long = sum(
-                name not in unavailable and bool(decision_unresolved[name])
-                for name in long_band
-            )
-            band_excluded_unresolved_short = sum(
-                name not in unavailable and bool(decision_unresolved[name])
-                for name in short_band
-            )
-            band_excluded_settled_long = sum(
-                name not in unavailable
-                and not decision_unresolved[name]
-                and bool(settled_names[name])
-                for name in long_band
-            )
-            band_excluded_settled_short = sum(
-                name not in unavailable
-                and not decision_unresolved[name]
-                and bool(settled_names[name])
-                for name in short_band
-            )
-            band_without_prior_print_long = sum(
-                last_print_session[name] < day - 1 for name in long_candidates
-            )
-            band_without_prior_print_short = sum(
-                last_print_session[name] < day - 1 for name in short_candidates
-            )
-            replacement_capacity = {
-                "buy": sum(shares[name] > 0.0 for name in same_day_exit_names),
-                "sell": sum(shares[name] < 0.0 for name in same_day_exit_names),
-            }
-            planned_values = projected_signed_values()
-            candidates_by_side = {
-                "buy": long_candidates,
-                "sell": short_candidates,
-            }
-            remaining_slots = {"buy": long_slots, "sell": short_slots}
-            attempted_candidates: dict[OrderSide, set[int]] = {
-                "buy": set(),
-                "sell": set(),
-            }
-            volatility_occupancy: dict[OrderSide, NDArray[np.int64]] = {
+            band_candidates_long = 0
+            band_candidates_short = 0
+            band_excluded_unresolved_long = 0
+            band_excluded_unresolved_short = 0
+            band_excluded_settled_long = 0
+            band_excluded_settled_short = 0
+            band_without_prior_print_long = 0
+            band_without_prior_print_short = 0
+            band_exhausted_long = 0
+            band_exhausted_short = 0
+            blocked_open_long = 0
+            blocked_open_short = 0
+            excluded_short_candidates = 0
+            spilled_entries: dict[OrderSide, NDArray[np.int64]] = {
                 "buy": np.zeros(config.volatility_group_count, dtype=np.int64),
                 "sell": np.zeros(config.volatility_group_count, dtype=np.int64),
             }
-            if config.volatility_balanced_entries:
-                for side, occupied in (
-                    ("buy", long_occupied),
-                    ("sell", short_occupied),
-                ):
-                    for name in occupied:
-                        group = int(volatility_groups[name])
-                        if group >= 0:
-                            volatility_occupancy[side][group] += 1
-                centre = (config.volatility_group_count - 1) / 2.0
-                group_priority = sorted(
-                    range(config.volatility_group_count),
-                    key=lambda group: (abs(group - centre), group),
+            if day < day_count - 1 and not small_universe:
+                slot_notional = (
+                    start_nav * config.gross_target / (2 * config.k_per_side)
                 )
-            else:
-                group_priority = []
-
-            def next_candidate(side: OrderSide) -> tuple[int, bool] | None:
-                candidates = candidates_by_side[side]
-                attempted = attempted_candidates[side]
+                same_day_exit_names = {
+                    name
+                    for name, pending in pending_exits.items()
+                    if pending.order.decision_session == day
+                    and pending.remaining_size >= 1.0 - 1e-12
+                }
+                unavailable = set(np.flatnonzero(shares != 0.0).tolist()) | set(
+                    pending_entries
+                )
+                long_occupied = {
+                    int(name)
+                    for name in np.flatnonzero(shares > 0.0)
+                    if int(name) not in same_day_exit_names
+                } | {
+                    name
+                    for name, pending in pending_entries.items()
+                    if pending.order.side == "buy"
+                }
+                short_occupied = {
+                    int(name)
+                    for name in np.flatnonzero(shares < 0.0)
+                    if int(name) not in same_day_exit_names
+                } | {
+                    name
+                    for name, pending in pending_entries.items()
+                    if pending.order.side == "sell"
+                }
+                long_slots = max(k_eff - len(long_occupied), 0)
+                short_slots = max(k_eff - len(short_occupied), 0)
                 if config.volatility_balanced_entries:
-                    for group in group_priority:
-                        if volatility_occupancy[side][group] >= volatility_quota[group]:
+                    long_band = []
+                    short_band = []
+                    for group in range(config.volatility_group_count):
+                        width = int(volatility_quota[group] + volatility_buffer[group])
+                        if width == 0:
                             continue
-                        for candidate in candidates:
+                        group_order = group_orders[group]
+                        long_band.extend(
+                            int(name) for name in group_order[-width:][::-1]
+                        )
+                        short_band.extend(int(name) for name in group_order[:width])
+                else:
+                    long_band = [int(name) for name in entry_order[-k_eff:][::-1]]
+                    short_band = [
+                        int(name)
+                        for name in entry_order[
+                            : (
+                                len(entry_order) // 2
+                                if config.borrow_source != "uniform"
+                                else k_eff
+                            )
+                        ]
+                    ]
+                if set(long_band) & set(short_band):
+                    raise RuntimeError("long and short entry bands overlap")
+                long_candidates = [
+                    name
+                    for name in long_band
+                    if entry_eligible[name]
+                    if name not in unavailable
+                    and not decision_unresolved[name]
+                    and not settled_names[name]
+                ]
+                short_candidates = [
+                    name
+                    for name in short_band
+                    if entry_eligible[name]
+                    if name not in unavailable
+                    and not decision_unresolved[name]
+                    and not settled_names[name]
+                    and inputs.shortable[day, name]
+                ]
+                long_candidates.sort(
+                    key=lambda name: (float(inputs.score[day, name]), name),
+                    reverse=True,
+                )
+                short_candidates.sort(
+                    key=lambda name: (float(inputs.score[day, name]), name)
+                )
+                excluded_short_candidates = sum(
+                    entry_eligible[name]
+                    and name not in unavailable
+                    and not decision_unresolved[name]
+                    and not settled_names[name]
+                    and not inputs.shortable[day, name]
+                    for name in short_band
+                )
+                band_candidates_long = len(long_candidates)
+                band_candidates_short = len(short_candidates)
+                band_excluded_unresolved_long = sum(
+                    name not in unavailable and bool(decision_unresolved[name])
+                    for name in long_band
+                )
+                band_excluded_unresolved_short = sum(
+                    name not in unavailable and bool(decision_unresolved[name])
+                    for name in short_band
+                )
+                band_excluded_settled_long = sum(
+                    name not in unavailable
+                    and not decision_unresolved[name]
+                    and bool(settled_names[name])
+                    for name in long_band
+                )
+                band_excluded_settled_short = sum(
+                    name not in unavailable
+                    and not decision_unresolved[name]
+                    and bool(settled_names[name])
+                    for name in short_band
+                )
+                band_without_prior_print_long = sum(
+                    last_print_session[name] < day - 1 for name in long_candidates
+                )
+                band_without_prior_print_short = sum(
+                    last_print_session[name] < day - 1 for name in short_candidates
+                )
+                replacement_capacity = {
+                    "buy": sum(shares[name] > 0.0 for name in same_day_exit_names),
+                    "sell": sum(shares[name] < 0.0 for name in same_day_exit_names),
+                }
+                planned_values = projected_signed_values()
+                candidates_by_side = {
+                    "buy": long_candidates,
+                    "sell": short_candidates,
+                }
+                remaining_slots = {"buy": long_slots, "sell": short_slots}
+                attempted_candidates: dict[OrderSide, set[int]] = {
+                    "buy": set(),
+                    "sell": set(),
+                }
+                volatility_occupancy: dict[OrderSide, NDArray[np.int64]] = {
+                    "buy": np.zeros(config.volatility_group_count, dtype=np.int64),
+                    "sell": np.zeros(config.volatility_group_count, dtype=np.int64),
+                }
+                if config.volatility_balanced_entries:
+                    for side, occupied in (
+                        ("buy", long_occupied),
+                        ("sell", short_occupied),
+                    ):
+                        for name in occupied:
+                            group = int(volatility_groups[name])
+                            if group >= 0:
+                                volatility_occupancy[side][group] += 1
+                    centre = (config.volatility_group_count - 1) / 2.0
+                    group_priority = sorted(
+                        range(config.volatility_group_count),
+                        key=lambda group: (abs(group - centre), group),
+                    )
+                else:
+                    group_priority = []
+
+                def next_candidate(side: OrderSide) -> tuple[int, bool] | None:
+                    candidates = candidates_by_side[side]
+                    attempted = attempted_candidates[side]
+                    if config.volatility_balanced_entries:
+                        for group in group_priority:
                             if (
-                                candidate not in attempted
-                                and volatility_groups[candidate] == group
+                                volatility_occupancy[side][group]
+                                >= volatility_quota[group]
                             ):
-                                return candidate, False
-                    spill = next(
+                                continue
+                            for candidate in candidates:
+                                if (
+                                    candidate not in attempted
+                                    and volatility_groups[candidate] == group
+                                ):
+                                    return candidate, False
+                        spill = next(
+                            (
+                                candidate
+                                for candidate in candidates
+                                if candidate not in attempted
+                            ),
+                            None,
+                        )
+                        return None if spill is None else (spill, True)
+                    candidate = next(
                         (
                             candidate
                             for candidate in candidates
@@ -2122,240 +2409,237 @@ def simulate_stateful_ledger(
                         ),
                         None,
                     )
-                    return None if spill is None else (spill, True)
-                candidate = next(
-                    (
-                        candidate
-                        for candidate in candidates
-                        if candidate not in attempted
-                    ),
-                    None,
-                )
-                return None if candidate is None else (candidate, False)
+                    return None if candidate is None else (candidate, False)
 
-            side_budget = {
-                "buy": long_slots * slot_notional,
-                "sell": short_slots * slot_notional,
-            }
-            inverse_weight_scale: dict[OrderSide, float] = {}
-            if sizing_volatility is not None:
-                for side in ("buy", "sell"):
-                    candidates = [
-                        name
-                        for name in candidates_by_side[side]
-                        if np.isfinite(last_observed[name])
-                        and last_observed[name] > 0.0
-                    ]
-                    sigma = sizing_volatility[day, candidates]
-                    if np.any(~np.isfinite(sigma) | (sigma <= 0.0)):
-                        raise ValueError(
-                            "inverse-volatility entries require positive causal sigma"
-                        )
-                    planned: list[int] = []
-                    for group in group_priority:
-                        deficit = max(
-                            int(
-                                volatility_quota[group]
-                                - volatility_occupancy[side][group]
-                            ),
-                            0,
-                        )
-                        planned.extend(
-                            [
-                                name
-                                for name in candidates
-                                if volatility_groups[name] == group
-                            ][:deficit]
-                        )
-                    planned.extend(name for name in candidates if name not in planned)
-                    planned = planned[: remaining_slots[side]]
-                    inverse_weight_scale[side] = (
-                        side_budget[side]
-                        / float(np.sum(1.0 / sizing_volatility[day, planned]))
-                        if planned
-                        else 0.0
-                    )
-
-            if long_slots > short_slots:
-                current_side: OrderSide = "buy"
-            elif short_slots > long_slots:
-                current_side = "sell"
-            else:
-                current_side = "buy"
-            while True:
-                other_side: OrderSide = "sell" if current_side == "buy" else "buy"
-                candidate_row = (
-                    next_candidate(current_side)
-                    if remaining_slots[current_side] > 0
-                    else None
-                )
-                other_candidate_row = (
-                    next_candidate(other_side)
-                    if remaining_slots[other_side] > 0
-                    else None
-                )
-                available = candidate_row is not None
-                other_available = other_candidate_row is not None
-                if not available and not other_available:
-                    break
-                if not available:
-                    current_side = other_side
-                    candidate_row = other_candidate_row
-                if candidate_row is None:
-                    raise RuntimeError("entry scheduler lost an available candidate")
-                name, is_spill = candidate_row
-                attempted_candidates[current_side].add(name)
-                reference = float(last_observed[name])
-                if not np.isfinite(reference) or reference <= 0.0:
-                    blocked_reference += 1
-                    current_side = "sell" if current_side == "buy" else "buy"
-                    continue
-                entry_notional = slot_notional
+                side_budget = {
+                    "buy": long_slots * slot_notional,
+                    "sell": short_slots * slot_notional,
+                }
+                inverse_weight_scale: dict[OrderSide, float] = {}
                 if sizing_volatility is not None:
-                    entry_notional = min(
-                        inverse_weight_scale[current_side]
-                        / sizing_volatility[day, name],
-                        start_nav * config.planned_name_weight_cap,
-                        side_budget[current_side],
+                    for side in ("buy", "sell"):
+                        candidates = [
+                            name
+                            for name in candidates_by_side[side]
+                            if np.isfinite(last_observed[name])
+                            and last_observed[name] > 0.0
+                        ]
+                        sigma = sizing_volatility[day, candidates]
+                        if np.any(~np.isfinite(sigma) | (sigma <= 0.0)):
+                            raise ValueError(
+                                "inverse-volatility entries require positive causal sigma"
+                            )
+                        planned: list[int] = []
+                        for group in group_priority:
+                            deficit = max(
+                                int(
+                                    volatility_quota[group]
+                                    - volatility_occupancy[side][group]
+                                ),
+                                0,
+                            )
+                            planned.extend(
+                                [
+                                    name
+                                    for name in candidates
+                                    if volatility_groups[name] == group
+                                ][:deficit]
+                            )
+                        planned.extend(
+                            name for name in candidates if name not in planned
+                        )
+                        planned = planned[: remaining_slots[side]]
+                        inverse_weight_scale[side] = (
+                            side_budget[side]
+                            / float(np.sum(1.0 / sizing_volatility[day, planned]))
+                            if planned
+                            else 0.0
+                        )
+
+                if long_slots > short_slots:
+                    current_side: OrderSide = "buy"
+                elif short_slots > long_slots:
+                    current_side = "sell"
+                else:
+                    current_side = "buy"
+                while True:
+                    other_side: OrderSide = "sell" if current_side == "buy" else "buy"
+                    candidate_row = (
+                        next_candidate(current_side)
+                        if remaining_slots[current_side] > 0
+                        else None
                     )
-                    if entry_notional <= 1e-12 * start_nav:
+                    other_candidate_row = (
+                        next_candidate(other_side)
+                        if remaining_slots[other_side] > 0
+                        else None
+                    )
+                    available = candidate_row is not None
+                    other_available = other_candidate_row is not None
+                    if not available and not other_available:
+                        break
+                    if not available:
+                        current_side = other_side
+                        candidate_row = other_candidate_row
+                    if candidate_row is None:
+                        raise RuntimeError(
+                            "entry scheduler lost an available candidate"
+                        )
+                    name, is_spill = candidate_row
+                    attempted_candidates[current_side].add(name)
+                    reference = float(last_observed[name])
+                    if not np.isfinite(reference) or reference <= 0.0:
+                        blocked_reference += 1
                         current_side = "sell" if current_side == "buy" else "buy"
                         continue
-                proposed = planned_values.copy()
-                proposed[name] += (
-                    entry_notional if current_side == "buy" else -entry_notional
-                )
-                gross_before, net_before, _ = _risk(planned_values, start_nav)
-                planned_gross, planned_net, _ = _risk(proposed, start_nav)
-                violates_gross = planned_gross > config.planned_gross_cap + 1e-12
-                violates_net = (
-                    abs(planned_net) > config.planned_absolute_net_cap + 1e-12
-                )
-                # A missing print can leave another name overweight while its
-                # risk exit is pending. Its concentration cannot veto an entry
-                # in this name; aggregate gross/net limits still apply.
-                violates_name = (
-                    abs(proposed[name]) / start_nav
-                    > config.planned_name_weight_cap + 1e-12
-                )
-                blocked_gross += int(violates_gross)
-                blocked_net += int(violates_net)
-                blocked_name += int(violates_name)
-                gross_cap_below_target += int(
-                    violates_gross and gross_before < config.gross_target
-                )
-                net_cap_balanced += int(
-                    violates_net
-                    and abs(net_before)
-                    <= config.planned_absolute_net_cap
-                    - entry_notional / start_nav
-                    - 1e-9
-                )
-                name_cap_fresh += int(
-                    violates_name
-                    and shares[name] == 0.0
-                    and name not in pending_entries
-                )
-                if violates_gross or violates_net or violates_name:
+                    entry_notional = slot_notional
+                    if sizing_volatility is not None:
+                        entry_notional = min(
+                            inverse_weight_scale[current_side]
+                            / sizing_volatility[day, name],
+                            start_nav * config.planned_name_weight_cap,
+                            side_budget[current_side],
+                        )
+                        if entry_notional <= 1e-12 * start_nav:
+                            current_side = "sell" if current_side == "buy" else "buy"
+                            continue
+                    proposed = planned_values.copy()
+                    proposed[name] += (
+                        entry_notional if current_side == "buy" else -entry_notional
+                    )
+                    gross_before, net_before, _ = _risk(planned_values, start_nav)
+                    planned_gross, planned_net, _ = _risk(proposed, start_nav)
+                    violates_gross = planned_gross > config.planned_gross_cap + 1e-12
+                    violates_net = (
+                        abs(planned_net) > config.planned_absolute_net_cap + 1e-12
+                    )
+                    # A missing print can leave another name overweight while its
+                    # risk exit is pending. Its concentration cannot veto an entry
+                    # in this name; aggregate gross/net limits still apply.
+                    violates_name = (
+                        abs(proposed[name]) / start_nav
+                        > config.planned_name_weight_cap + 1e-12
+                    )
+                    blocked_gross += int(violates_gross)
+                    blocked_net += int(violates_net)
+                    blocked_name += int(violates_name)
+                    gross_cap_below_target += int(
+                        violates_gross and gross_before < config.gross_target
+                    )
+                    net_cap_balanced += int(
+                        violates_net
+                        and abs(net_before)
+                        <= config.planned_absolute_net_cap
+                        - entry_notional / start_nav
+                        - 1e-9
+                    )
+                    name_cap_fresh += int(
+                        violates_name
+                        and shares[name] == 0.0
+                        and name not in pending_entries
+                    )
+                    if violates_gross or violates_net or violates_name:
+                        current_side = "sell" if current_side == "buy" else "buy"
+                        continue
+                    expiry = day + config.entry_expiry_sessions - 1
+                    submission_nav[name] = start_nav
+                    entry_cost_basis[name] = 0.0
+                    pending_entries[name] = submit_order(
+                        day,
+                        name,
+                        current_side,
+                        entry_notional,
+                        reference,
+                        "entry",
+                        expiry,
+                    )
+                    remaining_slots[current_side] -= 1
+                    side_budget[current_side] -= entry_notional
+                    if config.volatility_balanced_entries:
+                        volatility_occupancy[current_side][volatility_groups[name]] += 1
+                        if is_spill:
+                            spilled_entries[current_side][volatility_groups[name]] += 1
+                    submitted_entries += 1
+                    if replacement_capacity[current_side] > 0:
+                        same_close_replacements += 1
+                        replacement_capacity[current_side] -= 1
+                    planned_values = proposed
                     current_side = "sell" if current_side == "buy" else "buy"
-                    continue
-                expiry = day + config.entry_expiry_sessions - 1
-                submission_nav[name] = start_nav
-                entry_cost_basis[name] = 0.0
-                pending_entries[name] = submit_order(
-                    day,
-                    name,
-                    current_side,
-                    entry_notional,
-                    reference,
-                    "entry",
-                    expiry,
+                occupied_after_submission_long = k_eff - remaining_slots["buy"]
+                occupied_after_submission_short = k_eff - remaining_slots["sell"]
+                open_after_submission_long = remaining_slots["buy"]
+                open_after_submission_short = remaining_slots["sell"]
+                band_exhausted_long = (
+                    remaining_slots["buy"]
+                    if len(attempted_candidates["buy"]) == len(long_candidates)
+                    else 0
                 )
-                remaining_slots[current_side] -= 1
-                side_budget[current_side] -= entry_notional
-                if config.volatility_balanced_entries:
-                    volatility_occupancy[current_side][volatility_groups[name]] += 1
-                    if is_spill:
-                        spilled_entries[current_side][volatility_groups[name]] += 1
-                submitted_entries += 1
-                if replacement_capacity[current_side] > 0:
-                    same_close_replacements += 1
-                    replacement_capacity[current_side] -= 1
-                planned_values = proposed
-                current_side = "sell" if current_side == "buy" else "buy"
-            occupied_after_submission_long = k_eff - remaining_slots["buy"]
-            occupied_after_submission_short = k_eff - remaining_slots["sell"]
-            open_after_submission_long = remaining_slots["buy"]
-            open_after_submission_short = remaining_slots["sell"]
-            band_exhausted_long = (
-                remaining_slots["buy"]
-                if len(attempted_candidates["buy"]) == len(long_candidates)
-                else 0
+                band_exhausted_short = (
+                    remaining_slots["sell"]
+                    if len(attempted_candidates["sell"]) == len(short_candidates)
+                    else 0
+                )
+                blocked_open_long = (
+                    remaining_slots["buy"]
+                    if len(attempted_candidates["buy"]) < len(long_candidates)
+                    else 0
+                )
+                blocked_open_short = (
+                    remaining_slots["sell"]
+                    if len(attempted_candidates["sell"]) < len(short_candidates)
+                    else 0
+                )
+            blocked_reference_rows.append(blocked_reference)
+            blocked_gross_rows.append(blocked_gross)
+            blocked_net_rows.append(blocked_net)
+            blocked_name_rows.append(blocked_name)
+            submitted_entry_rows.append(submitted_entries)
+            submitted_exit_rows.append(
+                sum(
+                    order_.decision_session == day and order_.purpose != "entry"
+                    for order_ in orders
+                )
             )
-            band_exhausted_short = (
-                remaining_slots["sell"]
-                if len(attempted_candidates["sell"]) == len(short_candidates)
-                else 0
+            same_close_replacement_rows.append(same_close_replacements)
+            zero_entry_small_rows.append(submitted_entries == 0 and small_universe)
+            zero_entry_gross_rows.append(submitted_entries == 0 and blocked_gross > 0)
+            zero_entry_net_rows.append(submitted_entries == 0 and blocked_net > 0)
+            zero_entry_name_rows.append(submitted_entries == 0 and blocked_name > 0)
+            zero_entry_reference_rows.append(
+                submitted_entries == 0 and blocked_reference > 0
             )
-            blocked_open_long = (
-                remaining_slots["buy"]
-                if len(attempted_candidates["buy"]) < len(long_candidates)
-                else 0
+            risk_trim_gross_rows.append(risk_trim_gross)
+            risk_trim_net_rows.append(risk_trim_net)
+            risk_trim_name_rows.append(risk_trim_name)
+            occupied_after_submission_long_rows.append(occupied_after_submission_long)
+            occupied_after_submission_short_rows.append(occupied_after_submission_short)
+            open_after_submission_long_rows.append(open_after_submission_long)
+            open_after_submission_short_rows.append(open_after_submission_short)
+            band_candidates_long_rows.append(band_candidates_long)
+            band_candidates_short_rows.append(band_candidates_short)
+            excluded_short_candidate_rows.append(excluded_short_candidates)
+            band_excluded_unresolved_long_rows.append(band_excluded_unresolved_long)
+            band_excluded_unresolved_short_rows.append(band_excluded_unresolved_short)
+            band_excluded_settled_long_rows.append(band_excluded_settled_long)
+            band_excluded_settled_short_rows.append(band_excluded_settled_short)
+            band_without_prior_print_long_rows.append(band_without_prior_print_long)
+            band_without_prior_print_short_rows.append(band_without_prior_print_short)
+            band_exhausted_long_rows.append(band_exhausted_long)
+            band_exhausted_short_rows.append(band_exhausted_short)
+            blocked_open_long_rows.append(blocked_open_long)
+            blocked_open_short_rows.append(blocked_open_short)
+            exit_ineligible_hold_exhausted_rows.append(
+                int((exit_cause_today == 1).sum())
             )
-            blocked_open_short = (
-                remaining_slots["sell"]
-                if len(attempted_candidates["sell"]) < len(short_candidates)
-                else 0
-            )
-        blocked_reference_rows.append(blocked_reference)
-        blocked_gross_rows.append(blocked_gross)
-        blocked_net_rows.append(blocked_net)
-        blocked_name_rows.append(blocked_name)
-        submitted_entry_rows.append(submitted_entries)
-        submitted_exit_rows.append(
-            sum(
-                order_.decision_session == day and order_.purpose != "entry"
-                for order_ in orders
-            )
-        )
-        same_close_replacement_rows.append(same_close_replacements)
-        zero_entry_small_rows.append(submitted_entries == 0 and small_universe)
-        zero_entry_gross_rows.append(submitted_entries == 0 and blocked_gross > 0)
-        zero_entry_net_rows.append(submitted_entries == 0 and blocked_net > 0)
-        zero_entry_name_rows.append(submitted_entries == 0 and blocked_name > 0)
-        zero_entry_reference_rows.append(
-            submitted_entries == 0 and blocked_reference > 0
-        )
-        risk_trim_gross_rows.append(risk_trim_gross)
-        risk_trim_net_rows.append(risk_trim_net)
-        risk_trim_name_rows.append(risk_trim_name)
-        occupied_after_submission_long_rows.append(occupied_after_submission_long)
-        occupied_after_submission_short_rows.append(occupied_after_submission_short)
-        open_after_submission_long_rows.append(open_after_submission_long)
-        open_after_submission_short_rows.append(open_after_submission_short)
-        band_candidates_long_rows.append(band_candidates_long)
-        band_candidates_short_rows.append(band_candidates_short)
-        excluded_short_candidate_rows.append(excluded_short_candidates)
-        band_excluded_unresolved_long_rows.append(band_excluded_unresolved_long)
-        band_excluded_unresolved_short_rows.append(band_excluded_unresolved_short)
-        band_excluded_settled_long_rows.append(band_excluded_settled_long)
-        band_excluded_settled_short_rows.append(band_excluded_settled_short)
-        band_without_prior_print_long_rows.append(band_without_prior_print_long)
-        band_without_prior_print_short_rows.append(band_without_prior_print_short)
-        band_exhausted_long_rows.append(band_exhausted_long)
-        band_exhausted_short_rows.append(band_exhausted_short)
-        blocked_open_long_rows.append(blocked_open_long)
-        blocked_open_short_rows.append(blocked_open_short)
-        exit_ineligible_hold_exhausted_rows.append(int((exit_cause_today == 1).sum()))
-        exit_settlement_rows.append(int((exit_cause_today == 2).sum()))
-        exit_rank_rows.append(int((exit_cause_today == 3).sum()))
-        exit_terminal_rows.append(int((exit_cause_today == 4).sum()))
-        exit_cause_rows.append(exit_cause_today)
-        exit_side_rows.append(exit_side_today)
-        ineligible_exit_within_hold_rows.append(ineligible_exit_within_hold_today)
-        net_cap_balanced_rows.append(net_cap_balanced)
-        gross_cap_below_target_rows.append(gross_cap_below_target)
-        name_cap_fresh_rows.append(name_cap_fresh)
+            exit_settlement_rows.append(int((exit_cause_today == 2).sum()))
+            exit_rank_rows.append(int((exit_cause_today == 3).sum()))
+            exit_terminal_rows.append(int((exit_cause_today == 4).sum()))
+            exit_cause_rows.append(exit_cause_today)
+            exit_side_rows.append(exit_side_today)
+            ineligible_exit_within_hold_rows.append(ineligible_exit_within_hold_today)
+            net_cap_balanced_rows.append(net_cap_balanced)
+            gross_cap_below_target_rows.append(gross_cap_below_target)
+            name_cap_fresh_rows.append(name_cap_fresh)
 
         # A last-mark settlement is conditional accounting, not an observed
         # market execution. Freeze its fraction before the possible final print;
@@ -2406,7 +2690,11 @@ def simulate_stateful_ledger(
             else 0.0
         )
         hedge_unconstrained_target_notional = (
-            -equity_beta_notional if day != day_count - 1 else 0.0
+            target.hedge_weight * start_nav
+            if portfolio_policy is not None
+            else -equity_beta_notional
+            if day != day_count - 1
+            else 0.0
         )
         hedge_limit = config.hedge_notional_cap_nav * start_nav
         hedge_target_notional = float(
@@ -2418,7 +2706,12 @@ def simulate_stateful_ledger(
         hedge_notional_before = hedge_shares * hedge_mark if hedge_shares else 0.0
         rebalance_required = config.beta_hedge and (
             abs(hedge_target_notional - hedge_notional_before)
-            > config.hedge_rebalance_threshold_nav * start_nav
+            > (
+                0.0
+                if portfolio_policy is not None
+                else config.hedge_rebalance_threshold_nav
+            )
+            * start_nav
             or abs(hedge_notional_before) > hedge_limit + 1e-12
             or (day == day_count - 1 and hedge_shares != 0.0)
         )
@@ -2697,6 +2990,8 @@ def simulate_stateful_ledger(
                     del pending_map[name]
                     continue
                 if not printed[name]:
+                    continue
+                if entries and portfolio_policy is not None and name in pending_exits:
                     continue
                 if (
                     entries
@@ -3141,6 +3436,13 @@ def simulate_stateful_ledger(
             )
             / current_nav
         )
+
+        if portfolio_policy is not None:
+            small_universe_shortfall = sizing_fill = sizing_mark = sizing_nav = np.nan
+            occupancy_pending_count = occupancy_band_exhausted_count = np.nan
+            occupancy_blocked_count = occupancy_exit_gap_count = (
+                unclassified_occupancy
+            ) = np.nan
 
         economic_pnl = current_nav - start_nav - interest + borrow + costs
         equity_gross_pnl = economic_pnl - hedge_gross_pnl

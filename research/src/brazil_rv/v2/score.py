@@ -6,6 +6,7 @@ import argparse
 import hashlib
 import os
 import shutil
+import subprocess
 import tempfile
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass, replace
@@ -19,7 +20,9 @@ from .artifacts import sha256_file, write_json_atomic
 from .config import ModelConfig
 from .contract import (
     DECISION_FEATURE_ALIGNMENT,
+    FINETUNE_START,
     HORIZONS,
+    PRETRAIN_END,
     SCORE_ARTIFACT_SCHEMA,
     V1_READ_SEEDS,
 )
@@ -50,6 +53,66 @@ class ScoreArtifact:
     manifest_path: Path
     manifest_sha256: str
     checkpoint_sha256: str
+
+
+def verify_reused_inference_source(training_commit: str | None) -> dict[str, object]:
+    """Permit later non-model commits only when the inference dependencies match.
+
+    Checkpoint/store/preprocessing hashes remain independently checked. This
+    enables a genuinely compatible parent to score later research dates without
+    treating an unrelated documentation or accounting commit as new weights.
+    """
+    current = _repository_commit_if_available()
+    binding = {"training_commit": training_commit, "scoring_commit": current}
+    if training_commit is None or training_commit == current:
+        return binding
+    root = Path(__file__).resolve().parents[4]
+    files = [
+        "v2/model.py",
+        "v2/characteristic_model.py",
+        "v2/temporal_pathway.py",
+        "v2/config.py",
+        "v2/contract.py",
+        "v2/data.py",
+        "v2/store.py",
+        "v2/round7_preprocessing.py",
+        "v2/train.py",
+        "v2/round7_training.py",
+        "modeling/contract.py",
+        "modeling/layers.py",
+    ]
+    hashes = {}
+    for relative in files:
+        path = f"research/src/brazil_rv/{relative}"
+        historical = subprocess.check_output(
+            ["git", "show", f"{training_commit}:{path}"], cwd=root
+        )
+        actual = (root / path).read_bytes().replace(b"\r\n", b"\n")
+        if actual != historical.replace(b"\r\n", b"\n"):
+            raise ValueError(
+                f"reused checkpoint's inference dependency changed: {relative}"
+            )
+        hashes[path] = hashlib.sha256(actual).hexdigest()
+    return {**binding, "matched_inference_sources": hashes}
+
+
+def validate_parent_forecast_dates(dates: np.ndarray, indices: np.ndarray) -> None:
+    if len(indices) == 0 or np.any(np.diff(indices) != 1):
+        raise ValueError("parent forecast dates must be one chronological block")
+    cutoff = np.searchsorted(dates, np.datetime64(PRETRAIN_END), side="right") - 1
+    if indices[0] <= cutoff + max(HORIZONS):
+        raise ValueError(
+            "parent forecasts overlap the fit/selection information boundary"
+        )
+
+
+def parent_prelude_indices(store_root: Path) -> np.ndarray:
+    dates = np.load(store_root / "date_index.npy", allow_pickle=False)
+    rows = np.flatnonzero(
+        (dates >= np.datetime64(FINETUNE_START)) & (dates < np.datetime64("2018-01-01"))
+    )
+    validate_parent_forecast_dates(dates, rows)
+    return rows
 
 
 def _authorized_dataset(
@@ -174,6 +237,7 @@ def score_checkpoint_artifact(
     device: torch.device | None = None,
     record_branch_diagnostics: bool = False,
     invalid_sidecars: tuple[str, ...] = (),
+    compiled: bool | None = None,
 ) -> ScoreArtifact:
     """Score one authorized chronological axis into an immutable artifact root.
 
@@ -245,10 +309,9 @@ def score_checkpoint_artifact(
         raise PermissionError(
             "official validation refuses chronology-contaminated transfer artifacts"
         )
-    recorded_commit = checkpoint_contract.get("implementation_commit")
-    current_commit = _repository_commit_if_available()
-    if recorded_commit is not None and current_commit != recorded_commit:
-        raise ValueError("scoring implementation commit differs from the checkpoint")
+    inference_source = verify_reused_inference_source(
+        checkpoint_contract.get("implementation_commit")
+    )
     checkpoint_selection = checkpoint_contract.get("selection")
     if dataset.enabled_sidecars:
         features = (
@@ -293,6 +356,9 @@ def score_checkpoint_artifact(
         raise ValueError("scoring dataset differs from the checkpoint input identity")
     expected_alignment = DECISION_FEATURE_ALIGNMENT
     expected_dataset_stage = "pretrain" if stage == "P" else "evaluation"
+    if stage == "P" and dataset.stage == "evaluation":
+        validate_parent_forecast_dates(dataset.store.dates, dataset.date_indices)
+        expected_dataset_stage = "evaluation"
     if (
         dataset.stage != expected_dataset_stage
         or scoring_input.get("entry_alignment") != expected_alignment
@@ -320,7 +386,8 @@ def score_checkpoint_artifact(
     )
     model.to(target_device)
     model.eval()
-    forward_model = compile_forward(model) if model_config.compile_forward else model
+    compiled = model_config.compile_forward if compiled is None else compiled
+    forward_model = compile_forward(model) if compiled else model
     expected_indices = np.asarray(dataset.date_indices, dtype=np.int64)
     date_parts: list[np.ndarray] = []
     score_parts: list[np.ndarray] = []
@@ -415,6 +482,7 @@ def score_checkpoint_artifact(
             "action_terms_source": action_terms_source,
             "schedule_source": schedule_source,
             "checkpoint_input_contract_sha256": checkpoint_contract["sha256"],
+            "inference_source": inference_source,
             "scoring_input": scoring_input_payload,
             "scoring_input_sha256": scoring_input_sha256,
             "dataset": {
@@ -442,7 +510,7 @@ def score_checkpoint_artifact(
                 "forced_invalid_sidecars": list(invalid_sidecars),
                 "device_type": target_device.type,
                 "batch_size": getattr(loader, "batch_size", None),
-                "compiled": model_config.compile_forward,
+                "compiled": compiled,
                 "bf16_autocast": (
                     model_config.use_bf16 and target_device.type == "cuda"
                 ),
@@ -492,6 +560,7 @@ def _score_parser() -> argparse.ArgumentParser:
     parser.add_argument("--batch-size", type=int, default=16)
     parser.add_argument("--num-workers", type=int, default=0)
     parser.add_argument("--device", choices=("auto", "cpu", "cuda"), default="auto")
+    parser.add_argument("--parent-prelude", action="store_true")
     return parser
 
 
@@ -516,6 +585,10 @@ def main(argv: Sequence[str] | None = None) -> int:
     indices = np.arange(first, last + 1, dtype=np.int64)
     if indices.size != count:
         raise ValueError("checkpoint selection dates are not one contiguous axis")
+    if arguments.parent_prelude:
+        if payload["stage"] != "P":
+            raise ValueError("parent prelude requires a P checkpoint")
+        indices = parent_prelude_indices(arguments.store)
     sidecars = features.get("enabled_sidecar_groups")
     if not isinstance(sidecars, list) or not all(
         isinstance(value, str) for value in sidecars
@@ -531,7 +604,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     dataset = V2DailyDataset(
         arguments.store.resolve(),
         indices,
-        stage="pretrain" if stage == "P" else "evaluation",
+        stage="pretrain"
+        if stage == "P" and not arguments.parent_prelude
+        else "evaluation",
         lookback=int(selection["lookback_sessions"]),
         enabled_sidecars=tuple(sidecars),
         include_intraday=model_config.current_feature_count > 0,
