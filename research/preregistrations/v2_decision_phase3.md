@@ -89,3 +89,27 @@ isolated fold P&Ls or fill missing variant forecasts with other models.
 
 No 2025/2026 consumer reads, forward capture or Phase 4 work. After Phase 3,
 return to the postmortem and complete the combined review and recovery record.
+
+## CPU preparation and evaluation boundary clarification
+
+Lambda authentication is unavailable and the user deferred GPU work. Complete
+CPU engineering and preserve the remaining campaign for later. GPU acceptance
+uses two epochs for each architecture/objective at F2/seed11, so compile startup
+and the following epoch are reported separately. These disposable smoke fits
+do not enter the financial comparison. Require finite updates, actual CUDA
+tensor caches, compilation and identical matched populations before dispatch.
+
+New score panels contain the registered evaluation dates only. Start each
+matched fold book from cash on its first evaluation date, with the same final
+liquidation rule for both objectives. Do not manufacture a burn-in using old
+forecasts. Thus Phase 1/2 fold books are descriptive, not matched Phase 3 controls.
+Use only labels whose full horizon remains inside that evaluation block for
+rank/cardinal readouts. Continuous confirmation starts from cash at the first
+development evaluation date and carries inventory across subsequent fold changes.
+
+The blend coefficient is the TE weight. Select the highest prior-window utility;
+exact ties prefer the smaller weight, an explicit deterministic convention.
+Keep the original normalized rank coordinates when blending, without re-ranking
+the convex combination. The rank ensemble averages the three seed midranks;
+the economic head ensemble averages predictions in daily-return units. Freeze
+the four screen weights/mappings on sealed old OOS forecasts before new GPU fits.

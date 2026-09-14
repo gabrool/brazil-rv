@@ -232,7 +232,7 @@ def fit(root, arm, fold, seed, variant, *, smoke=False):
         stage="F",
         fold=fold,
         seed=seed,
-        epochs=1 if smoke else 60,
+        epochs=2 if smoke else 60,
         recipe=TrainingRecipe(**design["recipes"][arm]),
         parent=parent,
         parent_sha256=design["parents"][arm][str(seed)]["sha256"],
@@ -244,6 +244,12 @@ def fit(root, arm, fold, seed, variant, *, smoke=False):
 
 def plan(root, *, smoke=False, confirmation=False, max_parallel=2):
     design = read(root / "phase3/frozen_design.json")
+    if not smoke:
+        acceptance = read(root / "phase3/gpu_acceptance.json")
+        if not acceptance["passed"] or acceptance["design_sha256"] != sha256_file(
+            root / "phase3/frozen_design.json"
+        ):
+            raise ValueError("financial objective fits require matched GPU acceptance")
     arms = list(CELLS)
     if confirmation:
         arms = read(root / "phase3/screen_summary.json")["survivors"]
@@ -308,6 +314,69 @@ def plan(root, *, smoke=False, confirmation=False, max_parallel=2):
         {"schema": RUN_MANY_PLAN_SCHEMA, "max_parallel": max_parallel, "jobs": jobs},
     )
     return {"plan": str(destination), "fits": len(jobs)}
+
+
+def accept_smoke(root):
+    """Validate disposable compiled CUDA fits before financial dispatch."""
+    design = read(root / "phase3/frozen_design.json")
+    if not read(root / "phase3/cpu_acceptance.json")["passed"]:
+        raise ValueError("fit-only CPU gradient acceptance is missing")
+    results = {}
+    for arm in CELLS:
+        matched = []
+        for variant in ("neutral", "economic"):
+            path = root / "phase3/smoke" / arm / variant / "F2_seed_11"
+            record = read(path / "run_manifest.json")
+            contract = record["contract"]
+            history = read(path / "history.json")
+            if (
+                record["status"] != "completed"
+                or contract["code"] != design["implementation"]
+                or not contract["compile"]
+                or not contract["date_tensor_cache"]
+                or record["peak_cuda_bytes"] <= 0
+                or len(history) != 2
+                or not all(
+                    np.isfinite(
+                        [v["training_loss"], v["selection"]["mean_ic"], v["sam_gap"]]
+                    ).all()
+                    and v["updates"] > 0
+                    for v in history
+                )
+                or bool(contract["economic_auxiliary"]) != (variant == "economic")
+            ):
+                raise ValueError(
+                    f"compiled CUDA objective smoke failed: {arm}/{variant}"
+                )
+            for name, digest in record["artifacts"].items():
+                if sha256_file(path / name) != digest:
+                    raise ValueError("GPU smoke artifact changed")
+            matched.append(
+                (
+                    contract["padded_name_count"],
+                    contract["fit_target_window"],
+                    [v["updates"] for v in history],
+                )
+            )
+            results[f"{arm}/{variant}"] = {
+                "manifest_sha256": sha256_file(path / "run_manifest.json"),
+                "epoch_seconds": [v["seconds"] for v in history],
+                "peak_cuda_bytes": record["peak_cuda_bytes"],
+                "padded_names": contract["padded_name_count"],
+                "compiled_graphs": record["compiled_graphs"],
+            }
+        if matched[0] != matched[1]:
+            raise ValueError(
+                "matched objective smoke populations or update counts differ"
+            )
+    output = {
+        "passed": True,
+        "design_sha256": sha256_file(root / "phase3/frozen_design.json"),
+        "results": results,
+        "scope": "two compiled BF16 CUDA epochs per arm/objective; CPU gradient and unchanged initialization checked separately",
+    }
+    write_json_atomic(root / "phase3/gpu_acceptance.json", output)
+    return output
 
 
 def cpu_acceptance(root):
@@ -460,7 +529,9 @@ def cpu_acceptance(root):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("command", choices=("prepare", "fit", "plan", "cpu-check"))
+    parser.add_argument(
+        "command", choices=("prepare", "fit", "plan", "cpu-check", "accept-smoke")
+    )
     parser.add_argument("--root", type=Path, required=True)
     parser.add_argument("--arm", choices=CELLS)
     parser.add_argument("--fold", choices=DEVELOPMENT_FOLDS)
@@ -474,6 +545,8 @@ def main():
         prepare(args.root)
     elif args.command == "cpu-check":
         cpu_acceptance(args.root)
+    elif args.command == "accept-smoke":
+        accept_smoke(args.root)
     elif args.command == "plan":
         print(
             plan(

@@ -69,7 +69,10 @@ def plan(root, *, requested_kind, confirmation=False, max_parallel=6):
                         "fold": fold,
                         "run_dir": str(policy_path(root, arm, fold, kind, seed)),
                         "cwd": str(PROJECT),
-                        "resume": True,
+                        "resume": not (
+                            policy_path(root, arm, fold, kind, seed)
+                            / "run_manifest.json"
+                        ).exists(),
                         "command": [
                             sys.executable,
                             "-m",
