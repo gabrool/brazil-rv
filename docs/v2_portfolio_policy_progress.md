@@ -191,3 +191,24 @@ Archive ROOT/solver_resume_source_6e0ba2a retains original fits/books, migration
 probe and captured finalQP. Current receipt binds6e0ba2a→cd3916a; tensors unchanged.
 The current phase chain reuses all126 models and regenerates matched fold books,
 then continuous books and summary. No migration should be repeated.
+
+## Accepted solver and current replay chain
+
+Current shell77782, clean policy checkoutcf84b62. Log:
+model_runs/_ops/portfolio_policies_primal_cf84b62.log. All126 fits remain complete.
+S0/F12 replay aggregate residual2.609e-6 exceeded2e-6 acceptance. The attempted
+global1e-10 OSQP revision693f549 failed captured-QP engineering before replay.
+Final implementation uses Clarabel1e-10 as forward allocator; OSQP is only an
+adjoint workspace when training gradients are needed, fully solved1e-8 with
+same-QP primal agreement within2e-6NAV. No ADMM calls during inference. Economic
+objective/limits unchanged; native preference/inventory finite-difference tests
+pass.107 targeted tests pass. Actual128-session acceptance again passes: NAV
+error1.97e-11, 32/64 gradient cosine.9033 and norm ratio.8099. Replay.843s,
+64-session forward/backward1.168s. Evidence:
+docs/v2_portfolio_primal_adjoint_acceptance.json.
+Source-verified metadata continuations cd3916a→693f549→cf84b62 preserved all252
+checkpointfiles and original histories, without model/optimizer tensor changes.
+Archives solver_resume_source_cd3916a and solver_resume_source_693f549 retain
+migration scripts;693f549 produced no financial replay. Current receipt binds
+693f549→cf84b62. Do not repeat any migration. Current chain reuses all126 models
+for matched fold, continuous and sensitivity readouts, then summarizes.
