@@ -99,6 +99,18 @@ difficult cases instead of 20,000. Ordinary solves stop at convergence. No
 financial constraint, cost or utility parameter changed. Recompute Phase 2
 deterministic references using this same accuracy and compare them to Phase 1.
 
+The trained-model reconciliation also exposed two actual state defects. The
+differentiable account submitted sub-1e-10-NAV stock changes that the exact
+ledger ignores; these could set held/age flags despite negligible notional.
+It now uses the exact ledger's existing order-intention threshold. Conversely,
+the exact ledger retained the old holding age when an opposite entry crossed
+a residual too small to submit an exit; both accounts now start the new side's
+holding period and cost basis correctly. Neither change deletes inventory or
+changes eligibility. On the already-trained 144-session synthetic path, maximum
+NAV discrepancy fell from 1.186e-4 to 9.882e-12. A regression covers ignored
+entries, residual inventory and reversals. Preserve the pre-fix synthetic fits
+and retrain them; they do not count as final learning acceptance.
+
 ## Financial roster and decisions
 
 Fit TE_all .2 and C6 on F2/F6/F10/F14. S0 remains a deterministic reference from

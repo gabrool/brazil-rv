@@ -146,10 +146,14 @@ class PortfolioAccount:
         reduction = torch.where(
             reverse, before.abs(), (before.abs() - target.abs()).clamp_min(0)
         )
+        # Match the exact ledger's order-submission threshold in NAV units.
+        # Solver dust must not create held/age state only in the training account.
+        reduction = torch.where(reduction > 1e-10, reduction, 0.0)
         exit_fraction = (reduction / before.abs().clamp_min(1e-30)).clamp(max=1)
         increase = torch.where(
             reverse, target.abs(), (target.abs() - before.abs()).clamp_min(0)
         )
+        increase = torch.where(increase > 1e-10, increase, 0.0)
         entry_notional = target.sign() * increase * start_nav
         hedge_trade_notional = (target[-1] - before[-1]) * start_nav
 
@@ -292,6 +296,9 @@ class PortfolioAccount:
         held_before = shares_before_fill.detach().numpy() != 0
         changed_side = (
             shares_before_fill.detach().numpy() * self.shares.detach().numpy() < 0
+        )
+        self.cost_basis = torch.where(
+            torch.as_tensor(changed_side), self.shares.abs() * prices, self.cost_basis
         )
         self.entry_day[(~held_before | changed_side) & held_after] = day
         self.entry_day[~held_after] = -1

@@ -8,7 +8,12 @@ from brazil_rv.execution.portfolio_policy import (
     CalibratedPolicy,
     account_decision,
     exact_replay,
+    ledger_arguments,
     policy_ledger_config,
+)
+from brazil_rv.execution.stateful_ledger import (
+    PortfolioTarget,
+    simulate_stateful_ledger,
 )
 from brazil_rv.v2.controller_context import matured_shadow
 from brazil_rv.v2.controller_synthetic import synthetic_data
@@ -72,3 +77,35 @@ def test_conditional_policy_and_cash_switch_match_actual_account_transitions():
     np.testing.assert_allclose(result.nav, nav, atol=1e-8, rtol=0)
     assert result.cost_bps[7] > 0
     assert np.abs(targets[7:]).max() == 0
+
+
+def test_order_dust_and_reversal_preserve_actual_holding_state():
+    data, _, _ = synthetic_data(days=8)
+    targets = np.zeros((5, 33))
+    targets[0, :2] = [5e-11, 0.01]
+    targets[1, 1] = 5e-11
+    targets[2:4, 1] = -0.01
+    states = []
+
+    def callback(state):
+        states.append(state)
+        return PortfolioTarget(targets[state.day, :-1], 0.0)
+
+    result = simulate_stateful_ledger(
+        **ledger_arguments(data, 0, 5),
+        config=policy_ledger_config(),
+        shortable=data.shortable[:5],
+        portfolio_policy=callback,
+    )
+    account = data.initial_account(0, policy_ledger_config())
+    for day in range(5):
+        data.step(account, torch.from_numpy(targets[day]), day, terminal=day == 4)
+        assert account.shares[0] == 0
+        assert account.entry_day[0] == -1
+        np.testing.assert_allclose(
+            account.shares[:-1], result.signed_shares[day], atol=1e-15
+        )
+        np.testing.assert_allclose(float(account.nav), result.nav[day], atol=1e-14)
+        if day == 2:
+            assert account.entry_day[1] == 2
+    assert states[3].holding_sessions[1] == 1

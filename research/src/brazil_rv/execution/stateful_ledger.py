@@ -1647,7 +1647,8 @@ def simulate_stateful_ledger(
                 marked_pnl_fraction=np.where(
                     held,
                     np.sign(weights)
-                    * (np.abs(signed_values) - entry_cost_basis) / start_nav,
+                    * (np.abs(signed_values) - entry_cost_basis)
+                    / start_nav,
                     0.0,
                 ),
                 entry_allowed=entry_eligible.copy(),
@@ -3023,7 +3024,14 @@ def simulate_stateful_ledger(
                 )
                 after = float(shares[name])
                 if entries:
-                    entry_cost_basis[name] += notional
+                    if before * after < 0.0:
+                        # An entry may cross a residual below the exit-order
+                        # threshold. The new side starts a new holding period.
+                        entry_cost_basis[name] = (
+                            abs(after) * inputs.raw_close[day, name]
+                        )
+                    else:
+                        entry_cost_basis[name] += notional
                     entry_fill_short_today += int(
                         used_size < remaining_before_fill - 1e-12
                     )
@@ -3036,7 +3044,7 @@ def simulate_stateful_ledger(
                         exit_fill_short_today += int(before < 0.0)
                     else:
                         entry_cost_basis[name] *= abs(after) / abs(before)
-                if before == 0.0 and shares[name] != 0.0:
+                if (before == 0.0 or before * after < 0.0) and after != 0.0:
                     entry_session[name] = day
                 if before != 0.0 and shares[name] == 0.0:
                     entry_session[name] = -1
