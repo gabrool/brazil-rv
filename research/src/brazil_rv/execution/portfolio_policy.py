@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, replace
+from collections.abc import Mapping
 
 import numpy as np
 import torch
@@ -344,13 +345,15 @@ def exact_replay(data, model, start, stop, *, config=None, targets=None):
     """Independent ledger, same decision function; final boundary liquidates once."""
     inputs = data.inputs
     config = policy_ledger_config() if config is None else config
-    allocation = AllocationConfig(cost_bps=config.cost_bps_per_side)
+    # Stress scenarios change realized costs, not the frozen policy's estimate.
+    allocation = AllocationConfig()
     arguments = ledger_arguments(data, start, stop)
     chosen = []
     prior_weights = []
 
     def callback(state):
         day = start + state.day
+        current_model = model[day] if isinstance(model, Mapping) else model
         weights = tensor(np.r_[state.weights, state.hedge_weight])
         with torch.no_grad():
             target = (
@@ -358,7 +361,7 @@ def exact_replay(data, model, start, stop, *, config=None, targets=None):
                 if targets is not None
                 else decide(
                     data,
-                    model,
+                    current_model,
                     day,
                     weights,
                     tensor(state.free_cash_fraction),

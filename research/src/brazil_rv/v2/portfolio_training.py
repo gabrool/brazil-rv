@@ -37,6 +37,16 @@ def prepare(root, arm):
     for name, digest in manifest["files"].items():
         if sha256_file(directory / name) != digest:
             raise ValueError("frozen forecast cache changed")
+    completed = directory / "policy_data.json"
+    if completed.exists():
+        record = read(completed)
+        if (
+            record["forecast_manifest_sha256"]
+            != sha256_file(directory / "manifest.json")
+            or sha256_file(directory / "policy_data.pkl") != record["sha256"]
+        ):
+            raise ValueError("completed policy inputs differ from the frozen forecasts")
+        return
     indices, scores, mask = (
         np.load(directory / f"{name}.npy", allow_pickle=False)
         for name in ("indices", "scores", "mask")
@@ -48,8 +58,10 @@ def prepare(root, arm):
     output = directory / "policy_data.pkl"
     # This is an internal, hash-bound local artifact produced here. Never load
     # an external/user-supplied pickle as research inputs.
-    with output.open("xb") as target:
+    temporary = output.with_suffix(".tmp")
+    with temporary.open("wb") as target:
         pickle.dump(data, target, protocol=pickle.HIGHEST_PROTOCOL)
+    os.replace(temporary, output)
     write_json_atomic(
         directory / "policy_data.json",
         {
@@ -74,8 +86,8 @@ def prepare(root, arm):
                 "log_daily_volatility",
                 "beta",
                 "asinh_daily_borrow",
-            "prior_published_cdi",
-            "prior_cdi_valid",
+                "prior_published_cdi",
+                "prior_cdi_valid",
             ],
             "heldout_accessed": False,
         },

@@ -56,6 +56,29 @@ of an exact evaluation/selection book closes inventory under the existing ledger
 training chunks and epochs do not receive a liquidation bonus or a last-mark
 settlement windfall. Settlement uncertainty remains explicit in reporting.
 
+Cost/funding sensitivities replay the frozen policy under realized 2/8 bps and
+zero short-proceeds remuneration. Its planned trading-cost estimate remains
+4 bps; the neural controller is not refitted or made aware of a hindsight cost
+scenario. State and NAV respond normally to the changed realized expenses.
+Seed-zero-residual selections reuse their mathematically identical optimizer
+book, with explicit source hashes. Continuous books reuse this result only when
+every fold selected epoch zero. Controller seeds are reported individually and
+as a mean of daily outcomes, not represented as an implemented ensemble policy.
+
+CPU policy jobs load each forecast family once per fold, fit the three seeds and
+run the matched controls in that process. The initial concurrency is twelve,
+with one BLAS/PyTorch thread per process; it may be adjusted from measured host
+memory and throughput. GPU forecast jobs keep their independent six-job limit.
+Paired intervals retain 10,000 draws and the original 20-session block sampling;
+prefix sums avoid materializing repeated daily panels. A targeted numerical test
+matches the established intervals to 1e-12 bps.
+
+The three fresh C6 P trajectories and 102 new F trajectories are independent:
+C6 F inherits existing S0 P, not the new C6 prelude P. A single six-worker GPU
+queue runs these 105 fits, then scores the nine P prelude panels. This scheduling
+change avoids leaving half the GPU fit slots unused during the three-parent
+phase; it changes no model, seed, training window or forecast provenance.
+
 The first integrated bounded fixture showed that a 1e-6 solver tolerance could
 accumulate a joint-budget violation of 8.73e-6 NAV. Native OSQP now uses absolute
 tolerance 1e-8 and relative tolerance 1e-8 in percent-NAV coordinates, retaining

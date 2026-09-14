@@ -4,8 +4,9 @@ Status: initial and real-market local engineering passed. Approved launcher
 started at 2026-09-14 12:58 UTC from 17465f7, then exited at 13:18:58 UTC when
 its local log could not be written during a temporary full-disk condition.
 No instance had been obtained and no research fit has run. Free space recovered
-after the memory-heavy local check ended; the approved launcher will be restarted
-from the next clean committed checkpoint. No watcher remains from the first try.
+after the memory-heavy local check ended. The approved launcher was restarted at
+13:28:26 UTC from clean pushed commit 49d3c9a; it is waiting for us-east-3 capacity.
+Only this second watcher is active (local exec session 24373). The first exited.
 Existing five-minute heartbeat brazil-rv-gh200-launch-monitor is active and bound
 to this program. Do not start a second watcher. Local policy work continues.
 
@@ -33,8 +34,9 @@ controlled independent accounting parity and the real two-date parent smoke.
 Actual-data surrogate replay and 32/64-session gradient acceptance now pass:
 docs/v2_portfolio_policy_engineering_evidence.json and the implementation
 resolutions in research/preregistrations/v2_portfolio_policy_implementation.md.
-The cache/causal-input modules and resumable three-seed policy fitter are built
-and locally tested. Matched fold/continuous readouts and dispatch remain to build.
+The cache/causal-input modules, resumable three-seed policy fitter, matched
+fold/continuous readouts, cost/funding stresses and offline CPU batch are built
+and locally tested. No new financial result is available yet.
 
 The six reusable S0/TE parent checkpoints were restored and hash-verified locally.
 Three extracted TE weight copies were subsequently removed to free disk; all
@@ -43,9 +45,19 @@ and frozen_design.json remain at the source root derived from the recovery
 pointer. The full original root remains on persistent Lambda storage. Receipt:
 D:/quant-data/b3/interim/portfolio_policy_duplicate_removal.json.
 
-Host sequence: portfolio_program freeze; plan --phase parents and run_many;
-plan --phase prelude and run_many; plan --phase forecasters and run_many.
-Use max-parallel 6. There are 3 new P, 9 parent forecast panels, 102 new F and
-24 reused F. The new run root and exact instance receipt must be recorded here
-immediately after launch. Continue controller/cache implementation locally while
-independent forecasters run; preserve the frozen host training revision.
+Host sequence: ops/run_portfolio_forecasts.py --root ROOT, running against the
+frozen host checkout (49d3c9a from the current launcher). This script can be copied
+outside that checkout and executed with its research Python/PYTHONPATH. It combines
+the independent 3 C6 P and 102 F in one six-job queue, then scores 9 P preludes.
+C6 F inherits existing S0 P, so it does not depend on the new C6 P. Reuse 24 F.
+Record the exact instance ID, IP and new persistent run root when launch finishes.
+Do not update the running forecast checkout while fits execute.
+
+After the forecast source is complete, use the latest committed policy code in
+a separate clean checkout with the existing research Python and PYTHONPATH:
+portfolio_batch prepare, policies --workers 12, continuous --workers 3, summarize,
+each with --root ROOT. Prepare families sequentially to share the economic/beta
+build, then one CPU process per fold loads data once and fits all three seeds.
+Read research/preregistrations/v2_portfolio_policy.md again at each transition.
+Review the registered conditional architecture/objective follow-ups after results;
+completion also requires that decision, full review, recovery and exact shutdown.
