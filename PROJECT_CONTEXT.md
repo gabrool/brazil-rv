@@ -28,6 +28,9 @@ its accepted recipe; candidate comparisons bind current repaired inputs and
 fresh compatible parents. Historical fixed-budget Round-7 launching entrypoints
 are retired; their sealed results and original Git implementation remain intact.
 Stages D–F, new forward capture and 2025/2026 consumer reads remain outside this work.
+The user also authorized the [matched attention ASAM .5 extension](research/preregistrations/v2_post_data_attention_asam50.md)
+alongside .2 for all four attention variants. Preserve the original calibration
+choice; reuse identical parents and compatible B fits, and report both radii.
 
 Round 7 and its separately frozen temporal pathway extension are complete. Both
 retain A0 (repaired-store S0) as the research comparator; no new architecture

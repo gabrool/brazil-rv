@@ -183,6 +183,14 @@ recipe or evaluation score changed. B's end-to-end 4P+44F runner took
 
 ## Stage C — in progress
 
+User-authorized extension: additionally test attention ASAM .5 alongside .2
+for TE_slow, TL_slow, TE_family and TE_all. See
+[the amendment](../research/preregistrations/v2_post_data_attention_asam50.md).
+48 matched score jobs reuse four B fits; 44 new F fits, no new parents.
+The original screen, calibration choice and training checkout stay intact.
+Final readouts, recovery and shutdown must include the extension. Actual-plan
+argument/recipe parity passed for all 48 jobs; four readout tests passed.
+
 Fresh incumbent/common-recipe and GRU/early/late comparisons, then repaired
 family and FiLM contrasts on four folds and three seeds. Recover artifacts,
 publish a combined report, and close the exact paid instance.

@@ -27,6 +27,15 @@ from .round6 import resolve_file
 from .round6_readouts import evaluation_design
 
 
+ATTENTION_CELLS = ("TE_slow", "TL_slow", "TE_family", "TE_all")
+
+
+def score_source(cell, choices):
+    if cell in {f"{name}_asam50" for name in ATTENTION_CELLS}:
+        return cell.removesuffix("_asam50"), "asam50"
+    return cell, "incumbent" if cell == "S0" else choices["recipes"][cell]
+
+
 def prepare_economics(root):
     """Rebind only the store and beta provenance; prove beta arrays unchanged."""
     design = read(root / "frozen_design.json")
@@ -69,9 +78,9 @@ def prepare_economics(root):
 
 def ensemble(root, design, choices, cell, fold, seeds, dates, isins):
     members, reference, records = [], None, []
-    recipe = "incumbent" if cell == "S0" else choices["recipes"][cell]
+    source_cell, recipe = score_source(cell, choices)
     for seed in seeds:
-        directory = fit_path(root, cell, recipe, fold, seed)
+        directory = fit_path(root, source_cell, recipe, fold, seed)
         record = read(directory / "run_manifest.json")
         if (
             record["status"] != "completed"
@@ -201,7 +210,7 @@ def require_full_primary_scores(mask, active):
         raise ValueError("screen score mask drops a primary-head PIT-active name")
 
 
-def evaluate_fold(root, design, choices, economic, hashes, fold):
+def evaluate_fold(root, design, choices, economic, hashes, fold, cells=None):
     """Each fold owns its store/context and disjoint output directories."""
     context = rr._open_ledger_replay(economic)
     policy, _ = rr.load_selected_policy(
@@ -212,7 +221,7 @@ def evaluate_fold(root, design, choices, economic, hashes, fold):
     try:
         ix = context.evaluation[fold]
         active = context.store.read("active", ix)
-        for cell in CELLS:
+        for cell in CELLS if cells is None else cells:
             output = root / "aggregates" / cell / fold
             if _completed(output):
                 if (
@@ -292,7 +301,7 @@ def evaluate_fold(root, design, choices, economic, hashes, fold):
         context.store.close()
 
 
-def evaluate(root):
+def evaluate(root, *, attention_asam50=False):
     design, choices = (
         read(root / "frozen_design.json"),
         read(root / "calibration_choice.json"),
@@ -304,9 +313,15 @@ def evaluate(root):
         "post_data_calibration_choice": sha256_file(root / "calibration_choice.json"),
     }
     seeds, folds = design["seeds"], design["screen_folds"]
+    cells = list(CELLS)
+    if attention_asam50:
+        extension = read(root / "attention_asam50_amendment.json")
+        if extension["frozen_design_sha256"] != hashes["post_data_frozen_design"]:
+            raise ValueError("attention amendment uses another financial freeze")
+        cells += [f"{name}_asam50" for name in ATTENTION_CELLS]
     paths = {
         cell: {fold: root / "aggregates" / cell / fold for fold in folds}
-        for cell in CELLS
+        for cell in cells
     }
     # Preserve chronological replay within a book; only independent folds run
     # concurrently. Spawn avoids inheriting initialized numerical thread pools.
@@ -316,7 +331,7 @@ def evaluate(root):
     ) as executor:
         futures = [
             executor.submit(
-                evaluate_fold, root, design, choices, economic, hashes, fold
+                evaluate_fold, root, design, choices, economic, hashes, fold, cells
             )
             for fold in folds
         ]
@@ -324,7 +339,7 @@ def evaluate(root):
             future.result()
     context = rr._open_ledger_replay(economic)
     try:
-        requested = {(cell, "S0") for cell in CELLS if cell != "S0"}
+        requested = {(cell, "S0") for cell in cells if cell != "S0"}
         requested |= {
             ("TE_slow", "TL_slow"),
             ("TE_slow", "C1_slow"),
@@ -334,6 +349,14 @@ def evaluate(root):
             ("TE_family", "TE_slow"),
             ("TE_all", "TE_family"),
         }
+        if attention_asam50:
+            requested |= {(f"{c}_asam50", c) for c in ATTENTION_CELLS}
+            requested |= {
+                ("TE_slow_asam50", "TL_slow_asam50"),
+                ("TE_slow_asam50", "C1_slow"),
+                ("TE_family_asam50", "TE_slow_asam50"),
+                ("TE_all_asam50", "TE_family_asam50"),
+            }
         pairs, paired_alignment = {}, {}
         alignments = {
             c: {f: read(p / "alignment.json") for f, p in locations.items()}
@@ -388,7 +411,20 @@ def evaluate(root):
             "heldout_access": False,
             "forward_capture": False,
         }
-        write_json_atomic(root / "screen_result.json", result)
+        if attention_asam50:
+            result["attention_asam50_amendment_sha256"] = sha256_file(
+                root / "attention_asam50_amendment.json"
+            )
+            result["interpretation_extension"] = (
+                "User-requested matched radius extension; original calibration choice remains unchanged. No automatic promotion."
+            )
+        result["readout_implementation_sha256"] = sha256_file(Path(__file__))
+        filename = (
+            "screen_with_attention_asam50.json"
+            if attention_asam50
+            else "screen_result.json"
+        )
+        write_json_atomic(root / filename, result)
         return result
     finally:
         context.store.close()
@@ -398,8 +434,12 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--root", type=Path, required=True)
     parser.add_argument("--prepare-economics-only", action="store_true")
+    parser.add_argument("--attention-asam50", action="store_true")
     args = parser.parse_args()
-    prepare_economics(args.root) if args.prepare_economics_only else evaluate(args.root)
+    if args.prepare_economics_only:
+        prepare_economics(args.root)
+    else:
+        evaluate(args.root, attention_asam50=args.attention_asam50)
 
 
 if __name__ == "__main__":

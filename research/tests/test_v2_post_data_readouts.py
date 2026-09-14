@@ -5,7 +5,23 @@ import numpy as np
 import pytest
 
 from brazil_rv.v2 import research_rounds as rr
-from brazil_rv.v2.post_data_readouts import alignment, require_full_primary_scores
+from brazil_rv.v2.post_data_readouts import (
+    alignment,
+    require_full_primary_scores,
+    score_source,
+)
+
+
+def test_attention_radius_readouts_preserve_original_score_sources():
+    choices = {
+        "recipes": {
+            name: "asam20" for name in ("TE_slow", "TL_slow", "TE_family", "TE_all")
+        }
+    }
+    for name in choices["recipes"]:
+        assert score_source(name, choices) == (name, "asam20")
+        assert score_source(f"{name}_asam50", choices) == (name, "asam50")
+    assert score_source("S0", choices) == ("S0", "incumbent")
 
 
 def test_longer_blocks_keep_fold_boundaries_and_missing_dates():

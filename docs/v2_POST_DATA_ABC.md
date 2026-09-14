@@ -114,6 +114,24 @@ Stage B was verified against the reference plan before Stage C. C uses six isola
 
 ## Stage C financial results and closure
 
+The user subsequently requested ASAM .5 attention in addition to .2. The
+[explicit extension](../research/preregistrations/v2_post_data_attention_asam50.md)
+adds TE_slow, TL_slow, TE_family and TE_all at .5 on the same four folds and
+three seeds. It preserves identical parents and every other training setting.
+Four B fits are reusable, so this adds 44 new F fits and no parents: the combined
+program now has 27 distinct P fits, 188 distinct F fits and 13 scored C cells.
+The original calibration choice and original screen remain intact. Both radii,
+their paired differences and the additional development-search qualification
+will be reported; no winner is chosen in advance.
+
+An actual-plan acceptance compared all 48 extension jobs with their .2 sources:
+every parent/training argument was preserved, only rho changed among recipe
+parameters, output paths were distinct and the original plan hash was unchanged.
+Four targeted readout tests passed, including preservation of original score
+sources. The extension runs behind the original GPU screen at concurrency six
+and can overlap its CPU book readouts. A separate clean checkout supplies the
+extended evaluation code while the training checkout remains frozen.
+
 Pending completion of Stage C. Final sections will include paired IC and book economics, seed/fold and omission sensitivity, resource timing and complete artifact recovery.
 
 The economic rebind already passed: all four hedge-beta arrays are exactly unchanged under the repaired-store provenance. Ledger costs, borrow scenarios, execution policy and terminal qualifications remain fixed. C will report per-head and actual book-composite alignment, neutral/scaled/shareholder/price targets on matched populations, and persistence. Paired uncertainty uses within-fold 20-session moving blocks, a 60-session sensitivity, 10,000 draws and seed 20260913. Legacy helper readouts with other head definitions are auxiliary and cannot replace the explicit traded-head comparison. The intervals are nominal development diagnostics, not multiplicity-adjusted confirmation.
