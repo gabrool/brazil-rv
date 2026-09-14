@@ -1,5 +1,10 @@
 # Phase 2: controller engineering and chronological screen
 
+**Complete. Neither conditional controller advances.** The MLP failed its
+engineering admission criterion; the eight admitted conditional financial fits
+all completed. No additional Phase 2 confirmation/continuous campaign is triggered.
+See [the source-bound numerical results](v2_decision_phase2_results.json).
+
 This phase tests whether a learned decision model can demonstrate the intended
 behavior under the real allocator/account, then improve a bounded chronological
 comparison. It uses the original sealed forecasts, not newly trained encoders.
@@ -83,8 +88,7 @@ and amendments are in [the registration](../research/preregistrations/v2_decisio
 
 ## Financial comparison
 
-The numerical result and final advancement decision are recorded below when all
-eight registered fits have completed. The process retains each fit's full
+All eight registered fits completed. The process retains each fit's full
 selection/training curve, selected epoch, exact candidate and fallback books,
 fills/orders, costs, exposures, settlement flags and source hashes. The fallback
 chooses cash, benchmark or learned policy solely from the earlier selection
@@ -96,6 +100,54 @@ Every fit may run up to 30 epochs, with five-epoch patience after at least 20.
 Earlier source commits on completed fits are preserved; later commits prepared
 the independent Phase 3 readout or repaired launch/resume handling. They did not
 change the registered financial model between folds.
+
+All figures below are bps/day above CDI, including the stated costs and accounting.
+
+| Forecast arm | Fold | Selected epoch | Conditional | Benchmark control | Equal-rank control |
+| --- | --- | ---: | ---: | ---: | ---: |
+| TE_all | F2 | 9 | −6.681 | −2.328 | −0.200 |
+| TE_all | F6 | 0 | −3.974 | −3.974 | −6.162 |
+| TE_all | F10 | 9 | −2.682 | −1.040 | +0.173 |
+| TE_all | F14 | 19 | +2.537 | +8.900 | +9.643 |
+| C6 | F2 | 2 | +7.321 | +4.734 | +3.027 |
+| C6 | F6 | 3 | −2.825 | −3.852 | −4.450 |
+| C6 | F10 | 20 | −3.528 | +0.270 | −0.135 |
+| C6 | F14 | 0 | +9.415 | +9.415 | +9.960 |
+
+| Contrast: conditional minus benchmark | TE_all | C6 |
+| --- | ---: | ---: |
+| Net, weighted by evaluation sessions | −3.086 | −0.067 |
+| Nominal 95% interval, 40-session circular blocks | [−9.580, +2.517] | [−6.481, +5.724] |
+| Utility | −3.366 | −0.530 |
+| Utility interval | [−9.867, +2.251] | [−6.934, +5.260] |
+
+The conditional absolute net above CDI is −2.658 for TE and +2.572 for C6. C6 is
+essentially tied with its benchmark on net, but its additional risk worsens the
+utility comparison. Its two improved folds do not satisfy the three-of-four rule.
+TE does not improve any of the four folds. Neither meets positive paired net/
+utility; the −.25-bps materiality floor also fails. For the deterministic
+conditional model this is one controller's aggregate comparison, not evidence
+about variation across independently trained controller seeds.
+
+The past-only fallback chooses cash in TE/F14. That earns exactly CDI, missing the
+conditional model's +2.537 bps/day and the benchmark's +8.900 in that period.
+Its aggregate TE net contrast consequently falls to −3.729 bps/day. C6's fallback
+matches its candidate books. These choices were made before evaluation; choosing
+cash retrospectively only for bad periods would be hindsight leakage.
+
+All primary paired intervals span zero. This is a failed advancement screen,
+not a statistically established universal inferiority result. Twenty/sixty-session
+sensitivities, all curves and decomposition fields are retained in the numerical
+record. Settlement flags and terminal haircut sensitivities remain visible;
+historical unobserved fills and the assumed financing terms are not resolved by
+controller learning or account reconciliation.
+
+Local import-memory and clean-worktree restart failures were recovered before
+affected fits began. The old logs remain, and the final launcher verification
+skips all eight completed manifests. No selected fit was discarded or refit to
+improve an outcome. Financial training/account/calibration sources are unchanged
+from the first admitted fit; later commits prepared the independent objective
+experiment and its reports/continuation code.
 
 ## Interpretation and continuation
 

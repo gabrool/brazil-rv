@@ -2878,3 +2878,21 @@ This is an implementation repair with no changed score or research decision rule
 A4/A4.1 completes with 251 accepted and 1 rejected leave-one-out books. The working parent is S0; research designation is S0. P is excluded across every final panel after its unchanged occupancy failure. No additional neural fitting ran. Original full screening and all three fixed omissions, individual seed IC, paired intervals and exact failure evidence are published in docs/v2_ROUND4.md and the seed-audit JSON. All four required roots are fully host-recovered and hash-verified. This closes the research calculation as development evidence, with no independent-replication, holdout or deployment claim. Report commit parity and exact-instance shutdown follow.
 
 Round-4 closure: all four complete roots and final closed logs were host-verified before report commit `b6a1144` matched clean local main, GitHub and the exact GH200. Termination was requested at 2026-09-10T13:07:30.0046524Z. Provider inventories confirmed exact instance `248ec61615fa4c7ba2a58a32ff8fc813` absent at 2026-09-10T13:08:42.2241632Z and 2026-09-10T13:08:52.5076574Z. No adjacent instance was touched. The closing documentation records these later observations; the five-minute monitor is paused.
+
+## 2026-09-14: Decision-program CPU checkpoint
+
+Subsequent research rounds and data repairs are indexed by PROJECT_CONTEXT.md.
+The current authorized decision program has completed Phases 1–2: 315 frozen-
+forecast calibration books, corrected account-state engineering, and eight
+conditional controller fits. Neither controller advances; the stateful MLP's
+24 financial fits were not admitted after its behavioral prerequisite failed.
+Results, all attempts and numeric uncertainty are in docs/v2_DECISION_PHASE1.md,
+docs/v2_DECISION_PHASE2.md and their source-bound JSON records.
+
+Phase 3's economic auxiliary objective, explicit compatible parents, causal
+blend, full-population CPU checks and future readout/dispatch code are prepared.
+The user deferred Lambda after the approved launcher returned HTTP 401 before
+launch. No paid instance exists from this program. No forward capture or held-out
+read occurred. Continue from docs/v2_DECISION_RESUME.md and the saved CPU
+checkpoint; GPU acceptance and 48 matched initial F fits remain, with only
+gate-triggered confirmation thereafter.

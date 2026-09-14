@@ -397,7 +397,7 @@ def main():
         if args.command == "plan"
         else summarize(args.root, confirmation=args.confirmation)
     )
-    print({k: v for k, v in result.items() if k != "cells"})
+    print({k: v for k, v in result.items() if k not in ("cells", "engineering")})
 
 
 if __name__ == "__main__":

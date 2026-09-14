@@ -5,8 +5,10 @@ Reference registration: research/preregistrations/v2_decision_research.md.
 
 ## Current state
 
-Phase 1 accepted; Phase 2 engineering is in progress. The postmortem's Phase 1 and
-Phase 2 sections were reread after all 315 Phase 1 books completed.
+Phases 1 and 2 are complete. Phase 3 CPU engineering is prepared; GPU acceptance
+and financial fits are deferred at the user's request while Lambda authentication
+is unavailable. No instance was launched. The postmortem section 13 was reread
+after Phase 1 and again after all eight Phase 2 fits and their gate completed.
 
 Canonical pointer: docs/v2_decision_run.json. Run root:
 C:/quant-data/b3/processed/model_runs/v2_decision_60dc9a2_20260914T212110Z.
@@ -39,41 +41,63 @@ report equal-rank as an additional strong control. No automatic promotion.
 
 ## Phase 2 acceptance
 
-Pending: independent-date behavioral learning acceptance; exact feature/training
-amendment before financial fits; chronological four-fold/three-seed controller
-screen and gate-dependent continuation. Always RETURN TO postmortem section13
-Phase3 afterward, even if no controller wins.
+Complete under the recorded admission amendment. See
+[the report](v2_DECISION_PHASE2.md), [financial results](v2_decision_phase2_results.json)
+and [all engineering attempts](v2_decision_phase2_engineering.json).
 
-Engineering prepared: small conditional calibration and stateful MLP;
-fit-only smooth robust scaling; actual cash liquidation through the shared
-ledger; epoch resume; separate daily market context; strictly matured shadow
-outcomes; cross-seed rank disagreement. 675 source score/identity/mask/manifest
-members verified against sealed sources; three agreement arrays are saved under
-phase2/context, approximately 1.8 MB each. These inputs are not new financial
-results. Three new targeted causality/scaling/conditional-account tests pass;
-ten existing policy tests also pass. Synthetic behavioral acceptance is still
-required before financial dispatch.
+The small conditional model passes independent-date behavioral acceptance. The
+staged stateful MLP fails the inactivity prerequisite in one of three fixed seeds;
+the 24 MLP financial fits were explicitly not admitted. All eight unique
+conditional fits completed, using the same sealed three-seed forecast ensembles.
+The conditional controller is deterministic; its repeated initialization seeds
+are exact aliases and are not claimed as independent replications.
 
-Subsequent engineering found and fixed an actual training/replay state mismatch:
-sub-1e-10 NAV order intentions created microscopic holdings only in training,
-and the replay retained the old holding age when an opposite entry crossed a
-sub-threshold residual. Trained-path NAV reconciliation now agrees within
-9.882e-12; the dedicated regression and 21 other account/allocation tests pass.
-The synthetic null originally contained predictable adverse shocks and was
-under-sampled. Preserved attempts and all corrections are documented in the
-Phase 2 amendment. The balanced 1,920-session test accepts the conditional model;
-standalone MLP initializations remain unreliable in zero-opportunity states.
-A stateful residual initialized from the accepted frozen conditional map is
-being tested across three seeds under phase2/behavioral_acceptance. No real
-controller fit has yet started. Phase 3 compatible-parent and auxiliary-loss
-engineering proceeds independently while those tests run.
+Two account state defects were fixed without deleting holdings or changing
+eligibility. Trained synthetic NAV agreement improved to 9.882e-12. Twenty-four
+new deterministic reference books reproduce Phase 1 within the already registered
+bounds. The financial fitting/account/calibration implementations are unchanged
+through the eight-fit screen; individual source commits and all failed launcher/
+import attempts remain recorded. Final launcher verification skips all eight
+completed manifests. Total completed training: 169 epochs, 3,913.742 summed
+epoch-seconds (not wall-clock runtime).
+
+No controller advances. Conditional-minus-benchmark net is −3.086 bps/day for TE
+and −.067 for C6; utility differences are −3.366/−.530. All primary paired
+intervals span zero. C6 improves two folds; TE improves none. The prior-selection
+fallback does not rescue the screen. No additional Phase 2 confirmation or
+continuous books are triggered. The historical broader ML question remains open.
+
+Acceptance review against postmortem section 13: independent synthetic behavior,
+actual optimizer/accounts, failure disclosure, corrected context information,
+real chronological comparison, causal fallback and no automatic seed expansion
+are covered. The MLP comparison stopped at its declared prerequisite rather than
+being presented as a completed real-data experiment. Return to Phase 3 is accepted
+even without a Phase 2 winner, as specified by the original plan.
 
 ## Phase 3 acceptance
 
-Pending: precise economic auxiliary objective and parent adaptation amendment,
-matched neutral control, engineering/throughput acceptance, financial screen,
-causal blend control and gate-dependent confirmation. Preserve full history,
-eligibility, unique-date batches, AMP/compile where beneficial. TE_all .2 and C6
-are the matched architecture roster. Then combined LLM-ready report, verified
-artifact recovery, GitHub synchronization and exact paid-instance closure if
-one was launched. Phase 4 remains outside this task.
+Prepared: exact objective/parent amendment, three unchanged TE parents, three
+explicit C6 adaptations, sealed economic labels, single-pass auxiliary heads,
+fit-only scaling/masks, matched neutral training, score exports, fixed-policy
+readouts, prior-only blend, gate/confirmation dispatch and continuous inventory
+replay. Four screen mappings are frozen from old OOS fit/selection observations:
+TE weights F2=1, F6=1, F10=0, F14=.25. No new evaluation outcome selected them.
+
+Real fit-only CPU checks retain 60 sessions and all active names, preserve neutral
+initialization exactly, and show auxiliary gradients entering both encoders.
+The earlier 23 objective/model tests, three new readout tests, four inference/
+reuse tests and the continuous fallback regression pass. These are engineering
+checks, not a financial result or GPU performance acceptance.
+
+Pending: compiled/BF16 GPU numerical and two-epoch throughput acceptance, 48 new
+matched F fits, complete real-score readout, then only gate-triggered ten-fold
+confirmation. Keep the same neutral-IC checkpoint selector within both objectives.
+No Phase 3 financial fit has started. The user's CPU-only steering defers Lambda
+attempts and monitoring; no new capacity automation is active for this program.
+
+The [restart document](v2_DECISION_RESUME.md) records exact paths, commands, roster,
+limitations and recovery/termination requirements. The
+[CPU checkpoint](v2_decision_cpu_checkpoint.json) binds saved local artifacts.
+After the later Phase 3 completion, reread postmortem section 13 again and write
+the combined LLM-ready report. Phase 4, forward capture and held-out reads remain
+outside this task.

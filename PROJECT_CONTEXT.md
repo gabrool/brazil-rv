@@ -11,6 +11,17 @@ magnitude-aware auxiliary forecasting objective. Follow the
 after each phase. This extends the earlier scope statements below, without
 authorizing Phase 4, forward capture or 2025/2026 consumer reads.
 
+Phases 1–2 are complete under their recorded engineering/admission amendments.
+The [Phase 1 report](docs/v2_DECISION_PHASE1.md) supports coherent benchmark
+residuals and the equal-rank control. The [Phase 2 screen](docs/v2_DECISION_PHASE2.md)
+admits no new controller: the MLP fails behavioral admission and neither conditional
+controller passes the financial gate. No Phase 2 confirmation is triggered.
+Phase 3's matched economic auxiliary objective and CPU engineering are prepared;
+GPU acceptance and financial fits are deferred by the user while Lambda access
+is unavailable. No instance was launched. Resume from
+[the saved procedure](docs/v2_DECISION_RESUME.md) and
+[source-bound CPU checkpoint](docs/v2_decision_cpu_checkpoint.json).
+
 The [cash-aware portfolio program](research/preregistrations/v2_portfolio_policy.md)
 and its registered rich-attention timing confirmation are complete; see the
 [review and results](docs/v2_PORTFOLIO_POLICY_REVIEW.md). No new controller passes
