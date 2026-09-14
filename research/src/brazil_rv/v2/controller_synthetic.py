@@ -20,7 +20,7 @@ from brazil_rv.execution.portfolio_policy import (
 )
 from brazil_rv.v2.artifacts import write_json_atomic
 from brazil_rv.v2.controller_context import ControllerContext
-from brazil_rv.v2.controller_training import learn, RECIPE
+from brazil_rv.v2.controller_training import initialize_stateful, learn, RECIPE
 from brazil_rv.v2.evaluate import EvaluationInputs
 from brazil_rv.v2.portfolio_inputs import Calibration
 from brazil_rv.v2.portfolio_readouts import book_summary
@@ -207,13 +207,24 @@ def run_synthetic(root, *, seed=11, kind="reliability", recipe=RECIPE):
     }
     calibration = Calibration(np.zeros(3), np.ones(3), np.full(3, 0.001 / 3), 0.0)
     model = OpportunityPolicy(data, calibration, bounds["fit"], kind=kind)
-    output = root / "phase2/synthetic" / kind / f"seed_{seed}"
+    output = root / "phase2/behavioral_acceptance" / kind / f"seed_{seed}"
+    parent = None
+    if kind == "stateful":
+        parent = initialize_stateful(
+            model, root / "phase2/behavioral_acceptance/reliability/seed_11/selected.pt"
+        )
     fit = learn(
         data,
         model,
         bounds,
         output,
-        {"kind": kind, "seed": seed, "data_seed": 201, "scope": "synthetic"},
+        {
+            "kind": kind,
+            "seed": seed,
+            "data_seed": 201,
+            "scope": "synthetic",
+            "conditional_parent_sha256": parent,
+        },
         recipe=recipe,
     )
     rows = bounds["evaluation"]
@@ -250,7 +261,7 @@ def run_synthetic(root, *, seed=11, kind="reliability", recipe=RECIPE):
         < 0.75 * control["gross_zero"],
         "differentiated_adverse_response": decisions["reversal"]
         > decisions["continuation"] + 0.05,
-        "learned_checkpoint": fit["selected_epoch"] > 0,
+        "learned_checkpoint": fit["selected_epoch"] > 0 or parent is not None,
         "trained_account_parity": behavior["max_account_nav_difference"] < 1e-6,
         "known_cost_aware_inactivity": behavior["largest_paired_trade_increase_cost12"]
         < 1e-5,
@@ -267,6 +278,8 @@ def run_synthetic(root, *, seed=11, kind="reliability", recipe=RECIPE):
         "behavioral_account_checks": behavior,
         "independent_evaluation_dates": len(rows),
         "synthetic_data_seed": 201,
+        "conditional_parent_sha256": parent,
+        "stateful_increment_selected": kind == "stateful" and fit["selected_epoch"] > 0,
         "episodes_by_split": {
             split: {
                 str(state): int(np.count_nonzero(regime[indices][::16] == state))

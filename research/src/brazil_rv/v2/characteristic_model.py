@@ -218,6 +218,7 @@ class CharacteristicModel(nn.Module):
         slow_feature_age_sessions,
         sidecars=None,
         common_state=None,
+        return_hidden=False,
     ):
         active = active_mask.bool()
         parts = []
@@ -268,5 +269,6 @@ class CharacteristicModel(nn.Module):
         state = self.context(state, active)
         # Only the trunk is ensembled; no repeated 60-session GRU computation.
         state = state.unsqueeze(2).expand(-1, -1, self.config.members, -1)
-        scores = self.head(self.trunk(state))
-        return torch.where(active[..., None, None], scores, 0.0)
+        hidden = self.trunk(state)
+        scores = torch.where(active[..., None, None], self.head(hidden), 0.0)
+        return (scores, hidden) if return_hidden else scores

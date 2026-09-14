@@ -18,11 +18,13 @@ mu_i = (1 + tanh(g0(c))) * calibrated_mu_i
        + 0.0003 * g1(c) * average_rank_i + 0.0001 * g2(c).
 
 The stateful alternative contains this same direct conditional path plus a
-shared two-layer 32-unit SiLU MLP. The MLP adds an unbounded residual in
-0.0001-daily-return units. Its output layer and the conditional linear outputs
-initialize at zero, exactly preserving the coherent optimizer at epoch zero.
-The one-bp residual unit controls numerical conditioning; it is not an output
-cap or a change to available names/history. All parameters train together.
+shared two-layer 32-unit SiLU MLP. First fit/select the conditional model on the
+permitted fit/selection dates. Copy its exact state and freeze its conditional
+linear map; initialize the MLP output at zero and train the stateful correction.
+Thus stateful epoch zero equals the learned conditional policy. Its MLP adds an
+unbounded residual in 0.0001-daily-return units. This unit controls numerical
+conditioning; it is not an output cap or a change to available names/history.
+The conditional fit is reused across the three stateful initializations.
 
 Context preserves every field in the existing common-state partition: 41
 shared cross-market fields, three common market diagnostics, explicit validity,
@@ -129,6 +131,21 @@ fit sessions, 304 selection sessions and 432 evaluation sessions, separated by
 expansion. Test the one unique conditional fit and all three MLP initializations
 under the unchanged thirty-epoch recipe; disclose failed attempts and exact
 episode counts. Preserve the original short null-corrected fixture outputs.
+
+The larger balanced test confirmed that standalone joint optimization of the
+conditional path and MLP did not reliably learn inactivity. Use the staged
+conditional-plus-stateful-residual design specified above. Preserve standalone
+attempts under `phase2/synthetic`; final behavioral acceptance is under
+`phase2/behavioral_acceptance`. The already accepted conditional fit is reused
+byte-for-byte. Synthetic acceptance now distinguishes a learned conditional
+parent from a selected nonzero MLP epoch; retaining epoch zero is not evidence
+of an incremental MLP benefit. The complete policy must still pass every
+behavior check on the independent dates. Report MLP improvement against the
+conditional model separately; a duplicate conditional outcome cannot advance
+as a new stateful discovery.
+Specifically, stateful advancement also requires positive paired mean net and
+utility against the conditional model and positive incremental utility in at
+least three quarters of folds, in addition to the benchmark gates.
 
 ## Financial roster and decisions
 

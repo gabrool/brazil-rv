@@ -1,0 +1,91 @@
+# Phase 3: controlled economic auxiliary objective
+
+This amendment fixes the objective and matched comparison before new financial
+fits/evaluation. Phase 2 completion does not require a winning controller before
+this separately authorized phase can proceed.
+
+## One change within each architecture
+
+TE_all retains full 60-session temporal attention and early peer mixing, all
+accepted families, FiLM and ASAM .2. C6 retains its slow GRU, pooling and additive
+fundamentals/magnitudes projections, with SAM .125. Use the selected neutral P
+parents for seeds 11/29/47. TE weights/config/preprocessing load exactly. Adapt
+the S0 P parent to C6 explicitly: copy all shared tensors exactly, initialize
+only the new family projections at zero, retain the same store/slow coordinates,
+and fit the previously unseen family scalers only on F fitting dates. This is an
+explicit cold-family extension of S0, not a claim of all-family pretraining.
+
+For each architecture, compare fresh neutral-only and neutral-plus-economic
+fits using the same training implementation, batch order, schedule, regularizer,
+parents and seeds. The common trainer uses learning rate 1e-4, transferred
+multiplier .3, a 60-epoch fixed schedule and selection patience five. New family
+projections and the auxiliary head receive full learning rate. This changes C6's
+historical training recipe, so its old fits are descriptive references only;
+the fresh matched neutral control is mandatory. No lookback/name pruning.
+
+## Target and loss
+
+Add one linear economic head to the final shared trunk, evaluated in the same
+encoder pass. Its target is the mean daily five-session shareholder residual:
+
+`y = (shareholder_return_H5 - CDI_H5 - beta_at_decision * BOVA_excess_H5) / 5`.
+
+Use the already sealed shareholder/action economics and causal resolved beta.
+No outcome enters predictive inputs. An auxiliary label is valid only where
+its original shareholder mask, active name and benchmark endpoints are valid
+and all six dates belong to the permitted F target window. Missing auxiliary
+labels never remove a name or its ranking loss. Divide by the fit-only,
+equal-date root mean square target; keep zero as zero and preserve magnitudes.
+Do not rank, clip or cross-sectionally demean this target.
+
+Loss is the existing equal-date neutral ranking loss plus **0.25 times**
+equal-date/member Huber loss, delta one, in those scaled units. Initialize the
+economic head to zero without changing the matched RNG sequence. The encoder
+therefore receives its auxiliary gradient after the head begins learning.
+Record the scale and export the head in actual daily-return units. Test fit
+isolation, endpoint masks, ISIN alignment, unchanged neutral initialization and
+nonzero auxiliary gradients reaching both encoders.
+
+Use BF16 autocast, FP32 loss/optimizer, compiled model/loss and complete unique
+date caches. The head is a tiny additional matrix, not another history pass.
+Keep selection on the same neutral IC for both variants to isolate the objective
+change; record economic calibration and utility separately. A null result does
+not rule out changing checkpoint selection or end-to-end decision training.
+
+## Fixed policy and chronological comparison
+
+Use the coherent **equal-rank** calibrated QP from Phase 1 for both variants.
+It improved TE materially without establishing harm to C6 and avoids the
+unstable opposing three-horizon coefficients. This is fixed before Phase 3
+results; no Phase 2 evaluation-selected policy is substituted.
+
+Four-fold screening does not provide a full history of new out-of-fit forecasts.
+Therefore estimate each architecture's shared rank-to-return mapping using its
+existing sealed chronological forecast cache on each fold's permitted past.
+Apply that same mapping to fresh neutral and auxiliary ranks. Never calibrate
+with in-sample predictions from either new F fit or future evaluation outcomes.
+Report this shared historical mapping assumption; evaluate cardinal head errors,
+out-of-fit calibration slopes and tails separately. This experiment tests whether
+the auxiliary improves the learned representation under a fixed decision rule,
+not whether a newly optimized policy can exploit every auxiliary output.
+
+Also compare a simple C6/TE convex rank blend. Choose its weight from
+{0,.25,.5,.75,1} using the prior selection window and exact costs, with mapping
+fit on the preceding fit window using the two sealed out-of-fit caches. Freeze
+that weight for new evaluation scores and use identical weights for neutral
+and auxiliary variants. Report whether the architectures have complementary
+errors. This small blend is a diagnostic, not an additional architecture search.
+
+Screen F2/F6/F10/F14 x seeds11/29/47: 48 new F fits. No automatic seed expansion.
+Report each seed and the equally averaged rank ensemble, paired 20/40/60-session
+circular intervals, neutral IC, calibration/tail errors, net above CDI, utility,
+costs, exposures, fit/selection curves and settlement flags. Advance an economic
+variant only with positive ensemble paired net and utility versus its matched
+neutral control, positive utility in at least three folds and no seed mean net
+or utility below -0.25 bps/day. Confirm survivors and their matched neutral
+controls on the remaining ten folds. No real-result-driven retuning. New
+continuous books require the full corresponding forecast history; do not splice
+isolated fold P&Ls or fill missing variant forecasts with other models.
+
+No 2025/2026 consumer reads, forward capture or Phase 4 work. After Phase 3,
+return to the postmortem and complete the combined review and recovery record.

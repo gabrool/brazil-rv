@@ -28,17 +28,24 @@ def policy_path(root, arm, fold, kind, seed):
     return root / "phase2/policies" / arm / fold / kind / f"seed_{seed}"
 
 
-def plan(root, *, confirmation=False, max_parallel=6):
+def plan(root, *, requested_kind, confirmation=False, max_parallel=6):
     engineering = {}
     for kind in KINDS:
         for seed in seeds_for(kind):
-            path = root / "phase2/synthetic" / kind / f"seed_{seed}/acceptance.json"
+            path = (
+                root
+                / "phase2/behavioral_acceptance"
+                / kind
+                / f"seed_{seed}/acceptance.json"
+            )
             if not read(path)["passed"]:
                 raise ValueError(f"behavioral learning not accepted: {kind}/{seed}")
             engineering[str(path.relative_to(root))] = sha256_file(path)
     if confirmation:
         screen = read(root / "phase2/screen_summary.json")
         cells = [tuple(cell) for cell in screen["survivors"]]
+        if requested_kind == "reliability":
+            cells = sorted({(arm, "reliability") for arm, _ in cells})
         folds = tuple(f for f in DEVELOPMENT_FOLDS if f not in SCREEN_FOLDS)
     else:
         cells = [(arm, kind) for arm in ARMS for kind in KINDS]
@@ -46,6 +53,8 @@ def plan(root, *, confirmation=False, max_parallel=6):
     jobs = []
     for fold in folds:
         for arm, kind in cells:
+            if kind != requested_kind:
+                continue
             for seed in seeds_for(kind):
                 jobs.append(
                     {
@@ -87,7 +96,7 @@ def plan(root, *, confirmation=False, max_parallel=6):
     path = (
         root
         / "phase2"
-        / ("confirmation_plan.json" if confirmation else "screen_plan.json")
+        / f"{'confirmation' if confirmation else 'screen'}_{requested_kind}_plan.json"
     )
     write_json_atomic(path, result)
     return {"plan": str(path), "unique_fits": len(jobs)}
@@ -134,7 +143,10 @@ def summarize(root, *, confirmation=False):
                 }
         for policy in ("candidate", "fallback"):
             contrasts[policy] = {}
-            for reference in ("benchmark", "equal_rank", "cash"):
+            references = ("benchmark", "equal_rank", "cash") + (
+                ("conditional",) if kind == "stateful" else ()
+            )
+            for reference in references:
                 contrasts[policy][reference] = {}
                 for metric in METRICS:
                     arrays, fold_points, by_seed = (
@@ -144,7 +156,10 @@ def summarize(root, *, confirmation=False):
                     )
                     for fold in folds:
                         control = checked_book(
-                            root / "phase2/references" / arm / fold / reference
+                            policy_path(root, arm, fold, "reliability", 11)
+                            / "candidate"
+                            if reference == "conditional"
+                            else root / "phase2/references" / arm / fold / reference
                         )
                         differences = []
                         for seed in seeds_for(kind):
@@ -184,6 +199,14 @@ def summarize(root, *, confirmation=False):
             )
             >= -0.25,
         }
+        if kind == "stateful":
+            additional = contrasts["candidate"]["conditional"]
+            checks["incremental_net_and_utility"] = all(
+                additional[m]["mean"] > 0 for m in METRICS
+            )
+            checks["incremental_utility_three_quarters_of_folds"] = sum(
+                v > 0 for v in additional["utility_bps"]["fold_means"].values()
+            ) >= int(np.ceil(0.75 * len(folds)))
         if all(checks.values()):
             output["survivors"].append([arm, kind])
         output["cells"][f"{arm}/{kind}"] = {
@@ -211,9 +234,15 @@ def main():
     parser.add_argument("--root", type=Path, required=True)
     parser.add_argument("--confirmation", action="store_true")
     parser.add_argument("--max-parallel", type=int, default=6)
+    parser.add_argument("--kind", choices=KINDS)
     args = parser.parse_args()
     result = (
-        plan(args.root, confirmation=args.confirmation, max_parallel=args.max_parallel)
+        plan(
+            args.root,
+            requested_kind=args.kind,
+            confirmation=args.confirmation,
+            max_parallel=args.max_parallel,
+        )
         if args.command == "plan"
         else summarize(args.root, confirmation=args.confirmation)
     )

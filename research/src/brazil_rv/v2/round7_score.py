@@ -59,6 +59,7 @@ def score(
             "scoring checkpoint stage differs from the requested forecast block"
         )
     contract = payload["contract"]
+    auxiliary = contract.get("economic_auxiliary")
     inference_source = verify_reused_inference_source(contract["code"]["commit"])
     if parent_prelude:
         rows = parent_prelude_indices(store_root)
@@ -122,7 +123,12 @@ def score(
                 else DailyMultiHorizonModel(config)
             )
         )
+        if auxiliary and not reusable_models:
+            from .economic_objective import attach_economic_head
+
+            attach_economic_head(model)
         model.load_state_dict(payload["model_state_dict"], strict=True)
+        economic_head = model.economic_head if auxiliary else None
         device = device or torch.device("cuda" if torch.cuda.is_available() else "cpu")
         model.to(device).eval()
         model = (
@@ -130,7 +136,7 @@ def score(
             if reusable_models
             else (compile_forward(model) if compiled else model)
         )
-        values, validity, indices = [], [], []
+        values, validity, indices, economic_values = [], [], [], []
         with torch.no_grad():
             for cpu in loader:
                 batch = model_batch(cpu, device)
@@ -139,17 +145,35 @@ def score(
                     dtype=torch.bfloat16,
                     enabled=device.type == "cuda",
                 ):
-                    predicted = (
-                        forward(model, batch, characteristic=characteristic)
-                        .float()
-                        .mean(dim=2)
-                        .cpu()
-                        .numpy()
+                    prediction = forward(
+                        model,
+                        batch,
+                        characteristic=characteristic,
+                        return_hidden=bool(auxiliary),
                     )
+                    if auxiliary:
+                        prediction, hidden = prediction
+                        economic = (
+                            economic_head(hidden).squeeze(-1).float().mean(2)
+                            * auxiliary["scale"]
+                        )
+                    predicted = prediction.float().mean(dim=2).cpu().numpy()
                 scores, mask = canonical_head_panel(
                     predicted, batch["active_mask"].cpu().numpy(), horizons
                 )
                 names = cpu["name_index"].numpy()
+                if auxiliary:
+                    economic_values.append(
+                        restore_name_axis(
+                            np.where(
+                                batch["active_mask"].cpu().numpy(),
+                                economic.cpu().numpy(),
+                                0,
+                            ),
+                            names,
+                            len(dataset.store.isins),
+                        )
+                    )
                 values.append(
                     restore_name_axis(scores, names, len(dataset.store.isins))
                 )
@@ -165,6 +189,8 @@ def score(
             "date_index.npy": dataset.store.dates[rows],
             "isin_index.npy": np.asarray(dataset.store.isins),
         }
+        if auxiliary:
+            arrays["economic_daily_residual.npy"] = np.concatenate(economic_values)
         source = dataset.store.manifest
         access = dataset.access_ledger.payload()
         output.parent.mkdir(parents=True, exist_ok=True)

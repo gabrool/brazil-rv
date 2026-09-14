@@ -42,6 +42,18 @@ RECIPE = {
 }
 
 
+def initialize_stateful(model, checkpoint):
+    """Preserve a learned conditional base; train only the stateful correction."""
+    parent = torch.load(checkpoint, map_location="cpu", weights_only=True)
+    result = model.load_state_dict(parent["model"], strict=False)
+    if result.unexpected_keys or any(
+        not key.startswith("network.") for key in result.missing_keys
+    ):
+        raise ValueError("conditional parent differs from the stateful model")
+    model.calibration_network.requires_grad_(False)
+    return sha256_file(checkpoint)
+
+
 def controller_epoch(
     data, model, optimizer, rows, *, chunk_sessions=32, gradient_clip=1.0
 ):
@@ -190,6 +202,12 @@ def run_controller(data, root, arm, fold, seed, kind, binding):
     market = benchmark_excess_returns(data)
     calibration = calibrations(data, bounds["fit"], market)["benchmark"]
     model = OpportunityPolicy(data, calibration, bounds["fit"], kind=kind)
+    conditional_parent = None
+    if kind == "stateful":
+        conditional_parent = initialize_stateful(
+            model,
+            root / "phase2/policies" / arm / fold / "reliability/seed_11/selected.pt",
+        )
     output = root / "phase2/policies" / arm / fold / kind / f"seed_{seed}"
     provenance = {
         "implementation": _git_identity(),
@@ -197,6 +215,7 @@ def run_controller(data, root, arm, fold, seed, kind, binding):
         "fold": fold,
         "seed": seed,
         "kind": kind,
+        "conditional_parent_sha256": conditional_parent,
         "policy_data_sha256": binding,
         "frozen_design_sha256": sha256_file(root / "frozen_design.json"),
         "phase2_registration_sha256": sha256_file(

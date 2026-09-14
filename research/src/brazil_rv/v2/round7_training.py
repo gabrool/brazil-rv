@@ -227,6 +227,8 @@ def model_batch(cpu_batch, device):
         "common_state_age_sessions",
         "targets",
         "target_mask",
+        "economic_target",
+        "economic_mask",
     }
     return {
         key: value.to(device, non_blocking=device.type == "cuda")
@@ -236,9 +238,12 @@ def model_batch(cpu_batch, device):
     }
 
 
-def forward(model, batch, *, characteristic):
+def forward(model, batch, *, characteristic, return_hidden=False):
     if not characteristic:
-        return _model_forward(model, batch)[..., : len(HORIZONS)].unsqueeze(2)
+        result = _model_forward(model, batch, return_hidden=return_hidden)
+        scores, hidden = result if return_hidden else (result, None)
+        scores = scores[..., : len(HORIZONS)].unsqueeze(2)
+        return (scores, hidden.unsqueeze(2)) if return_hidden else scores
     return model(
         batch["slow_features"],
         batch["slow_feature_mask"],
@@ -261,6 +266,7 @@ def forward(model, batch, *, characteristic):
         )
         if "common_state_features" in batch
         else None,
+        **({"return_hidden": True} if return_hidden else {}),
     )
 
 
@@ -292,13 +298,23 @@ def daily_primary_ic(predictions, targets, mask, active):
 class TrainingObjective(nn.Module):
     """Compile model and FP32 ranking loss together, fusing pairwise reductions."""
 
-    def __init__(self, model, *, characteristic, head_indices, loss_kind, cuda):
+    def __init__(
+        self,
+        model,
+        *,
+        characteristic,
+        head_indices,
+        loss_kind,
+        cuda,
+        economic_weight=0.0,
+    ):
         super().__init__()
         self.model = model
         self.characteristic = characteristic
         self.head_indices = head_indices
         self.loss_kind = loss_kind
         self.cuda = cuda
+        self.economic_weight = economic_weight
 
     def forward(self, batch):
         with torch.autocast(
@@ -306,14 +322,31 @@ class TrainingObjective(nn.Module):
             dtype=torch.bfloat16,
             enabled=self.cuda,
         ):
-            scores = forward(self.model, batch, characteristic=self.characteristic)
-        return member_loss(
+            result = forward(
+                self.model,
+                batch,
+                characteristic=self.characteristic,
+                return_hidden=bool(self.economic_weight),
+            )
+            if self.economic_weight:
+                scores, hidden = result
+                economic = self.model.economic_head(hidden).squeeze(-1).float()
+            else:
+                scores = result
+        loss = member_loss(
             scores,
             batch["targets"][..., self.head_indices],
             batch["target_mask"][..., self.head_indices]
             & batch["active_mask"][..., None],
             kind=self.loss_kind,
         )
+        if self.economic_weight:
+            from .economic_objective import economic_loss
+
+            loss = loss + self.economic_weight * economic_loss(
+                economic, batch["economic_target"], batch["economic_mask"]
+            )
+        return loss
 
 
 def selection_readout(model, loader, device, *, characteristic, model_horizons):
@@ -436,7 +469,11 @@ def unexposed_families(dataset, preparation):
 
 def transferred_parameter_names(model, unexposed):
     """Wholly cold family encoders use full F LR; preserve learned shared tensors."""
-    prefixes = tuple(f"families.{name}." for name in unexposed)
+    prefixes = tuple(
+        prefix
+        for name in unexposed
+        for prefix in (f"families.{name}.", f"sidecar_projections.{name}")
+    )
     return tuple(
         name for name, _ in model.named_parameters() if not name.startswith(prefixes)
     )
@@ -458,6 +495,8 @@ def train(
     compiled=True,
     export_scores=False,
     diagnostics=True,
+    economic_targets=None,
+    economic_weight=0.0,
 ):
     code = _git_identity()
     cell_name = cell["cell"]
@@ -507,6 +546,14 @@ def train(
         )
         width = stage_name_count(training, selection)
         collator = partial(preparation.collate, fixed_name_count=width)
+        economic_contract = None
+        if economic_weight:
+            from .economic_objective import EconomicCollator
+
+            collator = EconomicCollator(
+                collator, economic_targets, fit, fit_window, training.store.isins
+            )
+            economic_contract = {**collator.contract, "weight": economic_weight}
         sampler = DateBatchSampler(fit, seed=seed)
         train_loader = DataLoader(
             training,
@@ -590,6 +637,7 @@ def train(
             "compile": compiled,
             "date_tensor_cache": device.type == "cuda",
             "parent_sha256": parent_sha256,
+            "economic_auxiliary": economic_contract,
         }
         set_deterministic_seed(seed)
         model = (
@@ -620,6 +668,10 @@ def train(
             else ()
         )
         contract["transferred_parameters"] = list(transferred)
+        if economic_weight:
+            from .economic_objective import attach_economic_head
+
+            attach_economic_head(model)
         optimizer = recipe_optimizer(
             model,
             cuda=device.type == "cuda",
@@ -718,6 +770,7 @@ def train(
             head_indices=[HORIZONS.index(h) for h in horizons],
             loss_kind=loss_kind,
             cuda=device.type == "cuda",
+            economic_weight=economic_weight,
         )
         training_forward = compile_forward(objective) if compiled else objective
         forward_model = compile_forward(model) if compiled else model

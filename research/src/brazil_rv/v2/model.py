@@ -721,6 +721,7 @@ class DailyMultiHorizonModel(nn.Module):
         fast_name_index: torch.Tensor | None = None,
         sidecars: Mapping[str, tuple[torch.Tensor, torch.Tensor, torch.Tensor]]
         | None = None,
+        return_hidden: bool = False,
     ) -> torch.Tensor:
         if active_mask.shape != slow_features.shape[:2]:
             raise ValueError("active_mask is misaligned with the model rows")
@@ -883,9 +884,10 @@ class DailyMultiHorizonModel(nn.Module):
             ),
             dim=-1,
         )
-        return torch.where(
+        predictions = torch.where(
             active_mask.bool()[..., None], predictions, torch.zeros_like(predictions)
         )
+        return (predictions, hidden) if return_hidden else predictions
 
 
 def _initialize_module(module: nn.Module) -> None:

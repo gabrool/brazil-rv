@@ -85,6 +85,8 @@ def configuration(cell, names):
     }
     if cell["inputs"] == "slow":
         families = {}
+    elif "families" in cell:
+        families = {name: families[name] for name in cell["families"]}
     if cell["graph"] == "s0":
         return ModelConfig(
             slow_feature_count=len(names["slow"]),

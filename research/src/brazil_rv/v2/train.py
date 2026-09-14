@@ -736,7 +736,9 @@ def load_stage_checkpoint(
     return actual_sha256
 
 
-def _model_forward(model: nn.Module, batch: Mapping[str, torch.Tensor]) -> torch.Tensor:
+def _model_forward(
+    model: nn.Module, batch: Mapping[str, torch.Tensor], *, return_hidden=False
+) -> torch.Tensor:
     return model(
         batch["slow_features"],
         batch["slow_feature_mask"],
@@ -763,6 +765,7 @@ def _model_forward(model: nn.Module, batch: Mapping[str, torch.Tensor]) -> torch
             for key, value in batch.items()
             if key.startswith("sidecar_") and key.endswith("_values")
         },
+        **({"return_hidden": True} if return_hidden else {}),
     )
 
 

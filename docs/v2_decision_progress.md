@@ -5,7 +5,7 @@ Reference registration: research/preregistrations/v2_decision_research.md.
 
 ## Current state
 
-Phase 1 accepted; Phase 2 engineering is next. The postmortem's Phase 1 and
+Phase 1 accepted; Phase 2 engineering is in progress. The postmortem's Phase 1 and
 Phase 2 sections were reread after all 315 Phase 1 books completed.
 
 Canonical pointer: docs/v2_decision_run.json. Run root:
@@ -53,6 +53,20 @@ phase2/context, approximately 1.8 MB each. These inputs are not new financial
 results. Three new targeted causality/scaling/conditional-account tests pass;
 ten existing policy tests also pass. Synthetic behavioral acceptance is still
 required before financial dispatch.
+
+Subsequent engineering found and fixed an actual training/replay state mismatch:
+sub-1e-10 NAV order intentions created microscopic holdings only in training,
+and the replay retained the old holding age when an opposite entry crossed a
+sub-threshold residual. Trained-path NAV reconciliation now agrees within
+9.882e-12; the dedicated regression and 21 other account/allocation tests pass.
+The synthetic null originally contained predictable adverse shocks and was
+under-sampled. Preserved attempts and all corrections are documented in the
+Phase 2 amendment. The balanced 1,920-session test accepts the conditional model;
+standalone MLP initializations remain unreliable in zero-opportunity states.
+A stateful residual initialized from the accepted frozen conditional map is
+being tested across three seeds under phase2/behavioral_acceptance. No real
+controller fit has yet started. Phase 3 compatible-parent and auxiliary-loss
+engineering proceeds independently while those tests run.
 
 ## Phase 3 acceptance
 
