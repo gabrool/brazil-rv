@@ -164,3 +164,14 @@ tests pass, including status2 retry and gradient. Preserved220checkpointfiles
 including99completedfits with unchanged tensors and explicit original source.
 Archive ROOT/solver_resume_source_98c2dbb includes the migration script and
 previous receipt. Current receipt binds98c2dbb→6b130a8. No migrations to rerun.
+
+Latest continuation supersedes all previous chain details: shell72396, clean
+policy checkout6e0ba2a, log model_runs/_ops/portfolio_policies_solver_6e0ba2a.log.
+TE_all/F13 exposed cycling across the adaptive retry grid. A single fixed-rho1
+fallback (adaptive_rho=False) solves all four captured QPs at original accuracy
+in3,275–5,050iterations,21–69ms. It replaces the intermediate adaptive grid;
+ordinary solve still uses20,000iterations, rare fixed fallback ceiling200,000.
+106 targeted tests pass and Ruff passes. Preserved246checkpointfiles including
+119completedfits through verified tensor-identical metadata continuation.
+Archive ROOT/solver_resume_source_6b130a8 retains migration and captured TE13 QP;
+current receipt binds6b130a8→6e0ba2a. Remaining fits resume; books regenerated.
