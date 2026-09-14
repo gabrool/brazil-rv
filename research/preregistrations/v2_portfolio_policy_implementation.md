@@ -150,3 +150,11 @@ Model and optimizer tensors remain untouched. Completed models are reused with
 explicit origin, incomplete models continue from the last saved epoch; derived
 books are regenerated under the new source binding. Do not migrate checkpoints
 from the rejected 74c4021 state-feature implementation.
+
+A subsequent captured C6/F1 fit-only QP cycles at rho .01 as well. Rho .001
+with the same interval/tolerances solves it in 4,425 iterations (~31ms); rho .1
+with interval25 solves in5,125. Bound the deterministic restart sequence to
+original defaults then rho .01/.001/.1, each with interval25 and20,000 iterations.
+All attempts solve the identical QP; no objective scaling or regularization is
+introduced. Apply the same source-verified checkpoint continuation from9160b19,
+preserving its archive/receipt and all completed compatible fit tensors.

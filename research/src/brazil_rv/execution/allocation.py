@@ -34,7 +34,12 @@ class _SparseQP(torch.autograd.Function):
 
     @staticmethod
     def forward(ctx, q, lower, upper, p, a, warm_start):
-        for retry in (False, True):
+        for settings in (
+            {},
+            {"rho": 0.01, "adaptive_rho_interval": 25},
+            {"rho": 0.001, "adaptive_rho_interval": 25},
+            {"rho": 0.1, "adaptive_rho_interval": 25},
+        ):
             solver = osqp.OSQP(algebra="builtin")
             solver.setup(
                 P=p,
@@ -47,7 +52,7 @@ class _SparseQP(torch.autograd.Function):
                 eps_rel=1e-8,
                 max_iter=20000,
                 polishing=True,
-                **({"rho": 0.01, "adaptive_rho_interval": 25} if retry else {}),
+                **settings,
             )
             solver.warm_start(x=warm_start)
             result = solver.solve(raise_error=False)
