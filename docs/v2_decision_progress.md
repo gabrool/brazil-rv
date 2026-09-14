@@ -5,43 +5,61 @@ Reference registration: research/preregistrations/v2_decision_research.md.
 
 ## Current state
 
-Phase 1 ready for numerical reproduction and financial readouts. Reviewed
-PROJECT_CONTEXT and postmortem section13. Main started from d682962; registration
-is committed at 60dc9a2. Existing portfolio results remain sealed. Run root:
-`C:/quant-data/b3/processed/model_runs/v2_decision_60dc9a2_20260914T212110Z`.
-All nine copied cache/metadata files match the sealed recovery inventory's
-SHA-256, including three 699,471,732-byte PolicyData files. Temporary S3
-credentials were process-only. Lambda ETags were not MD5 hashes; rclone's MD5
-comparison was disabled and replaced by exact sealed SHA-256 verification.
-No paid instance has been launched for this program. Initial local free space
-C:4.85GB / D:1.32GB; avoid duplicate caches.
+Phase 1 accepted; Phase 2 engineering is next. The postmortem's Phase 1 and
+Phase 2 sections were reread after all 315 Phase 1 books completed.
 
-Implemented coherent benchmark residuals using decision-time beta, one-regressor
-equal-rank control, block-cluster forecast uncertainty and QP absolute-exposure
-penalty, plus stock-only attribution. Deterministic calibration has its own small
-inference class; it avoids executing an identically zero MLP. Original MLP remains
-the stateful control and inherits the same economic mapping. Circular 40-session
-bootstrap replaces the underweighted-boundary implementation, with 20/60
-sensitivities. Ruff passes; 38 targeted allocation/account/causality/readout/source
-tests pass. Fit-only F2 calibration check reproduces original 8.0525483-bps
-intercept and yields 2.4206585-bps benchmark-residual intercept; no financial
-evaluation has yet been interpreted.
+Canonical pointer: docs/v2_decision_run.json. Run root:
+C:/quant-data/b3/processed/model_runs/v2_decision_60dc9a2_20260914T212110Z.
+Source freeze 60dc9a2; final Phase 1 financial implementation eed4a4e. All nine
+copied cache/metadata files match the sealed recovery inventory's SHA-256.
+Original portfolio results remain sealed. No paid instance launched for this
+program. No forward capture or held-out consumer read.
 
 ## Phase 1 acceptance
 
-Pending: freeze source root, implement calibration/uncertainty and deterministic
-roster, targeted causality/accounting tests, exact raw reproduction, financial
-readouts and diagnostic report. Then RETURN TO postmortem section13 Phase2.
+Complete: [report](v2_DECISION_PHASE1.md) and
+[numerical readouts](v2_decision_phase1_results.json). Seven cells, three arms,
+fourteen folds and continuous books. All ninety raw/cash controls reproduce;
+maximum daily-field error 0.000741 bps, maximum mean error 0.00000180 bps.
+No stock-day/input removal; zero additional masked calibration labels.
+
+Implemented benchmark residuals with decision-time beta, one-regressor equal
+rank, block-cluster forecast uncertainty and absolute-exposure penalty,
+stock-only attribution, and centered circular 20/40/60-session inference.
+Thirty-eight targeted tests passed before numerical execution. Original
+attempts with overly tight tolerances remain under phase1_numeric_probe and
+phase1_numeric_probe_unit. Local memory failures were recovered without changing
+financial calculations. NTFS compression preserves cache bytes while reducing
+their physical storage by approximately 1.5 GB.
+
+Main results: continuous equal-rank net 4.112/4.555/4.897 bps for S0/TE/C6;
+three-regressor benchmark -0.363/2.535/4.972. Equal-rank improves S0/TE with lower
+turnover, but does not dominate C6. Keep the registered benchmark reference and
+report equal-rank as an additional strong control. No automatic promotion.
 
 ## Phase 2 acceptance
 
-Pending: independent-date behavior-learning acceptance, exact feature/training
-amendment, real chronological screen and gate-dependent continuation. Then
-RETURN TO postmortem section13 Phase3 regardless of whether the controller wins.
+Pending: independent-date behavioral learning acceptance; exact feature/training
+amendment before financial fits; chronological four-fold/three-seed controller
+screen and gate-dependent continuation. Always RETURN TO postmortem section13
+Phase3 afterward, even if no controller wins.
+
+Engineering prepared: small conditional calibration and stateful MLP;
+fit-only smooth robust scaling; actual cash liquidation through the shared
+ledger; epoch resume; separate daily market context; strictly matured shadow
+outcomes; cross-seed rank disagreement. 675 source score/identity/mask/manifest
+members verified against sealed sources; three agreement arrays are saved under
+phase2/context, approximately 1.8 MB each. These inputs are not new financial
+results. Three new targeted causality/scaling/conditional-account tests pass;
+ten existing policy tests also pass. Synthetic behavioral acceptance is still
+required before financial dispatch.
 
 ## Phase 3 acceptance
 
 Pending: precise economic auxiliary objective and parent adaptation amendment,
 matched neutral control, engineering/throughput acceptance, financial screen,
-blend control and gate-dependent confirmation. Then combined report, recovery,
-GitHub synchronization and exact paid-instance closure if one was launched.
+causal blend control and gate-dependent confirmation. Preserve full history,
+eligibility, unique-date batches, AMP/compile where beneficial. TE_all .2 and C6
+are the matched architecture roster. Then combined LLM-ready report, verified
+artifact recovery, GitHub synchronization and exact paid-instance closure if
+one was launched. Phase 4 remains outside this task.

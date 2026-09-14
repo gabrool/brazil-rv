@@ -388,7 +388,13 @@ def run_phase1_arm(root, arm, only_fold=None):
 
 
 def summarize(root):
-    result = {"phase": 1, "continuous": {}, "folds": {}, "heldout_accessed": False}
+    result = {
+        "phase": 1,
+        "continuous": {},
+        "folds": {},
+        "fold_paired": {},
+        "heldout_accessed": False,
+    }
     for arm in ARMS:
         result["continuous"][arm], result["folds"][arm] = {}, {}
         for label in (*DEVELOPMENT_FOLDS, "continuous"):
@@ -420,6 +426,22 @@ def summarize(root):
                 result["continuous"][arm] = rows
             else:
                 result["folds"][arm][label] = rows
+        result["fold_paired"][arm] = {}
+        for cell in CELLS:
+            result["fold_paired"][arm][cell] = {}
+            for metric in ("net_excess_bps", "utility_bps"):
+                arrays = []
+                for fold in DEVELOPMENT_FOLDS:
+                    directory = root / "phase1/books" / arm / fold / "base"
+                    book = read(directory / cell / "book.json")
+                    baseline = read(directory / "benchmark/book.json")
+                    arrays.append(
+                        np.asarray(book["daily"][metric]) - baseline["daily"][metric]
+                    )
+                result["fold_paired"][arm][cell][metric] = {
+                    str(block): interval(arrays, block_length=block)
+                    for block in (20, 40, 60)
+                }
     write_json_atomic(root / "phase1_summary.json", result)
     write_json_atomic(PROJECT / "docs/v2_decision_phase1_results.json", result)
     return {"status": "completed", "source": str(root / "phase1_summary.json")}
