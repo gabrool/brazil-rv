@@ -1,8 +1,8 @@
 # Cash-aware portfolio experiment and conditional attention follow-up
 
-Review checkpoint: 2026-09-14. The main experiment is complete. The registered
-rich-attention timing follow-up and final recovery are in progress; their results
-must be added before treating this as the completed program report.
+Review date: 2026-09-14. The main experiment and the registered rich-attention
+screen and remaining-fold confirmation are complete. Final recovery and paid
+instance shutdown are being verified; see the completion record at the end.
 
 ## What the main experiment establishes
 
@@ -305,19 +305,90 @@ A coherent shared market-return reference is a more focused diagnostic than
 immediately changing the supervised encoder objective. It was not varied in the
 registered main comparison and has not been chosen using evaluation outcomes.
 
-The rich early/late attention trigger is met because TE remains competitive
-relative to S0 after changing controllers. The follow-up changes only stock-mixing
+The rich early/late attention trigger was met because TE remained competitive
+relative to S0 after changing controllers. The follow-up changed only stock-mixing
 timing, with compatible new rich parents, matched recipes, three seeds and the
-four original folds. It preserves the full history, inputs and capacity settings.
-It compares exact legacy books as a common controller and checks all three IC
-heads. A positive, sufficiently consistent screen is required before extending
-that new arm to the remaining folds. This is an empirical architecture check,
+four original folds. It preserved the full history, inputs and capacity settings.
+It compared exact legacy books as a common controller and checked all three IC
+heads. A positive, sufficiently consistent screen was required before extending
+that new arm to the remaining folds. This was an empirical architecture check,
 not a claim that late or early attention is universally canonical.
 
 The raw-return auxiliary objective is deferred because this experiment has not
 isolated the encoder's objective as the dominant bottleneck. Joint encoder/policy
 training is not triggered because the frozen learned policy did not improve
-utility. The main results remain sealed while this timing experiment runs.
+utility. The main results remained sealed throughout the timing experiment.
+
+## Completed rich early/late attention comparison
+
+Three compatible late-attention parents and all 42 late-attention fold fits were
+completed, with three causal parent prelude panels. The initial twelve screen
+fits were not rerun when the prewritten gate triggered the other thirty fits.
+No history, family, eligible name or capacity setting was removed. The existing
+temporal/peer architecture was configured for late timing; this was not a new
+model implementation requiring a different input contract.
+
+The screen's ensemble net increment was +.253 bps/day and utility increment
++.275, with three of four positive utility folds. Its nominal utility interval
+[-2.503,4.184] included zero. This justified running the registered confirmation;
+it did not justify declaring late attention superior.
+
+Final paired **TL minus TE** results:
+
+| Controller / window | Net excess difference | Utility difference [nominal 95% CI] |
+| --- | ---: | ---: |
+| Legacy, original four | +0.253 | +0.275 [-2.503, 4.184] |
+| Legacy, remaining ten | +0.170 | +0.169 [-1.754, 2.895] |
+| Legacy, all fourteen | +0.194 | +0.200 [-1.244, 2.563] |
+| Optimizer, original four | -1.954 | -1.960 [-3.117, -0.392] |
+| Optimizer, remaining ten | -0.153 | -0.151 [-1.711, 1.216] |
+| Optimizer, all fourteen | -0.672 | -0.673 [-1.793, 0.442] |
+
+The legacy comparison uses the common empty-start convention. The optimizer
+comparison uses the registered common burn-in. Within each comparison, dates,
+populations and accounting match; the re-created early-attention legacy daily
+returns and ICs match the sealed reference. Readout work was bounded to the
+evaluated dates without changing those metrics.
+
+The small positive legacy ensemble difference is not stable across individual
+seeds: all-fourteen paired net differences are -.597, +1.804 and -.987 bps/day
+for seeds 11/29/47. The ensemble is its own nonlinear book, so its outcome need
+not equal the mean of individual-seed books. Five of the ten remaining folds
+have positive ensemble utility differences. The uncertainty and seed reversals
+do not support a robust architecture improvement.
+
+Mean neutral IC is also weaker for late attention outside the screen:
+
+| Window | Early rich attention | Late rich attention |
+| --- | ---: | ---: |
+| Original four | .027103 | .027388 |
+| Remaining ten | .026280 | .023739 |
+| All fourteen | .026517 | .024791 |
+
+With the optimizer, late attention earns 1.938 bps/day above CDI over all folds,
+versus early's 2.610. Its continuous optimizer earns 2.029 versus 2.724, a -.695
+paired difference. Late's all-fold net disadvantage persists under 2 bps costs
+(-.525), 8 bps (-.967) and no proceeds remuneration (-.677). These stress results
+were not used to choose a new model or tune its parameters.
+
+The late continuous optimizer reconciles to 8.88e-16, with zero unresolved action
+days and terminal residual notional 5.38e-10. It still inherits material historical
+settlement uncertainty: cumulative settled notional .661 NAV over the window.
+Its maximum realized joint gross 2.376, absolute net .113 and absolute beta .137
+also illustrate that planned risk caps are not guarantees on exposures after
+later proxy fills/price moves. Mean net is .0518 and mean beta .0312. The comparison
+must retain that distinction rather than describe the book as perfectly neutral.
+Among the empty-start legacy ensemble books, F12 is flagged for both timings,
+and late F8 crosses the cumulative settlement threshold (.1593 NAV). These flags
+remain visible; there is no claim that every economic caveat was resolved.
+
+Decision: the positive legacy point estimates remain exploratory and controller-
+dependent. Late timing does not improve the calibrated optimizer and does not
+establish a robust advantage over early timing. Retain both as documented
+comparators, not as a reason for another unregistered training expansion. The
+experiment does not prove early attention is universally better, and it does
+not establish that the temporal attention architecture itself is incapable.
+No learned controller, joint training or new supervised objective is promoted.
 
 ## Evidence and completion checklist
 
@@ -328,9 +399,23 @@ training histories and every numerical migration receipt. The separate
 `_settlement_audit` directory contains the exact-replay diagnostics. Accepted
 engineering evidence is `docs/v2_portfolio_primal_adjoint_acceptance.json`.
 
-Recovery packages preserve all forecast fits, scores, current books and policy
-artifacts. Original numerical checkpoint/provenance history is included locally;
-superseded intermediate replay books additionally remain in a fully verified
-persistent archive. Reproducible policy caches remain hash-bound on persistent
-storage. Final local hash verification, attention results, GitHub delivery and
-exact-instance shutdown are still pending at this report checkpoint.
+Recovery is verified locally and on persistent storage: 11,464 required main
+members and 1,829 attention members, across five local archives. This includes
+every selected checkpoint, forecast, current book, training history, preprocessing
+contract and numerical provenance needed to review the decisions and reproduce
+scoring. The attention local packages total 865,091,652 bytes. Full intermediate
+attention epoch snapshots additionally remain in a verified 3,982,625,033-byte
+persistent archive; they are not needed to score the selected checkpoints.
+Superseded numerical replay books and reproducible caches also remain verified
+on persistent storage. No raw source was overwritten.
+
+Primary evidence:
+
+- [Main comparisons and settlement audit](v2_portfolio_policy_evidence.json).
+- [Historical boundary/forecast bridge](v2_portfolio_bridge_evidence.json).
+- [Attention screen, confirmation and optimizer comparisons](v2_portfolio_attention_evidence.json).
+- [Main recovery receipt](v2_portfolio_policy_recovery.json) and
+  [attention recovery receipt](v2_portfolio_attention_recovery.json).
+
+All scientific work is complete. GitHub synchronization and exact-instance
+shutdown are the remaining operational closure steps at this report checkpoint.

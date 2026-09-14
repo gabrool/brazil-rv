@@ -2,15 +2,23 @@
 
 Last verified: 2026-09-14.
 
-The user authorized the [cash-aware portfolio program](research/preregistrations/v2_portfolio_policy.md)
-following the [execution reassessment](docs/v2_EXECUTION_REASSESSMENT.md): repaired
-C6 bridge, causal frozen-forecast cache, constrained optimizer and small stateful
-decision-trained policy, then matched development confirmation. Cash may remain
-undeployed and earns historical CDI under the declared ledger assumptions;
-performance is measured above that same cash benchmark. Follow the
-[acceptance state](docs/v2_portfolio_policy_progress.md). This extends the completed
-A–C program without altering its sealed results. No held-out read, forward
-capture, intraday implementation or deployment is authorized by this extension.
+The [cash-aware portfolio program](research/preregistrations/v2_portfolio_policy.md)
+and its registered rich-attention timing confirmation are complete; see the
+[review and results](docs/v2_PORTFOLIO_POLICY_REVIEW.md). No new controller passes
+advancement, and late attention does not establish a robust improvement over
+early attention. No controller or architecture is promoted by this program.
+Original A–C and earlier results remain sealed. No held-out read, forward capture,
+intraday implementation or deployment is authorized by this extension.
+
+The accepted research allocator permits cash earning historical CDI, measures
+performance above the same cash benchmark, and jointly constrains stocks/BOVA.
+It uses a Clarabel forward solution with a verified OSQP training adjoint and
+FP64 accounting. Recovered artifacts include the repaired C6 bridge, three causal
+forecast caches' source forecasts, policy comparisons and rich late-attention
+confirmation. Historical missing-price settlement remains an economic assumption;
+keep raw flags and sensitivities visible despite negligible terminal dust.
+Recovery and exact-instance closure are recorded in the
+[acceptance state](docs/v2_portfolio_policy_progress.md).
 
 The post-Round-7 **data-only repair is accepted** for new development research.
 Resolve [the canonical data pointer](docs/v2_data_inputs.json); the new store is

@@ -1,0 +1,35 @@
+{
+  "status": "passed",
+  "required_members_verified": 1829,
+  "archives": [
+    {
+      "source": "/lambda/nfs/brazil-rv-east3/quant-data/b3/processed/model_runs/v2_portfolio_attention_62b7e2b_20260914T191200Z",
+      "phase": "required_fits",
+      "archive": "/lambda/nfs/brazil-rv-east3/quant-data/b3/processed/model_runs/v2_portfolio_attention_62b7e2b_20260914T191200Z_recovery/required_fits.tar.gz",
+      "sha256": "4bb549681ceb283caf3f4270f23afdec57cb6ce84951c2e5398dd3f0f7339222",
+      "bytes": 769568909,
+      "members_verified": true,
+      "local_archive": "C:\\quant-data\\b3\\processed\\model_runs\\v2_portfolio_attention_62b7e2b_20260914T191200Z\\archives\\required_fits.tar.gz",
+      "local_members_verified": 675
+    },
+    {
+      "source": "/lambda/nfs/brazil-rv-east3/quant-data/b3/processed/model_runs/v2_portfolio_attention_62b7e2b_20260914T191200Z",
+      "phase": "readouts",
+      "archive": "/lambda/nfs/brazil-rv-east3/quant-data/b3/processed/model_runs/v2_portfolio_attention_62b7e2b_20260914T191200Z_recovery/readouts.tar.gz",
+      "sha256": "c661be82bcde6906b4a724f59bd79f913c06ece7f7aa77e5998a2cc318cc9e5a",
+      "bytes": 95522743,
+      "members_verified": true,
+      "local_archive": "C:\\quant-data\\b3\\processed\\model_runs\\v2_portfolio_attention_62b7e2b_20260914T191200Z\\archives\\readouts.tar.gz",
+      "local_members_verified": 1154
+    }
+  ],
+  "full_epoch_archive_persistent": {
+    "source": "/lambda/nfs/brazil-rv-east3/quant-data/b3/processed/model_runs/v2_portfolio_attention_62b7e2b_20260914T191200Z",
+    "phase": "fits",
+    "archive": "/lambda/nfs/brazil-rv-east3/quant-data/b3/processed/model_runs/v2_portfolio_attention_62b7e2b_20260914T191200Z_recovery/fits.tar.gz",
+    "sha256": "4a9f56af6dda441b26feedd9ad21c9ff7b854254135d35f7491f8ed8f27dec61",
+    "bytes": 3982625033,
+    "members_verified": true
+  },
+  "coverage": "All completed selected checkpoints, preprocessing/contracts, training histories, forecasts, readouts and operational provenance recovered and verified locally. Intermediate per-epoch weight snapshots are additionally preserved in the fully verified persistent fits.tar.gz; they are not required to score the selected checkpoints. Full historical epoch replay can be restored from that persistent archive."
+}

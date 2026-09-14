@@ -301,3 +301,29 @@ net4.38627bps/day. All14IC S0.026724,TE.026517,C6.029321: originalTEICadvantage
 doesNOTpersistacrossallfolds. Needfinishreportwithremainingattentionresults,
 recovery,sourcehashesandactualshutdown. Suggestedfuturecoherentstock/hedgereturn
 referencecheck is hypothesis only; do NOTsilentlyaddanotherexperiment.
+
+## All scientific work complete; operational closure
+
+All42 TL fold fits,3parents,3preludes,112pairedlegacybooks and60TLoptimizerbooks
+are COMPLETE. Scripts bcc7d19 (legacy/date-bounded IC with exactsealedTEparity)
+and32d7879(optimizer)ranoutsideclean62b7e2battentioncheckout. No failures and
+NOFURTHEREXPERIMENTS. Main outcomes/policyadvancement remain unchanged.
+Late-minus-early legacy all14net+.193956/utility+.199903bps/day, uncertain;
+remaining10net+.170020/utility+.169287,5/10positivefolds. Individualall14seednet
+differences-.597,+1.804,-.987: inconsistent. TLall14IC.024791vsTE.026517.
+OptimizerTL-minus-TEall14net-.672382/utility-.672863, remainingnet-.153220;
+continuousnet-.695241. No robust late-timing improvement/promotion. Allraw
+accounting/settlementflagsretained. Fullresultsindocs/v2_portfolio_attention_evidence.json.
+
+REQUIREDRECOVERYCOMPLETE: docs/v2_portfolio_attention_recovery.json verifies1829
+members/865091652bytes inrequired_fits.tar.gz andreadouts.tar.gz locallyunder
+C:/quant-data/b3/processed/model_runs/v2_portfolio_attention_62b7e2b_20260914T191200Z/archives.
+Full3982625033-byteepocharchive isverifiedonpersistent_recovery/fits.tar.gz;
+per-epochintermediatesarenotneededtoscoreselectedmodelsandwerenotduplicatedlocally.
+Allselectedweights/contracts/histories/scores/currentreadouts/provenancearelocal.
+Main11464membersalreadyverified. Comprehensive reportupdatedwithallresults.
+
+Remaining ONLY: commit/pushclosingreport; transferverifiedgitbundleandfast-forward
+originalhostcheckout(ifclean); recordmatchingcodecommit; terminateexactpaidID
+ee625bd03bdc41fd9ba676de6e171511 usingDPAPIprovidercredential; verifyabsencetwice;
+writeclosureevidenceandfinaldocscommit; pauseheartbeat. Noactivecomputeleft.
