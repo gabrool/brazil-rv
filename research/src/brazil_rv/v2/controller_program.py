@@ -30,7 +30,7 @@ def policy_path(root, arm, fold, kind, seed):
 
 def plan(root, *, requested_kind, confirmation=False, max_parallel=6):
     engineering = {}
-    for kind in KINDS:
+    for kind in (requested_kind,):
         for seed in seeds_for(kind):
             path = (
                 root
@@ -48,7 +48,13 @@ def plan(root, *, requested_kind, confirmation=False, max_parallel=6):
             cells = sorted({(arm, "reliability") for arm, _ in cells})
         folds = tuple(f for f in DEVELOPMENT_FOLDS if f not in SCREEN_FOLDS)
     else:
-        cells = [(arm, kind) for arm in ARMS for kind in KINDS]
+        cells = [
+            (arm, kind)
+            for arm in ARMS
+            for kind in read(root / "phase2/engineering_acceptance.json")[
+                "financial_kinds"
+            ]
+        ]
         folds = SCREEN_FOLDS
     jobs = []
     for fold in folds:
@@ -122,9 +128,20 @@ def summarize(root, *, confirmation=False):
     cells = (
         [tuple(c) for c in read(root / "phase2/screen_summary.json")["survivors"]]
         if confirmation
-        else [(a, k) for a in ARMS for k in KINDS]
+        else [
+            (a, k)
+            for a in ARMS
+            for k in read(root / "phase2/engineering_acceptance.json")[
+                "financial_kinds"
+            ]
+        ]
     )
-    output = {"cells": {}, "survivors": [], "heldout_accessed": False}
+    output = {
+        "cells": {},
+        "survivors": [],
+        "heldout_accessed": False,
+        "engineering": read(root / "phase2/engineering_acceptance.json"),
+    }
     for arm, kind in cells:
         records, contrasts, seed_points = {}, {}, {}
         for seed in seeds_for(kind):

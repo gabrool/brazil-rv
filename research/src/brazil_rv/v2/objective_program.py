@@ -121,6 +121,7 @@ def adapt_c6_parent(source, destination, digest, seed, store_manifest, store_sha
             "prediction_max_abs_error": 0.0,
         },
     }
+    destination.parent.mkdir(parents=True, exist_ok=True)
     save_checkpoint(
         destination,
         {
