@@ -68,7 +68,11 @@ canonical fit/selection tensors are materialized once on the GPU, retaining
 every FP32 value, mask, age, date and name. Subsequent epochs gather those
 exact dates instead of reconstructing overlapping history on the CPU.
 Twenty-five cache/training/ASAM/selection checks pass. Real CUDA cache parity
-and full-fit resource use still need acceptance before enabling financial work.
+also passes P/F2/F14, including all full-batch model tensors in changed order.
+[Evidence](v2_post_data_cuda_cache_engineering.json) binds ba45f25 sources.
+F14 canonical collation/transfer was 228 ms versus .69 ms per cached gather;
+this is an input-stage comparison, not a complete-fit speedup. The plan was
+re-read after this A efficiency amendment. Full-fit resources remain to measure.
 
 ## Stage B — in progress
 
@@ -100,6 +104,15 @@ change is made solely on that hypothesis. Larger-LR
 SAM remains near zero; larger-LR AdamW encountered undefined flat predictions,
 which are retained as a failed attempt. The harness now records null IC and
 defined-date counts rather than failing JSON serialization and losing evidence.
+
+The corrected own-history task passes under BF16, FP32 head and full FP32
+(about .995). The lagged peer task fails under all three precisions (about
+−.024), so low precision does not explain that failure. Next bounded diagnosis
+isolates the duplicate current-state MLP and compares ASAM's LR bridge,
+weaker SAM and one-pass optimization on the original lagged task. These are
+engineering controls; no architecture or financial recipe is changed on an
+unverified hypothesis. The first 33 completed/failed attempts and all 103 files
+are [recorded and hash-verified locally](v2_post_data_engineering_attempts.json).
 
 The current-store evaluation adapter is implemented while engineering runs:
 unchanged economic-beta array proof, exact score provenance, common-population

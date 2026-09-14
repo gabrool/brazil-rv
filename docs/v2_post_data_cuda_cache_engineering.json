@@ -1,0 +1,105 @@
+{
+  "cache_only": true,
+  "checks": [
+    {
+      "all_model_tensors_exact": true,
+      "cache_bytes": 46122304,
+      "cached_gather_seconds": 0.0006445399400035967,
+      "canonical_collation_seconds": 0.5461875930000133,
+      "dates": [
+        459,
+        489,
+        520,
+        550,
+        581,
+        612,
+        642,
+        673,
+        703,
+        734,
+        765,
+        795,
+        826,
+        856,
+        887,
+        918
+      ],
+      "fold": "pretrain_internal",
+      "lookback": 60,
+      "padded_names": 160,
+      "stage": "P"
+    },
+    {
+      "all_model_tensors_exact": true,
+      "cache_bytes": 41510720,
+      "cached_gather_seconds": 0.0005611410400069871,
+      "canonical_collation_seconds": 0.1681430140001794,
+      "dates": [
+        1754,
+        1763,
+        1772,
+        1781,
+        1790,
+        1799,
+        1808,
+        1817,
+        1826,
+        1835,
+        1844,
+        1853,
+        1862,
+        1871,
+        1880,
+        1890
+      ],
+      "fold": "F2",
+      "lookback": 60,
+      "padded_names": 144,
+      "stage": "F"
+    },
+    {
+      "all_model_tensors_exact": true,
+      "cache_bytes": 73791808,
+      "cached_gather_seconds": 0.0006944151599964243,
+      "canonical_collation_seconds": 0.22831346200018743,
+      "dates": [
+        2250,
+        2292,
+        2334,
+        2376,
+        2418,
+        2460,
+        2502,
+        2544,
+        2587,
+        2629,
+        2671,
+        2713,
+        2755,
+        2797,
+        2839,
+        2882
+      ],
+      "fold": "F14",
+      "lookback": 60,
+      "padded_names": 256,
+      "stage": "F"
+    }
+  ],
+  "device": "cuda",
+  "evaluation_scores_read": false,
+  "heldout_access": false,
+  "source_hashes_lf": {
+    "characteristic_model.py": "25b83342d571fd08c4262116614ec178c453c7a01baff522cad090b42073ca1b",
+    "post_data_engineering.py": "400c8dfeb5800b19d37abaf8106b5ede8f5507862ec309177fd3a2a132cd96ba",
+    "round7_training.py": "3b70083f7f204073f71f3255e162d6ba935319bb75b0b81080326c87636a7426",
+    "temporal_pathway.py": "f417822e3ecbcbfc190803fc22a39d1a212e7aa3ea0c44cce4bfb4d500f26074",
+    "training_diagnostics.py": "990aec154f9e0a31b6795cbc73fa9d37af2b9e052baa194ac1a2408266573ad6"
+  },
+  "status": "passed",
+  "store": {
+    "manifest_sha256": "61149d43a23fc55fcd92b43aaa4e74d747fbdf62f852bedbbbdb2cf18281f3cc",
+    "root": "C:\\quant-data\\b3\\processed\\v2_data_store_2d59b9d_20260913T211700Z"
+  },
+  "torch": "2.13.0+cu126"
+}

@@ -6,7 +6,7 @@ import argparse
 import hashlib
 import json
 import time
-from dataclasses import asdict
+from dataclasses import asdict, replace
 from pathlib import Path
 from types import MethodType
 
@@ -122,6 +122,12 @@ def fp32_head(self, values):
         return torch.nn.functional.linear(values.float(), self.weight, self.bias)
 
 
+def no_current_core(self, values):
+    # All current fields remain in the final temporal token. Isolate competition
+    # from the separate current-state MLP; this is not a financial candidate.
+    return values.new_zeros((*values.shape[:-1], self[-1].normalized_shape[0]))
+
+
 def run(
     output,
     *,
@@ -134,6 +140,7 @@ def run(
     compiled=False,
     persistent=False,
     precision="bf16",
+    learning_rate=None,
 ):
     """Every update sees new dates; validation seeds never occur in training."""
     torch.set_num_threads(6)
@@ -143,11 +150,15 @@ def run(
     model = CharacteristicModel(config).to(device)
     if precision == "fp32_head":
         model.head.forward = MethodType(fp32_head, model.head)
+    if control == "no_current_core":
+        model.core.forward = MethodType(no_current_core, model.core)
     if control == "uniform":
         model.temporal_peer.peer.forward = MethodType(
             uniform_peer, model.temporal_peer.peer
         )
     recipe = RECIPES[recipe_name]
+    if learning_rate is not None:
+        recipe = replace(recipe, learning_rate=learning_rate)
     optimizer = recipe_optimizer(model, cuda=cuda, learning_rate=recipe.learning_rate)
     rho = None if control == "adamw" else recipe.rho
     objective = TrainingObjective(
@@ -300,9 +311,12 @@ def main():
     )
     parser.add_argument("--recipe", choices=tuple(RECIPES), default="sam125")
     parser.add_argument(
-        "--control", choices=("full", "own", "uniform", "adamw"), default="full"
+        "--control",
+        choices=("full", "own", "uniform", "adamw", "no_current_core"),
+        default="full",
     )
     parser.add_argument("--seed", type=int, default=11)
+    parser.add_argument("--learning-rate", type=float)
     parser.add_argument("--steps", type=int, default=512)
     parser.add_argument("--cuda", action="store_true")
     parser.add_argument("--compile", action="store_true")
@@ -322,6 +336,7 @@ def main():
         compiled=args.compile,
         persistent=args.persistent,
         precision=args.precision,
+        learning_rate=args.learning_rate,
     )
 
 
