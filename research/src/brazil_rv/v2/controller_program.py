@@ -278,7 +278,7 @@ def continuous(root, arm):
         raise ValueError("continuous controller replay requires a screen survivor")
     torch.set_num_threads(1)
     data, binding = load_data(root, arm)
-    data = load_context(root, arm, data, binding)
+    data.context = load_context(root, arm, binding)
     bounds = {fold: windows(root, data, fold) for fold in DEVELOPMENT_FOLDS}
     models = {
         name: {}
@@ -304,7 +304,7 @@ def continuous(root, arm):
         checkpoint = torch.load(
             path / "selected.pt", weights_only=True, map_location="cpu"
         )
-        model.load_state_dict(checkpoint["model_state_dict"], strict=True)
+        model.load_state_dict(checkpoint["model"], strict=True)
         model.eval()
         benchmark = CalibratedPolicy(fitted["benchmark"]).eval()
         equal = CalibratedPolicy(fitted["equal_rank"]).eval()
