@@ -80,8 +80,8 @@ class _SparseQP(torch.autograd.Function):
                 l=lower_np,
                 u=upper_np,
                 verbose=False,
-                eps_abs=1e-8,
-                eps_rel=1e-8,
+                eps_abs=1e-10,
+                eps_rel=1e-10,
                 polishing=True,
                 max_iter=20000,
             )

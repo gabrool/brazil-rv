@@ -192,3 +192,10 @@ OSQP refinement takes25–225iterations.106 targeted tests pass, including force
 fallback solution/adjoint parity. Retain compatible6e0ba2a checkpoints through
 the documented source/tensor-verified continuation; regenerate bound readouts.
 Reference: https://clarabel.org/stable/python/getting_started_py/ .
+
+One S0/F12 stress replay passed OSQP status1 but its aggregate actual-weight
+constraint residual was2.609e-6NAV, exceeding the independent2e-6 acceptance.
+Tighten OSQP absolute/relative tolerances to1e-10 (same as the interior solve);
+retain the2e-6 NAV acceptance and all economic limits. Small per-coordinate
+residuals must not accumulate beyond the joint-budget limit. Preserve all126
+completed models under source-verified numerical continuation; no refits needed.
