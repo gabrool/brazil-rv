@@ -75,6 +75,14 @@ the post-hoc nature of this diagnosis. A joint-task pass establishes that
 conditional capability only; it cannot certify learning from unlabelled market
 histories or justify a financial architecture/optimizer change by itself.
 
+The joint lagged task passed seed 11 while joint context had only .340 mean
+IC. Before interpreting that aggregate, record validation IC separately for
+the two observed regimes. A final bounded confirmation uses joint context
+full/uniform at 8192 fresh updates on seeds 11/29, joint lagged full on seed 29
+and uniform on seeds 11/29 at 4096, and corrected own-history seed 29 at 4096.
+The longer context schedule is a disclosed engineering adaptation. Preserve
+terminal weights for later diagnostics; no financial target or model changes.
+
 Financial calibration uses P and F fit/selection only, initially F2/F14 and
 seeds 11/29, on early-attention slow and C1-all representatives. The primary
 bracket is LR 1e-4 with SAM .125 and ASAM .2/.5. Add a matched SAM .125 LR 3e-4

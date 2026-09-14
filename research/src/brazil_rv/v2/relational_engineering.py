@@ -232,10 +232,12 @@ def run(
 
     validation = [batch(100_000_000 + seed * 100 + i) for i in range(8)]
     validation_support = []
+    validation_regimes = []
 
     def readout():
         model.eval()
         values = []
+        regimes = []
         with torch.no_grad():
             for sample in validation:
                 with torch.autocast(
@@ -258,9 +260,25 @@ def run(
                         sample["active_mask"].cpu().numpy(),
                     )
                 )
+                regimes.extend(
+                    (sample["slow_features"][:, 0, -1, 6] > 0).cpu().tolist()
+                )
         model.train()
         defined = np.isfinite(values)
         validation_support.append(int(defined.sum()))
+        values, regimes = np.asarray(values), np.asarray(regimes)
+        validation_regimes.append(
+            {
+                str(regime): {
+                    "dates": int((regimes == regime).sum()),
+                    "defined_dates": int((defined & (regimes == regime)).sum()),
+                    "ic": float(values[regimes == regime].mean())
+                    if defined[regimes == regime].all()
+                    else None,
+                }
+                for regime in (0, 1)
+            }
+        )
         # A flat prediction can make IC undefined. Retain that failure as null
         # and its support, instead of losing the run to JSON's NaN rejection.
         return float(np.mean(values)) if defined.all() else None
@@ -314,6 +332,8 @@ def run(
                 },
             )
     diagnostics["terminal"] = diagnostic()
+    checkpoint = output.with_suffix(".pt")
+    torch.save(model.state_dict(), checkpoint)
     result = {
         "status": "completed",
         "task": task,
@@ -327,6 +347,11 @@ def run(
         "independent_validation_dates": 128,
         "history": history,
         "defined_validation_dates": validation_support,
+        "validation_by_regime": validation_regimes,
+        "terminal_checkpoint": {
+            "file": checkpoint.name,
+            "sha256": hashlib.sha256(checkpoint.read_bytes()).hexdigest(),
+        },
         "diagnostics": diagnostics,
         "seconds": time.perf_counter() - start,
         "compiled": compiled,
