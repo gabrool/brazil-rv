@@ -1202,7 +1202,7 @@ class PortfolioDecisionState:
     pending_entry_weights: NDArray[np.float64]
     pending_exit_fractions: NDArray[np.float64]
     holding_sessions: NDArray[np.int64]
-    marked_return_since_entry: NDArray[np.float64]
+    marked_pnl_fraction: NDArray[np.float64]
     entry_allowed: NDArray[np.bool_]
     shortable: NDArray[np.bool_]
     required_exit: NDArray[np.bool_]
@@ -1644,10 +1644,10 @@ def simulate_stateful_ledger(
                 pending_entry_weights=pending_entry_weights,
                 pending_exit_fractions=pending_exit_fractions,
                 holding_sessions=np.where(held, day - entry_session, 0),
-                marked_return_since_entry=np.where(
+                marked_pnl_fraction=np.where(
                     held,
                     np.sign(weights)
-                    * (np.abs(signed_values) / np.maximum(entry_cost_basis, 1e-30) - 1),
+                    * (np.abs(signed_values) - entry_cost_basis) / start_nav,
                     0.0,
                 ),
                 entry_allowed=entry_eligible.copy(),
@@ -3615,7 +3615,7 @@ def simulate_stateful_ledger(
         or terminal_boundary_unpriced_inventory_notional > 0.0
         or terminal_hedge_last_mark_settlement_notional > 0.0
         or settlement_fraction > config.settlement_economics_unresolved_fraction_nav
-        or mean_gross < 0.5 * config.gross_target
+        or (portfolio_policy is None and mean_gross < 0.5 * config.gross_target)
     )
     exit_cause_array = np.stack(exit_cause_rows).astype(np.int8, copy=False)
     exit_side_array = np.stack(exit_side_rows).astype(np.int8, copy=False)

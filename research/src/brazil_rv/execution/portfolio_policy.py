@@ -133,6 +133,11 @@ class PreferenceModel(nn.Module):
         values = data.static[fit_rows][data.valid[fit_rows]]
         mean = values.mean(0, dtype=np.float64)
         scale = np.maximum(values.std(0, dtype=np.float64), 1e-4)
+        # Validity flags keep their natural 0/1 units. Fitting on eligible rows
+        # makes current validity constant; z-scoring would turn a held name's
+        # first missing score into a spurious -10,000 input.
+        mean[[6, 7, 12]] = 0.0
+        scale[[6, 7, 12]] = 1.0
         self.register_buffer("mean", torch.tensor(mean, dtype=torch.float32))
         self.register_buffer("scale", torch.tensor(scale, dtype=torch.float32))
         self.register_buffer("rank_mean", tensor(calibration.mean))
@@ -175,7 +180,7 @@ def state_features(weights, cash, restricted, age, adverse, pending, beta, volat
                 (
                     stock / 0.05,
                     torch.log1p(age / 20),
-                    torch.asinh(adverse / tensor(volatility)),
+                    torch.asinh(adverse / (0.05 * tensor(volatility))),
                     pending / 0.05,
                     (stock != 0).double(),
                 ),
@@ -260,11 +265,10 @@ def account_decision(data, model, account, day, *, allocation=AllocationConfig()
         account.weights[:-1].sign()
         * (
             (account.shares[:-1] * account.marks[:-1]).abs()
-            / account.cost_basis[:-1].clamp_min(1e-30)
-            - 1
+            - account.cost_basis[:-1]
         ),
         0,
-    )
+    ) / account.nav
     return decide(
         data,
         model,
@@ -367,7 +371,7 @@ def exact_replay(data, model, start, stop, *, config=None, targets=None):
                     tensor(state.free_cash_fraction),
                     tensor(state.restricted_cash_fraction),
                     tensor(state.holding_sessions),
-                    tensor(state.marked_return_since_entry),
+                    tensor(state.marked_pnl_fraction),
                     tensor(
                         state.pending_entry_weights
                         + state.pending_exit_fractions * state.weights

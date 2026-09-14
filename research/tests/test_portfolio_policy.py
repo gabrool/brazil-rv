@@ -69,6 +69,31 @@ def test_ridge_is_fit_only_and_does_not_read_crossing_endpoints():
     assert first.intercept == second.intercept
 
 
+def test_validity_flags_keep_binary_units_when_fit_values_are_constant():
+    data = policy_fixture()
+    data.static[:10, :, [6, 7, 12]] = 1.0
+    calibration = Calibration(np.zeros(3), np.ones(3), np.zeros(3), 0.0)
+    model = PreferenceModel(data, calibration, np.arange(10))
+    assert torch.equal(model.mean[[6, 7, 12]], torch.zeros(3))
+    assert torch.equal(model.scale[[6, 7, 12]], torch.ones(3))
+
+
+def test_tiny_inventory_does_not_amplify_marked_pnl_gradient(monkeypatch):
+    import brazil_rv.execution.portfolio_policy as policy
+
+    data = policy_fixture()
+    account = data.initial_account(0, policy_ledger_config())
+    account.shares[0] = 1e-16
+    account.cost_basis[0] = 1e-15
+    account.cost_basis.requires_grad_()
+    # Isolate the actual state input before the shared network/allocator.
+    monkeypatch.setattr(policy, "decide", lambda *args, **kwargs: args[7])
+    pnl = policy.account_decision(data, None, account, 0)
+    pnl.sum().backward()
+    assert account.cost_basis.grad.abs().max() < 2
+    assert pnl.abs().max() < 1e-10
+
+
 def test_shared_controller_and_independent_exact_ledger_agree():
     torch.set_num_threads(1)
     torch.manual_seed(11)

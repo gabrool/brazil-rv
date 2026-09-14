@@ -223,7 +223,9 @@ def save_book(output, data, result, targets, previous, start, first, provenance)
             ("orders", result.intended_orders),
         ):
             if records:
-                pl.DataFrame(_serialise_records(records)).write_parquet(
+                pl.DataFrame(
+                    _serialise_records(records), infer_schema_length=None
+                ).write_parquet(
                     output / f"{label}.parquet", compression="zstd"
                 )
     record = {

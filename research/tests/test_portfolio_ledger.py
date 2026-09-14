@@ -25,6 +25,7 @@ def test_cash_earns_cdi_once_and_has_zero_excess():
     assert result.nav == pytest.approx(np.cumprod(1 + cdi), abs=1e-12)
     assert result.net_excess_all_cash_bps == pytest.approx(np.zeros(3), abs=1e-10)
     assert not result.fills
+    assert not result.economics_unresolved
 
 
 def test_current_close_mutation_changes_fills_but_not_intentions():

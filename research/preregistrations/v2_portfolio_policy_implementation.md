@@ -99,3 +99,34 @@ Artifact: D:/quant-data/b3/interim/portfolio_policy_engineering/real_path/engine
 Any material actual-run discrepancy requires repair and a recorded decision
 before economic conclusions; accounting checks are not replaced by optimization
 success alone.
+
+## Actual-run numerical repair, 2026-09-14
+
+The first CPU policy batch failed before aggregate analysis. Preserve its
+policies/books/logs as rejected numerical evidence; restart all policy fits,
+retaining the complete frozen forecasts, ranks, calibration data and economics.
+No architecture, forecast, risk limit, learning rate, objective or epoch policy
+is selected from this failed batch's financial outcomes.
+
+- Keep validity channels (current score, previous score, prior CDI) in 0/1 units.
+  Fit-eligible rows make current validity constant; variance-floor z-scoring
+  incorrectly encoded a missing held-name score near -10,000.
+- Replace the inventory return divided by entry cost basis with signed marked
+  P&L divided by prior NAV, scaled by .05 times daily volatility before asinh.
+  Near-zero numerical holdings must not create unbounded state Jacobians through
+  division by a near-zero cost basis. The input preserves gains/losses and own
+  exposure; it does not discard names, clip losses or shorten gradient history.
+  Both independent accounting implementations expose the same state quantity.
+- The cash-capable callback is exempt from the legacy low-gross unresolved flag.
+  Insolvency, action uncertainty, unpaid claims and settlement flags remain.
+- Infer audit record schemas across all records so initial integer zero values
+  cannot cause later fractional execution quantities to fail serialization.
+
+On the same S0/F2 fit-only path, binary repair alone reduced epoch-zero chunk
+norms from up to 122,719 to at most 62.75, but weight updates still exposed the
+small-cost-basis Jacobian (norms above 1 million). With both state repairs,
+all 13 chronological chunks including Adam updates have finite norms 13.71–59.14.
+No QP tolerance or constraint was loosened; monitor convergence after removing
+these pathological preferences. Prior full-batch results are not valid evidence
+for ranking policies. Repeat the actual-path acceptance and targeted regression
+checks, then run the original experiment roster from fresh policy states.

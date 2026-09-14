@@ -97,3 +97,16 @@ Check this existing chain before any restart. Initial PID 60817 exited during
 import because the separate checkout lacked the required workspace layout;
 fixed layout and explicit root before any policy fitting. Failure log retained
 as portfolio_policies_20260914T165200Z.log. No model or financial contract change.
+## Numerical repair before policy conclusions
+
+The initial CPU batch failed; no aggregate policy result is accepted. Frozen
+forecasts/cache/economics remain valid. All initial policy outputs are retained
+under rejected_policy_numerics_74c4021 before fresh policy fitting. Resolutions
+are registered in v2_portfolio_policy_implementation.md: binary validity units,
+NAV-based marked P&L state (removes tiny-cost-basis Jacobian), cash exemption from
+legacy minimum-gross unresolved flag, full-record audit schema inference.
+Twenty-seven targeted policy tests and 77 legacy ledger tests pass. Real-path
+acceptance again passes: NAV max error 1.23e-10, 32/64 gradient cosine .902,
+norm ratio .802. See docs/v2_portfolio_policy_repair_acceptance.json.
+Same S0/F2 fit-only Adam-updated 13 chunks now have gradient norms 13.71–59.14.
+Original CPU chain exited on failure; do not resume its old checkpoints.

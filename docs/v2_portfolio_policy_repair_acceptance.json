@@ -1,0 +1,61 @@
+{
+  "accounting_max_absolute_errors": {
+    "cash": 3.2632856139525046e-09,
+    "claims": 0.0,
+    "nav": 1.224649270881173e-10,
+    "restricted": 3.7389487335531925e-09,
+    "shares": 5.4800973133427535e-11
+  },
+  "config": {
+    "annual_borrow_rate": 0.02,
+    "annual_debit_spread": 0.0,
+    "annual_sessions": 252,
+    "beta_hedge": true,
+    "borrow_registration_fee_cap": 0.007,
+    "borrow_registration_fee_floor": 0.00025,
+    "borrow_registration_fee_fraction": 0.2,
+    "borrow_source": "borrow_balance",
+    "buffer_per_side": 30,
+    "cancel_pending_outside_retention": true,
+    "cost_bps_per_side": 4.0,
+    "entry_expiry_sessions": 3,
+    "gross_target": 2.0,
+    "hedge_annual_borrow_rate": 0.02,
+    "hedge_cost_bps_per_side": 4.0,
+    "hedge_notional_cap_nav": 0.6,
+    "hedge_rebalance_threshold_nav": 0.05,
+    "ineligible_hold_sessions": 5,
+    "initial_capital_brl": 1.0,
+    "k_per_side": 30,
+    "planned_absolute_beta_cap": 0.05,
+    "planned_absolute_net_cap": 0.05,
+    "planned_gross_cap": 2.25,
+    "planned_name_weight_cap": 0.05,
+    "settle_terminal_residuals": true,
+    "settlement_economics_unresolved_fraction_nav": 0.15,
+    "settlement_grace_sessions": 10,
+    "settlement_haircut": 0.3,
+    "short_proceeds_remuneration": 1.0,
+    "small_stratum_scaling_threshold_multiple": 2,
+    "volatility_balanced_entries": false,
+    "volatility_group_count": 5
+  },
+  "forecast_design_sha256": "d5fecc8496dda7fc0a2b2b51a3e7642bfb2399d7670bc80dcc8391f699f87ed0",
+  "gradient": {
+    "cosine_32_64": 0.9015105962753296,
+    "finite": true,
+    "mean_planned_gross": 2.2499999995310516,
+    "norm32": 7.628801345825195,
+    "norm_ratio_32_64": 0.8019430637359619
+  },
+  "model_parameters": 1857,
+  "passed": true,
+  "risk_support_min_active": 40,
+  "scope": "synthetic preferences, 128 actual prelude market sessions; no alpha inference",
+  "timings_seconds": {
+    "data_load": 12.065265957999145,
+    "exact_128": 1.128920028999346,
+    "forward_backward_64_chunk32": 1.266920599000514,
+    "forward_backward_64_chunk64": 1.1217047909995017
+  }
+}
