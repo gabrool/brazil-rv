@@ -96,7 +96,9 @@ def check(output, *, cuda=False, cache_only=False):
             batch = model_batch(cpu, device)
             collation_seconds = time.perf_counter() - start
             if cache_only:
-                cache = DateTensorCache([cpu], size, device)
+                cache = DateTensorCache(
+                    [cpu], cpu["date_index"].numpy(), len(data.store.isins), device
+                )
                 order = list(reversed(range(size)))
                 gathered = cache.gather(order)
                 for key, value in batch.items():

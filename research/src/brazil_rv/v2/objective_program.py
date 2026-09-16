@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import gc
 from dataclasses import asdict, replace
 from pathlib import Path
 import sys
@@ -196,6 +197,13 @@ def prepare(root):
         raise ValueError("economic target cache changed")
     design = {
         "implementation": _git_identity(),
+        "execution": {
+            "torch": str(torch.__version__),
+            "gpu": torch.cuda.get_device_name() if torch.cuda.is_available() else None,
+            "capability": list(torch.cuda.get_device_capability())
+            if torch.cuda.is_available()
+            else None,
+        },
         "store": {"root": str(store), "manifest_sha256": store_sha},
         "store_resolution": resolution.payload(),
         "parents": parents,
@@ -213,9 +221,12 @@ def prepare(root):
 
 
 def fit(root, arm, fold, seed, variant, *, smoke=False):
+    torch.set_num_threads(1)
     design = read(root / "phase3/frozen_design.json")
     if design["implementation"] != _git_identity():
         raise ValueError("objective checkout differs from frozen engineering")
+    if design["execution"]["torch"] != str(torch.__version__):
+        raise ValueError("objective runtime differs from frozen engineering")
     store, _ = resolve_external_root(design["store"]["root"])
     from .data_roots import resolve_external_file
 
@@ -240,6 +251,51 @@ def fit(root, arm, fold, seed, variant, *, smoke=False):
         economic_weight=design["economic_weight"] if variant == "economic" else 0,
         export_scores=not smoke,
     )
+
+
+def run_local(root, *, smoke=False, confirmation=False):
+    """One GPU worker; retain verified store hashes and loaded CUDA libraries."""
+    plan(root, smoke=smoke, confirmation=confirmation, max_parallel=1)
+    kind = "smoke" if smoke else "confirmation" if confirmation else "screen"
+    jobs = read(root / "phase3" / f"{kind}_plan.json")["jobs"]
+    completed = []
+    for job in jobs:
+        arguments = job["command"]
+
+        def value(name):
+            return arguments[arguments.index(name) + 1]
+
+        # Independent fits retain their own RNG, optimizer, contract and resume
+        # files; only import/verification caches survive this boundary.
+        torch._dynamo.reset()
+        result = fit(
+            root,
+            value("--arm"),
+            value("--fold"),
+            int(value("--seed")),
+            value("--variant"),
+            smoke=smoke,
+        )
+        completed.append(
+            {
+                "name": job["name"],
+                "selected_epoch": result["selected_epoch"],
+                "manifest_sha256": sha256_file(
+                    Path(job["run_dir"]) / "run_manifest.json"
+                ),
+            }
+        )
+        write_json_atomic(
+            root / "phase3" / f"{kind}_local_progress.json",
+            {
+                "completed": completed,
+                "planned": len(jobs),
+                "status": "completed" if len(completed) == len(jobs) else "running",
+            },
+        )
+        gc.collect()
+        torch.cuda.empty_cache()
+    return completed
 
 
 def plan(root, *, smoke=False, confirmation=False, max_parallel=2):
@@ -322,6 +378,20 @@ def accept_smoke(root):
     if not read(root / "phase3/cpu_acceptance.json")["passed"]:
         raise ValueError("fit-only CPU gradient acceptance is missing")
     results = {}
+    local = design.get("execution", {}).get("capability", [8])[0] < 8
+    if local:
+        engineering = root / "phase3/local_engineering"
+        if not read(engineering / "input_verification.json")["passed"]:
+            raise ValueError("local input verification is missing")
+        for arm in CELLS:
+            for fold in ("F2", "F14"):
+                check = read(engineering / f"{arm}_{fold}.json")
+                if (
+                    not check["passed"]
+                    or not check["cache_exact"]
+                    or check["torch"] != design["execution"]["torch"]
+                ):
+                    raise ValueError("local full-population engineering failed")
     for arm in CELLS:
         matched = []
         for variant in ("neutral", "economic"):
@@ -344,6 +414,11 @@ def accept_smoke(root):
                     for v in history
                 )
                 or bool(contract["economic_auxiliary"]) != (variant == "economic")
+                or local
+                and (
+                    contract["runtime"]["autocast_dtype"] != "torch.float16"
+                    or not contract["runtime"]["gradient_scaling"]
+                )
             ):
                 raise ValueError(
                     f"compiled CUDA objective smoke failed: {arm}/{variant}"
@@ -356,6 +431,7 @@ def accept_smoke(root):
                     contract["padded_name_count"],
                     contract["fit_target_window"],
                     [v["updates"] for v in history],
+                    contract["runtime"],
                 )
             )
             results[f"{arm}/{variant}"] = {
@@ -364,6 +440,8 @@ def accept_smoke(root):
                 "peak_cuda_bytes": record["peak_cuda_bytes"],
                 "padded_names": contract["padded_name_count"],
                 "compiled_graphs": record["compiled_graphs"],
+                "runtime": contract["runtime"],
+                "cache": record["date_tensor_cache_resources"],
             }
         if matched[0] != matched[1]:
             raise ValueError(
@@ -373,7 +451,7 @@ def accept_smoke(root):
         "passed": True,
         "design_sha256": sha256_file(root / "phase3/frozen_design.json"),
         "results": results,
-        "scope": "two compiled BF16 CUDA epochs per arm/objective; CPU gradient and unchanged initialization checked separately",
+        "scope": "two compiled mixed-precision CUDA epochs per arm/objective; CPU gradient and unchanged initialization checked separately",
     }
     write_json_atomic(root / "phase3/gpu_acceptance.json", output)
     return output
@@ -530,7 +608,8 @@ def cpu_acceptance(root):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        "command", choices=("prepare", "fit", "plan", "cpu-check", "accept-smoke")
+        "command",
+        choices=("prepare", "fit", "plan", "cpu-check", "accept-smoke", "run-local"),
     )
     parser.add_argument("--root", type=Path, required=True)
     parser.add_argument("--arm", choices=CELLS)
@@ -547,6 +626,8 @@ def main():
         cpu_acceptance(args.root)
     elif args.command == "accept-smoke":
         accept_smoke(args.root)
+    elif args.command == "run-local":
+        run_local(args.root, smoke=args.smoke, confirmation=args.confirmation)
     elif args.command == "plan":
         print(
             plan(

@@ -50,7 +50,8 @@ def probe(
     rho,
     adaptive,
     eta,
-    use_bf16=True,
+    mixed_precision=True,
+    amp_dtype=torch.bfloat16,
 ):
     """One actual two-pass update, then restore model/optimizer/RNG exactly.
 
@@ -128,8 +129,8 @@ def probe(
     def predict():
         with torch.autocast(
             device_type=mask.device.type,
-            dtype=torch.bfloat16,
-            enabled=mask.is_cuda and use_bf16,
+            dtype=amp_dtype,
+            enabled=mask.is_cuda and mixed_precision,
         ):
             return forward(model, batch, characteristic=characteristic).float()
 
@@ -159,6 +160,9 @@ def probe(
             adaptive=adaptive,
             eta=eta,
             diagnostics=result,
+            scaler=torch.amp.GradScaler("cuda", init_scale=256.0)
+            if mask.is_cuda and mixed_precision and amp_dtype == torch.float16
+            else None,
         )
         result.update(
             clean_loss=clean,

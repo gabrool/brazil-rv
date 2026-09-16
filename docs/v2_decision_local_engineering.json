@@ -1,0 +1,625 @@
+{
+  "input_verification": {
+    "bindings": {
+      "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\cache\\C6\\manifest.json": "251cc1c3f313493d024551d1e17344d8bbf8fbc5d17e918354fd53e54235dc43",
+      "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\cache\\C6\\policy_data.json": "a6658313c32b8e2dee63e9247fd7362b69cf69c991a30d90c297960b1070f648",
+      "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\cache\\C6\\policy_data.pkl": "857d76f544f0c365ba229011a4df77beb9a501edc9a8b4f855a6d925d43e3cdf",
+      "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\cache\\S0\\manifest.json": "db70436421353c1eb6d089db3743d3fa1ea4702f01d2054b373df5a1ee2c8552",
+      "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\cache\\S0\\policy_data.json": "c6114c92aa138cde0ebd185954065f65d4fd079b557e1f947dae5559ba9c5b1b",
+      "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\cache\\S0\\policy_data.pkl": "2cef07a93beaba60f7589209b08365919b37c253aff10f293a01ad5e37b4c0ef",
+      "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\cache\\TE_all\\manifest.json": "1e54d6ddfa6a72e883ee86df9eec08c4b85ad17c4caa39dcad966623d9c7c38c",
+      "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\cache\\TE_all\\policy_data.json": "045e6a42780fdb67fccad25203d8a2a17d16040168c9d4d26c5b026146d67c96",
+      "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\cache\\TE_all\\policy_data.pkl": "2516fb377bb53c1c00990cd20a90264aa9736d4ff0eefab20ddcb15f69cf9f2f",
+      "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\economic_targets.npz": "f66bdafa1e2e8d5d393eeadbfebd9fb5a9549ff3266da50b751da029ecda184a",
+      "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\mappings\\F10.json": "33a47496a94d265237db2c263f80e42ae0722ea428bc0ae42607fb18c1ccc85d",
+      "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\mappings\\F14.json": "1bb81ab0ec562ec838d46b8f4e8a1bee73161a3a8ce37a0bcd2316d4c934d38a",
+      "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\mappings\\F2.json": "81fbee139510633a935c3721c187039288f9c77a3f6f3f28868e4947b2fa9663",
+      "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\mappings\\F6.json": "4490beff39e4061b55185f1085a1a8e0c852c8a9cf333a3e9e1b446e4aab44bc",
+      "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\parents\\C6\\seed_11\\selected.pt": "7a0784e35d0c843033053582bab37f21ef7e73c3938dba19eac11a61e595afa3",
+      "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\parents\\C6\\seed_29\\selected.pt": "ac5601f512cb7796167721a80f71da62ebbfeeeb57a1e405cc6aca7eca227649",
+      "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\parents\\C6\\seed_47\\selected.pt": "4c798435c699467e9eaf504632e7d84dddf2d2d195874ed59ba74b27139d3810",
+      "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\parents\\TE_all\\seed_11\\selected.pt": "51aec0c1f97c2ecec6ca39886dd965e3128799cb2302397e604f0cd6d49ff870",
+      "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\parents\\TE_all\\seed_29\\selected.pt": "fa97ed82f8c4a1fe46cb961d4d496aa37703b91efd7cbb0d1e86ec2280e99594",
+      "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\parents\\TE_all\\seed_47\\selected.pt": "cd88921a4cf942a9aa58af2d0b1312205c695351ae7880e77427d9d50bc0c04f",
+      "C:\\quant-data\\b3\\processed\\v2_data_store_2d59b9d_20260913T211700Z\\action_cash_per_prior_share.npy": "d530ec6c93794b97980848cba40cafe39cf8e6cd2d1a48569d964e80e5aa72c2",
+      "C:\\quant-data\\b3\\processed\\v2_data_store_2d59b9d_20260913T211700Z\\action_has_action.npy": "a08ab57918e9b5805537cb06b81a9994174e9de7588b702c972c65432ccdf1f6",
+      "C:\\quant-data\\b3\\processed\\v2_data_store_2d59b9d_20260913T211700Z\\action_payment_session.npy": "8601338a3e65a9c9c0393e2f0821849ebe8601812f1d53cbfa41532950dc2753",
+      "C:\\quant-data\\b3\\processed\\v2_data_store_2d59b9d_20260913T211700Z\\action_session_resolved.npy": "1d1f277649264bd63edbc54d88507b5257a690fcc053c8899e9e1018f461dace",
+      "C:\\quant-data\\b3\\processed\\v2_data_store_2d59b9d_20260913T211700Z\\action_shares_per_prior_share.npy": "8554e23cec96561745ac7232ec87efe3e93a5f4ce8863b4fdc541c8aa799d3ea",
+      "C:\\quant-data\\b3\\processed\\v2_data_store_2d59b9d_20260913T211700Z\\action_successor_index.npy": "cf0a8df8e100f2ab29b40221f51841dc1d46800a0458ddcb045b18a25208a65e",
+      "C:\\quant-data\\b3\\processed\\v2_data_store_2d59b9d_20260913T211700Z\\active.npy": "1e7f0e3c10592bcb99942b37359534e37485bdfdb6eab26f117ebf846d21629e",
+      "C:\\quant-data\\b3\\processed\\v2_data_store_2d59b9d_20260913T211700Z\\activity_valid.npy": "9ad7d2f5f3feb8cf5f64055302b959e668056f28902954c9456499d229b375c5",
+      "C:\\quant-data\\b3\\processed\\v2_data_store_2d59b9d_20260913T211700Z\\ambiguous_action_mask.npy": "1c4b613fb021c300c63ed07da8ec2d86d74bb7c2ca98a8c300251d02f26eede2",
+      "C:\\quant-data\\b3\\processed\\v2_data_store_2d59b9d_20260913T211700Z\\audit_eventual_survives_to_final_year.npy": "b908de2876d266f2dea8fa70482e52c472c88f617351f85d54c00c208175ecc9",
+      "C:\\quant-data\\b3\\processed\\v2_data_store_2d59b9d_20260913T211700Z\\common_state_diagnostic_valid.npy": "857a82d57d8564aff67b71be58457b352cab73d5c94e46fe596dad2941cb62b6",
+      "C:\\quant-data\\b3\\processed\\v2_data_store_2d59b9d_20260913T211700Z\\common_state_diagnostic_values.npy": "ce0942ab8304aacd1fdb8b13380c0da3634c911ea799dc80988540c60a8068b3",
+      "C:\\quant-data\\b3\\processed\\v2_data_store_2d59b9d_20260913T211700Z\\continuation_quote_mask.npy": "0f546bdd35998e45768c916ce190f8fee611f12b1570309add459c931a13b7f0",
+      "C:\\quant-data\\b3\\processed\\v2_data_store_2d59b9d_20260913T211700Z\\detected_cash_event_mask.npy": "1427a72ce215f99fb5d7a7e24a51da54eede900b33bb3e174986358834b0da12",
+      "C:\\quant-data\\b3\\processed\\v2_data_store_2d59b9d_20260913T211700Z\\detected_event_mask.npy": "c10d8adc711ca58c0b6086710f7ec1e26e20771faa398ebdbdcf874b863c58d2",
+      "C:\\quant-data\\b3\\processed\\v2_data_store_2d59b9d_20260913T211700Z\\detected_split_mask.npy": "0347a6c0cd231dcc8f5b549a38332d99141554ceb752a0b5a7c7749b43d54879",
+      "C:\\quant-data\\b3\\processed\\v2_data_store_2d59b9d_20260913T211700Z\\distribution_change_mask.npy": "98c6e203c56b5dbccdd3b7ea630fdb1a2b66921b55868f8d3156b1f1d849a774",
+      "C:\\quant-data\\b3\\processed\\v2_data_store_2d59b9d_20260913T211700Z\\distribution_number.npy": "8dac4d51ce7843c1390d06845670b40c3eee37bdc8ddcaf119141f9678aceea0",
+      "C:\\quant-data\\b3\\processed\\v2_data_store_2d59b9d_20260913T211700Z\\entry_fill_allowed.npy": "2d70609681664f62cd7046d61dce7900256e79eae816f0682baa94bf265354bf",
+      "C:\\quant-data\\b3\\processed\\v2_data_store_2d59b9d_20260913T211700Z\\fast_last_price_age_minutes.npy": "862569b6d3a3d51915e00754d85328a0b2542443e5f5167f6ef59663a05be345",
+      "C:\\quant-data\\b3\\processed\\v2_data_store_2d59b9d_20260913T211700Z\\fast_last_price_age_valid.npy": "685ac5e50f85c4bc26dce125e7d4d36f7d3e8c47f4d31558fd980197e9d8bace",
+      "C:\\quant-data\\b3\\processed\\v2_data_store_2d59b9d_20260913T211700Z\\fast_patch_mask.npy": "a7b1c57b04f6beb6b08707a34d393a4ee62546813b90bf93fb4b5fa7e2fe22bb",
+      "C:\\quant-data\\b3\\processed\\v2_data_store_2d59b9d_20260913T211700Z\\fast_patch_valid.npy": "77b625cc559c6126e323e9a890ec22a1326420f650361111d1116e0407b83112",
+      "C:\\quant-data\\b3\\processed\\v2_data_store_2d59b9d_20260913T211700Z\\fast_patch_values.npy": "b7f8fd190f2e386bb6bc3b8e8515a966d50915fbba9613c204829d9871f0b826",
+      "C:\\quant-data\\b3\\processed\\v2_data_store_2d59b9d_20260913T211700Z\\fast_present.npy": "8b50d2dac5c3eb0f5265aa4f008522091b8e61ebc7f7a3e1d3e6d9b1b48247fc",
+      "C:\\quant-data\\b3\\processed\\v2_data_store_2d59b9d_20260913T211700Z\\inferred_action_c1_mask.npy": "93b95c8c11eccdda55ca8295924c87aaeff5b45e81d10e37a4378131093834c0",
+      "C:\\quant-data\\b3\\processed\\v2_data_store_2d59b9d_20260913T211700Z\\inferred_action_large_move_no_action_mask.npy": "599e7fb9b7a92cf9b0c86795f0443f98234389b2b2af5d3f3fb5a204f28be114",
+      "C:\\quant-data\\b3\\processed\\v2_data_store_2d59b9d_20260913T211700Z\\inferred_action_u1_mask.npy": "c806e30d1b27167915d5ab7c3468f65683fc701665cf6123c8ccb2eb939b6f65",
+      "C:\\quant-data\\b3\\processed\\v2_data_store_2d59b9d_20260913T211700Z\\inferred_action_u2_mask.npy": "c31219fee166493a5dd63f5608006fc2fd1257e22c0603168ce59fdb9f9ef532",
+      "C:\\quant-data\\b3\\processed\\v2_data_store_2d59b9d_20260913T211700Z\\intraday_age_sessions.npy": "eb99dfa709b04c25b94d8aa31bc88ca21e3ce515cb43b810d2ab81b0fbde3337",
+      "C:\\quant-data\\b3\\processed\\v2_data_store_2d59b9d_20260913T211700Z\\intraday_boundary_lagged_mask.npy": "0347a6c0cd231dcc8f5b549a38332d99141554ceb752a0b5a7c7749b43d54879",
+      "C:\\quant-data\\b3\\processed\\v2_data_store_2d59b9d_20260913T211700Z\\intraday_boundary_sameday_mask.npy": "e46bba27866da3906526161a57acbccead0053bf39119a02c82cd1250f379c39",
+      "C:\\quant-data\\b3\\processed\\v2_data_store_2d59b9d_20260913T211700Z\\intraday_support_fraction.npy": "bb402eb3b93344d6f0f5d2e5abcd7c901a7ed29b4e1ced4e0ee78eb5ef0b204f",
+      "C:\\quant-data\\b3\\processed\\v2_data_store_2d59b9d_20260913T211700Z\\intraday_unit_or_unresolved_boundary_mask.npy": "1b9287ca863ff756fe2183362466ce9feee196e03e47ef362d06a0d3cb57cb36",
+      "C:\\quant-data\\b3\\processed\\v2_data_store_2d59b9d_20260913T211700Z\\intraday_valid.npy": "e8936605679c2ec81d1c4eed43f89b928a042c9115d2c4e0ce2cf18e2b0624e3",
+      "C:\\quant-data\\b3\\processed\\v2_data_store_2d59b9d_20260913T211700Z\\intraday_values.npy": "406a33996ef53670f5252e9c4bb2276166ed54af85bfe0183553610e6e796d73",
+      "C:\\quant-data\\b3\\processed\\v2_data_store_2d59b9d_20260913T211700Z\\m1_cotahist_return_consistent_mask.npy": "b57a70caaca227eb310eba87c2065ab34487f3f763ed2145f7291541827b07be",
+      "C:\\quant-data\\b3\\processed\\v2_data_store_2d59b9d_20260913T211700Z\\manifest.json": "61149d43a23fc55fcd92b43aaa4e74d747fbdf62f852bedbbbdb2cf18281f3cc",
+      "C:\\quant-data\\b3\\processed\\v2_data_store_2d59b9d_20260913T211700Z\\observed.npy": "1d1f277649264bd63edbc54d88507b5257a690fcc053c8899e9e1018f461dace",
+      "C:\\quant-data\\b3\\processed\\v2_data_store_2d59b9d_20260913T211700Z\\price_jump_anomaly_mask.npy": "7183c93ef82deca56ee7da1bf1a4d53c6a3d77d9335a3b99733174b77616998c",
+      "C:\\quant-data\\b3\\processed\\v2_data_store_2d59b9d_20260913T211700Z\\prior_reference_close.npy": "12ac53f3c965160bd80546ea60caf322bec39098b1d71d36b8e049b1a88b6903",
+      "C:\\quant-data\\b3\\processed\\v2_data_store_2d59b9d_20260913T211700Z\\quantity.npy": "b502c725d5d0539fc40e6a93577facde718b92d0d6e72fcff2c6c3c5bb89092c",
+      "C:\\quant-data\\b3\\processed\\v2_data_store_2d59b9d_20260913T211700Z\\raw_close.npy": "d822a557e79452270d897c9c0df470efd56519754e56b44840243b5024fd0e16",
+      "C:\\quant-data\\b3\\processed\\v2_data_store_2d59b9d_20260913T211700Z\\raw_high.npy": "937a488abe9ce691139e23819cec1627fd4727d82eb65ad9d2a9df919bb54e90",
+      "C:\\quant-data\\b3\\processed\\v2_data_store_2d59b9d_20260913T211700Z\\raw_low.npy": "048547d2761f95bad2b6a6715c0a0843b31354dfce3e255c5306e88bb04d5b80",
+      "C:\\quant-data\\b3\\processed\\v2_data_store_2d59b9d_20260913T211700Z\\raw_open.npy": "8d412be82944b3015662be37c489f277afa49bed63afde95c721231653693501",
+      "C:\\quant-data\\b3\\processed\\v2_data_store_2d59b9d_20260913T211700Z\\shareholder_wealth_close.npy": "6096b2ba03ee85073ab45cf4b22ca3ffede4ccde4263ffb224735a075551cced",
+      "C:\\quant-data\\b3\\processed\\v2_data_store_2d59b9d_20260913T211700Z\\shareholder_wealth_high.npy": "b5d1a2702e98985b8550752486f0e0a86aefd6dc686a7988c1ebf83175d5fe4b",
+      "C:\\quant-data\\b3\\processed\\v2_data_store_2d59b9d_20260913T211700Z\\shareholder_wealth_low.npy": "e82077f128ee0e40cf9fd5456818e8c372ba4b4ddcbebba9806351a7dceb7ef1",
+      "C:\\quant-data\\b3\\processed\\v2_data_store_2d59b9d_20260913T211700Z\\shareholder_wealth_open.npy": "138a55e1df4240b2317bae04ecc2789d017537f128235cfb31c3eafeaa7cd9eb",
+      "C:\\quant-data\\b3\\processed\\v2_data_store_2d59b9d_20260913T211700Z\\shareholder_wealth_valid.npy": "0e67ee1f891139c251058adc45e0887fdd144ba26fbba5f7a52b0ac6a7a1f7ae",
+      "C:\\quant-data\\b3\\processed\\v2_data_store_2d59b9d_20260913T211700Z\\sidecar_cross_market_age_sessions.npy": "3bb44c03adf73ff89f4ecbdc92710fe87bbae182f73f359082958a0fa8d4759d",
+      "C:\\quant-data\\b3\\processed\\v2_data_store_2d59b9d_20260913T211700Z\\sidecar_cross_market_valid.npy": "506f260e76d4f8afdab221c2201798079a396adef4aa62eaebf3f6208a073f07",
+      "C:\\quant-data\\b3\\processed\\v2_data_store_2d59b9d_20260913T211700Z\\sidecar_cross_market_values.npy": "b4be89655efa67dbd440545bcb5e83e16ff788cb07b829c95d2c851ae3f6e1b2",
+      "C:\\quant-data\\b3\\processed\\v2_data_store_2d59b9d_20260913T211700Z\\sidecar_events_age_sessions.npy": "1bbc1529614513d965814a67bcf0ebb12ddfaa0a67668d25b0272fa7932852e4",
+      "C:\\quant-data\\b3\\processed\\v2_data_store_2d59b9d_20260913T211700Z\\sidecar_events_valid.npy": "5115e984c59908b0466ea077c7262f881beacc59d73b45fb3495fe7ff1f98934",
+      "C:\\quant-data\\b3\\processed\\v2_data_store_2d59b9d_20260913T211700Z\\sidecar_events_values.npy": "33598bb61d1d547cfded637bdb1e1e6a546cdcaff9ba0e47739a91972471d5c1",
+      "C:\\quant-data\\b3\\processed\\v2_data_store_2d59b9d_20260913T211700Z\\sidecar_fundamentals_age_sessions.npy": "01fbb2305fd651f362310a433b0f35610e34d5c4cb75130130aa6c97383905d2",
+      "C:\\quant-data\\b3\\processed\\v2_data_store_2d59b9d_20260913T211700Z\\sidecar_fundamentals_valid.npy": "57a2423cf645e4e24cfa21686abf0b339fde676373a21b46476afd0fd90270ca",
+      "C:\\quant-data\\b3\\processed\\v2_data_store_2d59b9d_20260913T211700Z\\sidecar_fundamentals_values.npy": "0f0c5be07b7c7fa31e54758565e91aa19493007c2e06da53d691aa413824c44e",
+      "C:\\quant-data\\b3\\processed\\v2_data_store_2d59b9d_20260913T211700Z\\sidecar_lending_age_sessions.npy": "d219f97a662472c05ee8d26906b02c2b59be0639fc91468c0518d249791f9754",
+      "C:\\quant-data\\b3\\processed\\v2_data_store_2d59b9d_20260913T211700Z\\sidecar_lending_valid.npy": "f854f7401217cc0e26cb3d304701240e5e72121ae57625d5ffe3fa8b72cbabe7",
+      "C:\\quant-data\\b3\\processed\\v2_data_store_2d59b9d_20260913T211700Z\\sidecar_lending_values.npy": "3032dc8c4330c5d981ea8cd31d4e99bc449d481abdde7a8807b04cd59cea0c20",
+      "C:\\quant-data\\b3\\processed\\v2_data_store_2d59b9d_20260913T211700Z\\sidecar_magnitudes_age_sessions.npy": "8311cafb6d662d360094d7c520b01abb7df7cddf29685e105657504401a48867",
+      "C:\\quant-data\\b3\\processed\\v2_data_store_2d59b9d_20260913T211700Z\\sidecar_magnitudes_valid.npy": "ee4802bd9105566180c30a17a80943dcabf7ea6b64509734febe8fab90c2072c",
+      "C:\\quant-data\\b3\\processed\\v2_data_store_2d59b9d_20260913T211700Z\\sidecar_magnitudes_values.npy": "1382f20fd60b32e6b4bd643c93265b178030c77991a3c566ee20c3f820e1f0b0",
+      "C:\\quant-data\\b3\\processed\\v2_data_store_2d59b9d_20260913T211700Z\\sidecar_microstructure_age_sessions.npy": "0d168e38584a38834d676ccc7fd85b05b3419909e86a77c161a587860e6452eb",
+      "C:\\quant-data\\b3\\processed\\v2_data_store_2d59b9d_20260913T211700Z\\sidecar_microstructure_valid.npy": "6d128525a16269e6e718ff6b1b92d5f2ead4142da7c6fff1866b38f52365e87d",
+      "C:\\quant-data\\b3\\processed\\v2_data_store_2d59b9d_20260913T211700Z\\sidecar_microstructure_values.npy": "db9739ddab9720d6a86f9c4e84cd938afac70cc666c36213c474654478a8223e",
+      "C:\\quant-data\\b3\\processed\\v2_data_store_2d59b9d_20260913T211700Z\\sidecar_oddlot_age_sessions.npy": "b0db5b12916ee3f238ddd4b2baea588f3b190410d6dcb6f124142ef655c89d35",
+      "C:\\quant-data\\b3\\processed\\v2_data_store_2d59b9d_20260913T211700Z\\sidecar_oddlot_valid.npy": "7a106829d5bf3d7514740ac5791ad7bdeee1e06bb6284e761b8ee26c083524c2",
+      "C:\\quant-data\\b3\\processed\\v2_data_store_2d59b9d_20260913T211700Z\\sidecar_oddlot_values.npy": "62aebd78d046694f4256b63e643fa10288c2b4c838bd5b70e5e726aab4922eae",
+      "C:\\quant-data\\b3\\processed\\v2_data_store_2d59b9d_20260913T211700Z\\sidecar_options_age_sessions.npy": "14b2db5ba1c91fa37aea6d930f5cc5e297e755823a4cf3f6224618b0c216ba3f",
+      "C:\\quant-data\\b3\\processed\\v2_data_store_2d59b9d_20260913T211700Z\\sidecar_options_valid.npy": "d9590ce0679dcc0d9043a5eb4f2c7fe768d13f6cffae600dae9f9e751c77cce9",
+      "C:\\quant-data\\b3\\processed\\v2_data_store_2d59b9d_20260913T211700Z\\sidecar_options_values.npy": "51187a5ebc1b86c0bf1edcddf87d1a9df301c24bb5a06346beeb65f09861b8a5",
+      "C:\\quant-data\\b3\\processed\\v2_data_store_2d59b9d_20260913T211700Z\\sidecar_rebalance_age_sessions.npy": "34979d435d12c1523915c83644203db6bf31427cf0c6371fe2566b323bf3cf0c",
+      "C:\\quant-data\\b3\\processed\\v2_data_store_2d59b9d_20260913T211700Z\\sidecar_rebalance_valid.npy": "81f31846c8de0ce2f7cc10ff50dd44f5ee6e90af4b0583daad6968a8acd24cd8",
+      "C:\\quant-data\\b3\\processed\\v2_data_store_2d59b9d_20260913T211700Z\\sidecar_rebalance_values.npy": "b501e96d2086bde8bacefff3e3b7135798b3ad61a25e10191c124710dd016cb6",
+      "C:\\quant-data\\b3\\processed\\v2_data_store_2d59b9d_20260913T211700Z\\sidecar_sector_age_sessions.npy": "800291b07aa39563b7776a69e5fca7aea3a11ffd8411078b3294d274e2fe4912",
+      "C:\\quant-data\\b3\\processed\\v2_data_store_2d59b9d_20260913T211700Z\\sidecar_sector_valid.npy": "7e25e289742b70848cdd38a0610416576d1baa45f1cd0ad1c4b9b9f9f572d8f8",
+      "C:\\quant-data\\b3\\processed\\v2_data_store_2d59b9d_20260913T211700Z\\sidecar_sector_values.npy": "527e1575d8b2c7688ba893fac53a9acc4a2bb30db0ccc7fd6ae4f32206f64bac",
+      "C:\\quant-data\\b3\\processed\\v2_data_store_2d59b9d_20260913T211700Z\\slow_age_sessions.npy": "0dea866c838f5a04691d947773b59ca00f5078cb275d58258af18544562e91f4",
+      "C:\\quant-data\\b3\\processed\\v2_data_store_2d59b9d_20260913T211700Z\\slow_timestep_valid.npy": "b5d2494a4c34affae305c908bb2227173cc27eb83fa201bd22ac30348471c290",
+      "C:\\quant-data\\b3\\processed\\v2_data_store_2d59b9d_20260913T211700Z\\slow_valid.npy": "4f1c8a826a3685b389dde5f0d98ba4fd0454f32e5cc63369a9e69e7f2d35fda6",
+      "C:\\quant-data\\b3\\processed\\v2_data_store_2d59b9d_20260913T211700Z\\slow_values.npy": "b1d38b8a37ed75fffbef68c924e3e43a3fc26978daf17fccff5575df8425d22b",
+      "C:\\quant-data\\b3\\processed\\v2_data_store_2d59b9d_20260913T211700Z\\source_session_complete.npy": "c510b71ee5da69b23ec1481fb1bb1086a3e101de91e5b28dbbdd8ca1a36a9d1f",
+      "C:\\quant-data\\b3\\processed\\v2_data_store_2d59b9d_20260913T211700Z\\target_normalized_cross_section_valid.npy": "60d452c2d6c541aaadb94470b67251f8894bfe18eea7b00304900840c31cd7cf",
+      "C:\\quant-data\\b3\\processed\\v2_data_store_2d59b9d_20260913T211700Z\\target_normalized_residual.npy": "a924a51473d83525ffe31e14ea9d0c23aee776577533fdcce052f282dcf4ee0e",
+      "C:\\quant-data\\b3\\processed\\v2_data_store_2d59b9d_20260913T211700Z\\target_price_midrank.npy": "5c8b5026c86e521d9db96de8f3b0607e526b763d4225531c23d0ea2c6f18efb7",
+      "C:\\quant-data\\b3\\processed\\v2_data_store_2d59b9d_20260913T211700Z\\target_price_simple_return.npy": "b66d3138f313ecf65a9fdcca1f9b0439f573ec8342ffee8accb3ae1c5ae68748",
+      "C:\\quant-data\\b3\\processed\\v2_data_store_2d59b9d_20260913T211700Z\\target_price_valid.npy": "d87862b3ebc0854f3cd562d81258fd31caf1e51c59ad45f875cdcf4f8ec3be33",
+      "C:\\quant-data\\b3\\processed\\v2_data_store_2d59b9d_20260913T211700Z\\target_primary.npy": "8a06223f9f91f0fd7e16dbe1cc2c12f5097f9f9a574de9c04a38ad39ce949acb",
+      "C:\\quant-data\\b3\\processed\\v2_data_store_2d59b9d_20260913T211700Z\\target_scale_sigma.npy": "9b84f6ea226bfe4b52aa20ab5433a34f84263b80a5f5455cd7cdaaf34448efe2",
+      "C:\\quant-data\\b3\\processed\\v2_data_store_2d59b9d_20260913T211700Z\\target_shareholder_midrank.npy": "e2a9184eb99bf6d526e13d5b79148bf594eea5e6858b519948c52b2b01b96101",
+      "C:\\quant-data\\b3\\processed\\v2_data_store_2d59b9d_20260913T211700Z\\target_shareholder_simple_return.npy": "bf1409bccefa0f129310086d43dbd8a3b6b34088482e47d0a041ad862b663d49",
+      "C:\\quant-data\\b3\\processed\\v2_data_store_2d59b9d_20260913T211700Z\\target_shareholder_valid.npy": "d87862b3ebc0854f3cd562d81258fd31caf1e51c59ad45f875cdcf4f8ec3be33",
+      "C:\\quant-data\\b3\\processed\\v2_data_store_2d59b9d_20260913T211700Z\\target_terminal_loss.npy": "8879939910ebd7a5817d782c35cc9d0b7d99fbf081798c4bbab77d5c13377036",
+      "C:\\quant-data\\b3\\processed\\v2_data_store_2d59b9d_20260913T211700Z\\target_terminal_wealth.npy": "1d1866d5adc708b1e81e7c1ade3cd2dcc6b0beb229d8db52f283a3df797447dd",
+      "C:\\quant-data\\b3\\processed\\v2_data_store_2d59b9d_20260913T211700Z\\target_to_close.npy": "77aee7623f876e72ec11f2d8c643d3b22cf2799c991a3dd725543bbedab4320f",
+      "C:\\quant-data\\b3\\processed\\v2_data_store_2d59b9d_20260913T211700Z\\target_to_close_normalized_residual.npy": "b79f044021b3e6e613876635cd8679cd1090c418cf455cb011f7384ca16124ee",
+      "C:\\quant-data\\b3\\processed\\v2_data_store_2d59b9d_20260913T211700Z\\target_to_close_raw_log_return.npy": "716294dca601b3e5e02a0560f7943fa895ce51c149556642a51fc82c662e4729",
+      "C:\\quant-data\\b3\\processed\\v2_data_store_2d59b9d_20260913T211700Z\\target_to_close_valid.npy": "00cdefc0d6ca92cded88f3b9656146c608d661fccecf4c25df6a0ac0779be68e",
+      "C:\\quant-data\\b3\\processed\\v2_data_store_2d59b9d_20260913T211700Z\\target_valid.npy": "4980785493985c78054fbac4c62dd5911d46cc134001e4bbe64c800cd6c8f5c4",
+      "C:\\quant-data\\b3\\processed\\v2_data_store_2d59b9d_20260913T211700Z\\trade_count.npy": "9fdb391fe58d31886aaa08875a5ae2ee9386a43ac61596775c50a902f0d16581",
+      "C:\\quant-data\\b3\\processed\\v2_data_store_2d59b9d_20260913T211700Z\\trade_observed.npy": "1d1f277649264bd63edbc54d88507b5257a690fcc053c8899e9e1018f461dace",
+      "C:\\quant-data\\b3\\processed\\v2_data_store_2d59b9d_20260913T211700Z\\volume_brl.npy": "dc74f9a85da48f58a934a1785ccb274e17bb945e34ebbe05a8135146e6a1140d"
+    },
+    "files_verified": 126,
+    "filesystem_compression": "NTFS lossless; every accepted array hash unchanged",
+    "forward_capture": false,
+    "heldout_accessed": false,
+    "passed": true,
+    "store_end": "2024-12-30"
+  },
+  "checks": [
+    {
+      "active_names": [
+        112,
+        115,
+        114,
+        117,
+        115,
+        120,
+        128,
+        120,
+        131,
+        116,
+        126,
+        136,
+        134,
+        130,
+        140,
+        143
+      ],
+      "arm": "TE_all",
+      "cache_exact": true,
+      "cases": {
+        "compiled": {
+          "loss_and_sam_gap": [
+            [
+              1.0612311363220215,
+              -0.0031256675720214844
+            ],
+            [
+              1.0553196668624878,
+              -0.0032645463943481445
+            ],
+            [
+              1.049572467803955,
+              -0.0032500028610229492
+            ],
+            [
+              1.044053077697754,
+              -0.0031239986419677734
+            ]
+          ],
+          "peak_cuda_bytes": 948421632,
+          "scale_retries": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "seconds": [
+            28.699747099992237,
+            0.1167628999974113,
+            0.11270919999515172,
+            0.11585339999874122
+          ]
+        },
+        "eager": {
+          "loss_and_sam_gap": [
+            [
+              1.0611730813980103,
+              -0.0031255483627319336
+            ],
+            [
+              1.0556137561798096,
+              -0.0032998323440551758
+            ],
+            [
+              1.0495529174804688,
+              -0.0032500028610229492
+            ],
+            [
+              1.043961524963379,
+              -0.00307619571685791
+            ]
+          ],
+          "peak_cuda_bytes": 966285824,
+          "scale_retries": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "seconds": [
+            0.2695893000054639,
+            0.22262650000629947,
+            0.21143310000479687,
+            0.21748449999722652
+          ]
+        }
+      },
+      "dates": [
+        1618,
+        1645,
+        1672,
+        1699,
+        1726,
+        1754,
+        1781,
+        1808,
+        1835,
+        1862,
+        1890,
+        1917,
+        1944,
+        1971,
+        1998,
+        2026
+      ],
+      "fit_dates": 409,
+      "fold": "F2",
+      "fp16_error_over_fp32_std": 0.00043862900929525495,
+      "gpu": "NVIDIA GeForce RTX 2060",
+      "heldout_accessed": false,
+      "lookback": 60,
+      "padded_names": 144,
+      "parent_sha256": "51aec0c1f97c2ecec6ca39886dd965e3128799cb2302397e604f0cd6d49ff870",
+      "passed": true,
+      "store_manifest_sha256": "61149d43a23fc55fcd92b43aaa4e74d747fbdf62f852bedbbbdb2cf18281f3cc",
+      "torch": "2.6.0+cu126"
+    },
+    {
+      "active_names": [
+        112,
+        113,
+        118,
+        139,
+        138,
+        148,
+        152,
+        173,
+        182,
+        199,
+        230,
+        226,
+        206,
+        194,
+        202,
+        191
+      ],
+      "arm": "TE_all",
+      "cache_exact": true,
+      "cases": {
+        "compiled": {
+          "loss_and_sam_gap": [
+            [
+              1.0328305959701538,
+              0.002210259437561035
+            ],
+            [
+              1.0278761386871338,
+              0.001867055892944336
+            ],
+            [
+              1.0232524871826172,
+              0.0017300844192504883
+            ],
+            [
+              1.0190342664718628,
+              0.001572728157043457
+            ]
+          ],
+          "peak_cuda_bytes": 1509988352,
+          "scale_retries": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "seconds": [
+            70.13354749999417,
+            0.1798080000007758,
+            0.17598440000438131,
+            0.17072660000121687
+          ]
+        },
+        "eager": {
+          "loss_and_sam_gap": [
+            [
+              1.0329509973526,
+              0.0021556615829467773
+            ],
+            [
+              1.0277142524719238,
+              0.0019028186798095703
+            ],
+            [
+              1.0232720375061035,
+              0.0017403364181518555
+            ],
+            [
+              1.019271731376648,
+              0.0015895366668701172
+            ]
+          ],
+          "peak_cuda_bytes": 1544997888,
+          "scale_retries": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "seconds": [
+            0.5832540999981575,
+            0.31686330000229646,
+            0.32651699999405537,
+            0.3092515000025742
+          ]
+        }
+      },
+      "dates": [
+        1618,
+        1744,
+        1870,
+        1997,
+        2123,
+        2250,
+        2376,
+        2502,
+        2629,
+        2755,
+        2882,
+        3008,
+        3134,
+        3261,
+        3387,
+        3514
+      ],
+      "fit_dates": 1897,
+      "fold": "F14",
+      "fp16_error_over_fp32_std": 0.0004497281042858958,
+      "gpu": "NVIDIA GeForce RTX 2060",
+      "heldout_accessed": false,
+      "lookback": 60,
+      "padded_names": 256,
+      "parent_sha256": "51aec0c1f97c2ecec6ca39886dd965e3128799cb2302397e604f0cd6d49ff870",
+      "passed": true,
+      "store_manifest_sha256": "61149d43a23fc55fcd92b43aaa4e74d747fbdf62f852bedbbbdb2cf18281f3cc",
+      "torch": "2.6.0+cu126"
+    },
+    {
+      "active_names": [
+        112,
+        115,
+        114,
+        117,
+        115,
+        120,
+        128,
+        120,
+        131,
+        116,
+        126,
+        136,
+        134,
+        130,
+        140,
+        143
+      ],
+      "arm": "C6",
+      "cache_exact": true,
+      "cases": {
+        "compiled": {
+          "loss_and_sam_gap": [
+            [
+              1.0671428442001343,
+              0.018970251083374023
+            ],
+            [
+              1.0652145147323608,
+              0.01888751983642578
+            ],
+            [
+              1.063455581665039,
+              0.01891958713531494
+            ],
+            [
+              1.0619914531707764,
+              0.018911004066467285
+            ]
+          ],
+          "peak_cuda_bytes": 1002801152,
+          "scale_retries": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "seconds": [
+            43.39404529999592,
+            0.14046150000649504,
+            0.12975839999853633,
+            0.14148210000712425
+          ]
+        },
+        "eager": {
+          "loss_and_sam_gap": [
+            [
+              1.0671011209487915,
+              0.01894080638885498
+            ],
+            [
+              1.06560218334198,
+              0.018930435180664062
+            ],
+            [
+              1.06375253200531,
+              0.018924474716186523
+            ],
+            [
+              1.0618425607681274,
+              0.018867135047912598
+            ]
+          ],
+          "peak_cuda_bytes": 1002275328,
+          "scale_retries": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "seconds": [
+            0.1607269000087399,
+            0.14903110000886954,
+            0.15266049999627285,
+            0.15361419999680948
+          ]
+        }
+      },
+      "dates": [
+        1618,
+        1645,
+        1672,
+        1699,
+        1726,
+        1754,
+        1781,
+        1808,
+        1835,
+        1862,
+        1890,
+        1917,
+        1944,
+        1971,
+        1998,
+        2026
+      ],
+      "fit_dates": 409,
+      "fold": "F2",
+      "fp16_error_over_fp32_std": 0.0003570574626792222,
+      "gpu": "NVIDIA GeForce RTX 2060",
+      "heldout_accessed": false,
+      "lookback": 60,
+      "padded_names": 144,
+      "parent_sha256": "7a0784e35d0c843033053582bab37f21ef7e73c3938dba19eac11a61e595afa3",
+      "passed": true,
+      "store_manifest_sha256": "61149d43a23fc55fcd92b43aaa4e74d747fbdf62f852bedbbbdb2cf18281f3cc",
+      "torch": "2.6.0+cu126"
+    },
+    {
+      "active_names": [
+        112,
+        113,
+        118,
+        139,
+        138,
+        148,
+        152,
+        173,
+        182,
+        199,
+        230,
+        226,
+        206,
+        194,
+        202,
+        191
+      ],
+      "arm": "C6",
+      "cache_exact": true,
+      "cases": {
+        "compiled": {
+          "loss_and_sam_gap": [
+            [
+              1.040359377861023,
+              0.01677095890045166
+            ],
+            [
+              1.0394184589385986,
+              0.016486763954162598
+            ],
+            [
+              1.0378925800323486,
+              0.016210436820983887
+            ],
+            [
+              1.0371034145355225,
+              0.015771031379699707
+            ]
+          ],
+          "peak_cuda_bytes": 1725233664,
+          "scale_retries": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "seconds": [
+            127.4314546000096,
+            0.16852340000332333,
+            0.1841409000044223,
+            0.18488909999723546
+          ]
+        },
+        "eager": {
+          "loss_and_sam_gap": [
+            [
+              1.0406460762023926,
+              0.01674032211303711
+            ],
+            [
+              1.0392500162124634,
+              0.016530156135559082
+            ],
+            [
+              1.0384018421173096,
+              0.016163229942321777
+            ],
+            [
+              1.0370925664901733,
+              0.01592564582824707
+            ]
+          ],
+          "peak_cuda_bytes": 1725232128,
+          "scale_retries": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "seconds": [
+            0.4528591999987839,
+            0.22655730000406038,
+            0.21823880000738427,
+            0.22984070000529755
+          ]
+        }
+      },
+      "dates": [
+        1618,
+        1744,
+        1870,
+        1997,
+        2123,
+        2250,
+        2376,
+        2502,
+        2629,
+        2755,
+        2882,
+        3008,
+        3134,
+        3261,
+        3387,
+        3514
+      ],
+      "fit_dates": 1897,
+      "fold": "F14",
+      "fp16_error_over_fp32_std": 0.00034567175316624343,
+      "gpu": "NVIDIA GeForce RTX 2060",
+      "heldout_accessed": false,
+      "lookback": 60,
+      "padded_names": 256,
+      "parent_sha256": "7a0784e35d0c843033053582bab37f21ef7e73c3938dba19eac11a61e595afa3",
+      "passed": true,
+      "store_manifest_sha256": "61149d43a23fc55fcd92b43aaa4e74d747fbdf62f852bedbbbdb2cf18281f3cc",
+      "torch": "2.6.0+cu126"
+    }
+  ],
+  "tests": "23 targeted tests passed",
+  "scope": "fit-only engineering; no financial scores",
+  "source_hashes": {
+    "training_diagnostics.py": "ea2ccbfff0be87926cfa82ad0147fe27ceff041b62738d28c6b981569df3ddfa",
+    "train.py": "ca856ff2e17a8c887bc5ccc3ca09f130f06b4de8c2ff9a681d0cade9844f2d82",
+    "round7_training.py": "0a765f70c09594a2dbce09fd7d81bb04919478a91440dbb0871393b009538ec6",
+    "round7_score.py": "639027cabdbf1073b3dfdfcf92eebcdc312d39d596ec01fc2d4e708c2599c235",
+    "local_gpu_engineering.py": "dbdf666006b6471202a4038e1d0ac77ce7d65b27cd4dc0700a482959a55f6d88"
+  }
+}

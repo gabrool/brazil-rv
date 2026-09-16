@@ -94,6 +94,104 @@ def test_daily_selection_readout_matches_standing_common_population():
     assert actual == pytest.approx(expected)
 
 
+def test_factorized_history_cache_preserves_every_tensor_and_security():
+    from brazil_rv.v2.round7_training import DateTensorCache, model_batch
+
+    rng = np.random.default_rng(82)
+    dates, security_count, steps = np.array([60, 62, 66]), 5, 60
+    names = np.array([[0, 2, -1], [1, 2, 4], [0, 1, -1]])
+    values = rng.normal(size=(67, 5, 4)).astype(np.float32)
+    valid = rng.random(values.shape) > 0.2
+    age = np.where(valid, 0, -1).astype(np.float32)
+    cpu = {
+        "date_index": torch.from_numpy(dates),
+        "name_index": torch.from_numpy(names),
+        "active_mask": torch.from_numpy(names >= 0),
+        "targets": torch.randn(3, 3, 5),
+        "target_mask": torch.ones(3, 3, 5, dtype=torch.bool),
+    }
+    history = dates[:, None] - np.arange(steps - 1, -1, -1)
+    for key, source in (
+        ("slow_features", np.where(valid, values, 0)),
+        ("slow_feature_mask", valid),
+        ("slow_feature_age_sessions", age),
+        ("slow_history_mask", valid.any(-1)),
+    ):
+        window = source[history[:, None, :], names.clip(min=0)[..., None]]
+        window[names < 0] = 0
+        cpu[key] = torch.from_numpy(window)
+    chunks = [{k: v[a:b] for k, v in cpu.items()} for a, b in ((0, 2), (2, 3))]
+    cache = DateTensorCache(chunks, dates, security_count, torch.device("cpu"))
+    order = [2, 0, 1]
+    actual = cache.gather(order)
+    for key, value in model_batch(cpu, torch.device("cpu")).items():
+        torch.testing.assert_close(actual[key], value[order], rtol=0, atol=0)
+    assert actual["date_index"].tolist() == dates[order].tolist()
+
+
+@pytest.mark.parametrize("adaptive", [False, True])
+def test_scaled_sam_preserves_update_and_retries_without_skipping(adaptive):
+    torch.manual_seed(90)
+    plain = nn.Sequential(nn.Linear(4, 8), nn.Dropout(0.2), nn.Linear(8, 2))
+    scaled = copy.deepcopy(plain)
+    x, y = torch.randn(12, 4), torch.randn(12, 2)
+    a, b = recipe_optimizer(plain, cuda=False), recipe_optimizer(scaled, cuda=False)
+    torch.manual_seed(65)
+    optimizer_step(
+        plain, a, lambda: (plain(x) - y).square().mean(), 0.2, adaptive=adaptive
+    )
+    torch.manual_seed(65)
+    diagnostic = {}
+    optimizer_step(
+        scaled,
+        b,
+        lambda: (scaled(x) - y).square().mean(),
+        0.2,
+        adaptive=adaptive,
+        scaler=torch.amp.GradScaler("cpu", init_scale=256),
+        diagnostics=diagnostic,
+    )
+    for p, q in zip(plain.parameters(), scaled.parameters(), strict=True):
+        torch.testing.assert_close(p, q, atol=1e-7, rtol=1e-6)
+    assert diagnostic["loss_scale_retries"] == 0
+
+
+def test_scaled_sam_replays_overflow_with_same_dropout_and_one_update():
+    torch.manual_seed(71)
+    reference = nn.Sequential(nn.Linear(4, 8), nn.Dropout(0.3), nn.Linear(8, 2))
+    retry = copy.deepcopy(reference)
+    x = torch.randn(7, 4)
+    a, b = recipe_optimizer(reference, cuda=False), recipe_optimizer(retry, cuda=False)
+    torch.manual_seed(26)
+    optimizer_step(
+        reference, a, lambda: reference(x).square().mean(), 0.2, adaptive=True
+    )
+    attempts = 0
+
+    def transient_overflow(gradient):
+        nonlocal attempts
+        attempts += 1
+        return torch.full_like(gradient, float("inf")) if attempts == 1 else gradient
+
+    handle = retry[0].weight.register_hook(transient_overflow)
+    torch.manual_seed(26)
+    diagnostic = {}
+    optimizer_step(
+        retry,
+        b,
+        lambda: retry(x).square().mean(),
+        0.2,
+        adaptive=True,
+        scaler=torch.amp.GradScaler("cpu", init_scale=256),
+        diagnostics=diagnostic,
+    )
+    handle.remove()
+    assert diagnostic["loss_scale_retries"] == 1
+    for p, q in zip(reference.parameters(), retry.parameters(), strict=True):
+        torch.testing.assert_close(p, q, atol=1e-7, rtol=1e-6)
+    assert all(state["step"] == 1 for state in b.state.values())
+
+
 def test_three_head_export_never_fabricates_short_horizon_predictions():
     from brazil_rv.v2.round7_score import canonical_head_panel
 

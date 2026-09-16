@@ -19,7 +19,13 @@ from .contract import HORIZONS, SCORE_ARTIFACT_SCHEMA
 from .data import V2DailyDataset, restore_name_axis, stage_name_count
 from .model import DailyMultiHorizonModel
 from .round7_preprocessing import Round7Preprocessing
-from .round7_training import CHECKPOINT_SCHEMA, forward, model_batch, sequential_batches
+from .round7_training import (
+    CHECKPOINT_SCHEMA,
+    autocast_dtype,
+    forward,
+    model_batch,
+    sequential_batches,
+)
 from .score import _array_record, parent_prelude_indices, verify_reused_inference_source
 from .train import _cli_stage_indices, compile_forward
 
@@ -145,7 +151,7 @@ def score(
                 batch = model_batch(cpu, device)
                 with torch.autocast(
                     device_type=device.type,
-                    dtype=torch.bfloat16,
+                    dtype=autocast_dtype(device),
                     enabled=device.type == "cuda",
                 ):
                     prediction = forward(
@@ -240,7 +246,9 @@ def score(
                     "members": config.members if characteristic else 1,
                     "member_aggregation": "mean raw prediction",
                     "device_type": device.type,
-                    "bf16_autocast": device.type == "cuda",
+                    "autocast_dtype": str(autocast_dtype(device))
+                    if device.type == "cuda"
+                    else None,
                     "compiled": compiled,
                     "preprocessing": "checkpoint fit-only statistics",
                 },

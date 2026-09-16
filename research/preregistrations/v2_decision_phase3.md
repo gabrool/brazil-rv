@@ -113,3 +113,42 @@ Keep the original normalized rank coordinates when blending, without re-ranking
 the convex combination. The rank ensemble averages the three seed midranks;
 the economic head ensemble averages predictions in daily-return units. Freeze
 the four screen weights/mappings on sealed old OOS forecasts before new GPU fits.
+
+## Authorized local RTX 2060 execution amendment (2026-09-16)
+
+The user authorized optimizing and running the remaining experiment on their
+6 GiB RTX 2060. This supersedes the operational GPU deferral above. The complete
+48-fit roster, original parents, repaired store, economic targets, 60-session
+history, all eligible identities, unique-date effective batches, loss, SAM/ASAM
+radii, schedule, stopping, selector and financial gates remain unchanged.
+
+Use FP16 autocast with FP32 master weights, optimizer moments and losses on
+Turing. Scale and unscale both SAM passes before computing the perturbation or
+clipping. A scale overflow retries the same batch and dropout realization with
+a smaller scale; it never skips an update or advances the learning schedule.
+Persist scaling state for exact interruption/resumption. Both objectives use
+the same runtime and precision. Original P parameters load unchanged in FP32.
+
+Windows uses the supported PyTorch 2.6.0/cu126 and Triton-Windows 3.2.0.post21
+pair; the GH200 environment retains PyTorch 2.13.0. Native Turing compilation
+uses the default Inductor mode with fused forward/backward/loss. Exhaustive
+reduction autotuning is excluded after a discarded fit-only probe spent several
+minutes tuning its first backward. Use a short compiler-cache path to avoid
+Windows path-length failures. No compiler failure silently falls back to eager.
+
+Factor the canonical materialized histories by session and permanent security
+identity. Store each history observation once, without quantization, and gather
+the exact original full window for every sample. Decision snapshots and labels
+retain their own date axis. The cache receives only the existing authorized
+collator's tensors; it grants no broader data access. This replaces the expanded
+overlapping-window cache while preserving actual CUDA caching. One persistent
+GPU worker retains import/verified-file caches between independently seeded fits;
+models, optimizers, RNG and compiler graph references reset per fit.
+
+Before financial dispatch require: all input/parent/mapping hashes verified;
+exact canonical cache equality; representative F2/F14 full-population, full-history
+precision and actual two-pass throughput/memory checks; and the original four
+two-epoch matched smoke fits with finite losses, unchanged update/population
+counts and source-bound artifacts. Record first-epoch startup separately.
+Retain full histories, module diagnostics, selected weights and epoch checkpoints.
+Engineering probes consume fitting data only and do not select financial recipes.

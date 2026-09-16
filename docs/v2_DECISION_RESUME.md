@@ -1,6 +1,13 @@
 # Decision program: CPU checkpoint and GPU restart
 
 This document preserves the authorized Phases 1–3 program for a later session.
+**2026-09-16 update: the user authorized local RTX 2060 optimization and execution.**
+The prior CPU-only deferral below is historical. Use
+`ops/run-decision-local.ps1` after the source-bound local engineering and smoke
+acceptance. See `docs/v2_DECISION_LOCAL_GPU.md` for current runtime/state. The
+original dataset, parents, labels, mappings, financial recipe and roster below
+remain authoritative. No Lambda retry or forward capture is needed.
+
 The user's latest instruction is to finish CPU work and defer Lambda while they
 resolve its account/API problem. **Do not retry launch, restore capacity polling,
 or move the full forecasting campaign to local CPU without a later instruction.**

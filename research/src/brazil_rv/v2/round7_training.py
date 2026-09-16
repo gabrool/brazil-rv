@@ -42,6 +42,15 @@ from .train import (
 CHECKPOINT_SCHEMA = "BRAZIL_RV_SELECTED_CHECKPOINT_V1"
 
 
+def autocast_dtype(device):
+    # BF16 emulation is reported as supported on Turing, but has no Tensor Cores.
+    return (
+        torch.float16
+        if device.type == "cuda" and torch.cuda.get_device_capability(device)[0] < 8
+        else torch.bfloat16
+    )
+
+
 @dataclass(frozen=True)
 class TrainingRecipe:
     learning_rate: float = 1e-4
@@ -163,17 +172,47 @@ def sam_perturbations(optimizer, rho, *, adaptive=False, eta=0.01):
 
 
 def optimizer_step(
-    model, optimizer, closure, rho, *, adaptive=False, eta=0.01, diagnostics=None
+    model,
+    optimizer,
+    closure,
+    rho,
+    *,
+    adaptive=False,
+    eta=0.01,
+    diagnostics=None,
+    scaler=None,
 ):
     """Exact-restore SAM/ASAM with reused RNG; None means one-pass AdamW."""
     parameters = [p for p in model.parameters() if p.requires_grad]
     optimizer.zero_grad(set_to_none=True)
     start_rng = _rng_state() if rho is not None else None
-    loss = closure()
-    loss.backward()
-    first_norm = torch.nn.utils.clip_grad_norm_(
-        parameters, float("inf"), error_if_nonfinite=True
-    )
+    retries = 0
+
+    def backward():
+        nonlocal retries
+        rng = _rng_state() if scaler is not None else None
+        while True:
+            value = closure()
+            if scaler is None:
+                value.backward()
+            else:
+                scaler.scale(value).backward()
+                scaler.unscale_(optimizer)
+            norm = torch.nn.utils.clip_grad_norm_(
+                parameters, float("inf"), error_if_nonfinite=scaler is None
+            )
+            if scaler is None or bool(torch.isfinite(norm)):
+                return value, norm
+            # Retry the same observations/dropout at a lower scale. Never skip
+            # an update (which would change the registered sampling/schedule).
+            scaler.update()
+            retries += 1
+            if retries > 16 or not bool(torch.isfinite(value)):
+                raise FloatingPointError("FP16 loss/gradients remain nonfinite")
+            optimizer.zero_grad(set_to_none=True)
+            _restore_rng(rng)
+
+    loss, first_norm = backward()
     if diagnostics is not None:
         diagnostics["clean_gradient_norm"] = float(first_norm)
     if rho is None:
@@ -182,19 +221,26 @@ def optimizer_step(
         )
         if diagnostics is not None:
             diagnostics["descent_gradient_norm"] = float(descent_norm)
-        optimizer.step()
+        if scaler is None:
+            optimizer.step()
+        else:
+            scaler.step(optimizer)
+            scaler.update()
         return float(loss.detach()), 0.0
     used, perturbations, metric_norm = sam_perturbations(
         optimizer, rho, adaptive=adaptive, eta=eta
     )
     originals = [p.detach().clone() for p in used]
+    if scaler is not None:
+        # unscale_ has consumed the clean pass. update resets its per-optimizer
+        # state before the perturbed pass; it does not touch model/optimizer.
+        scaler.update()
     try:
         with torch.no_grad():
             torch._foreach_add_(used, perturbations)
         optimizer.zero_grad(set_to_none=True)
         _restore_rng(start_rng)
-        second = closure()
-        second.backward()
+        second, _ = backward()
     finally:
         with torch.no_grad():
             torch._foreach_copy_(used, originals)
@@ -203,6 +249,7 @@ def optimizer_step(
     )
     if diagnostics is not None:
         diagnostics.update(
+            loss_scale_retries=retries,
             descent_gradient_norm=float(descent_norm),
             metric_gradient_norm=float(metric_norm),
             perturbation_norm=float(
@@ -211,7 +258,11 @@ def optimizer_step(
                 )
             ),
         )
-    optimizer.step()
+    if scaler is None:
+        optimizer.step()
+    else:
+        scaler.step(optimizer)
+        scaler.update()
     return float(loss.detach()), float((second - loss).detach())
 
 
@@ -314,12 +365,13 @@ class TrainingObjective(nn.Module):
         self.head_indices = head_indices
         self.loss_kind = loss_kind
         self.cuda = cuda
+        self.amp_dtype = autocast_dtype(next(model.parameters()).device)
         self.economic_weight = economic_weight
 
     def forward(self, batch):
         with torch.autocast(
             device_type="cuda" if self.cuda else "cpu",
-            dtype=torch.bfloat16,
+            dtype=self.amp_dtype,
             enabled=self.cuda,
         ):
             result = forward(
@@ -359,7 +411,7 @@ def selection_readout(model, loader, device, *, characteristic, model_horizons):
             batch = model_batch(cpu_batch, device)
             with torch.autocast(
                 device_type=device.type,
-                dtype=torch.bfloat16,
+                dtype=autocast_dtype(device),
                 enabled=device.type == "cuda",
             ):
                 scores = (
@@ -394,45 +446,104 @@ def sequential_batches(count, size=16):
 
 
 class DateTensorCache:
-    """Canonical preprocessed dates once, then exact date gathers on the GPU.
+    """Factor overlapping histories by (session, permanent security identity).
 
-    No dtype compression, observation pruning or new transformation. The source
-    loader owns PIT/mask/fit-scaler enforcement; only its materialized model
-    tensors and date identities are retained, scoped to this fit process.
+    Only the canonical collator supplies values. Repeated histories share storage,
+    not observations; gathering restores the original full date/name/60 tensor.
+    Snapshots/labels stay on their decision-date axis. No dtype compression.
     """
 
-    def __init__(self, source, count, device):
+    def __init__(self, source, date_indices, security_count, device):
         start = time.perf_counter()
-        self.tensors = {}
+        count = len(date_indices)
+        self.tensors, self.histories = {}, {}
+        self.dates = torch.as_tensor(np.asarray(date_indices).copy())
+        self.security_count = security_count
         offset = 0
+        materialized_bytes = 0
         for cpu in source:
-            batch = model_batch(cpu, device)
-            batch["date_index"] = cpu["date_index"].to(device)
-            size = len(batch["date_index"])
+            batch = model_batch(cpu, torch.device("cpu"))
+            size = len(cpu["date_index"])
             if not self.tensors:
+                self.lookback = batch["slow_features"].shape[2]
+                self.first = int(min(date_indices)) - self.lookback + 1
+                slots = (int(max(date_indices)) - self.first + 1) * security_count + 1
+                seen = np.zeros(slots, dtype=bool)
+                seen[0] = True  # padded security: zero in every canonical tensor
+                self.names = torch.empty(
+                    (count, cpu["name_index"].shape[1]), dtype=torch.long, device=device
+                )
+                self.endpoints = (self.dates.to(device) - self.first) * security_count
+                self.lags = torch.arange(self.lookback - 1, -1, -1, device=device)
+                self.histories = {
+                    key: torch.zeros(
+                        (slots, *value.shape[3:]), dtype=value.dtype, device=device
+                    )
+                    for key, value in batch.items()
+                    if key.startswith("slow_")
+                }
                 self.tensors = {
                     key: torch.empty(
                         (count, *value.shape[1:]), dtype=value.dtype, device=device
                     )
                     for key, value in batch.items()
+                    if key not in self.histories
                 }
+            names = cpu["name_index"].numpy()
+            steps = cpu["date_index"].numpy()[:, None] - np.arange(
+                self.lookback - 1, -1, -1
+            )
+            keys = (
+                (steps[:, None, :] - self.first) * security_count + names[..., None] + 1
+            )
+            keys = np.where(names[..., None] >= 0, keys, 0).ravel()
+            unique, positions = np.unique(keys, return_index=True)
+            fresh = ~seen[unique]
+            unique, positions = unique[fresh], positions[fresh]
+            seen[unique] = True
+            destination = torch.as_tensor(unique, device=device)
+            self.names[offset : offset + size].copy_(cpu["name_index"].to(device))
             for key, value in batch.items():
-                self.tensors[key][offset : offset + size].copy_(value)
+                materialized_bytes += value.numel() * value.element_size()
+                if key in self.histories:
+                    values = value.reshape(-1, *value.shape[3:])[positions].to(device)
+                    self.histories[key].index_copy_(0, destination, values)
+                else:
+                    self.tensors[key][offset : offset + size].copy_(value.to(device))
             offset += size
         if offset != count:
             raise ValueError(
                 "date cache did not consume the complete permitted population"
             )
-        self.bytes = sum(t.numel() * t.element_size() for t in self.tensors.values())
+        self.bytes = sum(
+            t.numel() * t.element_size()
+            for t in (
+                *self.tensors.values(),
+                *self.histories.values(),
+                self.names,
+                self.endpoints,
+                self.lags,
+            )
+        )
+        self.materialized_bytes = materialized_bytes
         self.seconds = time.perf_counter() - start
 
     def gather(self, positions):
-        index = torch.as_tensor(
-            positions, dtype=torch.long, device=self.tensors["date_index"].device
+        index = torch.as_tensor(positions, dtype=torch.long, device=self.names.device)
+        names = self.names.index_select(0, index)
+        keys = (
+            self.endpoints.index_select(0, index)[:, None, None]
+            - self.lags * self.security_count
+            + names[..., None]
+            + 1
         )
-        return {
+        keys = torch.where(names[..., None] >= 0, keys, 0)
+        result = {
             name: value.index_select(0, index) for name, value in self.tensors.items()
         }
+        result.update({name: value[keys] for name, value in self.histories.items()})
+        result["date_index"] = self.dates[positions]
+        return result
 
     def batches(self, sampler):
         return CachedDateBatches(self, sampler)
@@ -529,6 +640,12 @@ def train(
     )
     selection = V2DailyDataset(store_root, select, purpose="selection", **options)
     device = device or torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    amp_dtype = autocast_dtype(device)
+    scaler = (
+        torch.amp.GradScaler("cuda", init_scale=256.0)
+        if device.type == "cuda" and amp_dtype == torch.float16
+        else None
+    )
     try:
         parent_payload = None
         parent_preprocessing = None
@@ -587,10 +704,12 @@ def train(
         )
         cache_resources = None
         if device.type == "cuda":
-            # GH200 holds the full finite P/F date sets without re-reading and
-            # re-collating each overlapping 60-session history every epoch.
-            training_cache = DateTensorCache(clean_fit_loader, len(training), device)
-            selection_cache = DateTensorCache(selection_loader, len(selection), device)
+            training_cache = DateTensorCache(
+                clean_fit_loader, fit, len(training.store.isins), device
+            )
+            selection_cache = DateTensorCache(
+                selection_loader, select, len(selection.store.isins), device
+            )
             train_loader = training_cache.batches(sampler)
             selection_loader = selection_cache.batches(
                 sequential_batches(len(selection))
@@ -604,6 +723,9 @@ def train(
             )
             cache_resources = {
                 "bytes": training_cache.bytes + selection_cache.bytes,
+                "materialized_bytes": training_cache.materialized_bytes
+                + selection_cache.materialized_bytes,
+                "layout": "session_security_history; exact canonical tensors",
                 "preparation_seconds": training_cache.seconds + selection_cache.seconds,
             }
         diagnostic_batch = model_batch(
@@ -635,6 +757,12 @@ def train(
             },
             "padded_name_count": width,
             "compile": compiled,
+            "runtime": {
+                "torch": str(torch.__version__),
+                "autocast_dtype": str(amp_dtype) if device.type == "cuda" else None,
+                "gradient_scaling": scaler is not None,
+                "cache_layout": "session_security_history",
+            },
             "date_tensor_cache": device.type == "cuda",
             "parent_sha256": parent_sha256,
             "economic_auxiliary": economic_contract,
@@ -727,6 +855,8 @@ def train(
                 raise ValueError("resume differs from the frozen training contract")
             model.load_state_dict(payload["model_state_dict"])
             optimizer.load_state_dict(payload["optimizer_state_dict"])
+            if scaler is not None:
+                scaler.load_state_dict(payload["grad_scaler"])
             history, start_epoch = payload["history"], payload["epoch"] + 1
             best_ic, best_epoch, stale = (
                 payload["best_ic"],
@@ -794,6 +924,7 @@ def train(
                             rho=rho,
                             adaptive=recipe.adaptive,
                             eta=recipe.eta,
+                            amp_dtype=amp_dtype,
                         ),
                     }
                 )
@@ -806,7 +937,7 @@ def train(
             epoch_start = time.perf_counter()
             model.train()
             sampler.set_epoch(epoch)
-            losses, gaps, clipped = [], [], []
+            losses, gaps, clipped, retries = [], [], [], []
             for batch_number, cpu_batch in enumerate(train_loader):
                 lr = recipe.learning_rate * learning_rate_fraction(
                     (epoch - 1) * len(train_loader) + batch_number, total_updates
@@ -825,11 +956,13 @@ def train(
                     adaptive=recipe.adaptive,
                     eta=recipe.eta,
                     diagnostics=step_diagnostics,
+                    scaler=scaler,
                 )
                 train_graphs += _unique_compiled_graphs() - before
                 losses.append(loss)
                 gaps.append(gap)
                 clipped.append(step_diagnostics["descent_gradient_norm"] > 1.0)
+                retries.append(step_diagnostics.get("loss_scale_retries", 0))
             before = _unique_compiled_graphs()
             readout = selection_readout(
                 forward_model,
@@ -864,6 +997,8 @@ def train(
                 "gradient_clip_fraction": float(np.mean(clipped)),
                 "selected": improved,
                 "updates": len(losses),
+                "loss_scale_retries": sum(retries),
+                "loss_scale": scaler.get_scale() if scaler is not None else None,
                 "seconds": time.perf_counter() - epoch_start,
                 "final_learning_rate": lr,
             }
@@ -897,6 +1032,7 @@ def train(
                     **checkpoint,
                     "optimizer_state_dict": optimizer.state_dict(),
                     "best_ic": best_ic,
+                    "grad_scaler": scaler.state_dict() if scaler is not None else None,
                     "best_epoch": best_epoch,
                     "stale": stale,
                     "module_diagnostics": module_diagnostics,

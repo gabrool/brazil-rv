@@ -1039,6 +1039,14 @@ def compile_forward(
     torch._dynamo.config.specialize_float = True
     if backend == "inductor":
         _configure_inductor_compiler()
+        if (
+            mode == "max-autotune"
+            and torch.cuda.is_available()
+            and torch.cuda.get_device_capability()[0] < 8
+        ):
+            # Turing's small GPU uses vendor GEMMs; exhaustive reduction tuning
+            # costs minutes per graph. Default retains compiled fusion/backward.
+            mode = "default"
         # The sparse fast path has a data-dependent present-name count.  CUDA
         # graph capture can reuse a stale dynamic buffer when the whole GRU +
         # sparse TCN graph is composed, even though every compiled subgraph is

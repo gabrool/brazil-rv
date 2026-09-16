@@ -16,9 +16,11 @@ The [Phase 1 report](docs/v2_DECISION_PHASE1.md) supports coherent benchmark
 residuals and the equal-rank control. The [Phase 2 screen](docs/v2_DECISION_PHASE2.md)
 admits no new controller: the MLP fails behavioral admission and neither conditional
 controller passes the financial gate. No Phase 2 confirmation is triggered.
-Phase 3's matched economic auxiliary objective and CPU engineering are prepared;
-GPU acceptance and financial fits are deferred by the user while Lambda access
-is unavailable. No instance was launched. Resume from
+Phase 3's matched economic auxiliary objective and CPU engineering are prepared.
+The user subsequently authorized optimizing and executing the remaining program
+on their local RTX 2060. Follow the local execution amendment in the Phase 3
+registration; preserve the complete matched roster and original input bindings.
+Lambda remains unused. Resume from
 [the saved procedure](docs/v2_DECISION_RESUME.md) and
 [source-bound CPU checkpoint](docs/v2_decision_cpu_checkpoint.json).
 
