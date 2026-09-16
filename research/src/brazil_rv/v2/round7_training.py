@@ -367,6 +367,7 @@ class TrainingObjective(nn.Module):
         self.cuda = cuda
         self.amp_dtype = autocast_dtype(next(model.parameters()).device)
         self.economic_weight = economic_weight
+        self.economic_enabled = bool(economic_weight)
 
     def forward(self, batch):
         with torch.autocast(
@@ -378,9 +379,9 @@ class TrainingObjective(nn.Module):
                 self.model,
                 batch,
                 characteristic=self.characteristic,
-                return_hidden=bool(self.economic_weight),
+                return_hidden=self.economic_enabled,
             )
-            if self.economic_weight:
+            if self.economic_enabled:
                 scores, hidden = result
                 economic = self.model.economic_head(hidden).squeeze(-1).float()
             else:
@@ -392,7 +393,7 @@ class TrainingObjective(nn.Module):
             & batch["active_mask"][..., None],
             kind=self.loss_kind,
         )
-        if self.economic_weight:
+        if self.economic_enabled:
             from .economic_objective import economic_loss
 
             loss = loss + self.economic_weight * economic_loss(
