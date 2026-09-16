@@ -89,3 +89,8 @@ in these probes was at most 1.607 GiB (excluding the subsequently constructed
 full fit caches and desktop use). All precision errors were below .000450 of
 FP32 prediction standard deviation. No overflow retry was needed in these probes.
 Source is now frozen for the four smoke fits. No financial Phase 3 fit yet.
+
+The first actual smoke launch exposed a pre-existing Phase 3 descriptor omission:
+parent records had paths/hashes but lacked the byte count required by the portable
+file resolver. Preparation now records the verified parent file size as well.
+No parent weights changed and the failed launch stopped before creating a fit.

@@ -186,6 +186,9 @@ def prepare(root):
                 )
             else:
                 parents[arm][str(seed)] = {"path": str(source), "sha256": digest}
+    for records in parents.values():
+        for record in records.values():
+            record["bytes"] = Path(record["path"]).stat().st_size
     target = root / "phase3/economic_targets.npz"
     if not target.exists():
         data, binding = load_data(root, "C6")
