@@ -5,10 +5,12 @@ Reference registration: research/preregistrations/v2_decision_research.md.
 
 ## Current state
 
-Phases 1 and 2 are complete. Phase 3 CPU engineering is prepared; GPU acceptance
-and financial fits are deferred at the user's request while Lambda authentication
-is unavailable. No instance was launched. The postmortem section 13 was reread
-after Phase 1 and again after all eight Phase 2 fits and their gate completed.
+Phases 1-3 are complete. The local RTX 2060 finished all 168 Phase 3 financial
+fits and 352 books. Both screen candidates received full confirmation; neither
+passed. No candidate is promoted. The postmortem section 13 was reread at final
+acceptance. See [the combined review](v2_DECISION_PHASES123.md),
+[verified results](v2_decision_phase3_results.json), and
+[recovery](v2_decision_complete_recovery.json).
 
 Canonical pointer: docs/v2_decision_run.json. Run root:
 C:/quant-data/b3/processed/model_runs/v2_decision_60dc9a2_20260914T212110Z.
@@ -76,28 +78,25 @@ even without a Phase 2 winner, as specified by the original plan.
 
 ## Phase 3 acceptance
 
-Prepared: exact objective/parent amendment, three unchanged TE parents, three
-explicit C6 adaptations, sealed economic labels, single-pass auxiliary heads,
-fit-only scaling/masks, matched neutral training, score exports, fixed-policy
-readouts, prior-only blend, gate/confirmation dispatch and continuous inventory
-replay. Four screen mappings are frozen from old OOS fit/selection observations:
-TE weights F2=1, F6=1, F10=0, F14=.25. No new evaluation outcome selected them.
+Complete under the registered local RTX 2060 amendment. The original parents,
+repaired store, labels, histories, full eligible populations and financial gates
+were retained. Four disposable smoke fits passed before the 48-fit screen.
+Both models passed screening, triggering all 120 confirmation fits. Sixteen
+continuous books carry actual inventory across all fourteen new score blocks.
 
-Real fit-only CPU checks retain 60 sessions and all active names, preserve neutral
-initialization exactly, and show auxiliary gradients entering both encoders.
-The earlier 23 objective/model tests, three new readout tests, four inference/
-reuse tests and the continuous fallback regression pass. These are engineering
-checks, not a financial result or GPU performance acceptance.
+TE confirmation: +.086 net bps/day, 95% interval [-.046,+.220], only six positive
+utility folds out of ten (eight required). C6: -.056, interval [-.227,+.117],
+six positive utility folds and a seed reversal below the -.25-bps floor. Neither
+advances. The diagnostic blend is +.106 [-.045,+.259] and remains non-promotional.
 
-Pending: compiled/BF16 GPU numerical and two-epoch throughput acceptance, 48 new
-matched F fits, complete real-score readout, then only gate-triggered ten-fold
-confirmation. Keep the same neutral-IC checkpoint selector within both objectives.
-No Phase 3 financial fit has started. The user's CPU-only steering defers Lambda
-attempts and monitoring; no new capacity automation is active for this program.
+The completion audit passed all 168 fits, 352 books and 5,366 bound artifact
+hashes, exact score axes/eligible masks and development-only access. The CUDA
+allocation failure after 91 confirmation fits and the empty-directory recovery
+stop are preserved; completed fits were verified/reused under unchanged b16732e.
+The final supervisor exited zero at 2026-09-17T04:03:38Z.
 
-The [restart document](v2_DECISION_RESUME.md) records exact paths, commands, roster,
-limitations and recovery/termination requirements. The
-[CPU checkpoint](v2_decision_cpu_checkpoint.json) binds saved local artifacts.
-After the later Phase 3 completion, reread postmortem section 13 again and write
-the combined LLM-ready report. Phase 4, forward capture and held-out reads remain
-outside this task.
+The combined review covers every original phase, attempted/gated branches,
+optimization, measured runtime, financial/forecast diagnostics, settlement
+sensitivity, storage cleanup and interpretation limits. The recovery archive is
+verified member by member. No additional experiment, forward capture, held-out
+consumer read, paid host or deployment was started.

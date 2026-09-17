@@ -1,5 +1,12 @@
 # Phase 3 local GPU execution
 
+**Completed 2026-09-17.** All 168 financial fits and registered readouts are done;
+no candidate passed confirmation. Do not relaunch this campaign. Use the
+[combined review](v2_DECISION_PHASES123.md), [results](v2_decision_phase3_results.json)
+and [verified recovery](v2_decision_complete_recovery.json). The procedures and
+intermediate status statements below are retained as the historical execution
+checkpoint, not current pending work.
+
 The user authorized local RTX 2060 optimization and the remaining Phases 1–3
 experiments on 16 September 2026. Phases 1–2 are complete with no controller
 survivors. Phase 3 requires 48 new F fits, their registered fixed-policy analysis,

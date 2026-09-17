@@ -1,0 +1,11 @@
+{
+  "verified": true,
+  "archive": "D:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\archives\\decision_phases123_complete.tar.gz",
+  "bytes": 10098346087,
+  "sha256": "fdfdac35c3c49cabe727d1562da1951d4732faba6b046b14f15ff5885cfcfd4e",
+  "members": 12036,
+  "inventory": "D:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\archives\\decision_phases123_inventory.json",
+  "inventory_sha256": "10ba74bb5722ddae6304aa4fd3513ea70c243406c0864457704fa29d6d541fe6",
+  "source_logical_bytes": 11649899013,
+  "location": "local D drive; no S3 upload claimed"
+}

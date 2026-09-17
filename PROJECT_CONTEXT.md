@@ -1,6 +1,6 @@
 # Brazil-RV project context
 
-Last verified: 2026-09-14.
+Last verified: 2026-09-17.
 
 The user has authorized **Phases 1–3** of the
 [decision-model postmortem](docs/v2_PORTFOLIO_DECISION_POSTMORTEM.md#13-recommended-next-program-small-questions-in-an-efficient-order):
@@ -16,13 +16,16 @@ The [Phase 1 report](docs/v2_DECISION_PHASE1.md) supports coherent benchmark
 residuals and the equal-rank control. The [Phase 2 screen](docs/v2_DECISION_PHASE2.md)
 admits no new controller: the MLP fails behavioral admission and neither conditional
 controller passes the financial gate. No Phase 2 confirmation is triggered.
-Phase 3's matched economic auxiliary objective and CPU engineering are prepared.
-The user subsequently authorized optimizing and executing the remaining program
-on their local RTX 2060. Follow the local execution amendment in the Phase 3
-registration; preserve the complete matched roster and original input bindings.
-Lambda remains unused. Resume from
-[the saved procedure](docs/v2_DECISION_RESUME.md) and
-[source-bound CPU checkpoint](docs/v2_decision_cpu_checkpoint.json).
+Phase 3 is complete on the local RTX 2060: 48 screen and 120 confirmation fits,
+plus registered continuous accounts. Neither economic-auxiliary candidate passes
+confirmation. TE's paired confirmation net is +.086 bps/day and C6's is -.056;
+both primary intervals include zero. No candidate is promoted. The causal blend
+remains diagnostic, and historical settlement sensitivities remain material.
+See the [combined Phases 1-3 review](docs/v2_DECISION_PHASES123.md),
+[verified results](docs/v2_decision_phase3_results.json) and
+[local recovery record](docs/v2_decision_complete_recovery.json).
+Lambda was unused. All authorized Phases 1-3 work is complete; Phase 4 remains
+outside this authorization.
 
 The [cash-aware portfolio program](research/preregistrations/v2_portfolio_policy.md)
 and its registered rich-attention timing confirmation are complete; see the

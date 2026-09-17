@@ -1,5 +1,12 @@
 # Decision program: CPU checkpoint and GPU restart
 
+**Completed 2026-09-17.** All 168 financial fits and registered readouts are done;
+no candidate passed confirmation. Do not relaunch this campaign. Use the
+[combined review](v2_DECISION_PHASES123.md), [results](v2_decision_phase3_results.json)
+and [verified recovery](v2_decision_complete_recovery.json). The procedures and
+intermediate status statements below are retained as the historical execution
+checkpoint, not current pending work.
+
 This document preserves the authorized Phases 1–3 program for a later session.
 **2026-09-16 update: the user authorized local RTX 2060 optimization and execution.**
 The prior CPU-only deferral below is historical. Use

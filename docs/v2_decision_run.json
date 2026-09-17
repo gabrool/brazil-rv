@@ -3,9 +3,15 @@
   "frozen_design_sha256": "907810f9382ceba1a3d2bcf57cfbf8940160d787b5edd2d4d78f8716ba162580",
   "phase1_status": "complete",
   "phase2_status": "complete_no_survivors",
-  "phase3_status": "cpu_prepared_gpu_deferred",
+  "phase3_status": "complete_confirmation_no_survivors",
   "root": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z",
   "sealed_control_books": 90,
   "source_cache_files_verified": 9,
-  "status": "cpu_complete_gpu_deferred"
+  "status": "complete_no_candidate_promoted",
+  "phase3_financial_fits": 168,
+  "phase3_books": 352,
+  "report": "docs/v2_DECISION_PHASES123.md",
+  "results": "docs/v2_decision_phase3_results.json",
+  "recovery": "docs/v2_decision_complete_recovery.json",
+  "financial_source_commit": "b16732e83a9031571429d2b14c31eeda4bd54d74"
 }
