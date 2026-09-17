@@ -316,16 +316,24 @@ def gradient_scale(model, neural_forward, cache, rows, data):
     ]
     for first in range(0, len(rows), 32):
         positions = np.arange(first, min(first + 32, len(rows)))
+        initial = clone_account(account)
         with torch.set_grad_enabled(first in starts):
             _, pref, ranking = encoded(
                 neural_forward, cache, positions, len(data.inputs.security_ids)
             )
-            utility, account, _, _ = utility_path(data, pref, account, rows[positions])
         if first in starts:
             gradients = []
-            for loss in (ranking, utility):
+            for index in range(2):
+                if index:
+                    _, second, _ = encoded(
+                        neural_forward, cache, positions, len(data.inputs.security_ids)
+                    )
+                    utility, _, _, _ = utility_path(
+                        data, second, initial, rows[positions]
+                    )
+                # Separate forwards preserve Inductor's donated-buffer optimization.
                 g = torch.autograd.grad(
-                    loss, parameters, retain_graph=True, allow_unused=True
+                    ranking if not index else utility, parameters, allow_unused=True
                 )
                 gradients.append(
                     float(
@@ -341,6 +349,10 @@ def gradient_scale(model, neural_forward, cache, rows, data):
                     "utility_gradient": gradients[1],
                     "ratio": gradients[0] / max(gradients[1], 1e-30),
                 }
+            )
+        with torch.no_grad():
+            _, account, _, _ = utility_path(
+                data, pref.detach(), account, rows[positions]
             )
         account.detach()
     if any(
@@ -431,9 +443,21 @@ def epoch(
     }
 
 
-def fit(root, design, data, arm, fold, seed, variant, *, engineering=False):
+def fit(
+    root,
+    design,
+    data,
+    arm,
+    fold,
+    seed,
+    variant,
+    prepared,
+    neural_forward,
+    *,
+    engineering=False,
+):
     set_deterministic_seed(seed)
-    model, caches, axes, view, source = preparation(design, data, arm, fold, seed)
+    model, caches, axes, view, source = prepared
     directory = (
         root
         / ("engineering" if engineering else "fits")
@@ -460,7 +484,6 @@ def fit(root, design, data, arm, fold, seed, variant, *, engineering=False):
             if sha256_file(directory / file) != digest:
                 raise ValueError("completed objective artifact changed")
         return old
-    neural_forward = compile_forward(model)
     optimizer = recipe_optimizer(
         model,
         cuda=True,
@@ -495,7 +518,17 @@ def fit(root, design, data, arm, fold, seed, variant, *, engineering=False):
         # Engineering profiles initial fit gradients only. The financial launch
         # receives no selection/evaluation result from the engineering run.
         t = time.monotonic()
-        scale = gradient_scale(model, neural_forward, caches["fit"], axes["fit"], view)
+        scale_path = root / "calibration" / arm / f"{fold}_seed_{seed}.json"
+        if scale_path.exists():
+            scale = read(scale_path)
+            if scale["parent"] != source["parent"]:
+                raise ValueError("loss-scale warm start changed")
+        else:
+            scale = gradient_scale(
+                model, neural_forward, caches["fit"], axes["fit"], view
+            )
+            scale["parent"] = source["parent"]
+            write_json_atomic(scale_path, scale)
         write_json_atomic(directory / "loss_scale.json", scale)
         if engineering:
             positions = np.arange(min(32, len(axes["fit"])))
@@ -575,6 +608,10 @@ def fit(root, design, data, arm, fold, seed, variant, *, engineering=False):
             model, neural_forward, caches["selection"], axes["selection"], view
         )
         history = [{"epoch": 0, "selection": initial, "seconds": time.monotonic() - t}]
+        save_checkpoint(
+            directory / "initial.pt",
+            {"model": model.state_dict(), "epoch": 0, "contract": contract},
+        )
         for selector in best:
             best[selector] = (initial[selector], 0)
             save_checkpoint(
@@ -654,6 +691,7 @@ def fit(root, design, data, arm, fold, seed, variant, *, engineering=False):
     }
     result["files"]["history.json"] = sha256_file(directory / "history.json")
     result["files"]["loss_scale.json"] = sha256_file(directory / "loss_scale.json")
+    result["files"]["initial.pt"] = sha256_file(directory / "initial.pt")
     write_json_atomic(complete, result)
     return result
 
@@ -677,13 +715,21 @@ def run(root, *, engineering=False, confirmation=False):
         data, _ = load_data(Path(design["decision_root"]), arm)
         for fold in ("F2", "F14") if engineering else folds:
             for seed in (11,) if engineering else ALLOWED_SEEDS:
+                torch._dynamo.reset()
+                torch.cuda.reset_peak_memory_stats()
+                set_deterministic_seed(seed)
+                prepared = preparation(design, data, arm, fold, seed)
+                initial = {
+                    k: v.detach().cpu().clone()
+                    for k, v in prepared[0].state_dict().items()
+                }
+                neural_forward = compile_forward(prepared[0])
                 for variant in (
                     ("hybrid",)
                     if engineering
                     else (VARIANTS if not confirmation else ("rank", *survivors[arm]))
                 ):
-                    torch._dynamo.reset()
-                    torch.cuda.reset_peak_memory_stats()
+                    prepared[0].load_state_dict(initial)
                     fit(
                         root,
                         design,
@@ -692,10 +738,13 @@ def run(root, *, engineering=False, confirmation=False):
                         fold,
                         seed,
                         variant,
+                        prepared,
+                        neural_forward,
                         engineering=engineering,
                     )
-                    gc.collect()
-                    torch.cuda.empty_cache()
+                del neural_forward, prepared, initial
+                gc.collect()
+                torch.cuda.empty_cache()
 
 
 def main():
