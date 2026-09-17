@@ -19,7 +19,7 @@
     "sha256": "aa0ae6e0d8a2d4b025935300c2d9a82f98eb2677feb4c77ef4c62081ca3c7ffd"
   },
   "root": "C:\\quant-data\\b3\\processed\\model_runs\\v2_portfolio_objective_e52be14_20260917",
-  "status": "matched_screen_running",
+  "status": "screen_fits_audited_readouts_running",
   "training_design": {
     "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_portfolio_objective_e52be14_20260917\\training_design.json",
     "sha256": "eae29aafad44756c15c1e3e529c1f025491312ddbcdb486bcdd9354d43e5615d"

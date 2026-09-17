@@ -66,6 +66,12 @@ budget and loss-scale rule are registered before runs.
 
 ## Stage C — running
 
+All 72 screen fits are complete as of 2026-09-17 19:10 UTC. The completed-fit
+audit passes for every trajectory: artifact hashes, exact inherited initial
+weights, zero initial cardinal head, shared gradient scale, and both selectors
+reproduced from the saved epochs. Portfolio readouts are running. No screen
+advancement decision is available yet; confirmation remains conditional.
+
 The matched 72-fit screen launched on 2026-09-17 at 13:28 UTC / 10:28 Brasilia.
 Its frozen clean worktree is `C:/quant/brazil-rv-portfolio-objective-33086be`.
 The source main branch may receive reports; do not modify this execution worktree.
