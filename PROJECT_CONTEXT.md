@@ -65,8 +65,14 @@ intraday implementation or deployment is authorized by this extension.
 
 The accepted research allocator permits cash earning historical CDI, measures
 performance above the same cash benchmark, and jointly constrains stocks/BOVA.
-It uses a Clarabel forward solution with a verified OSQP training adjoint and
-FP64 accounting. Recovered artifacts include the repaired C6 bridge, three causal
+It uses a Clarabel forward solution and FP64 accounting. The direct-objective
+admission subsequently exposed inaccurate native OSQP derivatives on the actual
+small-variance hedge problem, including a wrong-sign multi-day gradient. The
+current backward uses the reduced active face of the same convex problem, verified
+against finite differences and independent accounts. This qualifies earlier learned
+controller failures; it leaves sealed forward books and ranking/Huber fits unchanged.
+See the [engineering evidence](docs/v2_portfolio_objective_engineering.json).
+Recovered artifacts include the repaired C6 bridge, three causal
 forecast caches' source forecasts, policy comparisons and rich late-attention
 confirmation. Historical missing-price settlement remains an economic assumption;
 keep raw flags and sensitivities visible despite negligible terminal dust.

@@ -47,7 +47,13 @@ Three historical twelve-session gradient paths agree with numerical perturbation
 independent account NAV error is below 8e-13. All four representative local GPU
 cases (C6/TE_all, F2/F14, seed 11) pass. Warm 32-session SAM steps take .765-.938
 seconds and peak allocated GPU memory is 1.32-3.14 GiB. The smooth-rank interface
-bridge is the last engineering readout before financial dispatch.
+bridge is complete: mean absolute preference differences are .00560 bps for C6
+and .01686 bps for TE_all on 64 initial F2 fitting dates. The temperature was not
+selected from financial outcomes. All engineering checks finished before dispatch.
+See [the compact evidence](v2_portfolio_objective_engineering.json). The engineering
+source is 295f416; financial source 33086be preserves the identical training and
+allocation mathematics. The first engineering attempt's donated-buffer error is
+retained; separate forwards for gradient-norm measurements fixed it before fitting.
 
 The new preference adds an unranked cardinal return head to the differentiable
 rank anchor. Training uses actual chronological accounts and clones state for
@@ -58,10 +64,32 @@ be reused for a warm-start neural model trained on those endpoints. This does no
 assert that the old frozen-OOS controller calibration leaked. The continuation
 budget and loss-scale rule are registered before runs.
 
-## Stage C — not launched
+## Stage C — running
 
-Required: local GPU acceptance; freeze verified implementation; run the matched
-72-fit screen (two arms, three objectives, four folds, three seeds), compare both
-selectors on the same trajectories; confirm admitted pairs only; final economic
-readouts, archive/audit and combined LLM review. No new pretraining or Lambda.
-Re-read the registration after each stage. No held-out access or forward capture.
+The matched 72-fit screen launched on 2026-09-17 at 13:28 UTC / 10:28 Brasilia.
+Its frozen clean worktree is `C:/quant/brazil-rv-portfolio-objective-33086be`.
+The source main branch may receive reports; do not modify this execution worktree.
+Resolve the run pointer, then check `local_execution.json` and actual command lines
+before any restart. `local_campaign.stdout.log` contains epoch progress;
+`local_campaign.stderr.log` and `local_runner_exit.json` report failures. The
+supervisor prevents sleep while running and restores the normal setting on exit.
+Do not launch a duplicate. The existing 15-minute heartbeat now follows this task.
+
+The first completed trajectories passed hash, matched-parent, zero-initial-head,
+shared loss-scale and both checkpoint-selector audits. The audit command can be
+repeated after all fits: `uv run --project research --no-sync python
+ops/audit_portfolio_objective.py fits --root <resolved-root>`. Its receipt is
+`completed_fit_audit.json`. Do not use early selection results to alter the design.
+The input-population audit also verifies identical dates/ISIN axes and all 363,314
+active stock-days in the economic cache's 2016-07-18 through 2024-12-30 interval.
+Neither arm's cached score masks remove any accepted active observation. This is
+the accounting interval, not the full 2010-onward store and feature-history span.
+
+The supervisor compares both selectors on the same trajectories, admits candidates
+using the economic selector alone, and runs confirmation only for admitted pairs.
+`worker_complete.json` means financial readouts are finished, not that recovery and
+review are complete. Remaining: verify the screen and any triggered confirmation,
+all forecast populations/axes and hashes, paired conclusions, exact ledger and
+benchmark readouts; complete the LLM review; archive/hash recovery on D; commit/push
+and verify GitHub; pause the heartbeat. No new pretraining or Lambda. Re-read the
+registration after each stage. No held-out access or forward capture.

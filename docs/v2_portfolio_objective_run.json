@@ -3,8 +3,25 @@
     "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_portfolio_objective_e52be14_20260917\\closeout_design.json",
     "sha256": "0bf47167aabb12a929cf1bca138efe426a9b7ae295d12a28651515347f7aa5fb"
   },
+  "engineering_acceptance": {
+    "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_portfolio_objective_e52be14_20260917\\engineering_acceptance.json",
+    "sha256": "e5294fa394d142b86f7c43938b50ca40733da1e9547bce7570d66f3da90e7908"
+  },
+  "engineering_root": "C:\\quant-data\\b3\\processed\\model_runs\\v2_portfolio_objective_e52be14_20260917\\engineering_295f416",
   "forward_capture": false,
   "heldout_accessed": false,
+  "input_population_audit": {
+    "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_portfolio_objective_e52be14_20260917\\input_population_audit.json",
+    "sha256": "277a0e12d6b33859cbd42786ae7a24af1f0473c1f6c00394f9c17acba7a5aa23"
+  },
+  "local_execution": {
+    "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_portfolio_objective_e52be14_20260917\\local_execution.json",
+    "sha256": "aa0ae6e0d8a2d4b025935300c2d9a82f98eb2677feb4c77ef4c62081ca3c7ffd"
+  },
   "root": "C:\\quant-data\\b3\\processed\\model_runs\\v2_portfolio_objective_e52be14_20260917",
-  "status": "closeout_complete_engineering_in_progress"
+  "status": "matched_screen_running",
+  "training_design": {
+    "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_portfolio_objective_e52be14_20260917\\training_design.json",
+    "sha256": "eae29aafad44756c15c1e3e529c1f025491312ddbcdb486bcdd9354d43e5615d"
+  }
 }

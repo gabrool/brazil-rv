@@ -1,0 +1,219 @@
+{
+  "all_admission_evidence_completed_before_launch": true,
+  "engineering_design": {
+    "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_portfolio_objective_e52be14_20260917\\engineering_295f416\\training_design.json",
+    "sha256": "101201fc2d4e9502ef823c716e399eaa4d3638e983b696e09eccb9b2bed4c538"
+  },
+  "gpu_cases": {
+    "C6:F14": {
+      "loss_scale_retries": 0,
+      "nav_max_error": 5.169198402654729e-12,
+      "peak_cuda_gib": 2.6313695907592773,
+      "shared_encoder_gradient_blocks": [
+        {
+          "first_row": 0,
+          "ranking_gradient": 0.09958582371473312,
+          "ratio": 0.0007011216240571616,
+          "utility_gradient": 142.03787231445312
+        },
+        {
+          "first_row": 928,
+          "ranking_gradient": 0.14237143099308014,
+          "ratio": 0.0009705638162045999,
+          "utility_gradient": 146.6894073486328
+        },
+        {
+          "first_row": 1856,
+          "ranking_gradient": 0.10830138623714447,
+          "ratio": 0.0011128664505687697,
+          "utility_gradient": 97.3175048828125
+        }
+      ],
+      "source": {
+        "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_portfolio_objective_e52be14_20260917\\engineering_295f416\\engineering\\C6\\hybrid\\F14_seed_11\\acceptance.json",
+        "sha256": "4a054d7740073aee3c6abedfbd74178cb31e7f0cdcf1ffce9ba79c89b0b94e3f"
+      },
+      "warm_step_seconds": 0.8429999999934807
+    },
+    "C6:F2": {
+      "loss_scale_retries": 0,
+      "nav_max_error": 3.3306690738754696e-15,
+      "peak_cuda_gib": 1.3203763961791992,
+      "shared_encoder_gradient_blocks": [
+        {
+          "first_row": 0,
+          "ranking_gradient": 0.1314050406217575,
+          "ratio": 0.006470399133690391,
+          "utility_gradient": 20.308645248413086
+        },
+        {
+          "first_row": 192,
+          "ranking_gradient": 0.1554611176252365,
+          "ratio": 0.010206010422148184,
+          "utility_gradient": 15.23231029510498
+        },
+        {
+          "first_row": 352,
+          "ranking_gradient": 0.2931474447250366,
+          "ratio": 0.020179671776040298,
+          "utility_gradient": 14.52686882019043
+        }
+      ],
+      "source": {
+        "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_portfolio_objective_e52be14_20260917\\engineering_295f416\\engineering\\C6\\hybrid\\F2_seed_11\\acceptance.json",
+        "sha256": "2833c7ea6426f245fc89ee465b63663be4502ba9f5352a19522a679935a06692"
+      },
+      "warm_step_seconds": 0.9379999999946449
+    },
+    "TE_all:F14": {
+      "loss_scale_retries": 0,
+      "nav_max_error": 3.397282455352979e-12,
+      "peak_cuda_gib": 3.134803295135498,
+      "shared_encoder_gradient_blocks": [
+        {
+          "first_row": 0,
+          "ranking_gradient": 0.22069121897220612,
+          "ratio": 0.0014453605188391183,
+          "utility_gradient": 152.68939208984375
+        },
+        {
+          "first_row": 928,
+          "ranking_gradient": 0.24652287364006042,
+          "ratio": 0.0017194456742291476,
+          "utility_gradient": 143.3734588623047
+        },
+        {
+          "first_row": 1856,
+          "ranking_gradient": 0.19889463484287262,
+          "ratio": 0.0011859562700273143,
+          "utility_gradient": 167.70823669433594
+        }
+      ],
+      "source": {
+        "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_portfolio_objective_e52be14_20260917\\engineering_295f416\\engineering\\TE_all\\hybrid\\F14_seed_11\\acceptance.json",
+        "sha256": "5396b5b2d7af5ddba57429f20e2c1d9b36514e8e13c5af918654ffdf0a174339"
+      },
+      "warm_step_seconds": 0.8599999999860302
+    },
+    "TE_all:F2": {
+      "loss_scale_retries": 0,
+      "nav_max_error": 2.5410340498410733e-11,
+      "peak_cuda_gib": 1.5737500190734863,
+      "shared_encoder_gradient_blocks": [
+        {
+          "first_row": 0,
+          "ranking_gradient": 0.6599140763282776,
+          "ratio": 0.004871015987675853,
+          "utility_gradient": 135.4777069091797
+        },
+        {
+          "first_row": 192,
+          "ranking_gradient": 0.7561980485916138,
+          "ratio": 0.0058544265923149465,
+          "utility_gradient": 129.16688537597656
+        },
+        {
+          "first_row": 352,
+          "ranking_gradient": 0.905910849571228,
+          "ratio": 0.002612312183519393,
+          "utility_gradient": 346.7850646972656
+        }
+      ],
+      "source": {
+        "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_portfolio_objective_e52be14_20260917\\engineering_295f416\\engineering\\TE_all\\hybrid\\F2_seed_11\\acceptance.json",
+        "sha256": "f3ee0f2a60cd277142a3649e950065770a81a2c3700dd9ace1e9597afde79ee9"
+      },
+      "warm_step_seconds": 0.7650000000139698
+    }
+  },
+  "historical_gradient_source": {
+    "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_portfolio_objective_e52be14_20260917\\historical_gradient_audit.json",
+    "sha256": "21a648480a0eb5102307dacf34f7a3afce3dfd771cae2f5ba6dcb7b1fdad0423"
+  },
+  "historical_gradients": [
+    {
+      "analytic": -19.518192196651615,
+      "finite_difference": [
+        -19.518180946640484,
+        -19.518184062050636
+      ],
+      "first_row": 0,
+      "last_row": 11,
+      "nav_error": 2.4646951146678475e-14,
+      "seconds": 0.4220000000204891,
+      "target_error": 2.909382804117122e-13
+    },
+    {
+      "analytic": 27.294735511533894,
+      "finite_difference": [
+        27.23072779275526,
+        27.29407486166124
+      ],
+      "first_row": 120,
+      "last_row": 131,
+      "nav_error": 7.37188088351104e-14,
+      "seconds": 0.42199999999138527,
+      "target_error": 7.419620473569921e-13
+    },
+    {
+      "analytic": -9.584303588162571,
+      "finite_difference": [
+        -9.584302425409419,
+        -9.584312924459937
+      ],
+      "first_row": 300,
+      "last_row": 311,
+      "nav_error": 7.036593530074242e-13,
+      "seconds": 0.4370000000053551,
+      "target_error": 3.286032464843824e-11
+    }
+  ],
+  "local_execution": {
+    "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_portfolio_objective_e52be14_20260917\\local_execution.json",
+    "sha256": "aa0ae6e0d8a2d4b025935300c2d9a82f98eb2677feb4c77ef4c62081ca3c7ffd"
+  },
+  "rank_bridge": {
+    "C6": {
+      "fit_only_rows": [
+        0,
+        63
+      ],
+      "hard_mean_net_bps": 0.03340437975637656,
+      "max_absolute_preference_error_bps": 0.028213722755476477,
+      "mean_absolute_preference_error_bps": 0.005597312146789232,
+      "mean_absolute_weight_difference": 1.7199242406746164e-05,
+      "smooth_mean_net_bps": -0.024597730431882514,
+      "source_parent": {
+        "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\C6\\neutral\\F2_seed_11\\selected.pt",
+        "sha256": "0d2d856f6806cf075830f17859c236f42602e125e9f9c6b6703ea3a5f318a88a"
+      },
+      "temperature_chosen_from_financial_outcomes": false
+    },
+    "TE_all": {
+      "fit_only_rows": [
+        0,
+        63
+      ],
+      "hard_mean_net_bps": 1.8634617064286487,
+      "max_absolute_preference_error_bps": 0.08873841268492268,
+      "mean_absolute_preference_error_bps": 0.01686417695778637,
+      "mean_absolute_weight_difference": 4.0576555986449594e-05,
+      "smooth_mean_net_bps": 1.7730927016586933,
+      "source_parent": {
+        "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\TE_all\\neutral\\F2_seed_11\\selected.pt",
+        "sha256": "8352db5d190c36d3366563ad2c464a33419d75e01498bb4d3e626b16a427d47f"
+      },
+      "temperature_chosen_from_financial_outcomes": false
+    }
+  },
+  "rank_bridge_source": {
+    "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_portfolio_objective_e52be14_20260917\\engineering_295f416\\rank_bridge.json",
+    "sha256": "ec38f1e6231843549e409cf466f526e4378a1b4666b02817fab6e4a1fbb4496b"
+  },
+  "scope": "Engineering admission only; it is not evidence of economic improvement.",
+  "status": "engineering_passed_financial_experiment_running",
+  "training_design": {
+    "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_portfolio_objective_e52be14_20260917\\training_design.json",
+    "sha256": "eae29aafad44756c15c1e3e529c1f025491312ddbcdb486bcdd9354d43e5615d"
+  }
+}
