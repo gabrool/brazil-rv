@@ -86,3 +86,35 @@ CDI; USD-converted returns minus EFFR cash proxy; BRL minus zero), winning/losin
 days, maximum drawdown, exposures, turnover/costs, halves and settlement flags.
 Preserve artifacts, source/checkpoint hashes and a combined LLM review. Revisit
 this registration at each stage completion and record remaining work.
+
+## Implementation supplement, before financial fitting
+
+Use 32 chronological sessions per gradient block, encoded in GPU microbatches
+of at most 16 dates. All eligible names and all 60 history sessions remain.
+Continuation ceiling: 12 epochs, minimum six; after that stop when neither IC
+nor utility has improved for five epochs. Improvements are .0001 IC / .01 daily
+bps utility; earlier ties win. The ceiling is for continuation from an already
+selected F model, not a replacement 12-epoch training-from-scratch budget.
+Inherited parameters use peak LR 3e-5; the new cardinal head uses 1e-4; preserve
+original SAM/ASAM and AdamW decay routing. Warmup/cosine use the fixed ceiling.
+
+Smooth-rank temperature is .1 in same-date standardized-score units. The cardinal
+head is zero initialized, with one output unit equal to one daily basis point.
+Hybrid utility weight is the median ranking/utility shared-encoder gradient-norm
+ratio across three pre-specified initial fit blocks (first, middle, last full
+block). Direct utility uses that same scale. This is fit-only unit calibration,
+not selection of a loss weight on financial evaluation outcomes.
+
+Start economic selection from cash on the first original selection date. The
+preceding purge contains endpoints used by the inherited F ranking labels and
+cannot be used as supposedly unseen inventory burn-in. Evaluation may use only
+the post-selection embargo as unreported burn-in. Report this correction to the
+old portfolio selection convention. Never carry fitting inventory into selection.
+
+The admission tests exposed a wrong-sign multi-day derivative with the old OSQP
+adjoint despite correct forward portfolios. Replace that backward implementation
+with a reduced active-face derivative of the same convex problem; retain the
+Clarabel forward solve. Test the real hedge variance, inventory, no-trade regions,
+caps, finite differences and independent accounts before financial launch.
+The frozen old books and rank/Huber neural fits remain unchanged. Previous learned
+controller failures are qualified by this newly identified backward-path defect.

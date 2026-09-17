@@ -6,9 +6,8 @@ from dataclasses import dataclass
 
 import numpy as np
 import clarabel
-import osqp
 import torch
-from scipy import sparse
+from scipy import linalg, sparse
 from torch import Tensor
 
 
@@ -60,13 +59,7 @@ def _solve_primal_dual(p, q, a, lower, upper):
 
 
 class _SparseQP(torch.autograd.Function):
-    """Only preferences/bounds are learned; use OSQP's native vector adjoint.
-
-    A solve owns its workspace until backward. Reusing one mutable workspace
-    across sequential autograd nodes would differentiate the wrong day's QP.
-    Avoid the upstream torch wrapper's per-call full-machine thread pool and
-    unnecessary matrix derivatives for our fixed risk/constraint coefficients.
-    """
+    """Accurate forward QP with its reduced active-face implicit derivative."""
 
     @staticmethod
     def forward(ctx, q, lower, upper, p, a):
@@ -75,40 +68,96 @@ class _SparseQP(torch.autograd.Function):
         )
         x, dual = _solve_primal_dual(p, q_np, a, lower_np, upper_np)
         if any(ctx.needs_input_grad[:3]):
-            # The interior-point solution is the forward allocation. The native
-            # adjoint differentiates the identical QP, checked against that
-            # primal solution; inference does not need this second workspace.
-            solver = osqp.OSQP(algebra="builtin")
-            solver.setup(
-                P=p,
-                q=q_np,
-                A=a,
-                l=lower_np,
-                u=upper_np,
-                verbose=False,
-                eps_abs=1e-8,
-                eps_rel=1e-8,
-                polishing=True,
-                max_iter=100000,
-            )
-            solver.warm_start(x=x, y=dual)
-            result = solver.solve(raise_error=False)
-            n = (len(x) - 1) // 3
-            weight_difference = np.max(np.abs(result.x[:n] - x[:n]))
-            if result.info.status_val != 1 or weight_difference > 2e-4:
-                raise FloatingPointError(
-                    f"allocation adjoint solve disagrees: {result.info.status}, "
-                    f"primal={result.info.prim_res:g}, dual={result.info.dual_res:g}, "
-                    f"weight_difference_percent_NAV={weight_difference:g}"
-                )
-            ctx.solver = solver
+            ctx.problem = (x, dual, p.diagonal(), a, lower_np, upper_np)
         return torch.from_numpy(x)
 
     @staticmethod
     def backward(ctx, gradient):
-        solver = ctx.solver
-        solver.adjoint_derivative_compute(dx=gradient.contiguous().numpy())
-        dq, dl, du = solver.adjoint_derivative_get_vec()
+        x, dual, diagonal, a, lower, upper = ctx.problem
+        n = (len(x) - 1) // 3
+        w = x[:n]
+        beta = np.asarray(a[5 * n + 1, :n].toarray()).ravel()
+        # Epigraphs reduce exactly to |w-previous|, |w| and beta'w. At a
+        # strict kink the corresponding weight is fixed; elsewhere their
+        # slopes are constant. The remaining Hessian is positive diagonal
+        # plus one factor, so only a tiny exposure-constraint system remains.
+        tolerance = 1e-6  # percent NAV, below the accepted primal tolerance
+        at_lower = (np.abs(w - lower[:n]) < tolerance) & (dual[:n] < -1e-9)
+        at_upper = (np.abs(w - upper[:n]) < tolerance) & (dual[:n] > 1e-9)
+        equal = lower[:n] == upper[:n]
+        at_lower |= equal
+        at_upper &= ~equal
+        zero = (
+            (np.abs(w) < tolerance)
+            & (dual[3 * n : 4 * n] > 1e-9)
+            & (dual[4 * n : 5 * n] > 1e-9)
+        )
+        no_trade = (
+            (np.abs(w - upper[n : 2 * n]) < tolerance)
+            & (dual[n : 2 * n] > 1e-9)
+            & (dual[2 * n : 3 * n] > 1e-9)
+        )
+        fixed = at_lower | at_upper | zero | no_trade
+        free = ~fixed
+        rows, sides, exposures = [], [], []
+        for row in [5 * n, 5 * n + 1, 5 * n + 2, *range(5 * n + 4, len(dual))]:
+            if lower[row] == upper[row] or abs(dual[row]) > 1e-9:
+                rows.append(row)
+                sides.append(dual[row] < 0)
+                exposures.append(
+                    np.sign(w) if row == 5 * n + 2 else a[row, :n].toarray().ravel()
+                )
+        c = np.asarray(exposures).reshape(-1, n)
+        cf = c[:, free]
+        d, b = diagonal[:n][free], beta[free]
+        factor = diagonal[-1]
+
+        def inverse_hessian(v):
+            out = v / d[:, None]
+            return (
+                out
+                - (b / d)[:, None]
+                * (factor * (b @ out) / (1 + factor * np.sum(b * b / d)))[None, :]
+            )
+
+        g = gradient.numpy()[:n]
+        z = np.zeros(n)
+        multiplier = np.zeros(len(c))
+        if free.any():
+            inverse_g = inverse_hessian(g[free, None])[:, 0]
+            if len(c):
+                inverse_c = inverse_hessian(cf.T)
+                gram = cf @ inverse_c
+                # Redundant exposures (e.g. identical net and beta constraints)
+                # share a minimum-norm dual; the primal derivative is unique.
+                multiplier = linalg.pinvh(gram, rtol=1e-12) @ (cf @ inverse_g)
+                z[free] = inverse_g - inverse_c @ multiplier
+            else:
+                z[free] = inverse_g
+        fixed_gradient = g - factor * beta * (beta @ z) - c.T @ multiplier
+        residual = max(
+            np.max(np.abs(c @ z), initial=0),
+            np.max(np.abs((fixed_gradient - diagonal[:n] * z)[free]), initial=0),
+        )
+        if residual > 1e-7 * max(1.0, float(np.max(np.abs(g)))):
+            raise FloatingPointError(f"allocation derivative residual: {residual:g}")
+        dq, dl, du = np.zeros(len(x)), np.zeros(len(lower)), np.zeros(len(upper))
+        dq[:n] = -z
+        dq[n : 2 * n] = -z * np.sign(w - upper[n : 2 * n])
+        dq[2 * n : 3 * n] = -z * np.sign(w)
+        dq[-1] = -beta @ z
+        for i in np.flatnonzero(fixed):
+            if at_lower[i]:
+                dl[i] = fixed_gradient[i]
+            elif at_upper[i]:
+                du[i] = fixed_gradient[i]
+            elif not zero[i]:
+                du[n + i], du[2 * n + i] = (
+                    0.5 * fixed_gradient[i],
+                    -0.5 * fixed_gradient[i],
+                )
+        for row, low, value in zip(rows, sides, multiplier):
+            (dl if low else du)[row] = value
         values = tuple(torch.from_numpy(x) for x in (dq, dl, du))
         if not all(torch.isfinite(x).all() for x in values):
             raise FloatingPointError("allocation adjoint is non-finite")
@@ -135,7 +184,7 @@ def allocate(
     Five-period expected utility pays today's linear transaction cost once.
     The last coordinate is the optional hedge. Historical prices never enter
     this solve; the caller supplies only information available at the decision.
-    OSQP uses FP64 CPU sparse algebra; neural preferences retain their gradient
+    The solver uses FP64 CPU sparse algebra; neural preferences retain their gradient
     through any dtype conversion. Fixed diagonal+market covariance is PSD.
     """
     preference, previous, lower, upper = (

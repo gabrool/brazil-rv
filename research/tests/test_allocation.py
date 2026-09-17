@@ -53,7 +53,7 @@ def test_joint_constraints_and_borrow_cost():
     )
 
 
-def test_native_adjoint_matches_finite_difference_and_inventory_gradient():
+def test_adjoint_matches_finite_difference_and_inventory_gradient():
     mu = torch.tensor([0.00009, -0.000085, 0.000015], dtype=torch.float64)
     mu.requires_grad_()
     previous = torch.tensor([0.005, -0.01, 0.001], dtype=torch.float64)
@@ -94,34 +94,46 @@ def test_forecast_uncertainty_can_choose_cash_without_changing_return_risk():
     assert protected.abs().sum() < 1e-7
 
 
-@pytest.mark.parametrize("status", [2, 7])
-def test_incomplete_adjoint_solve_is_rejected(monkeypatch, status):
-    import osqp
+@pytest.mark.parametrize("seed", [3, 19, 47])
+def test_stock_hedge_active_constraints_and_uncertainty_gradient(seed):
+    rng = np.random.default_rng(seed)
+    n = 40
+    beta = rng.uniform(0.5, 1.5, n)
+    diagonal = rng.uniform(0.0001, 0.0008, n)
+    diagonal[-1] = 1e-8  # actual hedge conditioning, absent from old small tests
+    beta[-1] = 1
+    previous = torch.tensor(rng.uniform(-0.03, 0.03, n))
+    mu = torch.tensor(rng.normal(0, 0.0007, n), requires_grad=True)
+    u = torch.tensor(rng.uniform(0.00001, 0.00003, n), requires_grad=True)
+    direction = torch.tensor(rng.normal(size=n))
+    perturbation = torch.tensor(rng.normal(size=n) * 1e-8)
 
-    mu = torch.tensor([0.00011, -0.00011], dtype=torch.float64, requires_grad=True)
-    original = osqp.OSQP.solve
-    calls = 0
+    def value(m, uncertainty):
+        return (
+            allocate(
+                m,
+                previous,
+                beta=beta,
+                idiosyncratic_variance=diagonal,
+                market_variance=0.0002,
+                daily_borrow=np.full(n, 0.0001),
+                lower=torch.full((n,), -0.05),
+                upper=torch.full((n,), 0.05),
+                forecast_uncertainty=uncertainty,
+            )
+            @ direction
+        )
 
-    def first_iteration_limit(self, **kwargs):
-        nonlocal calls
-        result = original(self, **kwargs)
-        calls += 1
-        if calls == 1:
-            result.info.status_val = status
-        return result
-
-    monkeypatch.setattr(osqp.OSQP, "solve", first_iteration_limit)
-    with pytest.raises(FloatingPointError, match="adjoint solve disagrees"):
-        solve(mu)
-    assert calls == 1
-
-
-def test_inference_uses_only_the_accurate_primal_solver(monkeypatch):
-    import osqp
-
-    def no_adjoint_workspace(*args, **kwargs):
-        raise AssertionError("inference must not initialize an adjoint workspace")
-
-    monkeypatch.setattr(osqp.OSQP, "setup", no_adjoint_workspace)
-    result = solve(torch.tensor([0.0001, -0.0001]))
-    assert torch.isfinite(result).all()
+    derivatives = torch.autograd.grad(value(mu, u), (mu, u))
+    for index, analytic in enumerate(derivatives):
+        plus = (
+            value(mu + perturbation, u) if index == 0 else value(mu, u + perturbation)
+        )
+        minus = (
+            value(mu - perturbation, u) if index == 0 else value(mu, u - perturbation)
+        )
+        assert (analytic @ perturbation).item() == pytest.approx(
+            ((plus - minus) / 2).item(),
+            rel=5e-3,
+            abs=2e-8,
+        )
