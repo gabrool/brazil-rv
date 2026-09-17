@@ -1,0 +1,7 @@
+{
+  "supervisor_pid": 28056,
+  "root": "C:/quant-data/b3/processed/model_runs/v2_opportunity_056aad2_20260917",
+  "frozen_design_sha256": "3b9cc43e0712217b16fae2671428e93f024de49e6c34aa83ac1ee58b8c38b2c2",
+  "status": "running",
+  "source_worktree": "C:/quant/brazil-rv-opportunity-056aad2"
+}

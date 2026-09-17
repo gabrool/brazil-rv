@@ -103,3 +103,26 @@ all eligible names, exact ledger and FP64 accounting. Targeted tests protect
 currency/calendar alignment, maturity/fit isolation, group constraints and
 unchanged baseline. Commit source before financial replay, hash its inputs,
 record every variant, retain paired daily series and report failed experiments.
+
+## Recorded follow-up after the original twenty books
+
+The original conditional models failed the predictive/economic comparisons, and
+all twenty prior-only fits selected the strongest offered ridge penalty (100).
+Before dismissing conditional learning, run a **post-hoc development diagnostic**
+using the same frozen inputs and chronological windows. This is not a fresh
+confirmation and does not replace or erase the failed books.
+
+Compare the existing common context against a compact context: recent market
+return, median daily volatility, cross-sectional dispersion, matured shadow
+payoff/volatility, and seed/horizon disagreement, plus explicit validity flags.
+Choose penalties {1,10,100,1000,10000,constant mean} independently for shadow
+payoff and market return using the same purged prior 126-session selection.
+Refit only on matured earlier OOS labels. The constant is a selectable causal
+fallback, never chosen using the next evaluation period. Do not select a feature
+roster or penalty from full-period financial P&L.
+
+This follow-up initially predicts only. It triggers additional financial replay
+only if conditional squared error improves with a positive lower 40-session
+paired interval in both 2020–2021 and 2022–2024 for the relevant head. Report
+20/60-session sensitivity and all attempted feature sets. Otherwise close this
+timing branch without interpreting it as proof that all timing is impossible.

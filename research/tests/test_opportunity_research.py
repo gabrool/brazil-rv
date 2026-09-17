@@ -1,4 +1,6 @@
 from dataclasses import replace
+from pathlib import Path
+import runpy
 
 import numpy as np
 import pytest
@@ -113,3 +115,23 @@ def test_directional_market_forecast_enters_stock_and_hedge_once(monkeypatch):
     assert recorded["preference"][:-1].numpy() == pytest.approx(
         np.full(len(recorded["preference"]) - 1, 0.0017)
     )
+
+
+def test_reliability_followup_constant_fallback_and_future_isolation():
+    module = runpy.run_path(
+        str(
+            Path(__file__).resolve().parents[2] / "ops/audit_opportunity_reliability.py"
+        )
+    )
+    rng = np.random.default_rng(51)
+    x = rng.normal(size=(540, 3))
+    valid = np.ones_like(x, dtype=bool)
+    y = np.zeros((540, 2))
+    blocks = {"F5": np.arange(500, 540)}
+    first, base, fits = module["predict"](x, valid, y, blocks, 0)
+    assert fits["F5"]["selected_penalty"] == [None, None]
+    y[495:] = 99999
+    second, _, changed = module["predict"](x, valid, y, blocks, 0)
+    np.testing.assert_array_equal(first[500:], second[500:])
+    assert changed["F5"]["last_origin"] == 494
+    np.testing.assert_array_equal(first[500:], base[500:])
