@@ -596,8 +596,58 @@ def summarize(root):
             },
         }
     write_json_atomic(root / "summary.json", output)
-    write_json_atomic(PROJECT / "docs/v2_opportunity_results.json", output)
+    write_json_atomic(
+        PROJECT / "docs/v2_opportunity_results.json", review_payload(root, output)
+    )
     return {"status": "completed", "summary": str(root / "summary.json")}
+
+
+def review_payload(root, output):
+    """Keep the GitHub review compact; complete dated attribution stays bound."""
+    result = {
+        "source_summary": bound(root / "summary.json"),
+        "frozen_design": output["frozen_design"],
+        "arms": {},
+    }
+    for arm, record in output["arms"].items():
+        books = {}
+        for name, book in record["books"].items():
+            compact = {
+                k: v for k, v in book.items() if k not in ("attribution", "half_year")
+            }
+            compact["half_year"] = {
+                h: {
+                    k: v[k]
+                    for k in (
+                        "net_excess_bps",
+                        "utility_bps",
+                        "gross",
+                        "equity_residual_bps",
+                        "market_plus_hedge_bps",
+                        "trading_cost_bps",
+                        "borrow_bps",
+                    )
+                }
+                for h, v in book["half_year"].items()
+            }
+            compact["source_analysis"] = bound(
+                root / arm / "books" / name / "analysis.json"
+            )
+            compact["daily_means"] = read(Path(book["book"]["path"]))["summary"]["mean"]
+            if book["planned_limits"]["sector_net_cap"] is None:
+                compact["max_planned_sector_net"] = None  # not measured for this rule
+            books[name] = compact
+        result["arms"][arm] = {**record, "books": books}
+        result["arms"][arm]["paired_utility_bps"] = {}
+        for name, contrast in record["contrasts"].items():
+            values = []
+            for variant in (name, contrast["control"]):
+                book = read(root / arm / "books" / variant / "book.json")
+                values.append(np.asarray(book["daily"]["utility_bps"]))
+            result["arms"][arm]["paired_utility_bps"][name] = interval(
+                [values[0] - values[1]]
+            )
+    return result
 
 
 def main():

@@ -11,6 +11,15 @@ new supervised calibration uses earlier new-ensemble OOS outcomes only. Current
 sector labels cannot be retrospectively applied. Unknown classifications remain
 eligible. USD reporting uses historical PTAX and calendar-accrued EFFR explicitly
 labelled as a cash proxy. No new neural campaign, held-out access or forward capture.
+The program is complete: twenty CPU books reproduce both sealed neutral controls
+exactly. Flexible dollar exposure with tight beta improves nominal full-history
+net by +2.707 bps/day for C6 (40-session interval [.418,4.974]) and +1.440 for TE
+([-.642,3.543]); this remains a candidate under unresolved settlement sensitivities,
+not an accepted trading-policy replacement. Sector constraints do not improve net.
+The original conditional regressions fail; a registered post-hoc stronger-shrinkage,
+constant-fallback and compact-context diagnostic admits no additional financial
+replay. See the [complete review](docs/v2_OPPORTUNITY_PORTFOLIOS.md) and
+[run pointer](docs/v2_opportunity_run.json). No timing model is promoted.
 
 The user has authorized **Phases 1–3** of the
 [decision-model postmortem](docs/v2_PORTFOLIO_DECISION_POSTMORTEM.md#13-recommended-next-program-small-questions-in-an-efficient-order):

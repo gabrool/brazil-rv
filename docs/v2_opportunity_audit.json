@@ -1,0 +1,160 @@
+{
+  "arms": {
+    "C6": {
+      "books": {
+        "direction_permitted": {
+          "analysis_sha256": "851296aec94e19e00c4f89a7940341f3e37b5d1a63f181971de5ff52a4225986",
+          "book_sha256": "e46d0c3067e728913cde5b43e81f21d817c606afc6cd8c001cc01e897ba122a0",
+          "decomposition_max_error_bps": 1.1155520951433573e-12,
+          "fx_max_age_days": 0,
+          "sessions": 1738
+        },
+        "flexible_net": {
+          "analysis_sha256": "46141eb6fb9c27e607b01a55a04938e418934e26188e8666488f6888c0b84b1a",
+          "book_sha256": "55895e41aa965a3baa4608e37ecd5b18060c483bce59eebcba38f6982bb8b10e",
+          "decomposition_max_error_bps": 1.1368683772161603e-12,
+          "fx_max_age_days": 0,
+          "sessions": 1738
+        },
+        "neutral": {
+          "analysis_sha256": "c18d15390d2c9a79f770513e6e4c29dfdd19814d4f847898da6c592a6939db5d",
+          "book_sha256": "4c742437d57d8c355ec230a1df3757b23fa3c8e13bc6ee1f6cecc2badd90e6d7",
+          "decomposition_max_error_bps": 1.1084466677857563e-12,
+          "fx_max_age_days": 0,
+          "sessions": 1738
+        },
+        "neutral_2020": {
+          "analysis_sha256": "83a7488bfd7977fb2615c6df12b49d83bbffae3d88999293967e8c1bcd09a43a",
+          "book_sha256": "514c368fc3c14959dcb7a5844c517c236490596e4c8204d7fbbadfd016a9f0c0",
+          "decomposition_max_error_bps": 1.113775738303957e-12,
+          "fx_max_age_days": 0,
+          "sessions": 1245
+        },
+        "sector_band": {
+          "analysis_sha256": "98ad888ab5afddd1c194ea7760136bfbcedc32614a805c0a00ae466fbfd9f499",
+          "book_sha256": "8258d14faf195d822e2a58ed23b330fb2898f68e733518af36049371a201a1c4",
+          "decomposition_max_error_bps": 1.1084466677857563e-12,
+          "fx_max_age_days": 0,
+          "sessions": 1738
+        },
+        "sector_neutral": {
+          "analysis_sha256": "cc10157fdf645e46089e58610985ffe1ec3c23aecda5b14b8dd7fd4d7bd769db",
+          "book_sha256": "bf738033ebe48a5953ef2c51cce06258be93091796e730747bcf0bb5031ad346",
+          "decomposition_max_error_bps": 1.1226575225009583e-12,
+          "fx_max_age_days": 0,
+          "sessions": 1738
+        },
+        "supervised_conditional": {
+          "analysis_sha256": "116945ad0e5002a73e1f297c959a913d7542a798e4bcebe4213d43fc0498319c",
+          "book_sha256": "ae7476d9b24b29559917b880ee93389d767462310203e45478b07cbf55342c9c",
+          "decomposition_max_error_bps": 1.1226575225009583e-12,
+          "fx_max_age_days": 0,
+          "sessions": 1245
+        },
+        "supervised_directional": {
+          "analysis_sha256": "ca94b96d4542da3ee636ba64816e82ab0392707ba72de6c448638270068b2669",
+          "book_sha256": "e7116be8bf8b5abba39e167baa580d55c59547530fa9882ccab75d38fbcb970a",
+          "decomposition_max_error_bps": 1.1368683772161603e-12,
+          "fx_max_age_days": 0,
+          "sessions": 1245
+        },
+        "supervised_flexible": {
+          "analysis_sha256": "03bb693b1680d1fb26e3e2496268b11fe873e24a8ce132aa735e3e7dceb2d84d",
+          "book_sha256": "dbd08e4d9b2ba44e514f7d379aa8696218ba34e010dbda0bb5eeb3ff778ce357",
+          "decomposition_max_error_bps": 1.1368683772161603e-12,
+          "fx_max_age_days": 0,
+          "sessions": 1245
+        },
+        "supervised_unconditional": {
+          "analysis_sha256": "d95f9fca4a8304b7c2b3e10234b4a82ece264dc617b5584785f772ae9987cc3d",
+          "book_sha256": "5778b317baae68572114939f56de4788a59f3f1404d8673f871040a55cee54ae",
+          "decomposition_max_error_bps": 1.1084466677857563e-12,
+          "fx_max_age_days": 0,
+          "sessions": 1245
+        }
+      },
+      "forecast_stock_days": 319292,
+      "heldout_accessed": false,
+      "neutral_max_daily_error": 0.0
+    },
+    "TE_all": {
+      "books": {
+        "direction_permitted": {
+          "analysis_sha256": "5ce8e0fb9b4a058b4ab4db13901e78d3c2571f1d14193400e9e88fcbc53db04f",
+          "book_sha256": "decf7a63e013ee711fbe4156c0f9cd54c0e159eb974e958d6ec49c993b1161d1",
+          "decomposition_max_error_bps": 1.1652900866465643e-12,
+          "fx_max_age_days": 0,
+          "sessions": 1738
+        },
+        "flexible_net": {
+          "analysis_sha256": "afc094b9e4346a2f968da7466ec10ed0820106305fa725034d73cca123c1fdff",
+          "book_sha256": "f7788c5d8af92ee35b1222e1abdf343f62686d5aee6787354383db065a54905f",
+          "decomposition_max_error_bps": 1.1226575225009583e-12,
+          "fx_max_age_days": 0,
+          "sessions": 1738
+        },
+        "neutral": {
+          "analysis_sha256": "c673f4fdfc80a789b99196559e1089af6b812a0d365f23828a450eb5ca66e36e",
+          "book_sha256": "6a1c4f4533d203f0fb1b26b686b72baf25fea81ad88e012bda345f1ad701abe8",
+          "decomposition_max_error_bps": 1.1084466677857563e-12,
+          "fx_max_age_days": 0,
+          "sessions": 1738
+        },
+        "neutral_2020": {
+          "analysis_sha256": "da81faed647ace15fd31c2280503fe3c65fd0198d02b21ca878ac03fc11a7217",
+          "book_sha256": "0106f14d48d7078ce27cd64ebb0267be66d10600b84855705487c51debfdfb50",
+          "decomposition_max_error_bps": 1.1084466677857563e-12,
+          "fx_max_age_days": 0,
+          "sessions": 1245
+        },
+        "sector_band": {
+          "analysis_sha256": "6e01ddf95b5c85763a53b0b79c2518304adb040000bcd6f4a41996a25e4bef7e",
+          "book_sha256": "276506c9f36b4a6421560849d363e77b9da3594b321806e842789837d2296f04",
+          "decomposition_max_error_bps": 1.1937117960769683e-12,
+          "fx_max_age_days": 0,
+          "sessions": 1738
+        },
+        "sector_neutral": {
+          "analysis_sha256": "972d6a1059e39a383f477baebb024691ff1968af2eb42e24154a493f393e3ec0",
+          "book_sha256": "f548f3840837733a863961178e061ed5b32336520b9c4b2bc1fc27a708644d6f",
+          "decomposition_max_error_bps": 1.1084466677857563e-12,
+          "fx_max_age_days": 0,
+          "sessions": 1738
+        },
+        "supervised_conditional": {
+          "analysis_sha256": "0957f8089aa4b24e55bf49d0e2683e73129142626db28f58675c2cbfa6a65c8a",
+          "book_sha256": "4c1372d5be7e47f39d48c2c2b6351edfb6ca5b55be5830b8c2b2187c5f98b493",
+          "decomposition_max_error_bps": 1.1368683772161603e-12,
+          "fx_max_age_days": 0,
+          "sessions": 1245
+        },
+        "supervised_directional": {
+          "analysis_sha256": "a902c368dbc80689270b48c6215d8fbd19ef94e58b2463e55a8451e08084e686",
+          "book_sha256": "69e2e468743ff263b7c5c95f834c0546f70cdf270642e0f397d3d4aec214ecd3",
+          "decomposition_max_error_bps": 1.1368683772161603e-12,
+          "fx_max_age_days": 0,
+          "sessions": 1245
+        },
+        "supervised_flexible": {
+          "analysis_sha256": "d318a6ee2c8c366063e7b2ee96966554309930ff5490967649f2bdb0bbeb7e33",
+          "book_sha256": "d4d7b2a34b0ea056a3d753711c09ae1a732d56845f4ce694c8170f987752c32f",
+          "decomposition_max_error_bps": 1.1084466677857563e-12,
+          "fx_max_age_days": 0,
+          "sessions": 1245
+        },
+        "supervised_unconditional": {
+          "analysis_sha256": "014229b73c148bac17187deefb97532a643be7f7eac96b72354e96c81fbe915d",
+          "book_sha256": "fc33bbdfced1b41b3c423bae1bb31a251098b5708eb9ada5617d056de76360db",
+          "decomposition_max_error_bps": 1.1226575225009583e-12,
+          "fx_max_age_days": 0,
+          "sessions": 1245
+        }
+      },
+      "forecast_stock_days": 319292,
+      "heldout_accessed": false,
+      "neutral_max_daily_error": 0.0
+    }
+  },
+  "design_sha256": "3b9cc43e0712217b16fae2671428e93f024de49e6c34aa83ac1ee58b8c38b2c2",
+  "status": "passed"
+}

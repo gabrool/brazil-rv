@@ -1,7 +1,15 @@
 {
-  "supervisor_pid": 28056,
-  "root": "C:/quant-data/b3/processed/model_runs/v2_opportunity_056aad2_20260917",
+  "audit": "docs/v2_opportunity_audit.json",
+  "books": 20,
   "frozen_design_sha256": "3b9cc43e0712217b16fae2671428e93f024de49e6c34aa83ac1ee58b8c38b2c2",
-  "status": "running",
-  "source_worktree": "C:/quant/brazil-rv-opportunity-056aad2"
+  "original_financial_source": "056aad2",
+  "recovery": "docs/v2_opportunity_recovery.json",
+  "reliability_followup_source": "88a090bbb2fc67950b3c59a33d8425dba4db468d",
+  "reliability_results": "docs/v2_opportunity_reliability.json",
+  "report": "docs/v2_OPPORTUNITY_PORTFOLIOS.md",
+  "results": "docs/v2_opportunity_results.json",
+  "root": "C:/quant-data/b3/processed/model_runs/v2_opportunity_056aad2_20260917",
+  "source_worktree": "C:/quant/brazil-rv-opportunity-056aad2",
+  "status": "complete_no_controller_promoted",
+  "supervisor_pid": 28056
 }

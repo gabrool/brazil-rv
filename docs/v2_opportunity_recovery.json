@@ -1,0 +1,11 @@
+{
+  "archive": "D:\\quant-data\\b3\\processed\\model_runs\\v2_opportunity_056aad2_20260917\\archives\\opportunity_results.tar.gz",
+  "bytes": 222566291,
+  "inventory": "D:\\quant-data\\b3\\processed\\model_runs\\v2_opportunity_056aad2_20260917\\archives\\inventory.json",
+  "inventory_sha256": "2e9110dd0ec3a7f7ab513dddfea964e1d840166f94928e71392d8c9a4ad308ba",
+  "members": 180,
+  "scope": "Entire new run including prepared inputs, all 20 books, diagnostics and review. Original economic caches/store are referenced by immutable source bindings, not duplicated. Local D-drive recovery, no cloud upload.",
+  "sha256": "a303bb72ee11c0746166529926a99c63bf784968e6c534902b3365a569122cea",
+  "source_root": "C:\\quant-data\\b3\\processed\\model_runs\\v2_opportunity_056aad2_20260917",
+  "status": "verified"
+}
