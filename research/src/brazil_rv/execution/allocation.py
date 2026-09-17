@@ -22,6 +22,7 @@ class AllocationConfig:
     risk_aversion: float = 5.0
     planning_sessions: int = 5
     cost_bps: float = 4.0
+    sector_net_cap: float | None = None
 
 
 def _solve_primal_dual(p, q, a, lower, upper):
@@ -126,6 +127,7 @@ def allocate(
     upper: Tensor,
     config: AllocationConfig = AllocationConfig(),
     forecast_uncertainty: Tensor | None = None,
+    sector_exposure: np.ndarray | None = None,
 ) -> Tensor:
     """Allocate a compact stock-plus-hedge vector; residual capital is cash.
 
@@ -216,6 +218,17 @@ def allocate(
             ),
         )
     )
+    if config.sector_net_cap is not None:
+        if sector_exposure is None:
+            raise ValueError("sector allocation requires dated classifications")
+        groups = np.asarray(sector_exposure, dtype=np.float64)
+        a = sparse.vstack(
+            (a, sparse.hstack((groups, sparse.csc_matrix((len(groups), 2 * n + 1))))),
+            format="csc",
+        )
+        caps = torch.full((len(groups),), config.sector_net_cap, dtype=torch.float64)
+        bounds_lower = torch.cat((bounds_lower, -caps))
+        bounds_upper = torch.cat((bounds_upper, caps))
     # Percent-NAV solver coordinates avoid an ill-scaled epigraph: stock weights
     # are a few percent while objective slopes are several basis points. This
     # is an exact change of units, including adjoints and all bound gradients.
@@ -238,6 +251,8 @@ def allocate(
         float((lower.detach().numpy() - weights).max()),
         float((weights - upper.detach().numpy()).max()),
     )
+    if config.sector_net_cap is not None and len(groups):
+        residual = max(residual, np.abs(groups @ weights).max() - config.sector_net_cap)
     if not np.isfinite(weights).all() or residual > 2e-6:
         raise FloatingPointError(f"allocation violates planned constraints: {residual}")
     return solution

@@ -22,13 +22,12 @@ from brazil_rv.v2.portfolio_inputs import HEADS, normalized_ranks
 
 
 def policy_ledger_config(**changes):
-    return replace(
-        LedgerConfig(),
+    defaults = dict(
         volatility_balanced_entries=False,
         planned_absolute_net_cap=0.05,
         settle_terminal_residuals=True,
-        **changes,
     )
+    return replace(LedgerConfig(), **(defaults | changes))
 
 
 def daily_borrow(rates, config):
@@ -173,6 +172,10 @@ class CalibratedPolicy(nn.Module):
             tensor(data.ranks[day, names]),
         )
 
+    def market_return_for(self, day):
+        """Zero unless an independently fitted, causal market forecast is supplied."""
+        return 0.0
+
 
 class PreferenceModel(CalibratedPolicy):
     """Zero residual starts exactly at the fit-only calibrated optimizer."""
@@ -277,9 +280,19 @@ def decide(
         data.volatility[day],
     )[names]
     pref = model.preference_for(data, day, names, features)
-    # No separate directional BOVA forecast is invented. The hedge is chosen
-    # jointly for risk, financing and costs, with zero assumed daily excess alpha.
-    preference = torch.cat((pref, pref.new_zeros(1)))
+    market = pref.new_tensor(model.market_return_for(day))
+    # Stock preferences are benchmark residuals. A directional forecast must
+    # enter stocks and the hedge coherently, once, through the same market beta.
+    preference = torch.cat(
+        (pref + tensor(data.beta[day, names]) * market, market[None])
+    )
+    groups = None
+    if allocation.sector_net_cap is not None:
+        labels = data.sectors[day, names]
+        known = np.unique(labels[labels != ""])
+        groups = np.column_stack(
+            (known[:, None] == labels[None, :], np.zeros(len(known)))
+        )
     uncertainty = model.forecast_uncertainty(tensor(data.ranks[day, names]))
     chosen = allocate(
         preference,
@@ -291,6 +304,7 @@ def decide(
         lower=lower,
         upper=upper,
         config=allocation,
+        sector_exposure=groups,
         forecast_uncertainty=None
         if uncertainty is None
         else torch.cat((uncertainty, uncertainty.new_zeros(1))),

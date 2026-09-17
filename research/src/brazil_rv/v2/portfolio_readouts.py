@@ -32,6 +32,7 @@ from .evaluate import (
 )
 from .execution_policy import traded_signal
 from .portfolio_program import ARMS, SCREEN_FOLDS, read
+from .performance import performance
 from .portfolio_training import calibration_for, load_data, utility_series, windows
 from .research_rounds import _git_identity
 
@@ -155,6 +156,7 @@ def book_summary(data, result, previous, start, first):
     if not np.isfinite(net).all() or np.max(np.abs(result.reconciliation_error)) > 1e-7:
         raise ValueError("readout ledger has invalid or unreconciled economic results")
     summary = {
+        "performance": performance(absolute, result.cdi_benchmark_bps[selection] / 1e4),
         "mean": {k: float(v.mean()) for k, v in daily.items()},
         "sessions": len(net),
         "absolute_compounded_return": float(np.prod(1 + absolute) - 1),

@@ -2,6 +2,16 @@
 
 Last verified: 2026-09-17.
 
+The user subsequently authorized the CPU-first
+[opportunity and portfolio-arrangement program](research/preregistrations/v2_opportunity_portfolios.md):
+attribute remaining losses, test conditional opportunity independently, compare
+optional directional and receipt-dated sector constraints, and report BRL/CDI,
+USD/US-cash and zero-rate Sharpes. Reuse completed neutral Phase-3 ensembles;
+new supervised calibration uses earlier new-ensemble OOS outcomes only. Current
+sector labels cannot be retrospectively applied. Unknown classifications remain
+eligible. USD reporting uses historical PTAX and calendar-accrued EFFR explicitly
+labelled as a cash proxy. No new neural campaign, held-out access or forward capture.
+
 The user has authorized **Phases 1–3** of the
 [decision-model postmortem](docs/v2_PORTFOLIO_DECISION_POSTMORTEM.md#13-recommended-next-program-small-questions-in-an-efficient-order):
 coherent frozen-forecast allocation, controller learnability/reliability, and a
