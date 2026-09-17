@@ -23,6 +23,89 @@ from brazil_rv.v2.portfolio_training import load_data
 from brazil_rv.v2.research_rounds import _git_identity
 
 
+def audit_bridge(root):
+    from brazil_rv.v2.portfolio_inputs import normalized_ranks
+    from brazil_rv.v2.portfolio_objective_training import encoded, preparation
+    from brazil_rv.v2.train import compile_forward, rank_average_ensemble
+
+    torch.set_num_threads(1)
+    design = read(root / "training_design.json")
+    records = {}
+    for arm in ("TE_all", "C6"):
+        data, _ = load_data(Path(design["decision_root"]), arm)
+        model, caches, axes, view, _ = preparation(design, data, arm, "F2", 11)
+        model.eval()
+        compiled = compile_forward(model)
+        positions = np.arange(64)
+        rows = axes["fit"][positions]
+        with torch.no_grad():
+            scores, soft, _ = encoded(
+                compiled, caches["fit"], positions, len(data.inputs.security_ids)
+            )
+        active = caches["fit"].tensors["active_mask"][positions].cpu().numpy()
+        mask = np.repeat(active[..., None], 3, -1)
+        ranks = normalized_ranks(
+            rank_average_ensemble([scores.cpu().numpy()], mask), mask
+        )
+        m = calibration(read(checked(design["mappings"]["F2"]))["arms"][arm])
+        compact = (
+            (ranks.mean(-1) - m.mean[0]) / m.scale[0] * m.coefficient[0] + m.intercept
+        ) * active
+        from brazil_rv.v2.data import restore_name_axis
+
+        hard = restore_name_axis(
+            compact,
+            caches["fit"].names[positions].cpu().numpy(),
+            len(data.inputs.security_ids),
+        )
+        outcomes = {}
+        for name, preference in (("hard", torch.tensor(hard)), ("smooth", soft)):
+            result, target, _ = exact_replay(
+                view,
+                TensorPreference(preference, int(rows[0])),
+                int(rows[0]),
+                int(rows[-1] + 1),
+            )
+            outcomes[name] = (result, target)
+        difference = soft.numpy() - hard
+        chosen = view.valid[rows]
+        records[arm] = {
+            "fit_only_rows": [int(rows[0]), int(rows[-1])],
+            "mean_absolute_preference_error_bps": float(
+                np.abs(difference[chosen]).mean() * 1e4
+            ),
+            "max_absolute_preference_error_bps": float(
+                np.abs(difference[chosen]).max() * 1e4
+            ),
+            "mean_absolute_weight_difference": float(
+                np.abs(outcomes["hard"][1] - outcomes["smooth"][1]).mean()
+            ),
+            "hard_mean_net_bps": float(
+                outcomes["hard"][0].net_excess_all_cash_bps.mean()
+            ),
+            "smooth_mean_net_bps": float(
+                outcomes["smooth"][0].net_excess_all_cash_bps.mean()
+            ),
+            "temperature_chosen_from_financial_outcomes": False,
+            "source_parent": design["parents"][arm]["F2"]["11"],
+        }
+        del compiled, model, caches, data, view
+        torch._dynamo.reset()
+        import gc
+
+        gc.collect()
+        torch.cuda.empty_cache()
+    write_json_atomic(
+        root / "rank_bridge.json",
+        {
+            "implementation": _git_identity(),
+            "arms": records,
+            "financial_selection_or_evaluation_read": False,
+        },
+    )
+    print(records)
+
+
 def audit_gradients(root):
     torch.set_num_threads(1)
     old = Path(read(PROJECT / "docs/v2_decision_run.json")["root"])
@@ -159,7 +242,9 @@ def export_closeout(root):
                             "resolved": bool(arrays["action_session_resolved"][i, j]),
                             "successor": str(
                                 isins[arrays["action_successor_index"][i, j]]
-                            ),
+                            )
+                            if arrays["action_successor_index"][i, j] >= 0
+                            else None,
                         }
                         for i in range(begin, min(t + 1, len(dates)))
                         if arrays["action_has_action"][i, j]
@@ -178,10 +263,15 @@ def export_closeout(root):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("command", choices=("gradients", "closeout"))
+    parser.add_argument("command", choices=("gradients", "closeout", "bridge"))
     parser.add_argument("--root", type=Path, required=True)
     args = parser.parse_args()
-    (audit_gradients if args.command == "gradients" else export_closeout)(args.root)
+    if args.command == "gradients":
+        audit_gradients(args.root)
+    elif args.command == "closeout":
+        export_closeout(args.root)
+    else:
+        audit_bridge(args.root)
 
 
 if __name__ == "__main__":

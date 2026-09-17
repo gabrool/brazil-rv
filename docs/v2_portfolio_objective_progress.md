@@ -24,9 +24,12 @@ The primary allocator remains net .05/beta .05 as pre-registered.
 Largest stale-mark settlements include TRPL, CIEL, BRML, ALSO and CPLE units.
 The accepted store explicitly has inferred development-grade action terms and
 zero established ISIN succession links. The events must not be silently treated
-as observed executable fills or removed from the universe. Source-level event
-inspection and compact review export are being finalized; no new financial
-conclusion is promoted from these sensitivities.
+as observed executable fills or removed from the universe. The source-level
+inspection and [compact export](v2_portfolio_objective_closeout.json) are complete:
+they bind last/next same-ISIN quotes and available action rows for the largest
+events. Contractual successor/cash dispositions remain unverified. No new financial
+conclusion is promoted from these sensitivities. Stage A is complete; its registered
+freeze is the established neutral allocator, with the other arrangements as sensitivities.
 
 ## Stage B
 
@@ -37,15 +40,23 @@ derivative agreed. Changing OSQP objective scaling changed the derivative despit
 the mathematically identical optimization, so a single rescaling is not accepted
 as a repair. The implementation now differentiates the exact active face using
 the positive diagonal-plus-market Hessian and the small exposure constraint
-system. The same Clarabel forward portfolios are preserved. Twenty-eight targeted
-tests pass, including multi-day finite differences and the real small hedge
-variance. Historical financial/QP gradient checks and local GPU admission remain.
+system. The same Clarabel forward portfolios are preserved. Thirty targeted tests
+pass, including multi-day finite differences, the real small hedge variance,
+SAM account-state resets and label-mutation independence of neural preferences.
+Three historical twelve-session gradient paths agree with numerical perturbations;
+independent account NAV error is below 8e-13. All four representative local GPU
+cases (C6/TE_all, F2/F14, seed 11) pass. Warm 32-session SAM steps take .765-.938
+seconds and peak allocated GPU memory is 1.32-3.14 GiB. The smooth-rank interface
+bridge is the last engineering readout before financial dispatch.
 
 The new preference adds an unranked cardinal return head to the differentiable
 rank anchor. Training uses actual chronological accounts and clones state for
 SAM/retries. It preserves the 60-session model history and every eligible name.
-Implementation also separates selection from the inherited model's purged label
-endpoints. The continuation budget and loss-scale rule are registered before runs.
+Implementation also separates selection from the inherited neural model's purged
+label endpoints. The old portfolio-calibration burn-in convention cannot simply
+be reused for a warm-start neural model trained on those endpoints. This does not
+assert that the old frozen-OOS controller calibration leaked. The continuation
+budget and loss-scale rule are registered before runs.
 
 ## Stage C — not launched
 

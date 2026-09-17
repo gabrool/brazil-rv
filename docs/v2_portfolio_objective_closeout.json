@@ -1,0 +1,4650 @@
+{
+  "arms": {
+    "C6": {
+      "books": {
+        "cost8_net0.05": {
+          "book": {
+            "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_portfolio_objective_e52be14_20260917\\closeout\\C6\\cost8_net0.05\\book.json",
+            "sha256": "2a5df39612c5e0f10435ccb1bbb20604a7aacd9bc83ffeb363864613385eeffd"
+          },
+          "issuer_contribution_proxy_top": [
+            [
+              "UNKNOWN",
+              {
+                "max_absolute_net": 0.5193332816559777,
+                "mean_contribution_proxy_bps": 1.3996026907220809,
+                "mean_gross": 0.2854310432339268
+              }
+            ],
+            [
+              "76483817:014311",
+              {
+                "max_absolute_net": 0.10289117971510688,
+                "mean_contribution_proxy_bps": 0.5104337162179371,
+                "mean_gross": 0.021701203902831655
+              }
+            ],
+            [
+              "10629105:022187",
+              {
+                "max_absolute_net": 0.0625205632755626,
+                "mean_contribution_proxy_bps": 0.3366510010096505,
+                "mean_gross": 0.013064626512590192
+              }
+            ],
+            [
+              "33000167:009512",
+              {
+                "max_absolute_net": 0.10682123990557688,
+                "mean_contribution_proxy_bps": 0.30797590511697526,
+                "mean_gross": 0.028245607853719386
+              }
+            ],
+            [
+              "03847461:018724",
+              {
+                "max_absolute_net": 0.10486624818471582,
+                "mean_contribution_proxy_bps": 0.2870796141944294,
+                "mean_gross": 0.0320002745431691
+              }
+            ],
+            [
+              "07859971:020257",
+              {
+                "max_absolute_net": 0.1048085711566087,
+                "mean_contribution_proxy_bps": 0.2751121998212828,
+                "mean_gross": 0.022806945985511973
+              }
+            ],
+            [
+              "12528708:025283",
+              {
+                "max_absolute_net": 0.0340039769143869,
+                "mean_contribution_proxy_bps": 0.21644519724205097,
+                "mean_gross": 0.0033526472946622437
+              }
+            ],
+            [
+              "33958695:011592",
+              {
+                "max_absolute_net": 0.09781979936936067,
+                "mean_contribution_proxy_bps": 0.20316720364773921,
+                "mean_gross": 0.018211119144337675
+              }
+            ],
+            [
+              "16614075:021350",
+              {
+                "max_absolute_net": 0.05329671824294197,
+                "mean_contribution_proxy_bps": 0.20046418894676185,
+                "mean_gross": 0.013075340267405566
+              }
+            ],
+            [
+              "04423567:021237",
+              {
+                "max_absolute_net": 0.05152607951219946,
+                "mean_contribution_proxy_bps": 0.19004443865705195,
+                "mean_gross": 0.00955634697656092
+              }
+            ]
+          ],
+          "limitations": {
+            "economics_unresolved": true,
+            "sector_contribution_is_label_based_proxy": true,
+            "terminal_haircut_scenario_relative_difference": -0.35734015136351704
+          },
+          "mean": {
+            "absolute_bps": 6.551861029155732,
+            "beta": -0.01683078243827812,
+            "borrow_bps": 0.6909284222352563,
+            "cdi_bps": 3.0387208860759496,
+            "equity_gross_bps": 7.292593830545222,
+            "free_cash_fraction": 0.03274145716856543,
+            "gross": 1.9247993511626054,
+            "hedge_gross_bps": -1.958904986099543,
+            "interest_bps": 2.8811660494277263,
+            "net_excess_bps": 3.5131401430797826,
+            "restricted_cash_fraction": 0.9153616100775415,
+            "settlement_fraction": 0.00030364236502805966,
+            "signed_net": 0.051896932753893094,
+            "stale_fraction": 0.0027505873565262977,
+            "trading_cost_bps": 0.9720654424824074,
+            "turnover": 0.12150818031030093,
+            "unresolved_claim_fraction": 0.0,
+            "utility_bps": 3.0892630475590086
+          },
+          "metrics": {
+            "absolute_brl_flat_fraction": 0.0,
+            "absolute_brl_losing_fraction": 0.4372842347525892,
+            "absolute_brl_winning_fraction": 0.5627157652474108,
+            "absolute_compounded_return_brl": 2.008470633440096,
+            "absolute_compounded_return_usd": 0.6071606439319563,
+            "annualized_volatility_brl": 0.10348690801292602,
+            "cdi_excess_flat_fraction": 0.0,
+            "cdi_excess_losing_fraction": 0.45972382048331417,
+            "cdi_excess_winning_fraction": 0.5402761795166858,
+            "fx_carried_endpoint_count": 0,
+            "fx_max_age_days": 0,
+            "fx_valuation": "BCB PTAX BRL per USD; last dated fix on holidays",
+            "maximum_drawdown_brl": -0.11565321814635732,
+            "maximum_drawdown_usd": -0.30706189915931004,
+            "relative_to_cdi_compounded_return": 0.7742909620360183,
+            "sessions": 1738,
+            "sharpe_brl_minus_cdi": 0.8561505176415499,
+            "sharpe_brl_minus_zero": 1.595437539926324,
+            "sharpe_usd_minus_us_cash": 0.3433520519826489,
+            "us_cash_proxy": "EFFR, ACT/360 over calendar days",
+            "us_rate_max_age_days": 3
+          },
+          "paired_control": "full_net0.05",
+          "paired_net_bps": {
+            "block_length_sessions": 40,
+            "circular": true,
+            "estimate": -0.4873391102727742,
+            "fold_boundary_preserved": true,
+            "lower_95": -0.6467080449264787,
+            "observations": 1738,
+            "replications": 10000,
+            "resample_mean": -0.48828311870631513,
+            "upper_95": -0.3488562884886584
+          },
+          "realized_beta": -0.061832407037006064,
+          "year_net_bps": {
+            "2018": 0.399090198897292,
+            "2019": 4.738240354734778,
+            "2020": -1.4642331376633682,
+            "2021": 6.444608433768261,
+            "2022": 5.1835201609535035,
+            "2023": 4.2579246815603184,
+            "2024": 4.9956464894051145
+          }
+        },
+        "cost8_net0.45": {
+          "book": {
+            "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_portfolio_objective_e52be14_20260917\\closeout\\C6\\cost8_net0.45\\book.json",
+            "sha256": "e3fce77b122e68052f3f8c51c8968faf46c70d1174b194673d336f1fb79c8e5b"
+          },
+          "issuer_contribution_proxy_top": [
+            [
+              "UNKNOWN",
+              {
+                "max_absolute_net": 0.6892501400616942,
+                "mean_contribution_proxy_bps": 2.27239860916527,
+                "mean_gross": 0.3812008582588694
+              }
+            ],
+            [
+              "76483817:014311",
+              {
+                "max_absolute_net": 0.10387350461761874,
+                "mean_contribution_proxy_bps": 0.5046399454380864,
+                "mean_gross": 0.02639693994759755
+              }
+            ],
+            [
+              "07859971:020257",
+              {
+                "max_absolute_net": 0.1052815592446964,
+                "mean_contribution_proxy_bps": 0.3736811775881656,
+                "mean_gross": 0.032369459845226496
+              }
+            ],
+            [
+              "03847461:018724",
+              {
+                "max_absolute_net": 0.10470675111770057,
+                "mean_contribution_proxy_bps": 0.3299023412485139,
+                "mean_gross": 0.03416560968928361
+              }
+            ],
+            [
+              "04423567:021237",
+              {
+                "max_absolute_net": 0.05377946685129277,
+                "mean_contribution_proxy_bps": 0.3176384371331548,
+                "mean_gross": 0.017464529214996624
+              }
+            ],
+            [
+              "16614075:021350",
+              {
+                "max_absolute_net": 0.053339307886555776,
+                "mean_contribution_proxy_bps": 0.25982803998755244,
+                "mean_gross": 0.014840210763131991
+              }
+            ],
+            [
+              "12648266:024961",
+              {
+                "max_absolute_net": 0.05252672849582187,
+                "mean_contribution_proxy_bps": 0.24333459923872433,
+                "mean_gross": 0.006431339125350843
+              }
+            ],
+            [
+              "33958695:011592",
+              {
+                "max_absolute_net": 0.10112246117166865,
+                "mean_contribution_proxy_bps": 0.23801234337113744,
+                "mean_gross": 0.020284205764413466
+              }
+            ],
+            [
+              "88611835:008451",
+              {
+                "max_absolute_net": 0.10798454757971448,
+                "mean_contribution_proxy_bps": 0.23278102853075938,
+                "mean_gross": 0.015606974277096253
+              }
+            ],
+            [
+              "12528708:025283",
+              {
+                "max_absolute_net": 0.045162558941605646,
+                "mean_contribution_proxy_bps": 0.22007451283255064,
+                "mean_gross": 0.0038954796213289014
+              }
+            ]
+          ],
+          "limitations": {
+            "economics_unresolved": true,
+            "sector_contribution_is_label_based_proxy": true,
+            "terminal_haircut_scenario_relative_difference": -0.5858637302004688
+          },
+          "mean": {
+            "absolute_bps": 9.210521720208153,
+            "beta": 0.04418704721364191,
+            "borrow_bps": 0.6163556504348373,
+            "cdi_bps": 3.0387208860759496,
+            "equity_gross_bps": 11.018435494177337,
+            "free_cash_fraction": -0.27641812694581896,
+            "gross": 2.125891069289289,
+            "hedge_gross_bps": -1.8159450731035711,
+            "interest_bps": 1.69477303029499,
+            "net_excess_bps": 6.171800834132203,
+            "restricted_cash_fraction": 0.8346353738312622,
+            "settlement_fraction": 0.0003710050580980452,
+            "signed_net": 0.4417827531145568,
+            "stale_fraction": 0.0033681491778256973,
+            "trading_cost_bps": 1.070386080725788,
+            "turnover": 0.1337982600907235,
+            "unresolved_claim_fraction": 0.0,
+            "utility_bps": 5.594664198189298
+          },
+          "metrics": {
+            "absolute_brl_flat_fraction": 0.0,
+            "absolute_brl_losing_fraction": 0.4344073647871116,
+            "absolute_brl_winning_fraction": 0.5655926352128884,
+            "absolute_compounded_return_brl": 3.671025683426823,
+            "absolute_compounded_return_usd": 1.4953172425069483,
+            "annualized_volatility_brl": 0.13053482718816609,
+            "cdi_excess_flat_fraction": 0.0,
+            "cdi_excess_losing_fraction": 0.451668584579977,
+            "cdi_excess_winning_fraction": 0.5483314154200231,
+            "fx_carried_endpoint_count": 0,
+            "fx_max_age_days": 0,
+            "fx_valuation": "BCB PTAX BRL per USD; last dated fix on holidays",
+            "maximum_drawdown_brl": -0.12045463504446108,
+            "maximum_drawdown_usd": -0.29800543311553096,
+            "relative_to_cdi_compounded_return": 1.754807895221321,
+            "sessions": 1738,
+            "sharpe_brl_minus_cdi": 1.1920025979915263,
+            "sharpe_brl_minus_zero": 1.7781089717510075,
+            "sharpe_usd_minus_us_cash": 0.663425045071348,
+            "us_cash_proxy": "EFFR, ACT/360 over calendar days",
+            "us_rate_max_age_days": 3
+          },
+          "paired_control": "full_net0.45",
+          "paired_net_bps": {
+            "block_length_sessions": 40,
+            "circular": true,
+            "estimate": -0.5357125940459716,
+            "fold_boundary_preserved": true,
+            "lower_95": -0.6917852357881865,
+            "observations": 1738,
+            "replications": 10000,
+            "resample_mean": -0.5366289827649557,
+            "upper_95": -0.4014586253688943
+          },
+          "realized_beta": -0.04011160478865407,
+          "year_net_bps": {
+            "2018": -2.9210203868141384,
+            "2019": 12.802181393444013,
+            "2020": 2.3747037775720345,
+            "2021": 7.284398351610936,
+            "2022": 8.141900993648743,
+            "2023": 6.502369104588981,
+            "2024": 8.879236809177387
+          }
+        },
+        "debit3_net0.05": {
+          "book": {
+            "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_portfolio_objective_e52be14_20260917\\closeout\\C6\\debit3_net0.05\\book.json",
+            "sha256": "f039d5d0165f0cf35a0bb18b4aee2141a12f89cf8a84056d736dbc71700f7af3"
+          },
+          "issuer_contribution_proxy_top": [
+            [
+              "UNKNOWN",
+              {
+                "max_absolute_net": 0.5188342064207663,
+                "mean_contribution_proxy_bps": 1.400528854150725,
+                "mean_gross": 0.2854409806500213
+              }
+            ],
+            [
+              "76483817:014311",
+              {
+                "max_absolute_net": 0.10288095406522663,
+                "mean_contribution_proxy_bps": 0.5103727031248125,
+                "mean_gross": 0.02169482820898612
+              }
+            ],
+            [
+              "10629105:022187",
+              {
+                "max_absolute_net": 0.06250665145345108,
+                "mean_contribution_proxy_bps": 0.33674103258699334,
+                "mean_gross": 0.013064929416919764
+              }
+            ],
+            [
+              "33000167:009512",
+              {
+                "max_absolute_net": 0.10682238390360235,
+                "mean_contribution_proxy_bps": 0.30806371711124014,
+                "mean_gross": 0.028245953076291498
+              }
+            ],
+            [
+              "03847461:018724",
+              {
+                "max_absolute_net": 0.10486667662626917,
+                "mean_contribution_proxy_bps": 0.28702723892805165,
+                "mean_gross": 0.03199833620209644
+              }
+            ],
+            [
+              "07859971:020257",
+              {
+                "max_absolute_net": 0.10480599668908187,
+                "mean_contribution_proxy_bps": 0.2751989943138634,
+                "mean_gross": 0.022805881837092038
+              }
+            ],
+            [
+              "12528708:025283",
+              {
+                "max_absolute_net": 0.03404691819551032,
+                "mean_contribution_proxy_bps": 0.21656993213628087,
+                "mean_gross": 0.003353525271847341
+              }
+            ],
+            [
+              "33958695:011592",
+              {
+                "max_absolute_net": 0.09779938120902235,
+                "mean_contribution_proxy_bps": 0.20292404587641646,
+                "mean_gross": 0.018214908686759495
+              }
+            ],
+            [
+              "16614075:021350",
+              {
+                "max_absolute_net": 0.053268229116831184,
+                "mean_contribution_proxy_bps": 0.20038641892023296,
+                "mean_gross": 0.013071542696308917
+              }
+            ],
+            [
+              "04423567:021237",
+              {
+                "max_absolute_net": 0.05151771296268756,
+                "mean_contribution_proxy_bps": 0.1900215121389324,
+                "mean_gross": 0.009556969919920522
+              }
+            ]
+          ],
+          "limitations": {
+            "economics_unresolved": true,
+            "sector_contribution_is_label_based_proxy": true,
+            "terminal_haircut_scenario_relative_difference": -0.3681937001430615
+          },
+          "mean": {
+            "absolute_bps": 6.932019986270832,
+            "beta": -0.016832330396685673,
+            "borrow_bps": 0.6907366923896395,
+            "cdi_bps": 3.0387208860759496,
+            "equity_gross_bps": 7.295694473393594,
+            "free_cash_fraction": 0.03272618196677016,
+            "gross": 1.9246796143127847,
+            "hedge_gross_bps": -1.9607421557281048,
+            "interest_bps": 2.774071451281605,
+            "net_excess_bps": 3.893299100194882,
+            "restricted_cash_fraction": 0.9153790006581404,
+            "settlement_fraction": 0.00030354354858308665,
+            "signed_net": 0.05189481737508952,
+            "stale_fraction": 0.002750281889236792,
+            "trading_cost_bps": 0.4862670902866122,
+            "turnover": 0.12156677257165302,
+            "unresolved_claim_fraction": 0.0,
+            "utility_bps": 3.4694274408372543
+          },
+          "metrics": {
+            "absolute_brl_flat_fraction": 0.0,
+            "absolute_brl_losing_fraction": 0.4361334867663982,
+            "absolute_brl_winning_fraction": 0.5638665132336018,
+            "absolute_compounded_return_brl": 2.21380367140815,
+            "absolute_compounded_return_usd": 0.7168519847259065,
+            "annualized_volatility_brl": 0.10349652352096171,
+            "cdi_excess_flat_fraction": 0.0,
+            "cdi_excess_losing_fraction": 0.4579976985040276,
+            "cdi_excess_winning_fraction": 0.5420023014959724,
+            "fx_carried_endpoint_count": 0,
+            "fx_max_age_days": 0,
+            "fx_valuation": "BCB PTAX BRL per USD; last dated fix on holidays",
+            "maximum_drawdown_brl": -0.11242431703185762,
+            "maximum_drawdown_usd": -0.3062877470069161,
+            "relative_to_cdi_compounded_return": 0.8953892202089992,
+            "sessions": 1738,
+            "sharpe_brl_minus_cdi": 0.9487135602293226,
+            "sharpe_brl_minus_zero": 1.6878528641461537,
+            "sharpe_usd_minus_us_cash": 0.3979872417197849,
+            "us_cash_proxy": "EFFR, ACT/360 over calendar days",
+            "us_rate_max_age_days": 3
+          },
+          "paired_control": "full_net0.05",
+          "paired_net_bps": {
+            "block_length_sessions": 40,
+            "circular": true,
+            "estimate": -0.10718015315767489,
+            "fold_boundary_preserved": true,
+            "lower_95": -0.13672140416727804,
+            "observations": 1738,
+            "replications": 10000,
+            "resample_mean": -0.10726659295158224,
+            "upper_95": -0.07876504048588737
+          },
+          "realized_beta": -0.06184948082345351,
+          "year_net_bps": {
+            "2018": 0.4829425628472589,
+            "2019": 4.809372585990143,
+            "2020": -1.098983727647326,
+            "2021": 7.087448931531415,
+            "2022": 5.33227059298528,
+            "2023": 4.455635343286063,
+            "2024": 6.137411775419249
+          }
+        },
+        "debit3_net0.45": {
+          "book": {
+            "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_portfolio_objective_e52be14_20260917\\closeout\\C6\\debit3_net0.45\\book.json",
+            "sha256": "314c7f113d05eed40ab0e0e1a5b8419881a253c14490f3d712549ecb6c50b9b3"
+          },
+          "issuer_contribution_proxy_top": [
+            [
+              "UNKNOWN",
+              {
+                "max_absolute_net": 0.6887950549558175,
+                "mean_contribution_proxy_bps": 2.272648242502906,
+                "mean_gross": 0.3811887784444245
+              }
+            ],
+            [
+              "76483817:014311",
+              {
+                "max_absolute_net": 0.10384647795136784,
+                "mean_contribution_proxy_bps": 0.5046843794385317,
+                "mean_gross": 0.02639781053774513
+              }
+            ],
+            [
+              "07859971:020257",
+              {
+                "max_absolute_net": 0.10527954092354538,
+                "mean_contribution_proxy_bps": 0.37368537373386274,
+                "mean_gross": 0.03236932296211412
+              }
+            ],
+            [
+              "03847461:018724",
+              {
+                "max_absolute_net": 0.10470549960743389,
+                "mean_contribution_proxy_bps": 0.3299148934847248,
+                "mean_gross": 0.03416547630541182
+              }
+            ],
+            [
+              "04423567:021237",
+              {
+                "max_absolute_net": 0.053779227121850445,
+                "mean_contribution_proxy_bps": 0.31768169704639315,
+                "mean_gross": 0.0174645304675246
+              }
+            ],
+            [
+              "16614075:021350",
+              {
+                "max_absolute_net": 0.053313340418879994,
+                "mean_contribution_proxy_bps": 0.25980429621339246,
+                "mean_gross": 0.014838634728062728
+              }
+            ],
+            [
+              "12648266:024961",
+              {
+                "max_absolute_net": 0.052526339623637716,
+                "mean_contribution_proxy_bps": 0.2433210454955509,
+                "mean_gross": 0.0064309422777985665
+              }
+            ],
+            [
+              "33958695:011592",
+              {
+                "max_absolute_net": 0.1011068206448689,
+                "mean_contribution_proxy_bps": 0.2380600781037705,
+                "mean_gross": 0.020281812958948913
+              }
+            ],
+            [
+              "88611835:008451",
+              {
+                "max_absolute_net": 0.10796898374700376,
+                "mean_contribution_proxy_bps": 0.23276912786937384,
+                "mean_gross": 0.015606347930565779
+              }
+            ],
+            [
+              "12528708:025283",
+              {
+                "max_absolute_net": 0.04515912683061258,
+                "mean_contribution_proxy_bps": 0.22008433576246583,
+                "mean_gross": 0.0038951221510952544
+              }
+            ]
+          ],
+          "limitations": {
+            "economics_unresolved": true,
+            "sector_contribution_is_label_based_proxy": true,
+            "terminal_haircut_scenario_relative_difference": -0.593416530281873
+          },
+          "mean": {
+            "absolute_bps": 9.415919172996833,
+            "beta": 0.04418818836356377,
+            "borrow_bps": 0.6163509682559973,
+            "cdi_bps": 3.0387208860759496,
+            "equity_gross_bps": 11.018754700639384,
+            "free_cash_fraction": -0.27643515556791537,
+            "gross": 2.1258628476772463,
+            "hedge_gross_bps": -1.816408662060085,
+            "interest_bps": 1.36511731861078,
+            "net_excess_bps": 6.377198286920882,
+            "restricted_cash_fraction": 0.8346626689846485,
+            "settlement_fraction": 0.0003708966987088294,
+            "signed_net": 0.441772486583267,
+            "stale_fraction": 0.0033676628529919635,
+            "trading_cost_bps": 0.5351932159372564,
+            "turnover": 0.1337983039843141,
+            "unresolved_claim_fraction": 0.0,
+            "utility_bps": 5.80013421809314
+          },
+          "metrics": {
+            "absolute_brl_flat_fraction": 0.0,
+            "absolute_brl_losing_fraction": 0.43383199079401613,
+            "absolute_brl_winning_fraction": 0.5661680092059839,
+            "absolute_compounded_return_brl": 3.8406559573094183,
+            "absolute_compounded_return_usd": 1.585935743872168,
+            "annualized_volatility_brl": 0.1305300191857034,
+            "cdi_excess_flat_fraction": 0.0,
+            "cdi_excess_losing_fraction": 0.44994246260069043,
+            "cdi_excess_winning_fraction": 0.5500575373993095,
+            "fx_carried_endpoint_count": 0,
+            "fx_max_age_days": 0,
+            "fx_valuation": "BCB PTAX BRL per USD; last dated fix on holidays",
+            "maximum_drawdown_brl": -0.11893943449821465,
+            "maximum_drawdown_usd": -0.29858397822144056,
+            "relative_to_cdi_compounded_return": 1.854849909423574,
+            "sessions": 1738,
+            "sharpe_brl_minus_cdi": 1.2317223319243433,
+            "sharpe_brl_minus_zero": 1.8178283021773198,
+            "sharpe_usd_minus_us_cash": 0.6904728909154794,
+            "us_cash_proxy": "EFFR, ACT/360 over calendar days",
+            "us_rate_max_age_days": 3
+          },
+          "paired_control": "full_net0.45",
+          "paired_net_bps": {
+            "block_length_sessions": 40,
+            "circular": true,
+            "estimate": -0.3303151412572916,
+            "fold_boundary_preserved": true,
+            "lower_95": -0.37343676539881265,
+            "observations": 1738,
+            "replications": 10000,
+            "resample_mean": -0.3302934273591547,
+            "upper_95": -0.2853493009216813
+          },
+          "realized_beta": -0.040073879425826964,
+          "year_net_bps": {
+            "2018": -2.8806453381155652,
+            "2019": 12.773237870150396,
+            "2020": 2.484665476224609,
+            "2021": 7.6958815301424135,
+            "2022": 8.064351981405888,
+            "2023": 6.525842740406775,
+            "2024": 9.830694431123716
+          }
+        },
+        "full_net0.05": {
+          "book": {
+            "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_opportunity_056aad2_20260917\\C6\\books\\neutral\\book.json",
+            "sha256": "4c742437d57d8c355ec230a1df3757b23fa3c8e13bc6ee1f6cecc2badd90e6d7"
+          },
+          "issuer_contribution_proxy_top": [
+            [
+              "UNKNOWN",
+              {
+                "max_absolute_net": 0.5187243221483749,
+                "mean_contribution_proxy_bps": 1.4005074851268071,
+                "mean_gross": 0.2854594112764726
+              }
+            ],
+            [
+              "76483817:014311",
+              {
+                "max_absolute_net": 0.10287967815819005,
+                "mean_contribution_proxy_bps": 0.5103836296000129,
+                "mean_gross": 0.021695012703985023
+              }
+            ],
+            [
+              "10629105:022187",
+              {
+                "max_absolute_net": 0.06250461433952731,
+                "mean_contribution_proxy_bps": 0.33675183645360235,
+                "mean_gross": 0.013063888166816952
+              }
+            ],
+            [
+              "33000167:009512",
+              {
+                "max_absolute_net": 0.10681877653081415,
+                "mean_contribution_proxy_bps": 0.3080321047769069,
+                "mean_gross": 0.028244819885820505
+              }
+            ],
+            [
+              "03847461:018724",
+              {
+                "max_absolute_net": 0.10486416371023671,
+                "mean_contribution_proxy_bps": 0.2869894457970594,
+                "mean_gross": 0.03199648315594882
+              }
+            ],
+            [
+              "07859971:020257",
+              {
+                "max_absolute_net": 0.10480437169735991,
+                "mean_contribution_proxy_bps": 0.27519633233279656,
+                "mean_gross": 0.022806754388297802
+              }
+            ],
+            [
+              "12528708:025283",
+              {
+                "max_absolute_net": 0.03405362275504698,
+                "mean_contribution_proxy_bps": 0.21656509521257677,
+                "mean_gross": 0.0033543244060177907
+              }
+            ],
+            [
+              "33958695:011592",
+              {
+                "max_absolute_net": 0.09779480467837638,
+                "mean_contribution_proxy_bps": 0.20291349845439408,
+                "mean_gross": 0.01821702089763372
+              }
+            ],
+            [
+              "16614075:021350",
+              {
+                "max_absolute_net": 0.05326597750187076,
+                "mean_contribution_proxy_bps": 0.20038450583668302,
+                "mean_gross": 0.013071157065268795
+              }
+            ],
+            [
+              "04423567:021237",
+              {
+                "max_absolute_net": 0.05151748525524514,
+                "mean_contribution_proxy_bps": 0.19003741492607099,
+                "mean_gross": 0.00955767796899903
+              }
+            ]
+          ],
+          "limitations": {
+            "economics_unresolved": true,
+            "sector_contribution_is_label_based_proxy": true,
+            "terminal_haircut_scenario_relative_difference": -0.3712131605383546
+          },
+          "mean": {
+            "absolute_bps": 7.039200139428506,
+            "beta": -0.01683385917095359,
+            "borrow_bps": 0.690703055681068,
+            "cdi_bps": 3.0387208860759496,
+            "equity_gross_bps": 7.295425336043761,
+            "free_cash_fraction": 0.03274020642320121,
+            "gross": 1.9246553111473315,
+            "hedge_gross_bps": -1.9603549349147908,
+            "interest_bps": 2.8811748755943922,
+            "net_excess_bps": 4.000479253352557,
+            "restricted_cash_fraction": 0.9153657357453583,
+            "settlement_fraction": 0.0003035097116796401,
+            "signed_net": 0.05189405783144051,
+            "stale_fraction": 0.0027502029856082766,
+            "trading_cost_bps": 0.48634208161376713,
+            "turnover": 0.12158552040344177,
+            "unresolved_claim_fraction": 0.0,
+            "utility_bps": 3.5765832839480236
+          },
+          "metrics": {
+            "absolute_brl_flat_fraction": 0.0,
+            "absolute_brl_losing_fraction": 0.4361334867663982,
+            "absolute_brl_winning_fraction": 0.5638665132336018,
+            "absolute_compounded_return_brl": 2.2741660556426075,
+            "absolute_compounded_return_usd": 0.749098285300426,
+            "annualized_volatility_brl": 0.10350774634703559,
+            "cdi_excess_flat_fraction": 0.0,
+            "cdi_excess_losing_fraction": 0.4579976985040276,
+            "cdi_excess_winning_fraction": 0.5420023014959724,
+            "fx_carried_endpoint_count": 0,
+            "fx_max_age_days": 0,
+            "fx_valuation": "BCB PTAX BRL per USD; last dated fix on holidays",
+            "maximum_drawdown_brl": -0.11169080870981685,
+            "maximum_drawdown_usd": -0.3062877470069161,
+            "relative_to_cdi_compounded_return": 0.9309888473430403,
+            "sessions": 1738,
+            "sharpe_brl_minus_cdi": 0.9747461232314543,
+            "sharpe_brl_minus_zero": 1.7137639430276195,
+            "sharpe_usd_minus_us_cash": 0.4133700529714871,
+            "us_cash_proxy": "EFFR, ACT/360 over calendar days",
+            "us_rate_max_age_days": 3
+          },
+          "paired_control": "full_net0.05",
+          "paired_net_bps": {
+            "block_length_sessions": 40,
+            "circular": true,
+            "estimate": 0.0,
+            "fold_boundary_preserved": true,
+            "lower_95": 0.0,
+            "observations": 1738,
+            "replications": 10000,
+            "resample_mean": 0.0,
+            "upper_95": 0.0
+          },
+          "realized_beta": -0.061857363825542994,
+          "year_net_bps": {
+            "2018": 0.4829425628472589,
+            "2019": 4.809372585990143,
+            "2020": -1.0562974699296404,
+            "2021": 7.235814312323726,
+            "2022": 5.550294016496435,
+            "2023": 4.639417954919018,
+            "2024": 6.292471677402807
+          }
+        },
+        "full_net0.25": {
+          "book": {
+            "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_portfolio_objective_e52be14_20260917\\closeout\\C6\\full_net0.25\\book.json",
+            "sha256": "489ba1f30c299420d4b7d3752bbcbbcf11a33844095aa6850ddd6e08fa562eeb"
+          },
+          "issuer_contribution_proxy_top": [
+            [
+              "UNKNOWN",
+              {
+                "max_absolute_net": 0.5813419713334996,
+                "mean_contribution_proxy_bps": 1.6586163569787016,
+                "mean_gross": 0.32080974894666664
+              }
+            ],
+            [
+              "76483817:014311",
+              {
+                "max_absolute_net": 0.10319718170487319,
+                "mean_contribution_proxy_bps": 0.5118552990645279,
+                "mean_gross": 0.02510378394757026
+              }
+            ],
+            [
+              "07859971:020257",
+              {
+                "max_absolute_net": 0.10521223952991576,
+                "mean_contribution_proxy_bps": 0.32844557133606983,
+                "mean_gross": 0.028338414982604296
+              }
+            ],
+            [
+              "03847461:018724",
+              {
+                "max_absolute_net": 0.10438640988799965,
+                "mean_contribution_proxy_bps": 0.3114108200935613,
+                "mean_gross": 0.033063950589896425
+              }
+            ],
+            [
+              "33000167:009512",
+              {
+                "max_absolute_net": 0.10674155267388052,
+                "mean_contribution_proxy_bps": 0.27591529634477135,
+                "mean_gross": 0.022145061962866704
+              }
+            ],
+            [
+              "04423567:021237",
+              {
+                "max_absolute_net": 0.053327403455558774,
+                "mean_contribution_proxy_bps": 0.2563653465314804,
+                "mean_gross": 0.014988456214042245
+              }
+            ],
+            [
+              "16614075:021350",
+              {
+                "max_absolute_net": 0.053339491996377844,
+                "mean_contribution_proxy_bps": 0.25385912106182895,
+                "mean_gross": 0.014875760529198243
+              }
+            ],
+            [
+              "10629105:022187",
+              {
+                "max_absolute_net": 0.05289990769223951,
+                "mean_contribution_proxy_bps": 0.2306752978678294,
+                "mean_gross": 0.012862069344408873
+              }
+            ],
+            [
+              "12528708:025283",
+              {
+                "max_absolute_net": 0.034246414350022784,
+                "mean_contribution_proxy_bps": 0.21063112684039242,
+                "mean_gross": 0.0034376192677288784
+              }
+            ],
+            [
+              "12648266:024961",
+              {
+                "max_absolute_net": 0.052740575346510755,
+                "mean_contribution_proxy_bps": 0.20973504661964956,
+                "mean_gross": 0.004793591189780863
+              }
+            ]
+          ],
+          "limitations": {
+            "economics_unresolved": true,
+            "sector_contribution_is_label_based_proxy": true,
+            "terminal_haircut_scenario_relative_difference": -0.5433083925369946
+          },
+          "mean": {
+            "absolute_bps": 8.2926561084103,
+            "beta": 0.02571868142957559,
+            "borrow_bps": 0.6374345549115688,
+            "cdi_bps": 3.0387208860759496,
+            "equity_gross_bps": 9.078665447140258,
+            "free_cash_fraction": -0.1161528229673873,
+            "gross": 2.0042645605004514,
+            "hedge_gross_bps": -1.9176371237103575,
+            "interest_bps": 2.27226115504853,
+            "net_excess_bps": 5.253935222334352,
+            "restricted_cash_fraction": 0.864020063244439,
+            "settlement_fraction": 0.0003810202676588296,
+            "signed_net": 0.25213275972294824,
+            "stale_fraction": 0.0034566932120676584,
+            "trading_cost_bps": 0.5031988151565404,
+            "turnover": 0.12579970378913508,
+            "unresolved_claim_fraction": 0.0,
+            "utility_bps": 4.77821664797896
+          },
+          "metrics": {
+            "absolute_brl_flat_fraction": 0.0,
+            "absolute_brl_losing_fraction": 0.43670886075949367,
+            "absolute_brl_winning_fraction": 0.5632911392405063,
+            "absolute_compounded_return_brl": 3.0393594230075793,
+            "absolute_compounded_return_usd": 1.1578736448991371,
+            "annualized_volatility_brl": 0.11377025146148145,
+            "cdi_excess_flat_fraction": 0.0,
+            "cdi_excess_losing_fraction": 0.452819332566168,
+            "cdi_excess_winning_fraction": 0.547180667433832,
+            "fx_carried_endpoint_count": 0,
+            "fx_max_age_days": 0,
+            "fx_valuation": "BCB PTAX BRL per USD; last dated fix on holidays",
+            "maximum_drawdown_brl": -0.12119733241006048,
+            "maximum_drawdown_usd": -0.30166137309484053,
+            "relative_to_cdi_compounded_return": 1.38227318458551,
+            "sessions": 1738,
+            "sharpe_brl_minus_cdi": 1.1644633879916686,
+            "sharpe_brl_minus_zero": 1.8368152592392843,
+            "sharpe_usd_minus_us_cash": 0.5735576745386146,
+            "us_cash_proxy": "EFFR, ACT/360 over calendar days",
+            "us_rate_max_age_days": 3
+          },
+          "paired_control": "full_net0.05",
+          "paired_net_bps": {
+            "block_length_sessions": 40,
+            "circular": true,
+            "estimate": 1.253455968981795,
+            "fold_boundary_preserved": true,
+            "lower_95": 0.06930371088124086,
+            "observations": 1738,
+            "replications": 10000,
+            "resample_mean": 1.258659720488984,
+            "upper_95": 2.435593662791394
+          },
+          "realized_beta": -0.04688458255302188,
+          "year_net_bps": {
+            "2018": -1.3869355461145867,
+            "2019": 9.691869635694523,
+            "2020": 0.12197719113261205,
+            "2021": 7.893101592129555,
+            "2022": 6.350785523593578,
+            "2023": 5.657805879958847,
+            "2024": 8.353602799150304
+          }
+        },
+        "full_net0.45": {
+          "book": {
+            "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_opportunity_056aad2_20260917\\C6\\books\\flexible_net\\book.json",
+            "sha256": "55895e41aa965a3baa4608e37ecd5b18060c483bce59eebcba38f6982bb8b10e"
+          },
+          "issuer_contribution_proxy_top": [
+            [
+              "UNKNOWN",
+              {
+                "max_absolute_net": 0.6887950549558175,
+                "mean_contribution_proxy_bps": 2.271768613989849,
+                "mean_gross": 0.38117770096162
+              }
+            ],
+            [
+              "76483817:014311",
+              {
+                "max_absolute_net": 0.10383812783144875,
+                "mean_contribution_proxy_bps": 0.5046010838933832,
+                "mean_gross": 0.02639343634150871
+              }
+            ],
+            [
+              "07859971:020257",
+              {
+                "max_absolute_net": 0.10527572382585748,
+                "mean_contribution_proxy_bps": 0.37359976553605395,
+                "mean_gross": 0.032364814776284515
+              }
+            ],
+            [
+              "03847461:018724",
+              {
+                "max_absolute_net": 0.10470118112098048,
+                "mean_contribution_proxy_bps": 0.32976705408868906,
+                "mean_gross": 0.034160986828432674
+              }
+            ],
+            [
+              "04423567:021237",
+              {
+                "max_absolute_net": 0.053773825541491696,
+                "mean_contribution_proxy_bps": 0.3176709263143216,
+                "mean_gross": 0.017464960876034982
+              }
+            ],
+            [
+              "16614075:021350",
+              {
+                "max_absolute_net": 0.053306048447529446,
+                "mean_contribution_proxy_bps": 0.25981111032282705,
+                "mean_gross": 0.014836533477438043
+              }
+            ],
+            [
+              "12648266:024961",
+              {
+                "max_absolute_net": 0.05252171442652893,
+                "mean_contribution_proxy_bps": 0.24331377527603965,
+                "mean_gross": 0.006432690370956019
+              }
+            ],
+            [
+              "33958695:011592",
+              {
+                "max_absolute_net": 0.10109653084361409,
+                "mean_contribution_proxy_bps": 0.23787504671021456,
+                "mean_gross": 0.020281758958122738
+              }
+            ],
+            [
+              "88611835:008451",
+              {
+                "max_absolute_net": 0.10796378793634594,
+                "mean_contribution_proxy_bps": 0.23292022943097812,
+                "mean_gross": 0.01560555208337184
+              }
+            ],
+            [
+              "12528708:025283",
+              {
+                "max_absolute_net": 0.04518393690226603,
+                "mean_contribution_proxy_bps": 0.2201246619192624,
+                "mean_gross": 0.0038964512939685
+              }
+            ]
+          ],
+          "limitations": {
+            "economics_unresolved": true,
+            "sector_contribution_is_label_based_proxy": true,
+            "terminal_haircut_scenario_relative_difference": -0.6139303545739194
+          },
+          "mean": {
+            "absolute_bps": 9.746234314254123,
+            "beta": 0.044185080212976346,
+            "borrow_bps": 0.6163095886878986,
+            "cdi_bps": 3.0387208860759496,
+            "equity_gross_bps": 11.017707044142004,
+            "free_cash_fraction": -0.27636899143681803,
+            "gross": 2.1257346644132573,
+            "hedge_gross_bps": -1.814727874222686,
+            "interest_bps": 1.6948105956583084,
+            "net_excess_bps": 6.707513428178173,
+            "restricted_cash_fraction": 0.8346035118567205,
+            "settlement_fraction": 0.00037077783781813483,
+            "signed_net": 0.44176547958009754,
+            "stale_fraction": 0.0033671299640470062,
+            "trading_cost_bps": 0.5352458626356029,
+            "turnover": 0.13381146565890073,
+            "unresolved_claim_fraction": 0.0,
+            "utility_bps": 6.1304902514823905
+          },
+          "metrics": {
+            "absolute_brl_flat_fraction": 0.0,
+            "absolute_brl_losing_fraction": 0.4315304948216341,
+            "absolute_brl_winning_fraction": 0.5684695051783659,
+            "absolute_compounded_return_brl": 4.1263857642535555,
+            "absolute_compounded_return_usd": 1.7385759908516842,
+            "annualized_volatility_brl": 0.13053871820905358,
+            "cdi_excess_flat_fraction": 0.0,
+            "cdi_excess_losing_fraction": 0.4470655926352129,
+            "cdi_excess_winning_fraction": 0.5529344073647872,
+            "fx_carried_endpoint_count": 0,
+            "fx_max_age_days": 0,
+            "fx_valuation": "BCB PTAX BRL per USD; last dated fix on holidays",
+            "maximum_drawdown_brl": -0.11686413399220685,
+            "maximum_drawdown_usd": -0.29702217719696855,
+            "relative_to_cdi_compounded_return": 2.0233633755050495,
+            "sessions": 1738,
+            "sharpe_brl_minus_cdi": 1.2954574797115659,
+            "sharpe_brl_minus_zero": 1.8814732371270508,
+            "sharpe_usd_minus_us_cash": 0.7339402855356199,
+            "us_cash_proxy": "EFFR, ACT/360 over calendar days",
+            "us_rate_max_age_days": 3
+          },
+          "paired_control": "full_net0.45",
+          "paired_net_bps": {
+            "block_length_sessions": 40,
+            "circular": true,
+            "estimate": 0.0,
+            "fold_boundary_preserved": true,
+            "lower_95": 0.0,
+            "observations": 1738,
+            "replications": 10000,
+            "resample_mean": 0.0,
+            "upper_95": 0.0
+          },
+          "realized_beta": -0.040105949559207925,
+          "year_net_bps": {
+            "2018": -2.803588605956485,
+            "2019": 12.97021908080318,
+            "2020": 2.7885676160053015,
+            "2021": 8.07754508557401,
+            "2022": 8.519505939008837,
+            "2023": 6.9748872581272305,
+            "2024": 10.273974969338465
+          }
+        },
+        "intercept_net0.05": {
+          "book": {
+            "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_portfolio_objective_e52be14_20260917\\closeout\\C6\\intercept_net0.05\\book.json",
+            "sha256": "b57091fd043f3e0c52d2db8447b1f1e8d307db1aefe813c6ea625ea57f70a303"
+          },
+          "issuer_contribution_proxy_top": [
+            [
+              "UNKNOWN",
+              {
+                "max_absolute_net": 0.5297683286774775,
+                "mean_contribution_proxy_bps": 0.8881816375870724,
+                "mean_gross": 0.14570292205271776
+              }
+            ],
+            [
+              "33000167:009512",
+              {
+                "max_absolute_net": 0.040195736531537435,
+                "mean_contribution_proxy_bps": 0.11553838196777097,
+                "mean_gross": 0.011279395252138993
+              }
+            ],
+            [
+              "76483817:014311",
+              {
+                "max_absolute_net": 0.017033213555386374,
+                "mean_contribution_proxy_bps": 0.10832768309888402,
+                "mean_gross": 0.007493629213775867
+              }
+            ],
+            [
+              "84429695:005410",
+              {
+                "max_absolute_net": 0.012825751294925252,
+                "mean_contribution_proxy_bps": 0.0755273792428178,
+                "mean_gross": 0.005032788105702581
+              }
+            ],
+            [
+              "07859971:020257",
+              {
+                "max_absolute_net": 0.022360234390711796,
+                "mean_contribution_proxy_bps": 0.07066955118834095,
+                "mean_gross": 0.007187882472856897
+              }
+            ],
+            [
+              "60872504:019348",
+              {
+                "max_absolute_net": 0.02684579350227267,
+                "mean_contribution_proxy_bps": 0.06783548955600929,
+                "mean_gross": 0.014129381094473365
+              }
+            ],
+            [
+              "10629105:022187",
+              {
+                "max_absolute_net": 0.00634321214791063,
+                "mean_contribution_proxy_bps": 0.058815279016880564,
+                "mean_gross": 0.0023799734438314465
+              }
+            ],
+            [
+              "33611500:003980",
+              {
+                "max_absolute_net": 0.011069399907848967,
+                "mean_contribution_proxy_bps": 0.05465676199795956,
+                "mean_gross": 0.005200336423362992
+              }
+            ],
+            [
+              "76484013:018627",
+              {
+                "max_absolute_net": 0.014644157192967085,
+                "mean_contribution_proxy_bps": 0.05438978265622587,
+                "mean_gross": 0.006737191778402669
+              }
+            ],
+            [
+              "16614075:021350",
+              {
+                "max_absolute_net": 0.0077694096434630594,
+                "mean_contribution_proxy_bps": 0.054162308868560056,
+                "mean_gross": 0.0030279416492986363
+              }
+            ]
+          ],
+          "limitations": {
+            "economics_unresolved": true,
+            "sector_contribution_is_label_based_proxy": true,
+            "terminal_haircut_scenario_relative_difference": -0.13648042442806907
+          },
+          "mean": {
+            "absolute_bps": 3.5414883723666146,
+            "beta": -0.002783662446681784,
+            "borrow_bps": 0.4671376270862508,
+            "cdi_bps": 3.0387208860759496,
+            "equity_gross_bps": 3.1608143672311773,
+            "free_cash_fraction": 0.4036639412398061,
+            "gross": 1.238880358990802,
+            "hedge_gross_bps": -1.993646242422769,
+            "interest_bps": 2.8878488324844866,
+            "net_excess_bps": 0.5027674862906647,
+            "restricted_cash_fraction": 0.546510026685975,
+            "settlement_fraction": 0.0001388500660809618,
+            "signed_net": 0.04982603207421886,
+            "stale_fraction": 0.0012529742670586996,
+            "trading_cost_bps": 0.0463909578400165,
+            "turnover": 0.011597739460004123,
+            "unresolved_claim_fraction": 0.0,
+            "utility_bps": 0.47470832533241186
+          },
+          "metrics": {
+            "absolute_brl_flat_fraction": 0.0,
+            "absolute_brl_losing_fraction": 0.452819332566168,
+            "absolute_brl_winning_fraction": 0.547180667433832,
+            "absolute_compounded_return_brl": 0.8298775174354132,
+            "absolute_compounded_return_usd": -0.022457757589865457,
+            "annualized_volatility_brl": 0.05688917607344558,
+            "cdi_excess_flat_fraction": 0.0,
+            "cdi_excess_losing_fraction": 0.4873417721518987,
+            "cdi_excess_winning_fraction": 0.5126582278481012,
+            "fx_carried_endpoint_count": 0,
+            "fx_max_age_days": 0,
+            "fx_valuation": "BCB PTAX BRL per USD; last dated fix on holidays",
+            "maximum_drawdown_brl": -0.060343605929459754,
+            "maximum_drawdown_usd": -0.33599788814728215,
+            "relative_to_cdi_compounded_return": 0.07919788371209124,
+            "sessions": 1738,
+            "sharpe_brl_minus_cdi": 0.22271124625225977,
+            "sharpe_brl_minus_zero": 1.5687607580819969,
+            "sharpe_usd_minus_us_cash": -0.08144900656973479,
+            "us_cash_proxy": "EFFR, ACT/360 over calendar days",
+            "us_rate_max_age_days": 3
+          },
+          "paired_control": "full_net0.05",
+          "paired_net_bps": {
+            "block_length_sessions": 40,
+            "circular": true,
+            "estimate": -3.497711767061892,
+            "fold_boundary_preserved": true,
+            "lower_95": -6.250268434704182,
+            "observations": 1738,
+            "replications": 10000,
+            "resample_mean": -3.5006218050542186,
+            "upper_95": -0.8428257378332793
+          },
+          "realized_beta": -0.013555548985591685,
+          "year_net_bps": {
+            "2018": 0.9723726284615746,
+            "2019": 4.7754585325289085,
+            "2020": -0.5190158331296919,
+            "2021": 0.6810925462489625,
+            "2022": -2.081597859490225,
+            "2023": 1.0718846071532415,
+            "2024": -1.3273225220825806
+          }
+        },
+        "intercept_net0.45": {
+          "book": {
+            "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_portfolio_objective_e52be14_20260917\\closeout\\C6\\intercept_net0.45\\book.json",
+            "sha256": "0fbd8d82a09538bebe72af784e6651103080146e2cafa94d98b6c9f0b15a1c3e"
+          },
+          "issuer_contribution_proxy_top": [
+            [
+              "UNKNOWN",
+              {
+                "max_absolute_net": 0.7567339238011905,
+                "mean_contribution_proxy_bps": 1.3443117074853594,
+                "mean_gross": 0.2657082573700363
+              }
+            ],
+            [
+              "07859971:020257",
+              {
+                "max_absolute_net": 0.1151158319665682,
+                "mean_contribution_proxy_bps": 0.2993607932827767,
+                "mean_gross": 0.033443047328026915
+              }
+            ],
+            [
+              "04423567:021237",
+              {
+                "max_absolute_net": 0.04471635880908431,
+                "mean_contribution_proxy_bps": 0.24947214087629058,
+                "mean_gross": 0.011068258184725802
+              }
+            ],
+            [
+              "76484013:018627",
+              {
+                "max_absolute_net": 0.0803490563407808,
+                "mean_contribution_proxy_bps": 0.19114118924427753,
+                "mean_gross": 0.024371962741830462
+              }
+            ],
+            [
+              "33958695:011592",
+              {
+                "max_absolute_net": 0.043757073504383334,
+                "mean_contribution_proxy_bps": 0.17852942790609122,
+                "mean_gross": 0.007999391397722436
+              }
+            ],
+            [
+              "89096457:020745",
+              {
+                "max_absolute_net": 0.05141972446106739,
+                "mean_contribution_proxy_bps": 0.1587952521886812,
+                "mean_gross": 0.014409670630197739
+              }
+            ],
+            [
+              "06164253:019569",
+              {
+                "max_absolute_net": 0.03973803759709103,
+                "mean_contribution_proxy_bps": 0.1579876560080161,
+                "mean_gross": 0.0029058734660843805
+              }
+            ],
+            [
+              "07689002:020087",
+              {
+                "max_absolute_net": 0.04551302126220642,
+                "mean_contribution_proxy_bps": 0.15295910892292675,
+                "mean_gross": 0.008876657854847227
+              }
+            ],
+            [
+              "11669021:022365",
+              {
+                "max_absolute_net": 0.02469260791316787,
+                "mean_contribution_proxy_bps": 0.14332596759096322,
+                "mean_gross": 0.004552654697564063
+              }
+            ],
+            [
+              "07628528:020036",
+              {
+                "max_absolute_net": 0.05344207162399994,
+                "mean_contribution_proxy_bps": 0.14224871509894532,
+                "mean_gross": 0.013238912783050439
+              }
+            ]
+          ],
+          "limitations": {
+            "economics_unresolved": true,
+            "sector_contribution_is_label_based_proxy": true,
+            "terminal_haircut_scenario_relative_difference": -0.4075179715292858
+          },
+          "mean": {
+            "absolute_bps": 5.19281259988673,
+            "beta": 0.04689816824920797,
+            "borrow_bps": 0.5100463260592758,
+            "cdi_bps": 3.0387208860759496,
+            "equity_gross_bps": 6.202387303861149,
+            "free_cash_fraction": -0.06581738818798999,
+            "gross": 1.7661304459567335,
+            "hedge_gross_bps": -2.1200405826617366,
+            "interest_bps": 1.7021387495050702,
+            "net_excess_bps": 2.1540917138107805,
+            "restricted_cash_fraction": 0.6274199468422992,
+            "settlement_fraction": 0.0003524279796771929,
+            "signed_net": 0.438397441345691,
+            "stale_fraction": 0.0031765015379682285,
+            "trading_cost_bps": 0.08162654475846734,
+            "turnover": 0.020406636189616835,
+            "unresolved_claim_fraction": 0.0,
+            "utility_bps": 1.9422034071902323
+          },
+          "metrics": {
+            "absolute_brl_flat_fraction": 0.0,
+            "absolute_brl_losing_fraction": 0.45512082853855007,
+            "absolute_brl_winning_fraction": 0.5448791714614499,
+            "absolute_compounded_return_brl": 1.400519404777791,
+            "absolute_compounded_return_usd": 0.28238589716340434,
+            "annualized_volatility_brl": 0.08789599839585162,
+            "cdi_excess_flat_fraction": 0.0,
+            "cdi_excess_losing_fraction": 0.4815880322209436,
+            "cdi_excess_winning_fraction": 0.5184119677790564,
+            "fx_carried_endpoint_count": 0,
+            "fx_max_age_days": 0,
+            "fx_valuation": "BCB PTAX BRL per USD; last dated fix on holidays",
+            "maximum_drawdown_brl": -0.11098697724033801,
+            "maximum_drawdown_usd": -0.3621952213080657,
+            "relative_to_cdi_compounded_return": 0.41574254930287813,
+            "sessions": 1738,
+            "sharpe_brl_minus_cdi": 0.6173494537685726,
+            "sharpe_brl_minus_zero": 1.4887922078978482,
+            "sharpe_usd_minus_us_cash": 0.15636673728795625,
+            "us_cash_proxy": "EFFR, ACT/360 over calendar days",
+            "us_rate_max_age_days": 3
+          },
+          "paired_control": "full_net0.45",
+          "paired_net_bps": {
+            "block_length_sessions": 40,
+            "circular": true,
+            "estimate": -4.553421714367393,
+            "fold_boundary_preserved": true,
+            "lower_95": -7.286215860490462,
+            "observations": 1738,
+            "replications": 10000,
+            "resample_mean": -4.54532540186876,
+            "upper_95": -1.947671952460524
+          },
+          "realized_beta": -0.029022769848215606,
+          "year_net_bps": {
+            "2018": -0.46707474992891185,
+            "2019": 9.951070665024327,
+            "2020": 0.05772578581392981,
+            "2021": 4.350842230036404,
+            "2022": -0.13614506402793564,
+            "2023": -0.21186716936046313,
+            "2024": 1.545524939965756
+          }
+        },
+        "proceeds0_net0.05": {
+          "book": {
+            "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_portfolio_objective_e52be14_20260917\\closeout\\C6\\proceeds0_net0.05\\book.json",
+            "sha256": "f155f073fa26824cead7d1235ed27d201db6324c691a0974cde90de82397f220"
+          },
+          "issuer_contribution_proxy_top": [
+            [
+              "UNKNOWN",
+              {
+                "max_absolute_net": 0.5218276277035503,
+                "mean_contribution_proxy_bps": 1.399494458159959,
+                "mean_gross": 0.28512028860389843
+              }
+            ],
+            [
+              "76483817:014311",
+              {
+                "max_absolute_net": 0.10289962131966758,
+                "mean_contribution_proxy_bps": 0.5121680074524941,
+                "mean_gross": 0.021777637349107676
+              }
+            ],
+            [
+              "10629105:022187",
+              {
+                "max_absolute_net": 0.06252181950810581,
+                "mean_contribution_proxy_bps": 0.33630790052099013,
+                "mean_gross": 0.013083870834490986
+              }
+            ],
+            [
+              "33000167:009512",
+              {
+                "max_absolute_net": 0.1068810526459515,
+                "mean_contribution_proxy_bps": 0.30892838737131045,
+                "mean_gross": 0.02823895856821844
+              }
+            ],
+            [
+              "03847461:018724",
+              {
+                "max_absolute_net": 0.10496104179721073,
+                "mean_contribution_proxy_bps": 0.28718397496291265,
+                "mean_gross": 0.03202567753293233
+              }
+            ],
+            [
+              "07859971:020257",
+              {
+                "max_absolute_net": 0.10481324763991719,
+                "mean_contribution_proxy_bps": 0.2753632417152337,
+                "mean_gross": 0.022795624097263725
+              }
+            ],
+            [
+              "12528708:025283",
+              {
+                "max_absolute_net": 0.033673566632014984,
+                "mean_contribution_proxy_bps": 0.21654655379096374,
+                "mean_gross": 0.0033280101186494953
+              }
+            ],
+            [
+              "33958695:011592",
+              {
+                "max_absolute_net": 0.09784479534152661,
+                "mean_contribution_proxy_bps": 0.20341231109662558,
+                "mean_gross": 0.01816298005644958
+              }
+            ],
+            [
+              "16614075:021350",
+              {
+                "max_absolute_net": 0.05329852043478501,
+                "mean_contribution_proxy_bps": 0.2011839812611847,
+                "mean_gross": 0.013129682699115332
+              }
+            ],
+            [
+              "04423567:021237",
+              {
+                "max_absolute_net": 0.05152781318154928,
+                "mean_contribution_proxy_bps": 0.1917820796081311,
+                "mean_gross": 0.00958483105263672
+              }
+            ]
+          ],
+          "limitations": {
+            "economics_unresolved": true,
+            "sector_contribution_is_label_based_proxy": true,
+            "terminal_haircut_scenario_relative_difference": -0.29447458995979336
+          },
+          "mean": {
+            "absolute_bps": 4.075283606347739,
+            "beta": -0.016783438226816706,
+            "borrow_bps": 0.6919692087663211,
+            "cdi_bps": 3.0387208860759496,
+            "equity_gross_bps": 7.300153243003789,
+            "free_cash_fraction": 0.03236736633871423,
+            "gross": 1.925815701606125,
+            "hedge_gross_bps": -1.9700669541001772,
+            "interest_bps": -0.07844466672112421,
+            "net_excess_bps": 1.0365627202717886,
+            "restricted_cash_fraction": 0.9157224833983633,
+            "settlement_fraction": 0.0003036291675377286,
+            "signed_net": 0.051910150262922394,
+            "stale_fraction": 0.0027475239365165626,
+            "trading_cost_bps": 0.4843888070684424,
+            "turnover": 0.12109720176711061,
+            "unresolved_claim_fraction": 0.0,
+            "utility_bps": 0.6133093957480031
+          },
+          "metrics": {
+            "absolute_brl_flat_fraction": 0.0,
+            "absolute_brl_losing_fraction": 0.45512082853855007,
+            "absolute_brl_winning_fraction": 0.5448791714614499,
+            "absolute_compounded_return_brl": 0.956992488042963,
+            "absolute_compounded_return_usd": 0.04544856522554519,
+            "annualized_volatility_brl": 0.10320739355946777,
+            "cdi_excess_flat_fraction": 0.0,
+            "cdi_excess_losing_fraction": 0.4769850402761795,
+            "cdi_excess_winning_fraction": 0.5230149597238205,
+            "fx_carried_endpoint_count": 0,
+            "fx_max_age_days": 0,
+            "fx_valuation": "BCB PTAX BRL per USD; last dated fix on holidays",
+            "maximum_drawdown_brl": -0.11653745619208722,
+            "maximum_drawdown_usd": -0.34171396099559737,
+            "relative_to_cdi_compounded_return": 0.15416585613687905,
+            "sessions": 1738,
+            "sharpe_brl_minus_cdi": 0.25314094586684466,
+            "sharpe_brl_minus_zero": 0.995056103425277,
+            "sharpe_usd_minus_us_cash": -0.012570220796645607,
+            "us_cash_proxy": "EFFR, ACT/360 over calendar days",
+            "us_rate_max_age_days": 3
+          },
+          "paired_control": "full_net0.05",
+          "paired_net_bps": {
+            "block_length_sessions": 40,
+            "circular": true,
+            "estimate": -2.9639165330807673,
+            "fold_boundary_preserved": true,
+            "lower_95": -3.522736799137289,
+            "observations": 1738,
+            "replications": 10000,
+            "resample_mean": -2.9659967689036346,
+            "upper_95": -2.413298535650899
+          },
+          "realized_beta": -0.061382542274752205,
+          "year_net_bps": {
+            "2018": -0.9554765271403745,
+            "2019": 3.401146401229876,
+            "2020": -1.8930264531050474,
+            "2021": 5.347548090338229,
+            "2022": 0.25909955114109423,
+            "2023": -0.7750385776985841,
+            "2024": 1.872937599483432
+          }
+        },
+        "proceeds0_net0.45": {
+          "book": {
+            "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_portfolio_objective_e52be14_20260917\\closeout\\C6\\proceeds0_net0.45\\book.json",
+            "sha256": "ba84da5da2cebe01044a97c2dd9aa6eadc53b156741789425b9f5307b8c6572b"
+          },
+          "issuer_contribution_proxy_top": [
+            [
+              "UNKNOWN",
+              {
+                "max_absolute_net": 0.6887950549558175,
+                "mean_contribution_proxy_bps": 2.2810796337507755,
+                "mean_gross": 0.38119618772614766
+              }
+            ],
+            [
+              "76483817:014311",
+              {
+                "max_absolute_net": 0.10387490065947123,
+                "mean_contribution_proxy_bps": 0.5050627486457732,
+                "mean_gross": 0.02641533166620522
+              }
+            ],
+            [
+              "07859971:020257",
+              {
+                "max_absolute_net": 0.10528497851491339,
+                "mean_contribution_proxy_bps": 0.3741022047017044,
+                "mean_gross": 0.03239634904512856
+              }
+            ],
+            [
+              "03847461:018724",
+              {
+                "max_absolute_net": 0.10474809269187296,
+                "mean_contribution_proxy_bps": 0.33043104182573757,
+                "mean_gross": 0.03418562200464869
+              }
+            ],
+            [
+              "04423567:021237",
+              {
+                "max_absolute_net": 0.05381958584601079,
+                "mean_contribution_proxy_bps": 0.3173267065677933,
+                "mean_gross": 0.017451539745097548
+              }
+            ],
+            [
+              "16614075:021350",
+              {
+                "max_absolute_net": 0.05336578214529318,
+                "mean_contribution_proxy_bps": 0.2604209964534797,
+                "mean_gross": 0.014887774017742026
+              }
+            ],
+            [
+              "12648266:024961",
+              {
+                "max_absolute_net": 0.05254246276617545,
+                "mean_contribution_proxy_bps": 0.24331849472575462,
+                "mean_gross": 0.00641490190585258
+              }
+            ],
+            [
+              "33958695:011592",
+              {
+                "max_absolute_net": 0.10114466042568723,
+                "mean_contribution_proxy_bps": 0.23951852009404634,
+                "mean_gross": 0.020276163681386
+              }
+            ],
+            [
+              "88611835:008451",
+              {
+                "max_absolute_net": 0.10800951403519447,
+                "mean_contribution_proxy_bps": 0.23121370968857122,
+                "mean_gross": 0.01561544652484294
+              }
+            ],
+            [
+              "12528708:025283",
+              {
+                "max_absolute_net": 0.04498987406067359,
+                "mean_contribution_proxy_bps": 0.21999818054548087,
+                "mean_gross": 0.003885816192353583
+              }
+            ]
+          ],
+          "limitations": {
+            "economics_unresolved": true,
+            "sector_contribution_is_label_based_proxy": true,
+            "terminal_haircut_scenario_relative_difference": -0.4801562107023507
+          },
+          "mean": {
+            "absolute_bps": 7.11275964631288,
+            "beta": 0.04420590711042693,
+            "borrow_bps": 0.6165830498720029,
+            "cdi_bps": 3.0387208860759496,
+            "equity_gross_bps": 11.037040778441883,
+            "free_cash_fraction": -0.2769719945148641,
+            "gross": 2.1266796366493113,
+            "hedge_gross_bps": -1.830960288941224,
+            "interest_bps": -0.9419253411302209,
+            "net_excess_bps": 4.074038760236929,
+            "restricted_cash_fraction": 0.8351834024810253,
+            "settlement_fraction": 0.00037173716150787583,
+            "signed_net": 0.4417885920338388,
+            "stale_fraction": 0.0033716491166392738,
+            "trading_cost_bps": 0.5348124521855576,
+            "turnover": 0.13370311304638938,
+            "unresolved_claim_fraction": 0.0,
+            "utility_bps": 3.496900540067281
+          },
+          "metrics": {
+            "absolute_brl_flat_fraction": 0.0,
+            "absolute_brl_losing_fraction": 0.44649021864211735,
+            "absolute_brl_winning_fraction": 0.5535097813578826,
+            "absolute_compounded_return_brl": 2.2452227480677296,
+            "absolute_compounded_return_usd": 0.733636427596885,
+            "annualized_volatility_brl": 0.13039344846329562,
+            "cdi_excess_flat_fraction": 0.0,
+            "cdi_excess_losing_fraction": 0.4654775604142693,
+            "cdi_excess_winning_fraction": 0.5345224395857308,
+            "fx_carried_endpoint_count": 0,
+            "fx_max_age_days": 0,
+            "fx_valuation": "BCB PTAX BRL per USD; last dated fix on holidays",
+            "maximum_drawdown_brl": -0.12806658448779973,
+            "maximum_drawdown_usd": -0.30214431212128146,
+            "relative_to_cdi_compounded_return": 0.9139190948678853,
+            "sessions": 1738,
+            "sharpe_brl_minus_cdi": 0.7874645114016321,
+            "sharpe_brl_minus_zero": 1.3746207742756276,
+            "sharpe_usd_minus_us_cash": 0.3874203525224409,
+            "us_cash_proxy": "EFFR, ACT/360 over calendar days",
+            "us_rate_max_age_days": 3
+          },
+          "paired_control": "full_net0.45",
+          "paired_net_bps": {
+            "block_length_sessions": 40,
+            "circular": true,
+            "estimate": -2.633474667941244,
+            "fold_boundary_preserved": true,
+            "lower_95": -3.080895087009697,
+            "observations": 1738,
+            "replications": 10000,
+            "resample_mean": -2.6349170840836114,
+            "upper_95": -2.1917771639336503
+          },
+          "realized_beta": -0.03987712314560073,
+          "year_net_bps": {
+            "2018": -4.309498217324535,
+            "2019": 11.3158772836407,
+            "2020": 1.8724991878541641,
+            "2021": 6.540576610932322,
+            "2022": 4.103149724838761,
+            "2023": 2.3850702003979545,
+            "2024": 6.498443428721302
+          }
+        },
+        "rank_net0.05": {
+          "book": {
+            "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_portfolio_objective_e52be14_20260917\\closeout\\C6\\rank_net0.05\\book.json",
+            "sha256": "b3a7060ec656f266e0d03ed0560b5fb3c46a6dd6f142ee3df620e2dfeeb01c48"
+          },
+          "issuer_contribution_proxy_top": [
+            [
+              "UNKNOWN",
+              {
+                "max_absolute_net": 0.47398887048228433,
+                "mean_contribution_proxy_bps": 0.5777232782032765,
+                "mean_gross": 0.2694415910452694
+              }
+            ],
+            [
+              "12528708:025283",
+              {
+                "max_absolute_net": 0.046762034394959504,
+                "mean_contribution_proxy_bps": 0.30940955309298307,
+                "mean_gross": 0.005282724714982482
+              }
+            ],
+            [
+              "10629105:022187",
+              {
+                "max_absolute_net": 0.06368474842946241,
+                "mean_contribution_proxy_bps": 0.29590406084744014,
+                "mean_gross": 0.011938738391890023
+              }
+            ],
+            [
+              "76483817:014311",
+              {
+                "max_absolute_net": 0.10307070522380904,
+                "mean_contribution_proxy_bps": 0.2908016731392563,
+                "mean_gross": 0.012443813272417106
+              }
+            ],
+            [
+              "03847461:018724",
+              {
+                "max_absolute_net": 0.10435352567342912,
+                "mean_contribution_proxy_bps": 0.2655068921560905,
+                "mean_gross": 0.030384885560899983
+              }
+            ],
+            [
+              "61486650:019623",
+              {
+                "max_absolute_net": 0.05492290208312043,
+                "mean_contribution_proxy_bps": 0.21603223240973685,
+                "mean_gross": 0.006110406865077411
+              }
+            ],
+            [
+              "07859971:020257",
+              {
+                "max_absolute_net": 0.10566965814968346,
+                "mean_contribution_proxy_bps": 0.21397396684771072,
+                "mean_gross": 0.01865447958479876
+              }
+            ],
+            [
+              "09305994:024112",
+              {
+                "max_absolute_net": 0.04114388035073941,
+                "mean_contribution_proxy_bps": -0.20397875850207522,
+                "mean_gross": 0.0018153247195041094
+              }
+            ],
+            [
+              "08065557:020435",
+              {
+                "max_absolute_net": 0.04583833503083319,
+                "mean_contribution_proxy_bps": 0.20014965307552574,
+                "mean_gross": 0.004913632394770472
+              }
+            ],
+            [
+              "33000167:009512",
+              {
+                "max_absolute_net": 0.10750510299500089,
+                "mean_contribution_proxy_bps": 0.1920598053036065,
+                "mean_gross": 0.02306057124570968
+              }
+            ]
+          ],
+          "limitations": {
+            "economics_unresolved": true,
+            "sector_contribution_is_label_based_proxy": true,
+            "terminal_haircut_scenario_relative_difference": -0.45130533323319266
+          },
+          "mean": {
+            "absolute_bps": 7.50486240768137,
+            "beta": -0.0039004937695037273,
+            "borrow_bps": 0.5468574223100817,
+            "cdi_bps": 3.0387208860759496,
+            "equity_gross_bps": 5.712212079343717,
+            "free_cash_fraction": 0.19432029957296976,
+            "gross": 1.5105575670507216,
+            "hedge_gross_bps": -1.2690174864120335e-15,
+            "interest_bps": 2.895529479619414,
+            "net_excess_bps": 4.4661415216054206,
+            "restricted_cash_fraction": 0.7598375724110389,
+            "settlement_fraction": 0.0003779523336524938,
+            "signed_net": 0.04584212801599137,
+            "stale_fraction": 0.0034276394035162526,
+            "trading_cost_bps": 0.556021728971709,
+            "turnover": 0.13900543224292727,
+            "unresolved_claim_fraction": 0.0,
+            "utility_bps": 3.9311958778218266
+          },
+          "metrics": {
+            "absolute_brl_flat_fraction": 0.0,
+            "absolute_brl_losing_fraction": 0.40276179516685845,
+            "absolute_brl_winning_fraction": 0.5972382048331415,
+            "absolute_compounded_return_brl": 2.4690651726654065,
+            "absolute_compounded_return_usd": 0.8532157019487252,
+            "annualized_volatility_brl": 0.1318624031220625,
+            "cdi_excess_flat_fraction": 0.0,
+            "cdi_excess_losing_fraction": 0.46375143843498273,
+            "cdi_excess_winning_fraction": 0.5362485615650172,
+            "fx_carried_endpoint_count": 0,
+            "fx_max_age_days": 0,
+            "fx_valuation": "BCB PTAX BRL per USD; last dated fix on holidays",
+            "maximum_drawdown_brl": -0.16589133668475053,
+            "maximum_drawdown_usd": -0.37587405431298115,
+            "relative_to_cdi_compounded_return": 1.045933543162377,
+            "sessions": 1738,
+            "sharpe_brl_minus_cdi": 0.8541574250002096,
+            "sharpe_brl_minus_zero": 1.4342415138491251,
+            "sharpe_usd_minus_us_cash": 0.44995813667383294,
+            "us_cash_proxy": "EFFR, ACT/360 over calendar days",
+            "us_rate_max_age_days": 3
+          },
+          "paired_control": "full_net0.05",
+          "paired_net_bps": {
+            "block_length_sessions": 40,
+            "circular": true,
+            "estimate": 0.465662268252863,
+            "fold_boundary_preserved": true,
+            "lower_95": -1.5562455106603619,
+            "observations": 1738,
+            "replications": 10000,
+            "resample_mean": 0.4621275609903883,
+            "upper_95": 2.4936139902413323
+          },
+          "realized_beta": -0.05782135935172932,
+          "year_net_bps": {
+            "2018": -0.04633095649854084,
+            "2019": 1.3015724199502798,
+            "2020": -3.0598431735375806,
+            "2021": 10.273675945848995,
+            "2022": 11.27251601479559,
+            "2023": 4.736320154973297,
+            "2024": 6.702317443022202
+          }
+        },
+        "rank_net0.45": {
+          "book": {
+            "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_portfolio_objective_e52be14_20260917\\closeout\\C6\\rank_net0.45\\book.json",
+            "sha256": "c50d2209a2d035e2a4c2d19b3b0e05f5a4fa7492ec561e33f83aa0ee0b7bbeae"
+          },
+          "issuer_contribution_proxy_top": [
+            [
+              "UNKNOWN",
+              {
+                "max_absolute_net": 0.5070180534796191,
+                "mean_contribution_proxy_bps": 0.9869778492526339,
+                "mean_gross": 0.29098682360736433
+              }
+            ],
+            [
+              "76483817:014311",
+              {
+                "max_absolute_net": 0.10511533735003195,
+                "mean_contribution_proxy_bps": 0.33933864056579083,
+                "mean_gross": 0.015600994003256527
+              }
+            ],
+            [
+              "03847461:018724",
+              {
+                "max_absolute_net": 0.10476314688658489,
+                "mean_contribution_proxy_bps": 0.32087100185848216,
+                "mean_gross": 0.032120017893089006
+              }
+            ],
+            [
+              "12528708:025283",
+              {
+                "max_absolute_net": 0.04764282275206746,
+                "mean_contribution_proxy_bps": 0.2858777518292121,
+                "mean_gross": 0.0048923045193776426
+              }
+            ],
+            [
+              "33958695:011592",
+              {
+                "max_absolute_net": 0.10000745225535354,
+                "mean_contribution_proxy_bps": 0.2634015377042891,
+                "mean_gross": 0.019031340770464877
+              }
+            ],
+            [
+              "07859971:020257",
+              {
+                "max_absolute_net": 0.10556577036317122,
+                "mean_contribution_proxy_bps": 0.25080912260881033,
+                "mean_gross": 0.022592154020837602
+              }
+            ],
+            [
+              "08065557:020435",
+              {
+                "max_absolute_net": 0.046517381639739105,
+                "mean_contribution_proxy_bps": 0.21007358714286906,
+                "mean_gross": 0.0052943002191122805
+              }
+            ],
+            [
+              "61486650:019623",
+              {
+                "max_absolute_net": 0.054947508753752906,
+                "mean_contribution_proxy_bps": 0.2045994357025734,
+                "mean_gross": 0.005828542509830045
+              }
+            ],
+            [
+              "02800026:017973",
+              {
+                "max_absolute_net": 0.05319261481117235,
+                "mean_contribution_proxy_bps": 0.20335248333820985,
+                "mean_gross": 0.00998981716179029
+              }
+            ],
+            [
+              "22543331:023795",
+              {
+                "max_absolute_net": 0.052489850645739834,
+                "mean_contribution_proxy_bps": 0.2001009613251284,
+                "mean_gross": 0.009700350795192148
+              }
+            ]
+          ],
+          "limitations": {
+            "economics_unresolved": true,
+            "sector_contribution_is_label_based_proxy": true,
+            "terminal_haircut_scenario_relative_difference": -0.5998203483336435
+          },
+          "mean": {
+            "absolute_bps": 8.861822945774772,
+            "beta": 0.0351507114287744,
+            "borrow_bps": 0.49555768197873823,
+            "cdi_bps": 3.0387208860759496,
+            "equity_gross_bps": 7.611442500773865,
+            "free_cash_fraction": 0.08679745136834272,
+            "gross": 1.5397532573461796,
+            "hedge_gross_bps": -1.2840913471827003e-15,
+            "interest_bps": 2.2851659183325883,
+            "net_excess_bps": 5.823102059698822,
+            "restricted_cash_fraction": 0.6924581703821638,
+            "settlement_fraction": 0.0004233680066167964,
+            "signed_net": 0.2207443782494935,
+            "stale_fraction": 0.0038531871798770877,
+            "trading_cost_bps": 0.5392277913529152,
+            "turnover": 0.1348069478382288,
+            "unresolved_claim_fraction": 0.0,
+            "utility_bps": 5.273033596616635
+          },
+          "metrics": {
+            "absolute_brl_flat_fraction": 0.0,
+            "absolute_brl_losing_fraction": 0.3912543153049482,
+            "absolute_brl_winning_fraction": 0.6087456846950517,
+            "absolute_compounded_return_brl": 3.3555267517642857,
+            "absolute_compounded_return_usd": 1.3267739765250877,
+            "annualized_volatility_brl": 0.14047897702639267,
+            "cdi_excess_flat_fraction": 0.0,
+            "cdi_excess_losing_fraction": 0.4482163406214039,
+            "cdi_excess_winning_fraction": 0.5517836593785961,
+            "fx_carried_endpoint_count": 0,
+            "fx_max_age_days": 0,
+            "fx_valuation": "BCB PTAX BRL per USD; last dated fix on holidays",
+            "maximum_drawdown_brl": -0.15424401624636963,
+            "maximum_drawdown_usd": -0.34245338616929255,
+            "relative_to_cdi_compounded_return": 1.5687376385405525,
+            "sessions": 1738,
+            "sharpe_brl_minus_cdi": 1.0452134206542434,
+            "sharpe_brl_minus_zero": 1.5896893824302842,
+            "sharpe_usd_minus_us_cash": 0.6132688619239326,
+            "us_cash_proxy": "EFFR, ACT/360 over calendar days",
+            "us_rate_max_age_days": 3
+          },
+          "paired_control": "full_net0.45",
+          "paired_net_bps": {
+            "block_length_sessions": 40,
+            "circular": true,
+            "estimate": -0.8844113684793512,
+            "fold_boundary_preserved": true,
+            "lower_95": -3.797694721300321,
+            "observations": 1738,
+            "replications": 10000,
+            "resample_mean": -0.8884350603397643,
+            "upper_95": 1.9691478011255354
+          },
+          "realized_beta": -0.03952502193965218,
+          "year_net_bps": {
+            "2018": -0.04633095658446303,
+            "2019": 2.8215796316205752,
+            "2020": -0.6002075713441998,
+            "2021": 11.172710217053174,
+            "2022": 13.66414224010465,
+            "2023": 4.61695113682997,
+            "2024": 9.00758380545984
+          }
+        }
+      },
+      "intercept_daily_bps": {
+        "F1": 3.8503522583716565,
+        "F10": 2.209888046425251,
+        "F11": 2.335190838364235,
+        "F12": 1.8419971103575132,
+        "F13": 2.089743190940796,
+        "F14": 1.7136855233147175,
+        "F2": 2.420658541901456,
+        "F3": 1.6365330186194027,
+        "F4": 2.6801469978830137,
+        "F5": 3.744955450033486,
+        "F6": 4.6144333509624085,
+        "F7": 4.337326425677589,
+        "F8": 3.3529941013132243,
+        "F9": 3.6074928425465562
+      },
+      "source": {
+        "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_portfolio_objective_e52be14_20260917\\closeout\\C6\\summary.json",
+        "sha256": "d67ddd11628ee97db157817529b17e776e99a714d23fbc3c0c5fa84a6ee778d0"
+      }
+    },
+    "TE_all": {
+      "books": {
+        "cost8_net0.05": {
+          "book": {
+            "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_portfolio_objective_e52be14_20260917\\closeout\\TE_all\\cost8_net0.05\\book.json",
+            "sha256": "372782ad8e549e4a8f5fdd397dde60fe101974d13039b99f1638f54842eae0db"
+          },
+          "issuer_contribution_proxy_top": [
+            [
+              "UNKNOWN",
+              {
+                "max_absolute_net": 0.671135067691477,
+                "mean_contribution_proxy_bps": 2.0840689854654157,
+                "mean_gross": 0.4137484812206927
+              }
+            ],
+            [
+              "33000167:009512",
+              {
+                "max_absolute_net": 0.10786629534039646,
+                "mean_contribution_proxy_bps": 0.7918465739227423,
+                "mean_gross": 0.03773709195017085
+              }
+            ],
+            [
+              "76483817:014311",
+              {
+                "max_absolute_net": 0.10337285718441011,
+                "mean_contribution_proxy_bps": 0.3584395715410495,
+                "mean_gross": 0.01958832962116096
+              }
+            ],
+            [
+              "10629105:022187",
+              {
+                "max_absolute_net": 0.05213271899408218,
+                "mean_contribution_proxy_bps": 0.29487520745131574,
+                "mean_gross": 0.01341665958417713
+              }
+            ],
+            [
+              "16614075:021350",
+              {
+                "max_absolute_net": 0.05297859886124954,
+                "mean_contribution_proxy_bps": 0.22655763641530544,
+                "mean_gross": 0.012115701703210972
+              }
+            ],
+            [
+              "13217485:024694",
+              {
+                "max_absolute_net": 0.04163301379461718,
+                "mean_contribution_proxy_bps": -0.22547343229219702,
+                "mean_gross": 0.004111672394588003
+              }
+            ],
+            [
+              "03847461:018724",
+              {
+                "max_absolute_net": 0.10500603680171822,
+                "mean_contribution_proxy_bps": 0.20025039642607742,
+                "mean_gross": 0.02226195859164241
+              }
+            ],
+            [
+              "33958695:011592",
+              {
+                "max_absolute_net": 0.1007404632388002,
+                "mean_contribution_proxy_bps": 0.19986474327703166,
+                "mean_gross": 0.01583385629718258
+              }
+            ],
+            [
+              "60894730:014320",
+              {
+                "max_absolute_net": 0.08540674642015367,
+                "mean_contribution_proxy_bps": -0.19521466584075142,
+                "mean_gross": 0.009280643357844266
+              }
+            ],
+            [
+              "51466860:020516",
+              {
+                "max_absolute_net": 0.05257712421370424,
+                "mean_contribution_proxy_bps": 0.19402710066404055,
+                "mean_gross": 0.006503954060989165
+              }
+            ]
+          ],
+          "limitations": {
+            "economics_unresolved": true,
+            "sector_contribution_is_label_based_proxy": true,
+            "terminal_haircut_scenario_relative_difference": -0.35931692484757294
+          },
+          "mean": {
+            "absolute_bps": 6.996878031254728,
+            "beta": -0.0017913036637882333,
+            "borrow_bps": 0.7330272015827831,
+            "cdi_bps": 3.0387208860759496,
+            "equity_gross_bps": 7.929843142869268,
+            "free_cash_fraction": -0.004980628629102864,
+            "gross": 2.022365932299366,
+            "hedge_gross_bps": -2.0267674867104155,
+            "interest_bps": 2.892070218176418,
+            "net_excess_bps": 3.958157145178778,
+            "restricted_cash_fraction": 0.9554197042814389,
+            "settlement_fraction": 0.00028414073766832497,
+            "signed_net": 0.04956092434766403,
+            "stale_fraction": 0.00257638560650986,
+            "trading_cost_bps": 1.0652406414977589,
+            "turnover": 0.13315508018721983,
+            "unresolved_claim_fraction": 0.0,
+            "utility_bps": 3.493782499037119
+          },
+          "metrics": {
+            "absolute_brl_flat_fraction": 0.0,
+            "absolute_brl_losing_fraction": 0.4476409666283084,
+            "absolute_brl_winning_fraction": 0.5523590333716916,
+            "absolute_compounded_return_brl": 2.233945759573203,
+            "absolute_compounded_return_usd": 0.7276121267813263,
+            "annualized_volatility_brl": 0.11026058816472963,
+            "cdi_excess_flat_fraction": 0.0,
+            "cdi_excess_losing_fraction": 0.47123130034522437,
+            "cdi_excess_winning_fraction": 0.5287686996547756,
+            "fx_carried_endpoint_count": 0,
+            "fx_max_age_days": 0,
+            "fx_valuation": "BCB PTAX BRL per USD; last dated fix on holidays",
+            "maximum_drawdown_brl": -0.13222547708402488,
+            "maximum_drawdown_usd": -0.29619498400229827,
+            "relative_to_cdi_compounded_return": 0.9072683207029233,
+            "sessions": 1738,
+            "sharpe_brl_minus_cdi": 0.9049059083877325,
+            "sharpe_brl_minus_zero": 1.5991328299844967,
+            "sharpe_usd_minus_us_cash": 0.39645151530984046,
+            "us_cash_proxy": "EFFR, ACT/360 over calendar days",
+            "us_rate_max_age_days": 3
+          },
+          "paired_control": "full_net0.05",
+          "paired_net_bps": {
+            "block_length_sessions": 40,
+            "circular": true,
+            "estimate": -0.5385563777512236,
+            "fold_boundary_preserved": true,
+            "lower_95": -0.6394746380214876,
+            "observations": 1738,
+            "replications": 10000,
+            "resample_mean": -0.5384751947049533,
+            "upper_95": -0.44030067440949366
+          },
+          "realized_beta": -0.06758246088413832,
+          "year_net_bps": {
+            "2018": -1.5153525503402454,
+            "2019": 7.551624912125281,
+            "2020": 1.4051429712262633,
+            "2021": 9.873835382727592,
+            "2022": 3.7376217253434247,
+            "2023": 3.3026259416473462,
+            "2024": 3.328927931129693
+          }
+        },
+        "cost8_net0.45": {
+          "book": {
+            "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_portfolio_objective_e52be14_20260917\\closeout\\TE_all\\cost8_net0.45\\book.json",
+            "sha256": "dab1bd1a75b2a672bd4bc4e010ab67408542bb4014e50ed7b62a141a7d9ca4c3"
+          },
+          "issuer_contribution_proxy_top": [
+            [
+              "UNKNOWN",
+              {
+                "max_absolute_net": 0.8574099359224859,
+                "mean_contribution_proxy_bps": 2.84539800956172,
+                "mean_gross": 0.4632949659725086
+              }
+            ],
+            [
+              "33000167:009512",
+              {
+                "max_absolute_net": 0.10421365942719008,
+                "mean_contribution_proxy_bps": 0.7230652018396129,
+                "mean_gross": 0.03280335882559305
+              }
+            ],
+            [
+              "76483817:014311",
+              {
+                "max_absolute_net": 0.09406387768744358,
+                "mean_contribution_proxy_bps": 0.4314838063490575,
+                "mean_gross": 0.024151515959135825
+              }
+            ],
+            [
+              "04423567:021237",
+              {
+                "max_absolute_net": 0.05347814387686355,
+                "mean_contribution_proxy_bps": 0.30390355109698947,
+                "mean_gross": 0.015488739032487833
+              }
+            ],
+            [
+              "33958695:011592",
+              {
+                "max_absolute_net": 0.1022463561394277,
+                "mean_contribution_proxy_bps": 0.28820521469586785,
+                "mean_gross": 0.018697236853642208
+              }
+            ],
+            [
+              "02351877:024910",
+              {
+                "max_absolute_net": 0.05480167105912799,
+                "mean_contribution_proxy_bps": 0.25930814500629007,
+                "mean_gross": 0.005193907205851554
+              }
+            ],
+            [
+              "16614075:021350",
+              {
+                "max_absolute_net": 0.05311980774033975,
+                "mean_contribution_proxy_bps": 0.24871571675096205,
+                "mean_gross": 0.011914433083591787
+              }
+            ],
+            [
+              "23373000:024716",
+              {
+                "max_absolute_net": 0.05563597122779434,
+                "mean_contribution_proxy_bps": 0.2464446872807635,
+                "mean_gross": 0.005956466871744831
+              }
+            ],
+            [
+              "08807432:021016",
+              {
+                "max_absolute_net": 0.06046210630417199,
+                "mean_contribution_proxy_bps": -0.24324235926569515,
+                "mean_gross": 0.006822036771519444
+              }
+            ],
+            [
+              "00416968:024406",
+              {
+                "max_absolute_net": 0.06036451963462584,
+                "mean_contribution_proxy_bps": 0.2425574677448667,
+                "mean_gross": 0.004305284949127959
+              }
+            ]
+          ],
+          "limitations": {
+            "economics_unresolved": true,
+            "sector_contribution_is_label_based_proxy": true,
+            "terminal_haircut_scenario_relative_difference": -0.5054468278016708
+          },
+          "mean": {
+            "absolute_bps": 8.40839197364877,
+            "beta": 0.046455435161822115,
+            "borrow_bps": 0.6451097261404101,
+            "cdi_bps": 3.0387208860759496,
+            "equity_gross_bps": 10.416453183057985,
+            "free_cash_fraction": -0.24068836443032512,
+            "gross": 2.147533441669777,
+            "hedge_gross_bps": -2.160205524088575,
+            "interest_bps": 1.9290448495944679,
+            "net_excess_bps": 5.369671087572822,
+            "restricted_cash_fraction": 0.8508144384707579,
+            "settlement_fraction": 0.000324865219132418,
+            "signed_net": 0.38987392595956716,
+            "stale_fraction": 0.0029510823224434294,
+            "trading_cost_bps": 1.1317908087746897,
+            "turnover": 0.14147385109683622,
+            "unresolved_claim_fraction": 0.0,
+            "utility_bps": 4.806934639743979
+          },
+          "metrics": {
+            "absolute_brl_flat_fraction": 0.0,
+            "absolute_brl_losing_fraction": 0.44016110471806674,
+            "absolute_brl_winning_fraction": 0.5598388952819332,
+            "absolute_compounded_return_brl": 3.084681216144026,
+            "absolute_compounded_return_usd": 1.182085083572269,
+            "annualized_volatility_brl": 0.12462074502714812,
+            "cdi_excess_flat_fraction": 0.0,
+            "cdi_excess_losing_fraction": 0.45972382048331417,
+            "cdi_excess_winning_fraction": 0.5402761795166858,
+            "fx_carried_endpoint_count": 0,
+            "fx_max_age_days": 0,
+            "fx_valuation": "BCB PTAX BRL per USD; last dated fix on holidays",
+            "maximum_drawdown_brl": -0.12266525934259875,
+            "maximum_drawdown_usd": -0.3107249262063232,
+            "relative_to_cdi_compounded_return": 1.4090023961163025,
+            "sessions": 1738,
+            "sharpe_brl_minus_cdi": 1.0858295392267627,
+            "sharpe_brl_minus_zero": 1.700290571122724,
+            "sharpe_usd_minus_us_cash": 0.5628478577364188,
+            "us_cash_proxy": "EFFR, ACT/360 over calendar days",
+            "us_rate_max_age_days": 3
+          },
+          "paired_control": "full_net0.45",
+          "paired_net_bps": {
+            "block_length_sessions": 40,
+            "circular": true,
+            "estimate": -0.5674804109056509,
+            "fold_boundary_preserved": true,
+            "lower_95": -0.6642398016957457,
+            "observations": 1738,
+            "replications": 10000,
+            "resample_mean": -0.5673566858278609,
+            "upper_95": -0.47340977483191266
+          },
+          "realized_beta": -0.028473257790953402,
+          "year_net_bps": {
+            "2018": -3.619509136195215,
+            "2019": 14.642654798845353,
+            "2020": 3.8832480066238118,
+            "2021": 9.354250706474764,
+            "2022": 6.239169214231799,
+            "2023": 1.0878068942005303,
+            "2024": 5.899970545766806
+          }
+        },
+        "debit3_net0.05": {
+          "book": {
+            "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_portfolio_objective_e52be14_20260917\\closeout\\TE_all\\debit3_net0.05\\book.json",
+            "sha256": "585eb72f5485edc28f898c056ea4261bd412da78d03f31372d9f5c3f78a04e64"
+          },
+          "issuer_contribution_proxy_top": [
+            [
+              "UNKNOWN",
+              {
+                "max_absolute_net": 0.6710767285441215,
+                "mean_contribution_proxy_bps": 2.083800390226737,
+                "mean_gross": 0.41378488053181267
+              }
+            ],
+            [
+              "33000167:009512",
+              {
+                "max_absolute_net": 0.10786533981287583,
+                "mean_contribution_proxy_bps": 0.7916414886017902,
+                "mean_gross": 0.037732196850785514
+              }
+            ],
+            [
+              "76483817:014311",
+              {
+                "max_absolute_net": 0.10336927557998773,
+                "mean_contribution_proxy_bps": 0.358377795653094,
+                "mean_gross": 0.01958680321117185
+              }
+            ],
+            [
+              "10629105:022187",
+              {
+                "max_absolute_net": 0.05212863404836172,
+                "mean_contribution_proxy_bps": 0.29474957901441434,
+                "mean_gross": 0.013421774802428977
+              }
+            ],
+            [
+              "16614075:021350",
+              {
+                "max_absolute_net": 0.05298031567305671,
+                "mean_contribution_proxy_bps": 0.2267196193636464,
+                "mean_gross": 0.012114926248010397
+              }
+            ],
+            [
+              "13217485:024694",
+              {
+                "max_absolute_net": 0.04168254296895203,
+                "mean_contribution_proxy_bps": -0.22568334826676326,
+                "mean_gross": 0.004115292040599995
+              }
+            ],
+            [
+              "03847461:018724",
+              {
+                "max_absolute_net": 0.10499638052318566,
+                "mean_contribution_proxy_bps": 0.2000450393719324,
+                "mean_gross": 0.022264264806015777
+              }
+            ],
+            [
+              "33958695:011592",
+              {
+                "max_absolute_net": 0.10072831800211748,
+                "mean_contribution_proxy_bps": 0.19988152353365682,
+                "mean_gross": 0.01583816476795004
+              }
+            ],
+            [
+              "60894730:014320",
+              {
+                "max_absolute_net": 0.08538120863531767,
+                "mean_contribution_proxy_bps": -0.1954505442168654,
+                "mean_gross": 0.00929680790281919
+              }
+            ],
+            [
+              "51466860:020516",
+              {
+                "max_absolute_net": 0.052572908030983675,
+                "mean_contribution_proxy_bps": 0.19421145494271588,
+                "mean_gross": 0.006516099102148159
+              }
+            ]
+          ],
+          "limitations": {
+            "economics_unresolved": true,
+            "sector_contribution_is_label_based_proxy": true,
+            "terminal_haircut_scenario_relative_difference": -0.37102158639484983
+          },
+          "mean": {
+            "absolute_bps": 7.432564585206766,
+            "beta": -0.0017950467423414513,
+            "borrow_bps": 0.7326417568798589,
+            "cdi_bps": 3.0387208860759496,
+            "equity_gross_bps": 7.934912841880976,
+            "free_cash_fraction": -0.005145885358642331,
+            "gross": 2.022249541827899,
+            "hedge_gross_bps": -2.0264026944710225,
+            "interest_bps": 2.7897093595982,
+            "net_excess_bps": 4.393843699130816,
+            "restricted_cash_fraction": 0.9555864059900435,
+            "settlement_fraction": 0.00028412208099649335,
+            "signed_net": 0.0495594793685988,
+            "stale_fraction": 0.002576716295280746,
+            "trading_cost_bps": 0.5330131649214883,
+            "turnover": 0.13325329123037208,
+            "unresolved_claim_fraction": 0.0,
+            "utility_bps": 3.929330172971866
+          },
+          "metrics": {
+            "absolute_brl_flat_fraction": 0.0,
+            "absolute_brl_losing_fraction": 0.4436133486766398,
+            "absolute_brl_winning_fraction": 0.5563866513233602,
+            "absolute_compounded_return_brl": 2.4881504289543255,
+            "absolute_compounded_return_usd": 0.8634112718990847,
+            "annualized_volatility_brl": 0.11026422055749835,
+            "cdi_excess_flat_fraction": 0.0,
+            "cdi_excess_losing_fraction": 0.4672036823935558,
+            "cdi_excess_winning_fraction": 0.5327963176064442,
+            "fx_carried_endpoint_count": 0,
+            "fx_max_age_days": 0,
+            "fx_valuation": "BCB PTAX BRL per USD; last dated fix on holidays",
+            "maximum_drawdown_brl": -0.13012600481516579,
+            "maximum_drawdown_usd": -0.2883048395811224,
+            "relative_to_cdi_compounded_return": 1.0571893611069427,
+            "sessions": 1738,
+            "sharpe_brl_minus_cdi": 1.0045116963820295,
+            "sharpe_brl_minus_zero": 1.6986528050551155,
+            "sharpe_usd_minus_us_cash": 0.4572069732066119,
+            "us_cash_proxy": "EFFR, ACT/360 over calendar days",
+            "us_rate_max_age_days": 3
+          },
+          "paired_control": "full_net0.05",
+          "paired_net_bps": {
+            "block_length_sessions": 40,
+            "circular": true,
+            "estimate": -0.10286982379918477,
+            "fold_boundary_preserved": true,
+            "lower_95": -0.13032360366833814,
+            "observations": 1738,
+            "replications": 10000,
+            "resample_mean": -0.10298199555194056,
+            "upper_95": -0.07730635082476975
+          },
+          "realized_beta": -0.06756229912306985,
+          "year_net_bps": {
+            "2018": -1.4135000033657081,
+            "2019": 7.800270455754461,
+            "2020": 1.68744636020661,
+            "2021": 10.401874863564862,
+            "2022": 3.975007429777032,
+            "2023": 4.131655998304196,
+            "2024": 4.1454222982915745
+          }
+        },
+        "debit3_net0.45": {
+          "book": {
+            "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_portfolio_objective_e52be14_20260917\\closeout\\TE_all\\debit3_net0.45\\book.json",
+            "sha256": "5ff4a070de65d38aadf861b25b3b91b78e01fec341156ecb9e7abcdcc8051c0e"
+          },
+          "issuer_contribution_proxy_top": [
+            [
+              "UNKNOWN",
+              {
+                "max_absolute_net": 0.8568438214325302,
+                "mean_contribution_proxy_bps": 2.8450991091950266,
+                "mean_gross": 0.4633127161953479
+              }
+            ],
+            [
+              "33000167:009512",
+              {
+                "max_absolute_net": 0.10421440150922216,
+                "mean_contribution_proxy_bps": 0.7231135549323551,
+                "mean_gross": 0.03280210577843457
+              }
+            ],
+            [
+              "76483817:014311",
+              {
+                "max_absolute_net": 0.09407265408703727,
+                "mean_contribution_proxy_bps": 0.4315261177633686,
+                "mean_gross": 0.024151676848953193
+              }
+            ],
+            [
+              "04423567:021237",
+              {
+                "max_absolute_net": 0.05347841409029737,
+                "mean_contribution_proxy_bps": 0.3038731206704592,
+                "mean_gross": 0.015492337137389778
+              }
+            ],
+            [
+              "33958695:011592",
+              {
+                "max_absolute_net": 0.10223585213473493,
+                "mean_contribution_proxy_bps": 0.2880899972589585,
+                "mean_gross": 0.0186990467657381
+              }
+            ],
+            [
+              "02351877:024910",
+              {
+                "max_absolute_net": 0.05479703385614157,
+                "mean_contribution_proxy_bps": 0.25930133269358074,
+                "mean_gross": 0.005195149697809952
+              }
+            ],
+            [
+              "16614075:021350",
+              {
+                "max_absolute_net": 0.05311684370486524,
+                "mean_contribution_proxy_bps": 0.24880459034889965,
+                "mean_gross": 0.011915949950809116
+              }
+            ],
+            [
+              "23373000:024716",
+              {
+                "max_absolute_net": 0.055632866792748155,
+                "mean_contribution_proxy_bps": 0.24645821600884174,
+                "mean_gross": 0.0059591435285427504
+              }
+            ],
+            [
+              "08807432:021016",
+              {
+                "max_absolute_net": 0.06045643039443002,
+                "mean_contribution_proxy_bps": -0.24331565801019242,
+                "mean_gross": 0.006818450538439452
+              }
+            ],
+            [
+              "00416968:024406",
+              {
+                "max_absolute_net": 0.060333699257832774,
+                "mean_contribution_proxy_bps": 0.24257052486717545,
+                "mean_gross": 0.004305366025580604
+              }
+            ]
+          ],
+          "limitations": {
+            "economics_unresolved": true,
+            "sector_contribution_is_label_based_proxy": true,
+            "terminal_haircut_scenario_relative_difference": -0.5155105914838902
+          },
+          "mean": {
+            "absolute_bps": 8.687473025346543,
+            "beta": 0.046453190552094126,
+            "borrow_bps": 0.6450139764307296,
+            "cdi_bps": 3.0387208860759496,
+            "equity_gross_bps": 10.417974935619558,
+            "free_cash_fraction": -0.24077758840639024,
+            "gross": 2.147494873245675,
+            "hedge_gross_bps": -2.159919787156591,
+            "interest_bps": 1.6405101288386896,
+            "net_excess_bps": 5.6487521392705915,
+            "restricted_cash_fraction": 0.8508891435708552,
+            "settlement_fraction": 0.00032474470527996406,
+            "signed_net": 0.38988844483553503,
+            "stale_fraction": 0.0029503405006291354,
+            "trading_cost_bps": 0.5660782755243994,
+            "turnover": 0.14151956888109982,
+            "unresolved_claim_fraction": 0.0,
+            "utility_bps": 5.08600549829147
+          },
+          "metrics": {
+            "absolute_brl_flat_fraction": 0.0,
+            "absolute_brl_losing_fraction": 0.43843498273878023,
+            "absolute_brl_winning_fraction": 0.5615650172612198,
+            "absolute_compounded_return_brl": 3.287518751550455,
+            "absolute_compounded_return_usd": 1.2904432973417022,
+            "annualized_volatility_brl": 0.12462167227463215,
+            "cdi_excess_flat_fraction": 0.0,
+            "cdi_excess_losing_fraction": 0.4608745684695052,
+            "cdi_excess_winning_fraction": 0.5391254315304949,
+            "fx_carried_endpoint_count": 0,
+            "fx_max_age_days": 0,
+            "fx_valuation": "BCB PTAX BRL per USD; last dated fix on holidays",
+            "maximum_drawdown_brl": -0.12237550711745326,
+            "maximum_drawdown_usd": -0.31040535603967834,
+            "relative_to_cdi_compounded_return": 1.5286288939896515,
+            "sessions": 1738,
+            "sharpe_brl_minus_cdi": 1.142286127301414,
+            "sharpe_brl_minus_zero": 1.7567114631256386,
+            "sharpe_usd_minus_us_cash": 0.5996838139613023,
+            "us_cash_proxy": "EFFR, ACT/360 over calendar days",
+            "us_rate_max_age_days": 3
+          },
+          "paired_control": "full_net0.45",
+          "paired_net_bps": {
+            "block_length_sessions": 40,
+            "circular": true,
+            "estimate": -0.2883993592078803,
+            "fold_boundary_preserved": true,
+            "lower_95": -0.3268637483786871,
+            "observations": 1738,
+            "replications": 10000,
+            "resample_mean": -0.288553464183105,
+            "upper_95": -0.2505890812757905
+          },
+          "realized_beta": -0.028400493120675146,
+          "year_net_bps": {
+            "2018": -3.5800865855039157,
+            "2019": 14.722023131477782,
+            "2020": 3.9971628988287873,
+            "2021": 9.694455304365178,
+            "2022": 6.274964493772952,
+            "2023": 1.8482955221848887,
+            "2024": 6.480670358416735
+          }
+        },
+        "full_net0.05": {
+          "book": {
+            "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_opportunity_056aad2_20260917\\TE_all\\books\\neutral\\book.json",
+            "sha256": "6a1c4f4533d203f0fb1b26b686b72baf25fea81ad88e012bda345f1ad701abe8"
+          },
+          "issuer_contribution_proxy_top": [
+            [
+              "UNKNOWN",
+              {
+                "max_absolute_net": 0.6710650213327192,
+                "mean_contribution_proxy_bps": 2.083796414891058,
+                "mean_gross": 0.4137914541764788
+              }
+            ],
+            [
+              "33000167:009512",
+              {
+                "max_absolute_net": 0.10786309476446154,
+                "mean_contribution_proxy_bps": 0.7915810834398582,
+                "mean_gross": 0.037730637052149935
+              }
+            ],
+            [
+              "76483817:014311",
+              {
+                "max_absolute_net": 0.10336821746341707,
+                "mean_contribution_proxy_bps": 0.3583620381655464,
+                "mean_gross": 0.01958657241338864
+              }
+            ],
+            [
+              "10629105:022187",
+              {
+                "max_absolute_net": 0.05212791578431556,
+                "mean_contribution_proxy_bps": 0.29471632255193947,
+                "mean_gross": 0.013422034372054302
+              }
+            ],
+            [
+              "16614075:021350",
+              {
+                "max_absolute_net": 0.05297982899351108,
+                "mean_contribution_proxy_bps": 0.2267343329149912,
+                "mean_gross": 0.012114854639751083
+              }
+            ],
+            [
+              "13217485:024694",
+              {
+                "max_absolute_net": 0.041690495998593584,
+                "mean_contribution_proxy_bps": -0.22569711588613722,
+                "mean_gross": 0.004115882284233247
+              }
+            ],
+            [
+              "03847461:018724",
+              {
+                "max_absolute_net": 0.10499613644204944,
+                "mean_contribution_proxy_bps": 0.20002307043449163,
+                "mean_gross": 0.0222636746996542
+              }
+            ],
+            [
+              "33958695:011592",
+              {
+                "max_absolute_net": 0.10072177749899527,
+                "mean_contribution_proxy_bps": 0.19986018395526806,
+                "mean_gross": 0.01583828263408179
+              }
+            ],
+            [
+              "60894730:014320",
+              {
+                "max_absolute_net": 0.08534252601219872,
+                "mean_contribution_proxy_bps": -0.1954937834317911,
+                "mean_gross": 0.00929884881609849
+              }
+            ],
+            [
+              "51466860:020516",
+              {
+                "max_absolute_net": 0.052571832311197185,
+                "mean_contribution_proxy_bps": 0.19424660449288697,
+                "mean_gross": 0.006518067634225194
+              }
+            ]
+          ],
+          "limitations": {
+            "economics_unresolved": true,
+            "sector_contribution_is_label_based_proxy": true,
+            "terminal_haircut_scenario_relative_difference": -0.3737717901597244
+          },
+          "mean": {
+            "absolute_bps": 7.53543440900595,
+            "beta": -0.0017949802624946793,
+            "borrow_bps": 0.7325940269688693,
+            "cdi_bps": 3.0387208860759496,
+            "equity_gross_bps": 7.935363867219796,
+            "free_cash_fraction": -0.005147420450669222,
+            "gross": 2.0222276118176308,
+            "hedge_gross_bps": -2.026341520280175,
+            "interest_bps": 2.8920742064180467,
+            "net_excess_bps": 4.496713522930001,
+            "restricted_cash_fraction": 0.9555884787817988,
+            "settlement_fraction": 0.00028409526898009985,
+            "signed_net": 0.04955894166887042,
+            "stale_fraction": 0.0025766605723016077,
+            "trading_cost_bps": 0.5330681173828437,
+            "turnover": 0.1332670293457109,
+            "unresolved_claim_fraction": 0.0,
+            "utility_bps": 4.032198145043468
+          },
+          "metrics": {
+            "absolute_brl_flat_fraction": 0.0,
+            "absolute_brl_losing_fraction": 0.44188722669735325,
+            "absolute_brl_winning_fraction": 0.5581127733026467,
+            "absolute_compounded_return_brl": 2.5510308238487274,
+            "absolute_compounded_return_usd": 0.8970027235908187,
+            "annualized_volatility_brl": 0.11026447943044906,
+            "cdi_excess_flat_fraction": 0.0,
+            "cdi_excess_losing_fraction": 0.4660529344073648,
+            "cdi_excess_winning_fraction": 0.5339470655926352,
+            "fx_carried_endpoint_count": 0,
+            "fx_max_age_days": 0,
+            "fx_valuation": "BCB PTAX BRL per USD; last dated fix on holidays",
+            "maximum_drawdown_brl": -0.12923448119310166,
+            "maximum_drawdown_usd": -0.28720833356750997,
+            "relative_to_cdi_compounded_return": 1.0942740230312804,
+            "sessions": 1738,
+            "sharpe_brl_minus_cdi": 1.0280429710049752,
+            "sharpe_brl_minus_zero": 1.7221588319992724,
+            "sharpe_usd_minus_us_cash": 0.4715451315971454,
+            "us_cash_proxy": "EFFR, ACT/360 over calendar days",
+            "us_rate_max_age_days": 3
+          },
+          "paired_control": "full_net0.05",
+          "paired_net_bps": {
+            "block_length_sessions": 40,
+            "circular": true,
+            "estimate": 0.0,
+            "fold_boundary_preserved": true,
+            "lower_95": 0.0,
+            "observations": 1738,
+            "replications": 10000,
+            "resample_mean": 0.0,
+            "upper_95": 0.0
+          },
+          "realized_beta": -0.06757142582042423,
+          "year_net_bps": {
+            "2018": -1.4135000033657081,
+            "2019": 7.828574336668697,
+            "2020": 1.731702030737104,
+            "2021": 10.553752427542596,
+            "2022": 4.184967338907063,
+            "2023": 4.270445225233712,
+            "2024": 4.290144471481345
+          }
+        },
+        "full_net0.25": {
+          "book": {
+            "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_portfolio_objective_e52be14_20260917\\closeout\\TE_all\\full_net0.25\\book.json",
+            "sha256": "ac82fc068ada9f0c4d9fa0aa9280c2f6bb6b9f741b37fe7a44fb65ca80441928"
+          },
+          "issuer_contribution_proxy_top": [
+            [
+              "UNKNOWN",
+              {
+                "max_absolute_net": 0.7308102811417254,
+                "mean_contribution_proxy_bps": 2.565132894796094,
+                "mean_gross": 0.4367461686517355
+              }
+            ],
+            [
+              "33000167:009512",
+              {
+                "max_absolute_net": 0.10708388726090153,
+                "mean_contribution_proxy_bps": 0.7513949400306873,
+                "mean_gross": 0.034912850163930906
+              }
+            ],
+            [
+              "76483817:014311",
+              {
+                "max_absolute_net": 0.0988293084597466,
+                "mean_contribution_proxy_bps": 0.4400835757950685,
+                "mean_gross": 0.022717468393592163
+              }
+            ],
+            [
+              "16614075:021350",
+              {
+                "max_absolute_net": 0.05303414972069662,
+                "mean_contribution_proxy_bps": 0.26839077334507516,
+                "mean_gross": 0.013112532890240716
+              }
+            ],
+            [
+              "33958695:011592",
+              {
+                "max_absolute_net": 0.10183422507846493,
+                "mean_contribution_proxy_bps": 0.25766642998168904,
+                "mean_gross": 0.016566426855683235
+              }
+            ],
+            [
+              "04423567:021237",
+              {
+                "max_absolute_net": 0.053057912082135894,
+                "mean_contribution_proxy_bps": 0.24724992199068066,
+                "mean_gross": 0.01254643294802064
+              }
+            ],
+            [
+              "13217485:024694",
+              {
+                "max_absolute_net": 0.05161882622562712,
+                "mean_contribution_proxy_bps": -0.24580736664506775,
+                "mean_gross": 0.004351584888587842
+              }
+            ],
+            [
+              "08807432:021016",
+              {
+                "max_absolute_net": 0.05786071288552123,
+                "mean_contribution_proxy_bps": -0.216741296018011,
+                "mean_gross": 0.006800447668479853
+              }
+            ],
+            [
+              "23373000:024716",
+              {
+                "max_absolute_net": 0.05237710571409779,
+                "mean_contribution_proxy_bps": 0.21407253573481472,
+                "mean_gross": 0.005699413237086976
+              }
+            ],
+            [
+              "03847461:018724",
+              {
+                "max_absolute_net": 0.10410157235614267,
+                "mean_contribution_proxy_bps": 0.21166252979268563,
+                "mean_gross": 0.024412686848049266
+              }
+            ]
+          ],
+          "limitations": {
+            "economics_unresolved": true,
+            "sector_contribution_is_label_based_proxy": true,
+            "terminal_haircut_scenario_relative_difference": -0.4990455327044585
+          },
+          "mean": {
+            "absolute_bps": 8.743512777113859,
+            "beta": 0.031399801197656514,
+            "borrow_bps": 0.6827068656330274,
+            "cdi_bps": 3.0387208860759496,
+            "equity_gross_bps": 9.663904640825303,
+            "free_cash_fraction": -0.1216909866708158,
+            "gross": 2.0701419356790796,
+            "hedge_gross_bps": -2.055083151888296,
+            "interest_bps": 2.356994840721816,
+            "net_excess_bps": 5.704791891037909,
+            "restricted_cash_fraction": 0.8881846737802138,
+            "settlement_fraction": 0.00032129556292946035,
+            "signed_net": 0.23350631289060184,
+            "stale_fraction": 0.002922144882196983,
+            "trading_cost_bps": 0.5395966869119447,
+            "turnover": 0.13489917172798618,
+            "unresolved_claim_fraction": 0.0,
+            "utility_bps": 5.210964699157166
+          },
+          "metrics": {
+            "absolute_brl_flat_fraction": 0.0,
+            "absolute_brl_losing_fraction": 0.44016110471806674,
+            "absolute_brl_winning_fraction": 0.5598388952819332,
+            "absolute_compounded_return_brl": 3.3664616370743436,
+            "absolute_compounded_return_usd": 1.3326155217676812,
+            "annualized_volatility_brl": 0.1142807662957481,
+            "cdi_excess_flat_fraction": 0.0,
+            "cdi_excess_losing_fraction": 0.4654775604142693,
+            "cdi_excess_winning_fraction": 0.5345224395857308,
+            "fx_carried_endpoint_count": 0,
+            "fx_max_age_days": 0,
+            "fx_valuation": "BCB PTAX BRL per USD; last dated fix on holidays",
+            "maximum_drawdown_brl": -0.12767325064255253,
+            "maximum_drawdown_usd": -0.30127074043496826,
+            "relative_to_cdi_compounded_return": 1.5751866521891746,
+            "sessions": 1738,
+            "sharpe_brl_minus_cdi": 1.2582206609885536,
+            "sharpe_brl_minus_zero": 1.9280280411583754,
+            "sharpe_usd_minus_us_cash": 0.6276134645079947,
+            "us_cash_proxy": "EFFR, ACT/360 over calendar days",
+            "us_rate_max_age_days": 3
+          },
+          "paired_control": "full_net0.05",
+          "paired_net_bps": {
+            "block_length_sessions": 40,
+            "circular": true,
+            "estimate": 1.208078368107908,
+            "fold_boundary_preserved": true,
+            "lower_95": 0.022693492420375026,
+            "observations": 1738,
+            "replications": 10000,
+            "resample_mean": 1.211751053225174,
+            "upper_95": 2.43069334901013
+          },
+          "realized_beta": -0.03914597887611073,
+          "year_net_bps": {
+            "2018": -2.2877428721151967,
+            "2019": 12.434639728315933,
+            "2020": 2.536586545360049,
+            "2021": 11.189308454052105,
+            "2022": 6.778799613123575,
+            "2023": 3.173286861572292,
+            "2024": 6.034224600690892
+          }
+        },
+        "full_net0.45": {
+          "book": {
+            "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_opportunity_056aad2_20260917\\TE_all\\books\\flexible_net\\book.json",
+            "sha256": "f7788c5d8af92ee35b1222e1abdf343f62686d5aee6787354383db065a54905f"
+          },
+          "issuer_contribution_proxy_top": [
+            [
+              "UNKNOWN",
+              {
+                "max_absolute_net": 0.8568438214325302,
+                "mean_contribution_proxy_bps": 2.8447639646823726,
+                "mean_gross": 0.4633016282336161
+              }
+            ],
+            [
+              "33000167:009512",
+              {
+                "max_absolute_net": 0.10420944209848201,
+                "mean_contribution_proxy_bps": 0.7229815054773396,
+                "mean_gross": 0.03279789661513574
+              }
+            ],
+            [
+              "76483817:014311",
+              {
+                "max_absolute_net": 0.09407655200502923,
+                "mean_contribution_proxy_bps": 0.43143152062463874,
+                "mean_gross": 0.024148936523988505
+              }
+            ],
+            [
+              "04423567:021237",
+              {
+                "max_absolute_net": 0.05347446738255537,
+                "mean_contribution_proxy_bps": 0.3038472213605007,
+                "mean_gross": 0.015492242932699187
+              }
+            ],
+            [
+              "33958695:011592",
+              {
+                "max_absolute_net": 0.10223245425496799,
+                "mean_contribution_proxy_bps": 0.28806687083427884,
+                "mean_gross": 0.018697708861243376
+              }
+            ],
+            [
+              "02351877:024910",
+              {
+                "max_absolute_net": 0.054795689262318356,
+                "mean_contribution_proxy_bps": 0.2592576454529518,
+                "mean_gross": 0.005194958579355763
+              }
+            ],
+            [
+              "16614075:021350",
+              {
+                "max_absolute_net": 0.05311454075982475,
+                "mean_contribution_proxy_bps": 0.24861881831770183,
+                "mean_gross": 0.01191138013304987
+              }
+            ],
+            [
+              "23373000:024716",
+              {
+                "max_absolute_net": 0.05563045476249054,
+                "mean_contribution_proxy_bps": 0.24649646495837751,
+                "mean_gross": 0.005960199644682304
+              }
+            ],
+            [
+              "08807432:021016",
+              {
+                "max_absolute_net": 0.06045189155921471,
+                "mean_contribution_proxy_bps": -0.24335305651628414,
+                "mean_gross": 0.006818802275050417
+              }
+            ],
+            [
+              "00416968:024406",
+              {
+                "max_absolute_net": 0.06031812064199989,
+                "mean_contribution_proxy_bps": 0.24254946562373186,
+                "mean_gross": 0.0043046016628344634
+              }
+            ]
+          ],
+          "limitations": {
+            "economics_unresolved": true,
+            "sector_contribution_is_label_based_proxy": true,
+            "terminal_haircut_scenario_relative_difference": -0.5313679762452281
+          },
+          "mean": {
+            "absolute_bps": 8.975872384554423,
+            "beta": 0.046452951119048486,
+            "borrow_bps": 0.6449645071648731,
+            "cdi_bps": 3.0387208860759496,
+            "equity_gross_bps": 10.417838518707594,
+            "free_cash_fraction": -0.24076907951802162,
+            "gross": 2.147396537320383,
+            "hedge_gross_bps": -2.159842036142794,
+            "interest_bps": 1.9289706410382417,
+            "net_excess_bps": 5.937151498478472,
+            "restricted_cash_fraction": 0.850884255993506,
+            "settlement_fraction": 0.00032459994479013004,
+            "signed_net": 0.3898848235245155,
+            "stale_fraction": 0.0029494569004365058,
+            "trading_cost_bps": 0.5661302318837351,
+            "turnover": 0.14153255797093375,
+            "unresolved_claim_fraction": 0.0,
+            "utility_bps": 5.374476621918859
+          },
+          "metrics": {
+            "absolute_brl_flat_fraction": 0.0,
+            "absolute_brl_losing_fraction": 0.4378596087456847,
+            "absolute_brl_winning_fraction": 0.5621403912543153,
+            "absolute_compounded_return_brl": 3.507742996213474,
+            "absolute_compounded_return_usd": 1.4080896971196553,
+            "annualized_volatility_brl": 0.12461567552641108,
+            "cdi_excess_flat_fraction": 0.0,
+            "cdi_excess_losing_fraction": 0.4579976985040276,
+            "cdi_excess_winning_fraction": 0.5420023014959724,
+            "fx_carried_endpoint_count": 0,
+            "fx_max_age_days": 0,
+            "fx_valuation": "BCB PTAX BRL per USD; last dated fix on holidays",
+            "maximum_drawdown_brl": -0.12014354853613363,
+            "maximum_drawdown_usd": -0.3086247752288569,
+            "relative_to_cdi_compounded_return": 1.6585094660595536,
+            "sessions": 1738,
+            "sharpe_brl_minus_cdi": 1.2006733090966137,
+            "sharpe_brl_minus_zero": 1.815116622650192,
+            "sharpe_usd_minus_us_cash": 0.6377806017223564,
+            "us_cash_proxy": "EFFR, ACT/360 over calendar days",
+            "us_rate_max_age_days": 3
+          },
+          "paired_control": "full_net0.45",
+          "paired_net_bps": {
+            "block_length_sessions": 40,
+            "circular": true,
+            "estimate": 0.0,
+            "fold_boundary_preserved": true,
+            "lower_95": 0.0,
+            "observations": 1738,
+            "replications": 10000,
+            "resample_mean": 0.0,
+            "upper_95": 0.0
+          },
+          "realized_beta": -0.028445651967470245,
+          "year_net_bps": {
+            "2018": -3.4600066893443446,
+            "2019": 14.940317839518492,
+            "2020": 4.280368558101775,
+            "2021": 10.066378337949963,
+            "2022": 6.72157904931308,
+            "2023": 2.0892560631947643,
+            "2024": 6.81487901435382
+          }
+        },
+        "intercept_net0.05": {
+          "book": {
+            "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_portfolio_objective_e52be14_20260917\\closeout\\TE_all\\intercept_net0.05\\book.json",
+            "sha256": "cb4dcbc123e3d50f716f9ebf18f90a2140cb1a0ef72f06418684bbf78abe682c"
+          },
+          "issuer_contribution_proxy_top": [
+            [
+              "UNKNOWN",
+              {
+                "max_absolute_net": 0.5297683286774775,
+                "mean_contribution_proxy_bps": 0.8881816375870724,
+                "mean_gross": 0.14570292205271776
+              }
+            ],
+            [
+              "33000167:009512",
+              {
+                "max_absolute_net": 0.040195736531537435,
+                "mean_contribution_proxy_bps": 0.11553838196777097,
+                "mean_gross": 0.011279395252138993
+              }
+            ],
+            [
+              "76483817:014311",
+              {
+                "max_absolute_net": 0.017033213555386374,
+                "mean_contribution_proxy_bps": 0.10832768309888402,
+                "mean_gross": 0.007493629213775867
+              }
+            ],
+            [
+              "84429695:005410",
+              {
+                "max_absolute_net": 0.012825751294925252,
+                "mean_contribution_proxy_bps": 0.0755273792428178,
+                "mean_gross": 0.005032788105702581
+              }
+            ],
+            [
+              "07859971:020257",
+              {
+                "max_absolute_net": 0.022360234390711796,
+                "mean_contribution_proxy_bps": 0.07066955118834095,
+                "mean_gross": 0.007187882472856897
+              }
+            ],
+            [
+              "60872504:019348",
+              {
+                "max_absolute_net": 0.02684579350227267,
+                "mean_contribution_proxy_bps": 0.06783548955600929,
+                "mean_gross": 0.014129381094473365
+              }
+            ],
+            [
+              "10629105:022187",
+              {
+                "max_absolute_net": 0.00634321214791063,
+                "mean_contribution_proxy_bps": 0.058815279016880564,
+                "mean_gross": 0.0023799734438314465
+              }
+            ],
+            [
+              "33611500:003980",
+              {
+                "max_absolute_net": 0.011069399907848967,
+                "mean_contribution_proxy_bps": 0.05465676199795956,
+                "mean_gross": 0.005200336423362992
+              }
+            ],
+            [
+              "76484013:018627",
+              {
+                "max_absolute_net": 0.014644157192967085,
+                "mean_contribution_proxy_bps": 0.05438978265622587,
+                "mean_gross": 0.006737191778402669
+              }
+            ],
+            [
+              "16614075:021350",
+              {
+                "max_absolute_net": 0.0077694096434630594,
+                "mean_contribution_proxy_bps": 0.054162308868560056,
+                "mean_gross": 0.0030279416492986363
+              }
+            ]
+          ],
+          "limitations": {
+            "economics_unresolved": true,
+            "sector_contribution_is_label_based_proxy": true,
+            "terminal_haircut_scenario_relative_difference": -0.13648042442806907
+          },
+          "mean": {
+            "absolute_bps": 3.5414883723666146,
+            "beta": -0.002783662446681784,
+            "borrow_bps": 0.4671376270862508,
+            "cdi_bps": 3.0387208860759496,
+            "equity_gross_bps": 3.1608143672311773,
+            "free_cash_fraction": 0.4036639412398061,
+            "gross": 1.238880358990802,
+            "hedge_gross_bps": -1.993646242422769,
+            "interest_bps": 2.8878488324844866,
+            "net_excess_bps": 0.5027674862906647,
+            "restricted_cash_fraction": 0.546510026685975,
+            "settlement_fraction": 0.0001388500660809618,
+            "signed_net": 0.04982603207421886,
+            "stale_fraction": 0.0012529742670586996,
+            "trading_cost_bps": 0.0463909578400165,
+            "turnover": 0.011597739460004123,
+            "unresolved_claim_fraction": 0.0,
+            "utility_bps": 0.47470832533241186
+          },
+          "metrics": {
+            "absolute_brl_flat_fraction": 0.0,
+            "absolute_brl_losing_fraction": 0.452819332566168,
+            "absolute_brl_winning_fraction": 0.547180667433832,
+            "absolute_compounded_return_brl": 0.8298775174354132,
+            "absolute_compounded_return_usd": -0.022457757589865457,
+            "annualized_volatility_brl": 0.05688917607344558,
+            "cdi_excess_flat_fraction": 0.0,
+            "cdi_excess_losing_fraction": 0.4873417721518987,
+            "cdi_excess_winning_fraction": 0.5126582278481012,
+            "fx_carried_endpoint_count": 0,
+            "fx_max_age_days": 0,
+            "fx_valuation": "BCB PTAX BRL per USD; last dated fix on holidays",
+            "maximum_drawdown_brl": -0.060343605929459754,
+            "maximum_drawdown_usd": -0.33599788814728215,
+            "relative_to_cdi_compounded_return": 0.07919788371209124,
+            "sessions": 1738,
+            "sharpe_brl_minus_cdi": 0.22271124625225977,
+            "sharpe_brl_minus_zero": 1.5687607580819969,
+            "sharpe_usd_minus_us_cash": -0.08144900656973479,
+            "us_cash_proxy": "EFFR, ACT/360 over calendar days",
+            "us_rate_max_age_days": 3
+          },
+          "paired_control": "full_net0.05",
+          "paired_net_bps": {
+            "block_length_sessions": 40,
+            "circular": true,
+            "estimate": -3.9939460366393362,
+            "fold_boundary_preserved": true,
+            "lower_95": -7.39968453609535,
+            "observations": 1738,
+            "replications": 10000,
+            "resample_mean": -3.992699144408778,
+            "upper_95": -0.6801219263736424
+          },
+          "realized_beta": -0.013555548985591685,
+          "year_net_bps": {
+            "2018": 0.9723726284615746,
+            "2019": 4.7754585325289085,
+            "2020": -0.5190158331296919,
+            "2021": 0.6810925462489625,
+            "2022": -2.081597859490225,
+            "2023": 1.0718846071532415,
+            "2024": -1.3273225220825806
+          }
+        },
+        "intercept_net0.45": {
+          "book": {
+            "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_portfolio_objective_e52be14_20260917\\closeout\\TE_all\\intercept_net0.45\\book.json",
+            "sha256": "714c965bd3ac484050f31a94e87499e5fea701104937cd6ca7b34ef652dcb8f2"
+          },
+          "issuer_contribution_proxy_top": [
+            [
+              "UNKNOWN",
+              {
+                "max_absolute_net": 0.7567339238011905,
+                "mean_contribution_proxy_bps": 1.3443117074853594,
+                "mean_gross": 0.2657082573700363
+              }
+            ],
+            [
+              "07859971:020257",
+              {
+                "max_absolute_net": 0.1151158319665682,
+                "mean_contribution_proxy_bps": 0.2993607932827767,
+                "mean_gross": 0.033443047328026915
+              }
+            ],
+            [
+              "04423567:021237",
+              {
+                "max_absolute_net": 0.04471635880908431,
+                "mean_contribution_proxy_bps": 0.24947214087629058,
+                "mean_gross": 0.011068258184725802
+              }
+            ],
+            [
+              "76484013:018627",
+              {
+                "max_absolute_net": 0.0803490563407808,
+                "mean_contribution_proxy_bps": 0.19114118924427753,
+                "mean_gross": 0.024371962741830462
+              }
+            ],
+            [
+              "33958695:011592",
+              {
+                "max_absolute_net": 0.043757073504383334,
+                "mean_contribution_proxy_bps": 0.17852942790609122,
+                "mean_gross": 0.007999391397722436
+              }
+            ],
+            [
+              "89096457:020745",
+              {
+                "max_absolute_net": 0.05141972446106739,
+                "mean_contribution_proxy_bps": 0.1587952521886812,
+                "mean_gross": 0.014409670630197739
+              }
+            ],
+            [
+              "06164253:019569",
+              {
+                "max_absolute_net": 0.03973803759709103,
+                "mean_contribution_proxy_bps": 0.1579876560080161,
+                "mean_gross": 0.0029058734660843805
+              }
+            ],
+            [
+              "07689002:020087",
+              {
+                "max_absolute_net": 0.04551302126220642,
+                "mean_contribution_proxy_bps": 0.15295910892292675,
+                "mean_gross": 0.008876657854847227
+              }
+            ],
+            [
+              "11669021:022365",
+              {
+                "max_absolute_net": 0.02469260791316787,
+                "mean_contribution_proxy_bps": 0.14332596759096322,
+                "mean_gross": 0.004552654697564063
+              }
+            ],
+            [
+              "07628528:020036",
+              {
+                "max_absolute_net": 0.05344207162399994,
+                "mean_contribution_proxy_bps": 0.14224871509894532,
+                "mean_gross": 0.013238912783050439
+              }
+            ]
+          ],
+          "limitations": {
+            "economics_unresolved": true,
+            "sector_contribution_is_label_based_proxy": true,
+            "terminal_haircut_scenario_relative_difference": -0.4075179715292858
+          },
+          "mean": {
+            "absolute_bps": 5.19281259988673,
+            "beta": 0.04689816824920797,
+            "borrow_bps": 0.5100463260592758,
+            "cdi_bps": 3.0387208860759496,
+            "equity_gross_bps": 6.202387303861149,
+            "free_cash_fraction": -0.06581738818798999,
+            "gross": 1.7661304459567335,
+            "hedge_gross_bps": -2.1200405826617366,
+            "interest_bps": 1.7021387495050702,
+            "net_excess_bps": 2.1540917138107805,
+            "restricted_cash_fraction": 0.6274199468422992,
+            "settlement_fraction": 0.0003524279796771929,
+            "signed_net": 0.438397441345691,
+            "stale_fraction": 0.0031765015379682285,
+            "trading_cost_bps": 0.08162654475846734,
+            "turnover": 0.020406636189616835,
+            "unresolved_claim_fraction": 0.0,
+            "utility_bps": 1.9422034071902323
+          },
+          "metrics": {
+            "absolute_brl_flat_fraction": 0.0,
+            "absolute_brl_losing_fraction": 0.45512082853855007,
+            "absolute_brl_winning_fraction": 0.5448791714614499,
+            "absolute_compounded_return_brl": 1.400519404777791,
+            "absolute_compounded_return_usd": 0.28238589716340434,
+            "annualized_volatility_brl": 0.08789599839585162,
+            "cdi_excess_flat_fraction": 0.0,
+            "cdi_excess_losing_fraction": 0.4815880322209436,
+            "cdi_excess_winning_fraction": 0.5184119677790564,
+            "fx_carried_endpoint_count": 0,
+            "fx_max_age_days": 0,
+            "fx_valuation": "BCB PTAX BRL per USD; last dated fix on holidays",
+            "maximum_drawdown_brl": -0.11098697724033801,
+            "maximum_drawdown_usd": -0.3621952213080657,
+            "relative_to_cdi_compounded_return": 0.41574254930287813,
+            "sessions": 1738,
+            "sharpe_brl_minus_cdi": 0.6173494537685726,
+            "sharpe_brl_minus_zero": 1.4887922078978482,
+            "sharpe_usd_minus_us_cash": 0.15636673728795625,
+            "us_cash_proxy": "EFFR, ACT/360 over calendar days",
+            "us_rate_max_age_days": 3
+          },
+          "paired_control": "full_net0.45",
+          "paired_net_bps": {
+            "block_length_sessions": 40,
+            "circular": true,
+            "estimate": -3.783059784667693,
+            "fold_boundary_preserved": true,
+            "lower_95": -6.815755763169563,
+            "observations": 1738,
+            "replications": 10000,
+            "resample_mean": -3.767143751798564,
+            "upper_95": -0.730949701831155
+          },
+          "realized_beta": -0.029022769848215606,
+          "year_net_bps": {
+            "2018": -0.46707474992891185,
+            "2019": 9.951070665024327,
+            "2020": 0.05772578581392981,
+            "2021": 4.350842230036404,
+            "2022": -0.13614506402793564,
+            "2023": -0.21186716936046313,
+            "2024": 1.545524939965756
+          }
+        },
+        "proceeds0_net0.05": {
+          "book": {
+            "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_portfolio_objective_e52be14_20260917\\closeout\\TE_all\\proceeds0_net0.05\\book.json",
+            "sha256": "81b65de91734aefa1966ae7c7fddab499b281f531c3270f63b46a06a386515c1"
+          },
+          "issuer_contribution_proxy_top": [
+            [
+              "UNKNOWN",
+              {
+                "max_absolute_net": 0.6704749204017616,
+                "mean_contribution_proxy_bps": 2.082539332807397,
+                "mean_gross": 0.4136442140362532
+              }
+            ],
+            [
+              "33000167:009512",
+              {
+                "max_absolute_net": 0.10792471142684883,
+                "mean_contribution_proxy_bps": 0.7932678996576858,
+                "mean_gross": 0.03778121225372767
+              }
+            ],
+            [
+              "76483817:014311",
+              {
+                "max_absolute_net": 0.10339566728085567,
+                "mean_contribution_proxy_bps": 0.3582445092180331,
+                "mean_gross": 0.0195843720366826
+              }
+            ],
+            [
+              "10629105:022187",
+              {
+                "max_absolute_net": 0.05214598497414667,
+                "mean_contribution_proxy_bps": 0.2956772120173985,
+                "mean_gross": 0.013393448609825546
+              }
+            ],
+            [
+              "16614075:021350",
+              {
+                "max_absolute_net": 0.05298068535127186,
+                "mean_contribution_proxy_bps": 0.22567065304659564,
+                "mean_gross": 0.012120957062583478
+              }
+            ],
+            [
+              "13217485:024694",
+              {
+                "max_absolute_net": 0.0414038192209252,
+                "mean_contribution_proxy_bps": -0.22487351240356065,
+                "mean_gross": 0.004090469413377475
+              }
+            ],
+            [
+              "03847461:018724",
+              {
+                "max_absolute_net": 0.10499912376108175,
+                "mean_contribution_proxy_bps": 0.20123551277765245,
+                "mean_gross": 0.022270104750804237
+              }
+            ],
+            [
+              "33958695:011592",
+              {
+                "max_absolute_net": 0.10079925330262002,
+                "mean_contribution_proxy_bps": 0.19943155730750545,
+                "mean_gross": 0.01581196639752905
+              }
+            ],
+            [
+              "60894730:014320",
+              {
+                "max_absolute_net": 0.08596066880217743,
+                "mean_contribution_proxy_bps": -0.19339553061911796,
+                "mean_gross": 0.009220401547863874
+              }
+            ],
+            [
+              "51466860:020516",
+              {
+                "max_absolute_net": 0.05260510411770742,
+                "mean_contribution_proxy_bps": 0.19320733660299422,
+                "mean_gross": 0.006445385582798864
+              }
+            ]
+          ],
+          "limitations": {
+            "economics_unresolved": true,
+            "sector_contribution_is_label_based_proxy": true,
+            "terminal_haircut_scenario_relative_difference": -0.3005383545795912
+          },
+          "mean": {
+            "absolute_bps": 4.457304804315538,
+            "beta": -0.001762615546269682,
+            "borrow_bps": 0.7351106382090002,
+            "cdi_bps": 3.0387208860759496,
+            "equity_gross_bps": 7.89796914890321,
+            "free_cash_fraction": -0.004847826774449585,
+            "gross": 2.0234733111003997,
+            "hedge_gross_bps": -2.0260612702289698,
+            "interest_bps": -0.14884263574318102,
+            "net_excess_bps": 1.4185839182395876,
+            "restricted_cash_fraction": 0.9552796972007311,
+            "settlement_fraction": 0.00028445121250878945,
+            "signed_net": 0.04956812957371849,
+            "stale_fraction": 0.0025761206008079584,
+            "trading_cost_bps": 0.5306498004065042,
+            "turnover": 0.13266245010162603,
+            "unresolved_claim_fraction": 0.0,
+            "utility_bps": 0.954691902494276
+          },
+          "metrics": {
+            "absolute_brl_flat_fraction": 0.0,
+            "absolute_brl_losing_fraction": 0.4660529344073648,
+            "absolute_brl_winning_fraction": 0.5339470655926352,
+            "absolute_compounded_return_brl": 1.080611431904055,
+            "absolute_compounded_return_usd": 0.11148726914694951,
+            "annualized_volatility_brl": 0.11011988830901147,
+            "cdi_excess_flat_fraction": 0.0,
+            "cdi_excess_losing_fraction": 0.48791714614499426,
+            "cdi_excess_winning_fraction": 0.5120828538550057,
+            "fx_carried_endpoint_count": 0,
+            "fx_max_age_days": 0,
+            "fx_valuation": "BCB PTAX BRL per USD; last dated fix on holidays",
+            "maximum_drawdown_brl": -0.15011620580987162,
+            "maximum_drawdown_usd": -0.3186906889081583,
+            "relative_to_cdi_compounded_return": 0.22707199402340672,
+            "sessions": 1738,
+            "sharpe_brl_minus_cdi": 0.3245680017726421,
+            "sharpe_brl_minus_zero": 1.0200163003576141,
+            "sharpe_usd_minus_us_cash": 0.04240930687614529,
+            "us_cash_proxy": "EFFR, ACT/360 over calendar days",
+            "us_rate_max_age_days": 3
+          },
+          "paired_control": "full_net0.05",
+          "paired_net_bps": {
+            "block_length_sessions": 40,
+            "circular": true,
+            "estimate": -3.0781296046904134,
+            "fold_boundary_preserved": true,
+            "lower_95": -3.614074085944036,
+            "observations": 1738,
+            "replications": 10000,
+            "resample_mean": -3.080232063164912,
+            "upper_95": -2.5488877576735027
+          },
+          "realized_beta": -0.06711833382344352,
+          "year_net_bps": {
+            "2018": -2.9644744757191837,
+            "2019": 5.838373510629562,
+            "2020": 0.8176738777866681,
+            "2021": 8.659030888475,
+            "2022": -1.0689288368846357,
+            "2023": -1.06803213427565,
+            "2024": -0.2645369748414802
+          }
+        },
+        "proceeds0_net0.45": {
+          "book": {
+            "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_portfolio_objective_e52be14_20260917\\closeout\\TE_all\\proceeds0_net0.45\\book.json",
+            "sha256": "2ea9ae0280b5d4b4b51a8b53100692e11d17018ba8db7dc65ad801c09939b5fc"
+          },
+          "issuer_contribution_proxy_top": [
+            [
+              "UNKNOWN",
+              {
+                "max_absolute_net": 0.8568438214325302,
+                "mean_contribution_proxy_bps": 2.8442988300853767,
+                "mean_gross": 0.4633245619643073
+              }
+            ],
+            [
+              "33000167:009512",
+              {
+                "max_absolute_net": 0.10424463168627042,
+                "mean_contribution_proxy_bps": 0.7239591677850139,
+                "mean_gross": 0.03283894106103937
+              }
+            ],
+            [
+              "76483817:014311",
+              {
+                "max_absolute_net": 0.0940616149869619,
+                "mean_contribution_proxy_bps": 0.4324830246115924,
+                "mean_gross": 0.024171136939930837
+              }
+            ],
+            [
+              "04423567:021237",
+              {
+                "max_absolute_net": 0.05351721207432158,
+                "mean_contribution_proxy_bps": 0.30393720505153954,
+                "mean_gross": 0.015474898885149397
+              }
+            ],
+            [
+              "33958695:011592",
+              {
+                "max_absolute_net": 0.10224389309565551,
+                "mean_contribution_proxy_bps": 0.28836348922171895,
+                "mean_gross": 0.018699312764629102
+              }
+            ],
+            [
+              "02351877:024910",
+              {
+                "max_absolute_net": 0.05479882245277296,
+                "mean_contribution_proxy_bps": 0.25957828875891054,
+                "mean_gross": 0.0051914155043187495
+              }
+            ],
+            [
+              "16614075:021350",
+              {
+                "max_absolute_net": 0.05313101164466256,
+                "mean_contribution_proxy_bps": 0.24973188815932396,
+                "mean_gross": 0.011947162003743456
+              }
+            ],
+            [
+              "23373000:024716",
+              {
+                "max_absolute_net": 0.05564770583537249,
+                "mean_contribution_proxy_bps": 0.2460575931838086,
+                "mean_gross": 0.005941405958119553
+              }
+            ],
+            [
+              "08807432:021016",
+              {
+                "max_absolute_net": 0.06050803407947766,
+                "mean_contribution_proxy_bps": -0.24326524108729597,
+                "mean_gross": 0.006827452012694101
+              }
+            ],
+            [
+              "00416968:024406",
+              {
+                "max_absolute_net": 0.06037309175274708,
+                "mean_contribution_proxy_bps": 0.24248935638452349,
+                "mean_gross": 0.004309363810257919
+              }
+            ]
+          ],
+          "limitations": {
+            "economics_unresolved": true,
+            "sector_contribution_is_label_based_proxy": true,
+            "terminal_haircut_scenario_relative_difference": -0.4239130653533021
+          },
+          "mean": {
+            "absolute_bps": 6.2595482750621345,
+            "beta": 0.046461726028994135,
+            "borrow_bps": 0.6457886104927394,
+            "cdi_bps": 3.0387208860759496,
+            "equity_gross_bps": 10.404198316723802,
+            "free_cash_fraction": -0.24082280188567332,
+            "gross": 2.1483330447446027,
+            "hedge_gross_bps": -2.1604093856137374,
+            "interest_bps": -0.7734443220551214,
+            "net_excess_bps": 3.2208273889861845,
+            "restricted_cash_fraction": 0.8510145317893616,
+            "settlement_fraction": 0.00032579769789450224,
+            "signed_net": 0.38980827009631175,
+            "stale_fraction": 0.00295635550084313,
+            "trading_cost_bps": 0.5650077235000883,
+            "turnover": 0.14125193087502208,
+            "unresolved_claim_fraction": 0.0,
+            "utility_bps": 2.6578714576357805
+          },
+          "metrics": {
+            "absolute_brl_flat_fraction": 0.0,
+            "absolute_brl_losing_fraction": 0.45569620253164556,
+            "absolute_brl_winning_fraction": 0.5443037974683544,
+            "absolute_compounded_return_brl": 1.8123831778435955,
+            "absolute_compounded_return_usd": 0.502408402743191,
+            "annualized_volatility_brl": 0.12461323214118927,
+            "cdi_excess_flat_fraction": 0.0,
+            "cdi_excess_losing_fraction": 0.47410817031070196,
+            "cdi_excess_winning_fraction": 0.525891829689298,
+            "fx_carried_endpoint_count": 0,
+            "fx_max_age_days": 0,
+            "fx_valuation": "BCB PTAX BRL per USD; last dated fix on holidays",
+            "maximum_drawdown_brl": -0.12407986502003243,
+            "maximum_drawdown_usd": -0.3153492079296266,
+            "relative_to_cdi_compounded_return": 0.6586454256075451,
+            "sessions": 1738,
+            "sharpe_brl_minus_cdi": 0.6511232078544865,
+            "sharpe_brl_minus_zero": 1.2658416270981763,
+            "sharpe_usd_minus_us_cash": 0.27904966235548284,
+            "us_cash_proxy": "EFFR, ACT/360 over calendar days",
+            "us_rate_max_age_days": 3
+          },
+          "paired_control": "full_net0.45",
+          "paired_net_bps": {
+            "block_length_sessions": 40,
+            "circular": true,
+            "estimate": -2.7163241094922888,
+            "fold_boundary_preserved": true,
+            "lower_95": -3.178959423910118,
+            "observations": 1738,
+            "replications": 10000,
+            "resample_mean": -2.717625020212388,
+            "upper_95": -2.2548873682127444
+          },
+          "realized_beta": -0.02814898408951953,
+          "year_net_bps": {
+            "2018": -5.082403915909472,
+            "2019": 13.240272234193037,
+            "2020": 3.3981199215568165,
+            "2021": 8.537648479281062,
+            "2022": 2.3557877268950196,
+            "2023": -2.8307492013591578,
+            "2024": 2.858754114498737
+          }
+        },
+        "rank_net0.05": {
+          "book": {
+            "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_portfolio_objective_e52be14_20260917\\closeout\\TE_all\\rank_net0.05\\book.json",
+            "sha256": "6e89b0ce21d94712e07a49c1258e8e7bbceee48419629b03dba38168532cbad7"
+          },
+          "issuer_contribution_proxy_top": [
+            [
+              "UNKNOWN",
+              {
+                "max_absolute_net": 0.6398437057539079,
+                "mean_contribution_proxy_bps": 1.5839392831908938,
+                "mean_gross": 0.42582469362088093
+              }
+            ],
+            [
+              "33000167:009512",
+              {
+                "max_absolute_net": 0.10751930860870981,
+                "mean_contribution_proxy_bps": 0.6694976072829016,
+                "mean_gross": 0.033070805558097306
+              }
+            ],
+            [
+              "76483817:014311",
+              {
+                "max_absolute_net": 0.10156253590980534,
+                "mean_contribution_proxy_bps": 0.2868260370637359,
+                "mean_gross": 0.019325998687815236
+              }
+            ],
+            [
+              "60894730:014320",
+              {
+                "max_absolute_net": 0.09191910454576141,
+                "mean_contribution_proxy_bps": -0.27005398794865276,
+                "mean_gross": 0.013248309447576627
+              }
+            ],
+            [
+              "10629105:022187",
+              {
+                "max_absolute_net": 0.052745913962158844,
+                "mean_contribution_proxy_bps": 0.2451190022335888,
+                "mean_gross": 0.013260715385545728
+              }
+            ],
+            [
+              "13217485:024694",
+              {
+                "max_absolute_net": 0.04185260337053675,
+                "mean_contribution_proxy_bps": -0.23393352248442228,
+                "mean_gross": 0.0052236078382570895
+              }
+            ],
+            [
+              "08807432:021016",
+              {
+                "max_absolute_net": 0.05357263079858065,
+                "mean_contribution_proxy_bps": -0.2335639977370623,
+                "mean_gross": 0.01058908111954633
+              }
+            ],
+            [
+              "12528708:025283",
+              {
+                "max_absolute_net": 0.05139095226659166,
+                "mean_contribution_proxy_bps": 0.22423106945298418,
+                "mean_gross": 0.004530221874072517
+              }
+            ],
+            [
+              "23373000:024716",
+              {
+                "max_absolute_net": 0.05180712598839308,
+                "mean_contribution_proxy_bps": 0.2149662761154477,
+                "mean_gross": 0.0062983489136341315
+              }
+            ],
+            [
+              "51466860:020516",
+              {
+                "max_absolute_net": 0.052540301464302705,
+                "mean_contribution_proxy_bps": 0.21224201868366355,
+                "mean_gross": 0.00945273492011989
+              }
+            ]
+          ],
+          "limitations": {
+            "economics_unresolved": true,
+            "sector_contribution_is_label_based_proxy": true,
+            "terminal_haircut_scenario_relative_difference": -0.43497097440866517
+          },
+          "mean": {
+            "absolute_bps": 7.54485814902502,
+            "beta": 0.007910094358609338,
+            "borrow_bps": 0.6514198563938278,
+            "cdi_bps": 3.0387208860759496,
+            "equity_gross_bps": 5.845910469974652,
+            "free_cash_fraction": 0.0955121023253917,
+            "gross": 1.7515162895288916,
+            "hedge_gross_bps": 8.456120297635198e-16,
+            "interest_bps": 2.9860473161000414,
+            "net_excess_bps": 4.506137262949071,
+            "restricted_cash_fraction": 0.880372288770872,
+            "settlement_fraction": 0.00035807141845497,
+            "signed_net": 0.024115608903736235,
+            "stale_fraction": 0.003248448040698221,
+            "trading_cost_bps": 0.6356797806558474,
+            "turnover": 0.15891994516396185,
+            "unresolved_claim_fraction": 0.0,
+            "utility_bps": 3.910891004578824
+          },
+          "metrics": {
+            "absolute_brl_flat_fraction": 0.0,
+            "absolute_brl_losing_fraction": 0.42289988492520136,
+            "absolute_brl_winning_fraction": 0.5771001150747986,
+            "absolute_compounded_return_brl": 2.4623858941342767,
+            "absolute_compounded_return_usd": 0.8496475522497535,
+            "annualized_volatility_brl": 0.14113855201954054,
+            "cdi_excess_flat_fraction": 0.0,
+            "cdi_excess_losing_fraction": 0.47123130034522437,
+            "cdi_excess_winning_fraction": 0.5287686996547756,
+            "fx_carried_endpoint_count": 0,
+            "fx_max_age_days": 0,
+            "fx_valuation": "BCB PTAX BRL per USD; last dated fix on holidays",
+            "maximum_drawdown_brl": -0.2111280207455285,
+            "maximum_drawdown_usd": -0.34070464961297553,
+            "relative_to_cdi_compounded_return": 1.0419943378402627,
+            "sessions": 1738,
+            "sharpe_brl_minus_cdi": 0.8047860488579853,
+            "sharpe_brl_minus_zero": 1.3471190021072843,
+            "sharpe_usd_minus_us_cash": 0.4364794207662316,
+            "us_cash_proxy": "EFFR, ACT/360 over calendar days",
+            "us_rate_max_age_days": 3
+          },
+          "paired_control": "full_net0.05",
+          "paired_net_bps": {
+            "block_length_sessions": 40,
+            "circular": true,
+            "estimate": 0.009423740019068906,
+            "fold_boundary_preserved": true,
+            "lower_95": -2.0972608035434614,
+            "observations": 1738,
+            "replications": 10000,
+            "resample_mean": -0.00013727420918244882,
+            "upper_95": 2.1000054851697745
+          },
+          "realized_beta": -0.06710049112274968,
+          "year_net_bps": {
+            "2018": -1.315361462752967,
+            "2019": 3.750915050329778,
+            "2020": 1.3461946817341592,
+            "2021": 12.688189722382573,
+            "2022": 6.492840312967995,
+            "2023": 2.1445572319330606,
+            "2024": 6.372340956001899
+          }
+        },
+        "rank_net0.45": {
+          "book": {
+            "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_portfolio_objective_e52be14_20260917\\closeout\\TE_all\\rank_net0.45\\book.json",
+            "sha256": "c4db7656c1dd67bb5aa7dec66fff1496e595aa548374bbf64308b8213cb67ce0"
+          },
+          "issuer_contribution_proxy_top": [
+            [
+              "UNKNOWN",
+              {
+                "max_absolute_net": 0.6275835333296613,
+                "mean_contribution_proxy_bps": 1.7305288476868597,
+                "mean_gross": 0.43216906511717706
+              }
+            ],
+            [
+              "33000167:009512",
+              {
+                "max_absolute_net": 0.10658643716647179,
+                "mean_contribution_proxy_bps": 0.6257245780989655,
+                "mean_gross": 0.03258290210680619
+              }
+            ],
+            [
+              "76483817:014311",
+              {
+                "max_absolute_net": 0.10961844529422517,
+                "mean_contribution_proxy_bps": 0.319472408684962,
+                "mean_gross": 0.022212703328624007
+              }
+            ],
+            [
+              "60894730:014320",
+              {
+                "max_absolute_net": 0.08528496948282098,
+                "mean_contribution_proxy_bps": -0.255455299646996,
+                "mean_gross": 0.012852775223110256
+              }
+            ],
+            [
+              "33958695:011592",
+              {
+                "max_absolute_net": 0.09884326355576453,
+                "mean_contribution_proxy_bps": 0.2296373025600008,
+                "mean_gross": 0.017363872574909865
+              }
+            ],
+            [
+              "08807432:021016",
+              {
+                "max_absolute_net": 0.05341360300538482,
+                "mean_contribution_proxy_bps": -0.2210611651545304,
+                "mean_gross": 0.011372772824820491
+              }
+            ],
+            [
+              "51466860:020516",
+              {
+                "max_absolute_net": 0.05171668875986322,
+                "mean_contribution_proxy_bps": 0.21542289999858807,
+                "mean_gross": 0.009135479254010766
+              }
+            ],
+            [
+              "03847461:018724",
+              {
+                "max_absolute_net": 0.10305302064121687,
+                "mean_contribution_proxy_bps": 0.2142480000346874,
+                "mean_gross": 0.024456800265258014
+              }
+            ],
+            [
+              "16614075:021350",
+              {
+                "max_absolute_net": 0.05341019320197758,
+                "mean_contribution_proxy_bps": 0.2042592451542413,
+                "mean_gross": 0.011726044223956834
+              }
+            ],
+            [
+              "12528708:025283",
+              {
+                "max_absolute_net": 0.036508257253906926,
+                "mean_contribution_proxy_bps": 0.1930572227120702,
+                "mean_gross": 0.003933169162547026
+              }
+            ]
+          ],
+          "limitations": {
+            "economics_unresolved": true,
+            "sector_contribution_is_label_based_proxy": true,
+            "terminal_haircut_scenario_relative_difference": -0.5278241778753956
+          },
+          "mean": {
+            "absolute_bps": 8.264196718191096,
+            "beta": 0.04035421172213415,
+            "borrow_bps": 0.6203016666599978,
+            "cdi_bps": 3.0387208860759496,
+            "equity_gross_bps": 6.770470593401142,
+            "free_cash_fraction": 0.031148228457378278,
+            "gross": 1.7802096471865205,
+            "hedge_gross_bps": -7.884469876557583e-16,
+            "interest_bps": 2.7359275102341374,
+            "net_excess_bps": 5.225475832115146,
+            "restricted_cash_fraction": 0.8442890279976064,
+            "settlement_fraction": 0.0003726502748888186,
+            "signed_net": 0.12456274354501527,
+            "stale_fraction": 0.0033907198670722846,
+            "trading_cost_bps": 0.6218997187841958,
+            "turnover": 0.15547492969604895,
+            "unresolved_claim_fraction": 0.0,
+            "utility_bps": 4.6210875332928545
+          },
+          "metrics": {
+            "absolute_brl_flat_fraction": 0.0,
+            "absolute_brl_losing_fraction": 0.41829689298043726,
+            "absolute_brl_winning_fraction": 0.5817031070195627,
+            "absolute_compounded_return_brl": 2.906667958818682,
+            "absolute_compounded_return_usd": 1.0869882931660397,
+            "annualized_volatility_brl": 0.14541146510921618,
+            "cdi_excess_flat_fraction": 0.0,
+            "cdi_excess_losing_fraction": 0.4562715765247411,
+            "cdi_excess_winning_fraction": 0.543728423475259,
+            "fx_carried_endpoint_count": 0,
+            "fx_max_age_days": 0,
+            "fx_valuation": "BCB PTAX BRL per USD; last dated fix on holidays",
+            "maximum_drawdown_brl": -0.184599604898809,
+            "maximum_drawdown_usd": -0.27819414494631955,
+            "relative_to_cdi_compounded_return": 1.304016390906778,
+            "sessions": 1738,
+            "sharpe_brl_minus_cdi": 0.9057522898297911,
+            "sharpe_brl_minus_zero": 1.4321962655557912,
+            "sharpe_usd_minus_us_cash": 0.5202624508638808,
+            "us_cash_proxy": "EFFR, ACT/360 over calendar days",
+            "us_rate_max_age_days": 3
+          },
+          "paired_control": "full_net0.45",
+          "paired_net_bps": {
+            "block_length_sessions": 40,
+            "circular": true,
+            "estimate": -0.7116756663633266,
+            "fold_boundary_preserved": true,
+            "lower_95": -3.579400891379965,
+            "observations": 1738,
+            "replications": 10000,
+            "resample_mean": -0.714241737822057,
+            "upper_95": 2.183468663253171
+          },
+          "realized_beta": -0.04381478625338974,
+          "year_net_bps": {
+            "2018": -1.6429238298752091,
+            "2019": 5.696557462681307,
+            "2020": 3.684667910506924,
+            "2021": 13.167091486342313,
+            "2022": 8.355398779428066,
+            "2023": 2.8483572136148756,
+            "2024": 4.408967701650618
+          }
+        }
+      },
+      "intercept_daily_bps": {
+        "F1": 3.8503522583716565,
+        "F10": 2.209888046425251,
+        "F11": 2.335190838364235,
+        "F12": 1.8419971103575132,
+        "F13": 2.089743190940796,
+        "F14": 1.7136855233147175,
+        "F2": 2.420658541901456,
+        "F3": 1.6365330186194027,
+        "F4": 2.6801469978830137,
+        "F5": 3.744955450033486,
+        "F6": 4.6144333509624085,
+        "F7": 4.337326425677589,
+        "F8": 3.3529941013132243,
+        "F9": 3.6074928425465562
+      },
+      "source": {
+        "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_portfolio_objective_e52be14_20260917\\closeout\\TE_all\\summary.json",
+        "sha256": "676d27cdfd6c6ae1640d60b2687423805c0a09d0622db8c394141d656093723f"
+      }
+    }
+  },
+  "corporate_action_contract": {
+    "action_terms_source": "inferred_cotahist_dismes_v1",
+    "complex_or_unmapped_terms": "unresolved",
+    "coverage_status": "inferred",
+    "currency": "BRL",
+    "decision_known_coverage_resolved_fraction": 0.33897176968415504,
+    "feature_action_alignment": "daily row e uses terms known by the next session's 15:45 decision; same-day intraday boundaries use only the open-gap diagnostic",
+    "inferred_terms_are_verified": false,
+    "legacy_realized_ratio_classifier_is_diagnostic_only": true,
+    "payment_date_modeling": "inferred ex-session payment under the development-grade tier",
+    "provider_rows_are_audit_only": true,
+    "provider_rows_enter_model_arrays": false,
+    "retrospective_coverage_resolved_fraction": 0.33897176968415504,
+    "stored_action_arrays": "retrospective outcome/accounting terms"
+  },
+  "design": {
+    "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_portfolio_objective_e52be14_20260917\\closeout_design.json",
+    "sha256": "0bf47167aabb12a929cf1bca138efe426a9b7ae295d12a28651515347f7aa5fb"
+  },
+  "isin_succession_link_count": 0,
+  "largest_events": {
+    "BRALSOACNOR5:2023-11-08": {
+      "action_rows": [],
+      "example_arm": "C6",
+      "example_scenario": "flexible_net",
+      "example_settlement": {
+        "cost": 4.72385115441268e-05,
+        "fill_date": "2023-11-08",
+        "fill_session": 1452,
+        "gross_notional": 0.118096278860317,
+        "order_id": "order-00027690",
+        "price": 23.329999923706055,
+        "purpose": "terminal_settlement",
+        "quantity": 0.0050619922523153175,
+        "security": "BRALSOACNOR5",
+        "security_index": 34,
+        "side": "sell"
+      },
+      "last_quote": "2023-10-24",
+      "next_quote_same_isin": null,
+      "observed_fill": false,
+      "source_limit": "No verified contractual successor/cash settlement in accepted store; retain sensitivity flag."
+    },
+    "BRBIDIACNOR3:2022-07-01": {
+      "action_rows": [],
+      "example_arm": "C6",
+      "example_scenario": "flexible_net",
+      "example_settlement": {
+        "cost": 2.1436147821785912e-05,
+        "fill_date": "2022-07-01",
+        "fill_session": 1113,
+        "gross_notional": 0.05359036955446478,
+        "order_id": "order-00019331",
+        "price": 3.4000000953674316,
+        "purpose": "terminal_settlement",
+        "quantity": 0.015761872956263363,
+        "security": "BRBIDIACNOR3",
+        "security_index": 110,
+        "side": "buy"
+      },
+      "last_quote": "2022-06-17",
+      "next_quote_same_isin": null,
+      "observed_fill": false,
+      "source_limit": "No verified contractual successor/cash settlement in accepted store; retain sensitivity flag."
+    },
+    "BRBIDIACNPR0:2022-07-01": {
+      "action_rows": [],
+      "example_arm": "TE_all",
+      "example_scenario": "flexible_net",
+      "example_settlement": {
+        "cost": 2.786655251014229e-05,
+        "fill_date": "2022-07-01",
+        "fill_session": 1113,
+        "gross_notional": 0.06966638127535572,
+        "order_id": "order-00020771",
+        "price": 3.4100000858306885,
+        "purpose": "terminal_settlement",
+        "quantity": 0.02043002332018556,
+        "security": "BRBIDIACNPR0",
+        "security_index": 111,
+        "side": "buy"
+      },
+      "last_quote": "2022-06-17",
+      "next_quote_same_isin": null,
+      "observed_fill": false,
+      "source_limit": "No verified contractual successor/cash settlement in accepted store; retain sensitivity flag."
+    },
+    "BRBIDICDAXX3:2022-07-01": {
+      "action_rows": [],
+      "example_arm": "C6",
+      "example_scenario": "flexible_net",
+      "example_settlement": {
+        "cost": 2.0552754765327568e-05,
+        "fill_date": "2022-07-01",
+        "fill_session": 1113,
+        "gross_notional": 0.051381886913318915,
+        "order_id": "order-00019333",
+        "price": 10.399999618530273,
+        "purpose": "terminal_settlement",
+        "quantity": 0.004940566230576478,
+        "security": "BRBIDICDAXX3",
+        "security_index": 113,
+        "side": "buy"
+      },
+      "last_quote": "2022-06-17",
+      "next_quote_same_isin": null,
+      "observed_fill": false,
+      "source_limit": "No verified contractual successor/cash settlement in accepted store; retain sensitivity flag."
+    },
+    "BRBOASACNOR6:2023-08-21": {
+      "action_rows": [],
+      "example_arm": "C6",
+      "example_scenario": "flexible_net",
+      "example_settlement": {
+        "cost": 6.356849564630694e-05,
+        "fill_date": "2023-08-21",
+        "fill_session": 1398,
+        "gross_notional": 0.15892123911576736,
+        "order_id": "order-00026110",
+        "price": 7.949999809265137,
+        "purpose": "terminal_settlement",
+        "quantity": 0.01999009345013523,
+        "security": "BRBOASACNOR6",
+        "security_index": 135,
+        "side": "sell"
+      },
+      "last_quote": "2023-08-07",
+      "next_quote_same_isin": null,
+      "observed_fill": false,
+      "source_limit": "No verified contractual successor/cash settlement in accepted store; retain sensitivity flag."
+    },
+    "BRBRDTACNOR1:2021-11-05": {
+      "action_rows": [],
+      "example_arm": "C6",
+      "example_scenario": "neutral",
+      "example_settlement": {
+        "cost": 1.2227868564991499e-05,
+        "fill_date": "2021-11-05",
+        "fill_session": 951,
+        "gross_notional": 0.030569671412478745,
+        "order_id": "order-00012999",
+        "price": 22.030000686645508,
+        "purpose": "terminal_settlement",
+        "quantity": 0.0013876382414735897,
+        "security": "BRBRDTACNOR1",
+        "security_index": 153,
+        "side": "sell"
+      },
+      "last_quote": "2021-10-21",
+      "next_quote_same_isin": null,
+      "observed_fill": false,
+      "source_limit": "No verified contractual successor/cash settlement in accepted store; retain sensitivity flag."
+    },
+    "BRBRMLACNOR9:2023-01-20": {
+      "action_rows": [],
+      "example_arm": "C6",
+      "example_scenario": "flexible_net",
+      "example_settlement": {
+        "cost": 5.341120834672453e-05,
+        "fill_date": "2023-01-20",
+        "fill_session": 1253,
+        "gross_notional": 0.13352802086681131,
+        "order_id": "order-00022462",
+        "price": 8.260000228881836,
+        "purpose": "terminal_settlement",
+        "quantity": 0.01616561951171848,
+        "security": "BRBRMLACNOR9",
+        "security_index": 169,
+        "side": "sell"
+      },
+      "last_quote": "2023-01-06",
+      "next_quote_same_isin": null,
+      "observed_fill": false,
+      "source_limit": "No verified contractual successor/cash settlement in accepted store; retain sensitivity flag."
+    },
+    "BRBTOWACNOR8:2021-07-30": {
+      "action_rows": [],
+      "example_arm": "C6",
+      "example_scenario": "neutral",
+      "example_settlement": {
+        "cost": 1.1848262743048205e-05,
+        "fill_date": "2021-07-30",
+        "fill_session": 884,
+        "gross_notional": 0.02962065685762051,
+        "order_id": "order-00010438",
+        "price": 68.0,
+        "purpose": "terminal_settlement",
+        "quantity": 0.0004355978949650075,
+        "security": "BRBTOWACNOR8",
+        "security_index": 184,
+        "side": "buy"
+      },
+      "last_quote": "2021-07-16",
+      "next_quote_same_isin": null,
+      "observed_fill": false,
+      "source_limit": "No verified contractual successor/cash settlement in accepted store; retain sensitivity flag."
+    },
+    "BRCCPRACNOR9:2021-09-24": {
+      "action_rows": [],
+      "example_arm": "C6",
+      "example_scenario": "neutral",
+      "example_settlement": {
+        "cost": 1.501242733279903e-05,
+        "fill_date": "2021-09-24",
+        "fill_session": 923,
+        "gross_notional": 0.037531068331997576,
+        "order_id": "order-00011872",
+        "price": 10.15999984741211,
+        "purpose": "terminal_settlement",
+        "quantity": 0.0036940028440607953,
+        "security": "BRCCPRACNOR9",
+        "security_index": 206,
+        "side": "buy"
+      },
+      "last_quote": "2021-09-10",
+      "next_quote_same_isin": null,
+      "observed_fill": false,
+      "source_limit": "No verified contractual successor/cash settlement in accepted store; retain sensitivity flag."
+    },
+    "BRCIELACNOR3:2024-09-09": {
+      "action_rows": [],
+      "example_arm": "C6",
+      "example_scenario": "flexible_net",
+      "example_settlement": {
+        "cost": 8.78476608378588e-05,
+        "fill_date": "2024-09-09",
+        "fill_session": 1661,
+        "gross_notional": 0.219619152094647,
+        "order_id": "order-00035043",
+        "price": 5.829999923706055,
+        "purpose": "terminal_settlement",
+        "quantity": 0.037670524008349894,
+        "security": "BRCIELACNOR3",
+        "security_index": 235,
+        "side": "sell"
+      },
+      "last_quote": "2024-08-26",
+      "next_quote_same_isin": null,
+      "observed_fill": false,
+      "source_limit": "No verified contractual successor/cash settlement in accepted store; retain sensitivity flag."
+    },
+    "BRCPLECDAM13:2024-01-10": {
+      "action_rows": [],
+      "example_arm": "TE_all",
+      "example_scenario": "flexible_net",
+      "example_settlement": {
+        "cost": 5.3691381734340506e-05,
+        "fill_date": "2024-01-10",
+        "fill_session": 1493,
+        "gross_notional": 0.13422845433585126,
+        "order_id": "order-00031075",
+        "price": 50.119998931884766,
+        "purpose": "terminal_settlement",
+        "quantity": 0.002678141604078514,
+        "security": "BRCPLECDAM13",
+        "security_index": 262,
+        "side": "sell"
+      },
+      "last_quote": "2023-12-22",
+      "next_quote_same_isin": null,
+      "observed_fill": false,
+      "source_limit": "No verified contractual successor/cash settlement in accepted store; retain sensitivity flag."
+    },
+    "BRDMMOACNOR0:2023-01-20": {
+      "action_rows": [],
+      "example_arm": "C6",
+      "example_scenario": "flexible_net",
+      "example_settlement": {
+        "cost": 5.159629681178802e-05,
+        "fill_date": "2023-01-20",
+        "fill_session": 1253,
+        "gross_notional": 0.12899074202947006,
+        "order_id": "order-00022463",
+        "price": 1.7599999904632568,
+        "purpose": "terminal_settlement",
+        "quantity": 0.07329019473205672,
+        "security": "BRDMMOACNOR0",
+        "security_index": 313,
+        "side": "sell"
+      },
+      "last_quote": "2023-01-06",
+      "next_quote_same_isin": null,
+      "observed_fill": false,
+      "source_limit": "No verified contractual successor/cash settlement in accepted store; retain sensitivity flag."
+    },
+    "BRFIBRACNOR9:2019-01-17": {
+      "action_rows": [],
+      "example_arm": "TE_all",
+      "example_scenario": "flexible_net",
+      "example_settlement": {
+        "cost": 1.8901007779386595e-05,
+        "fill_date": "2019-01-17",
+        "fill_session": 256,
+        "gross_notional": 0.047252519448466486,
+        "order_id": "order-00002438",
+        "price": 66.30000305175781,
+        "purpose": "terminal_settlement",
+        "quantity": 0.0007127076511833385,
+        "security": "BRFIBRACNOR9",
+        "security_index": 393,
+        "side": "sell"
+      },
+      "last_quote": "2019-01-03",
+      "next_quote_same_isin": null,
+      "observed_fill": false,
+      "source_limit": "No verified contractual successor/cash settlement in accepted store; retain sensitivity flag."
+    },
+    "BRGNDIACNOR2:2022-02-25": {
+      "action_rows": [],
+      "example_arm": "TE_all",
+      "example_scenario": "neutral",
+      "example_settlement": {
+        "cost": 2.110682955558585e-05,
+        "fill_date": "2022-02-25",
+        "fill_session": 1028,
+        "gross_notional": 0.05276707388896462,
+        "order_id": "order-00015854",
+        "price": 66.94999694824219,
+        "purpose": "terminal_settlement",
+        "quantity": 0.0007881564793760615,
+        "security": "BRGNDIACNOR2",
+        "security_index": 426,
+        "side": "sell"
+      },
+      "last_quote": "2022-02-11",
+      "next_quote_same_isin": null,
+      "observed_fill": false,
+      "source_limit": "No verified contractual successor/cash settlement in accepted store; retain sensitivity flag."
+    },
+    "BRHGTXACNOR9:2021-10-01": {
+      "action_rows": [],
+      "example_arm": "TE_all",
+      "example_scenario": "neutral",
+      "example_settlement": {
+        "cost": 2.704315922856464e-05,
+        "fill_date": "2021-10-01",
+        "fill_session": 928,
+        "gross_notional": 0.0676078980714116,
+        "order_id": "order-00013447",
+        "price": 37.5,
+        "purpose": "terminal_settlement",
+        "quantity": 0.0018028772819043092,
+        "security": "BRHGTXACNOR9",
+        "security_index": 451,
+        "side": "sell"
+      },
+      "last_quote": "2021-09-17",
+      "next_quote_same_isin": null,
+      "observed_fill": false,
+      "source_limit": "No verified contractual successor/cash settlement in accepted store; retain sensitivity flag."
+    },
+    "BRJSLGACNOR2:2020-10-01": {
+      "action_rows": [],
+      "example_arm": "C6",
+      "example_scenario": "neutral",
+      "example_settlement": {
+        "cost": 1.9384486661406363e-05,
+        "fill_date": "2020-10-01",
+        "fill_session": 681,
+        "gross_notional": 0.04846121665351591,
+        "order_id": "order-00005795",
+        "price": 30.399999618530273,
+        "purpose": "terminal_settlement",
+        "quantity": 0.001594118988869212,
+        "security": "BRJSLGACNOR2",
+        "security_index": 503,
+        "side": "sell"
+      },
+      "last_quote": "2020-09-17",
+      "next_quote_same_isin": "2020-11-11",
+      "observed_fill": false,
+      "source_limit": "No verified contractual successor/cash settlement in accepted store; retain sensitivity flag."
+    },
+    "BRLINXACNOR0:2021-07-12": {
+      "action_rows": [
+        {
+          "date": "2021-06-22",
+          "resolved": true,
+          "successor": "BRLINXACNOR0"
+        }
+      ],
+      "example_arm": "C6",
+      "example_scenario": "flexible_net",
+      "example_settlement": {
+        "cost": 3.43170198388098e-05,
+        "fill_date": "2021-07-12",
+        "fill_session": 870,
+        "gross_notional": 0.0857925495970245,
+        "order_id": "order-00012655",
+        "price": 37.400001525878906,
+        "purpose": "terminal_settlement",
+        "quantity": 0.002293918344833767,
+        "security": "BRLINXACNOR0",
+        "security_index": 526,
+        "side": "sell"
+      },
+      "last_quote": "2021-06-25",
+      "next_quote_same_isin": null,
+      "observed_fill": false,
+      "source_limit": "No verified contractual successor/cash settlement in accepted store; retain sensitivity flag."
+    },
+    "BRSMLSACNOR1:2021-06-18": {
+      "action_rows": [],
+      "example_arm": "TE_all",
+      "example_scenario": "flexible_net",
+      "example_settlement": {
+        "cost": 3.551867901379871e-05,
+        "fill_date": "2021-06-18",
+        "fill_session": 855,
+        "gross_notional": 0.08879669753449676,
+        "order_id": "order-00014366",
+        "price": 22.399999618530273,
+        "purpose": "terminal_settlement",
+        "quantity": 0.003964138350298908,
+        "security": "BRSMLSACNOR1",
+        "security_index": 762,
+        "side": "sell"
+      },
+      "last_quote": "2021-06-04",
+      "next_quote_same_isin": null,
+      "observed_fill": false,
+      "source_limit": "No verified contractual successor/cash settlement in accepted store; retain sensitivity flag."
+    },
+    "BRTIETCDAM15:2021-04-12": {
+      "action_rows": [],
+      "example_arm": "C6",
+      "example_scenario": "flexible_net",
+      "example_settlement": {
+        "cost": 3.3050752325856496e-05,
+        "fill_date": "2021-04-12",
+        "fill_session": 808,
+        "gross_notional": 0.08262688081464123,
+        "order_id": "order-00011115",
+        "price": 17.440000534057617,
+        "purpose": "terminal_settlement",
+        "quantity": 0.004737779718141851,
+        "security": "BRTIETCDAM15",
+        "security_index": 824,
+        "side": "sell"
+      },
+      "last_quote": "2021-03-26",
+      "next_quote_same_isin": null,
+      "observed_fill": false,
+      "source_limit": "No verified contractual successor/cash settlement in accepted store; retain sensitivity flag."
+    },
+    "BRTRPLACNPR1:2024-12-02": {
+      "action_rows": [],
+      "example_arm": "C6",
+      "example_scenario": "flexible_net",
+      "example_settlement": {
+        "cost": 9.358487586490277e-05,
+        "fill_date": "2024-12-02",
+        "fill_session": 1719,
+        "gross_notional": 0.23396218966225693,
+        "order_id": "order-00037603",
+        "price": 24.200000762939453,
+        "purpose": "terminal_settlement",
+        "quantity": 0.009667858772159754,
+        "security": "BRTRPLACNPR1",
+        "security_index": 858,
+        "side": "sell"
+      },
+      "last_quote": "2024-11-14",
+      "next_quote_same_isin": null,
+      "observed_fill": false,
+      "source_limit": "No verified contractual successor/cash settlement in accepted store; retain sensitivity flag."
+    },
+    "BRWIZSACNOR1:2023-02-24": {
+      "action_rows": [],
+      "example_arm": "TE_all",
+      "example_scenario": "flexible_net",
+      "example_settlement": {
+        "cost": 3.175893915207122e-05,
+        "fill_date": "2023-02-24",
+        "fill_session": 1276,
+        "gross_notional": 0.07939734788017805,
+        "order_id": "order-00024847",
+        "price": 7.159999847412109,
+        "purpose": "terminal_settlement",
+        "quantity": 0.01108901530338373,
+        "security": "BRWIZSACNOR1",
+        "security_index": 926,
+        "side": "buy"
+      },
+      "last_quote": "2023-02-08",
+      "next_quote_same_isin": null,
+      "observed_fill": false,
+      "source_limit": "No verified contractual successor/cash settlement in accepted store; retain sensitivity flag."
+    }
+  }
+}

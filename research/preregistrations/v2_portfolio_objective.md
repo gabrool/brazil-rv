@@ -108,8 +108,10 @@ not selection of a loss weight on financial evaluation outcomes.
 Start economic selection from cash on the first original selection date. The
 preceding purge contains endpoints used by the inherited F ranking labels and
 cannot be used as supposedly unseen inventory burn-in. Evaluation may use only
-the post-selection embargo as unreported burn-in. Report this correction to the
-old portfolio selection convention. Never carry fitting inventory into selection.
+the post-selection embargo as unreported burn-in. This adapts the old portfolio
+selection convention to the neural warm start; it does not imply the old
+frozen-OOS calibration used those purge outcomes. Never carry fitting inventory
+into selection.
 
 The admission tests exposed a wrong-sign multi-day derivative with the old OSQP
 adjoint despite correct forward portfolios. Replace that backward implementation
@@ -118,3 +120,9 @@ Clarabel forward solve. Test the real hedge variance, inventory, no-trade region
 caps, finite differences and independent accounts before financial launch.
 The frozen old books and rank/Huber neural fits remain unchanged. Previous learned
 controller failures are qualified by this newly identified backward-path defect.
+
+Screen admission uses the economic selector, fixed in advance. The IC selector
+and selector-minus-IC contrast are reported for every objective but do not form
+an additional route through the screen. Include paired comparisons against the
+unmodified warm start as well as the rank continuation. Independent fold accounts
+must not be presented as one uninterrupted compounded history.
