@@ -1,7 +1,8 @@
 # Direct portfolio-objective experiment: implementation and evidence
 
-Status: implementation and engineering admission complete; financial experiment
-running. This document is an interim review, not a result or promotion decision.
+Status: implementation, engineering admission and the 72-fit screen are complete;
+the sole admitted candidate is undergoing confirmation. This is an interim review,
+not a promotion decision.
 Resolve [the canonical run pointer](v2_portfolio_objective_run.json). The complete
 contract is [the registration](../research/preregistrations/v2_portfolio_objective.md);
 [progress and recovery instructions](v2_portfolio_objective_progress.md) identify
@@ -178,10 +179,40 @@ both selectors from saved history. A hidden supervisor prevents sleep during the
 campaign. The existing heartbeat monitors progress and handles final verification,
 review, recovery archiving and GitHub publication.
 
-## 7. Financial findings still pending
+## 7. Screen findings and pending confirmation
 
-Training and selection progress are not evidence of generalization. The final
-review will add paired screen/confirmation results, selector comparisons, economic
+All 72 fits passed the trajectory audit, with zero zero-gradient blocks and zero
+AMP retries. The readout audit verified 168 forecasts and 392 books across eight
+arm/fold panels, including exact eligible populations and permanent-identity axes.
+[The compact screen export](v2_portfolio_objective_screen.json) binds the full output.
+
+Primary economic-selector comparison, in mean daily bps above CDI:
+
+| Arm | Objective | Net | Difference from matched rank | Utility difference | Pass screen? |
+|---|---|---:|---:|---:|---|
+| C6 | Rank | 1.623 | — | — | Control |
+| C6 | Hybrid | 1.255 | -.368 | -.356 | No |
+| C6 | Utility | .952 | -.671 | -.674 | No |
+| Attention | Rank | 1.305 | — | — | Control |
+| Attention | Hybrid | 1.311 | +.006 | -.002 | No |
+| Attention | Utility | 2.149 | +.843 | +.828 | Yes |
+
+Attention utility-only has positive paired utility in F2/F10/F14, negative in F6,
+and positive mean differences for all three seeds. Its 40-session paired net
+interval is [-.745, 2.418] bps/day; utility is [-.760, 2.402]. Passing this screen
+means it merits confirmation, not that superiority has been established. Under
+the diagnostic IC selector its net advantage is +.552 [-.730, 1.874] bps/day.
+The hybrid attention result is effectively flat, and the C6 economic-selector
+comparisons do not support continuation with either economic loss.
+
+These means cover 501 evaluation sessions in four separate fold accounts. They
+must not be compared directly with the earlier 4.0/4.5-bps continuous full-history
+figures; dates, account boundaries and the matched continuation/interface differ.
+The registered confirmation started automatically: sixty TE_all fits, comprising
+rank and utility across the remaining ten folds and three seeds. No C6 or hybrid
+confirmation is run. No training contract was changed after observing the screen.
+
+The final review will add confirmation results, selector comparisons, economic
 and IC metrics, BRL/CDI, USD/EFFR and zero-rate Sharpes, winning/losing days, drawdown,
 exposure, costs and halves. It will state whether any candidate passes the registered
 gate and which assumptions limit the conclusion. No new objective or model is

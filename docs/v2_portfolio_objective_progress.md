@@ -69,8 +69,17 @@ budget and loss-scale rule are registered before runs.
 All 72 screen fits are complete as of 2026-09-17 19:10 UTC. The completed-fit
 audit passes for every trajectory: artifact hashes, exact inherited initial
 weights, zero initial cardinal head, shared gradient scale, and both selectors
-reproduced from the saved epochs. Portfolio readouts are running. No screen
-advancement decision is available yet; confirmation remains conditional.
+reproduced from the saved epochs. The eight screen readout panels completed at
+19:37 UTC; all 168 forecast artifacts and 392 books pass the population/axis/hash
+audit. Attention utility-only is the sole admitted candidate: +.843 daily net bps
+and +.828 utility versus the matched rank/economic-selector control, with positive
+utility in three of four folds and all three seeds. Its primary net interval is
+[-.745, 2.418], so the screen does not establish improvement. Neither hybrid arm
+nor C6 utility passes. See [the screen export](v2_portfolio_objective_screen.json).
+The supervisor has started the 60 registered confirmation fits: TE_all rank/utility,
+ten remaining folds, three seeds. Both selectors reuse those trajectories. Financial
+source and contract are unchanged. Confirmation and final continuous books/audit
+remain pending.
 
 The matched 72-fit screen launched on 2026-09-17 at 13:28 UTC / 10:28 Brasilia.
 Its frozen clean worktree is `C:/quant/brazil-rv-portfolio-objective-33086be`.
