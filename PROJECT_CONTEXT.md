@@ -2,6 +2,15 @@
 
 Last verified: 2026-09-17.
 
+The user subsequently authorized the [direct portfolio-objective program](research/preregistrations/v2_portfolio_objective.md):
+bounded portfolio/financing closeout, then matched ranking, hybrid and direct
+utility continuations with gradients through allocation and actual accounting.
+Reuse verified fold-specific Phase-3 neutral checkpoints, the accepted repaired
+store and the local RTX 2060. Freeze the established neutral allocator as the
+primary comparison; compare IC and economic selectors on shared trajectories.
+This extends earlier restrictions on new neural experiments and economic losses,
+while preserving the held-out consumer ban, no forward capture and no deployment.
+
 The user subsequently authorized the CPU-first
 [opportunity and portfolio-arrangement program](research/preregistrations/v2_opportunity_portfolios.md):
 attribute remaining losses, test conditional opportunity independently, compare

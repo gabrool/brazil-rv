@@ -23,3 +23,4 @@ docs/*.json text eol=lf
 docs/*.sha256 text eol=lf
 research/preregistrations/v2_post_data.md text eol=lf
 research/preregistrations/v2_post_data_attention_asam50.md text eol=lf
+research/preregistrations/v2_portfolio_objective.md text eol=lf
