@@ -4,6 +4,36 @@ import pytest
 from brazil_rv.v2.round7_preprocessing import RobustScaler, common_snapshot
 
 
+def test_named_input_removal_preserves_masks_ages_and_checkpoint_coordinates():
+    from brazil_rv.v2.round7_preprocessing import Round7Preprocessing, retained_fields
+
+    names = ("observed", "empty", "age_only")
+    assert retained_fields(names, ["empty"]) == ("observed", "age_only")
+    with pytest.raises(ValueError, match="absent"):
+        retained_fields(names, ["typo"])
+    scaler = RobustScaler.fit(
+        np.array([[1.0, 0.0], [3.0, 0.0]]),
+        np.array([[True, False], [True, False]]),
+        [0, 1],
+    )
+    prep = Round7Preprocessing(
+        {"options": scaler},
+        feature_names={"options": ("observed", "age_only")},
+        source_columns={"options": (0, 2)},
+    )
+    raw = {
+        "sidecar_options_values": np.array([[3.0, 999.0, 0.0]]),
+        "sidecar_options_valid": np.array([[True, False, False]]),
+        "sidecar_options_age_sessions": np.array([[0.0, -1.0, 7.0]]),
+    }
+    restored = Round7Preprocessing.from_payload(prep.payload())
+    result = restored.transform_sample(raw)
+    np.testing.assert_array_equal(result["sidecar_options_valid"], [[True, False]])
+    np.testing.assert_array_equal(result["sidecar_options_age_sessions"], [[0.0, 7.0]])
+    assert result["sidecar_options_values"][0, 1] == 0
+    assert raw["sidecar_options_values"].shape[-1] == 3
+
+
 def test_robust_statistics_exclude_later_values_and_keep_sparse_signs():
     panel = np.asarray(
         [[[-4.0, 10.0]], [[0.0, 10.0]], [[4.0, 10.0]], [[999.0, -999.0]]]

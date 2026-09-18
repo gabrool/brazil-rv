@@ -16,6 +16,7 @@ from torch import nn
 from torch.utils.data import DataLoader
 
 from brazil_rv.modeling.engine import _soft_spearman_group_losses
+from brazil_rv.modeling.trajectory import ModelEMA, temporarily_load_state
 
 from .artifacts import sha256_file, write_json_atomic
 from .characteristic_model import CharacteristicModel
@@ -571,6 +572,8 @@ def unexposed_families(dataset, preparation):
         for start in range(0, len(dataset.date_indices), 128):
             rows = dataset.date_indices[start : start + 128]
             ages = dataset.store.read(f"sidecar_{family}_age_sessions", rows)
+            if family in preparation.source_columns:
+                ages = ages[..., preparation.source_columns[family]]
             if np.any((ages >= 0) & dataset.store.read("active", rows)[..., None]):
                 exposed = True
                 break
@@ -609,6 +612,7 @@ def train(
     diagnostics=True,
     economic_targets=None,
     economic_weight=0.0,
+    ema_half_life_epochs=None,
 ):
     code = _git_identity()
     cell_name = cell["cell"]
@@ -626,7 +630,7 @@ def train(
         )
     )
     fit, select, _, fit_window = _cli_stage_indices(store_root, stage, fold)
-    split_common = characteristic and bool(families)
+    split_common = characteristic and "cross_market" in families
     options = dict(
         stage="pretrain" if stage == "P" else "finetune",
         lookback=60,
@@ -660,7 +664,10 @@ def train(
                 parent_payload["contract"]["preprocessing"]
             )
         preparation = Round7Preprocessing.fit(
-            training, split_common=split_common, parent=parent_preprocessing
+            training,
+            split_common=split_common,
+            parent=parent_preprocessing,
+            excluded_fields=cell.get("excluded_fields"),
         )
         width = stage_name_count(training, selection)
         collator = partial(preparation.collate, fixed_name_count=width)
@@ -797,6 +804,12 @@ def train(
             else ()
         )
         contract["transferred_parameters"] = list(transferred)
+        if ema_half_life_epochs is not None:
+            contract["ema"] = {
+                "half_life_epochs": ema_half_life_epochs,
+                "decay": 2 ** (-1 / (ema_half_life_epochs * len(train_loader))),
+                "selection": "same prior selection; raw patience bounds shared trajectory",
+            }
         if economic_weight:
             from .economic_objective import attach_economic_head
 
@@ -809,6 +822,8 @@ def train(
             transferred_multiplier=recipe.transferred_multiplier,
         )
         best_ic, best_epoch, stale = -float("inf"), 0, 0
+        ema = ModelEMA(model, contract["ema"]["decay"]) if "ema" in contract else None
+        ema_best_ic, ema_best_epoch = -float("inf"), 0
         module_diagnostics = []
         start_epoch, history = 1, []
         previous_compilation_sessions = []
@@ -855,6 +870,12 @@ def train(
             ) != _canonical_payload_sha256(contract):
                 raise ValueError("resume differs from the frozen training contract")
             model.load_state_dict(payload["model_state_dict"])
+            if ema is not None:
+                ema.shadow = payload["ema_state_dict"]
+                ema_best_ic, ema_best_epoch = (
+                    payload["ema_best_ic"],
+                    payload["ema_best_epoch"],
+                )
             optimizer.load_state_dict(payload["optimizer_state_dict"])
             if scaler is not None:
                 scaler.load_state_dict(payload["grad_scaler"])
@@ -959,6 +980,8 @@ def train(
                     diagnostics=step_diagnostics,
                     scaler=scaler,
                 )
+                if ema is not None:
+                    ema.update(model)
                 train_graphs += _unique_compiled_graphs() - before
                 losses.append(loss)
                 gaps.append(gap)
@@ -972,6 +995,20 @@ def train(
                 characteristic=characteristic,
                 model_horizons=horizons,
             )
+            ema_readout = None
+            if ema is not None:
+                rng = _rng_state()
+                try:
+                    with temporarily_load_state(model, ema.shadow):
+                        ema_readout = selection_readout(
+                            forward_model,
+                            selection_loader,
+                            device,
+                            characteristic=characteristic,
+                            model_horizons=horizons,
+                        )
+                finally:
+                    _restore_rng(rng)
             rng = _rng_state()
             try:
                 fit_readout = selection_readout(
@@ -1003,6 +1040,8 @@ def train(
                 "seconds": time.perf_counter() - epoch_start,
                 "final_learning_rate": lr,
             }
+            if ema_readout is not None:
+                record["ema_selection"] = ema_readout
             history.append(record)
             if epoch in (1, 3):
                 diagnostic(f"epoch_{epoch}")
@@ -1026,6 +1065,20 @@ def train(
                         "optimizer_state_dict": optimizer.state_dict(),
                     },
                 )
+            if (
+                ema_readout is not None
+                and ema_readout["mean_ic"] > ema_best_ic + recipe.minimum_improvement
+            ):
+                ema_best_ic, ema_best_epoch = ema_readout["mean_ic"], epoch
+                _atomic_torch_save(
+                    output / "selected_ema.pt",
+                    {
+                        **checkpoint,
+                        "model_state_dict": ema.cpu_state_dict(),
+                        "selection_ic": ema_best_ic,
+                        "weight_rule": "update_ema",
+                    },
+                )
             rng, cuda_rng = _rng_state()
             _atomic_torch_save(
                 resume_path,
@@ -1036,6 +1089,15 @@ def train(
                     "grad_scaler": scaler.state_dict() if scaler is not None else None,
                     "best_epoch": best_epoch,
                     "stale": stale,
+                    **(
+                        {
+                            "ema_state_dict": ema.cpu_state_dict(),
+                            "ema_best_ic": ema_best_ic,
+                            "ema_best_epoch": ema_best_epoch,
+                        }
+                        if ema is not None
+                        else {}
+                    ),
                     "module_diagnostics": module_diagnostics,
                     "history": history,
                     "cpu_rng": rng,
@@ -1104,6 +1166,11 @@ def train(
             "contract": contract,
             "epochs_completed": len(history),
             "selected_epoch": best_epoch,
+            **(
+                {"ema_selected_epoch": ema_best_epoch, "ema_selection_ic": ema_best_ic}
+                if ema is not None
+                else {}
+            ),
             "selection_ic": best_ic,
             "stop_reason": "patience" if stale >= recipe.patience else "ceiling",
             "date_tensor_cache_resources": cache_resources,
@@ -1139,6 +1206,7 @@ def train(
                 str(p.relative_to(output)): sha256_file(p)
                 for p in [
                     output / "selected.pt",
+                    *([output / "selected_ema.pt"] if ema is not None else []),
                     output / "history.json",
                     output / "diagnostics.json",
                     *sorted((output / "epochs").glob("*.pt")),

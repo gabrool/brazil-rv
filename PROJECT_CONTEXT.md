@@ -1,6 +1,17 @@
 # Brazil-RV project context
 
-Last verified: 2026-09-17.
+Last verified: 2026-09-18.
+
+The user has authorized all five workstreams of the
+[model foundation program](research/preregistrations/v2_foundation.md): input
+selection/cleanup, component attribution, variance reduction, capacity scaling
+and the bounded existing-rich-data residual probe. Follow section 9 of
+`docs/v2_NEXT_RESEARCH_DECISION.md`, with at most two new candidate cells per GPU
+wave and review between waves. Use the accepted repaired store and local RTX 2060;
+preserve the entire eligible population and 60-session history. Continue the
+bounded settlement/financing review. This authorizes the registered new neural
+fits but no held-out access, forward capture or deployment. Earlier results and
+source stores remain sealed. Progress is in `docs/v2_foundation_progress.md`.
 
 The user subsequently authorized the [direct portfolio-objective program](research/preregistrations/v2_portfolio_objective.md):
 bounded portfolio/financing closeout, then matched ranking, hybrid and direct

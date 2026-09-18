@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import argparse
 import json
-from dataclasses import asdict
+from dataclasses import asdict, replace
 
 import numpy as np
 import torch
@@ -78,8 +78,12 @@ PATHWAY_CELLS = tuple(
 
 
 def configuration(cell, names):
+    from .round7_preprocessing import retained_fields
+
     families = {
-        k.removeprefix("sidecar_"): tuple(v)
+        k.removeprefix("sidecar_"): retained_fields(
+            v, cell.get("excluded_fields", {}).get(k.removeprefix("sidecar_"), ())
+        )
         for k, v in names.items()
         if k.startswith("sidecar_")
     }
@@ -88,31 +92,39 @@ def configuration(cell, names):
     elif "families" in cell:
         families = {name: families[name] for name in cell["families"]}
     if cell["graph"] == "s0":
-        return ModelConfig(
-            slow_feature_count=len(names["slow"]),
-            current_feature_count=0,
-            disable_fast_stream=True,
-            use_bf16=True,
-            sidecar_feature_counts=tuple(
-                (n, len(v)) for n, v in sorted(families.items())
+        return replace(
+            ModelConfig(
+                slow_feature_count=len(names["slow"]),
+                current_feature_count=0,
+                disable_fast_stream=True,
+                use_bf16=True,
+                sidecar_feature_counts=tuple(
+                    (n, len(v)) for n, v in sorted(families.items())
+                ),
             ),
+            **cell.get("model", {}),
         )
     common = ()
-    if families:
+    if "cross_market" in families:
         common, families["cross_market"] = cross_market_partition(
             families["cross_market"]
         )
-    return CharacteristicConfig(
-        family_counts=tuple((n, len(v)) for n, v in sorted(families.items())),
-        common_field_count=(len(common) + (3 if common else 0))
-        if cell.get("film", True)
-        else 0,
-        temporal=cell["graph"] != "c1_no_gru",
-        context="attention" if cell["graph"] == "c1_attention" else "pool",
-        members=8 if cell["graph"] == "c1_tabm" else 1,
-        horizons=(1, 2, 3, 5, 10) if cell["graph"] == "c1_five_heads" else (3, 5, 10),
-        temporal_encoder=cell.get("temporal_encoder", "gru"),
-        peer_timing=cell.get("peer_timing", "none"),
+    return replace(
+        CharacteristicConfig(
+            family_counts=tuple((n, len(v)) for n, v in sorted(families.items())),
+            common_field_count=(len(common) + (3 if common else 0))
+            if cell.get("film", True)
+            else 0,
+            temporal=cell["graph"] != "c1_no_gru",
+            context="attention" if cell["graph"] == "c1_attention" else "pool",
+            members=8 if cell["graph"] == "c1_tabm" else 1,
+            horizons=(1, 2, 3, 5, 10)
+            if cell["graph"] == "c1_five_heads"
+            else (3, 5, 10),
+            temporal_encoder=cell.get("temporal_encoder", "gru"),
+            peer_timing=cell.get("peer_timing", "none"),
+        ),
+        **cell.get("model", {}),
     )
 
 

@@ -37,22 +37,26 @@ DIAGNOSTIC_RULES = ("diagnostic_best_epoch_raw",)
 
 class ModelEMA:
     def __init__(self, model: nn.Module, decay: float) -> None:
-        if decay not in EMA_KEYS:
-            raise ValueError(f"Unsupported EMA decay: {decay}")
+        if not 0 <= decay < 1:
+            raise ValueError(f"EMA decay must be in [0, 1): {decay}")
         self.decay = decay
-        self.key = EMA_KEYS[decay]
+        self.key = EMA_KEYS.get(decay, f"ema_{decay:.12g}")
         self.shadow = {
             name: value.detach().clone() for name, value in model.state_dict().items()
         }
 
     @torch.no_grad()
     def update(self, model: nn.Module) -> None:
+        shadows, values = [], []
         for name, value in model.state_dict().items():
             shadow = self.shadow[name]
             if torch.is_floating_point(shadow):
-                shadow.mul_(self.decay).add_(value.detach(), alpha=1.0 - self.decay)
+                shadows.append(shadow)
+                values.append(value.detach())
             else:
                 shadow.copy_(value)
+        torch._foreach_mul_(shadows, self.decay)
+        torch._foreach_add_(shadows, values, alpha=1.0 - self.decay)
 
     def cpu_state_dict(self) -> dict[str, torch.Tensor]:
         return state_dict_to_cpu(self.shadow)

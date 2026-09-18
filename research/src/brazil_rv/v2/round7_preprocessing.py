@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 import numpy as np
 
@@ -24,6 +24,13 @@ def cross_market_partition(names):
         }
     )
     return common, tuple(n for n in names if n not in common)
+
+
+def retained_fields(names, excluded=()):
+    """Named exclusions preserve source order; a typo must not alter a study."""
+    if set(excluded) - set(names):
+        raise ValueError("excluded field is absent from the source schema")
+    return tuple(n for n in names if n not in excluded)
 
 
 @dataclass(frozen=True)
@@ -154,11 +161,12 @@ class Round7Preprocessing:
     common_columns: tuple[int, ...] = ()
     per_name_columns: tuple[int, ...] = ()
     feature_names: dict[str, tuple[str, ...]] | None = None
+    source_columns: dict[str, tuple[int, ...]] = field(default_factory=dict)
 
     @classmethod
-    def fit(cls, dataset, *, split_common, parent=None):
+    def fit(cls, dataset, *, split_common, parent=None, excluded_fields=None):
         store, rows = dataset.store, dataset.date_indices
-        families, names_by_family = {}, {}
+        families, names_by_family, source_columns = {}, {}, {}
         common_columns = per_name_columns = ()
         specifications = {
             (s["family"], s["name"]): s
@@ -166,7 +174,13 @@ class Round7Preprocessing:
         }
         for family in dataset.enabled_sidecars:
             prefix = "sidecar_" + family
-            names = tuple(store.manifest["feature_names"][prefix])
+            source_names = tuple(store.manifest["feature_names"][prefix])
+            names = retained_fields(
+                source_names, (excluded_fields or {}).get(family, ())
+            )
+            indices = tuple(source_names.index(n) for n in names)
+            if names != source_names:
+                source_columns[family] = indices
             names_by_family[family] = names
             shared_indices = ()
             if family == "cross_market":
@@ -178,16 +192,16 @@ class Round7Preprocessing:
             columns = [[] for _ in names]
             for start in range(0, len(rows), 128):
                 chunk = rows[start : start + 128]
-                values = store.read(prefix + "_values", chunk)
+                values = store.read(prefix + "_values", chunk)[..., indices]
                 valid = (
-                    store.read(prefix + "_valid", chunk)
+                    store.read(prefix + "_valid", chunk)[..., indices]
                     & store.read("active", chunk)[..., None]
                 )
                 if shared_indices:
                     common_values, common_valid, _ = common_snapshot(
                         values[..., shared_indices],
                         valid[..., shared_indices],
-                        store.read(prefix + "_age_sessions", chunk)[
+                        store.read(prefix + "_age_sessions", chunk)[..., indices][
                             ..., shared_indices
                         ],
                     )
@@ -219,7 +233,12 @@ class Round7Preprocessing:
                 parent=None if parent is None else parent.diagnostic,
             )
         return cls(
-            families, diagnostic, common_columns, per_name_columns, names_by_family
+            families,
+            diagnostic,
+            common_columns,
+            per_name_columns,
+            names_by_family,
+            source_columns,
         )
 
     def payload(self):
@@ -233,6 +252,11 @@ class Round7Preprocessing:
             "feature_names": {
                 n: list(v) for n, v in (self.feature_names or {}).items()
             },
+            **(
+                {"source_columns": {n: list(v) for n, v in self.source_columns.items()}}
+                if self.source_columns
+                else {}
+            ),
         }
 
     @classmethod
@@ -245,12 +269,17 @@ class Round7Preprocessing:
             tuple(payload["common_columns"]),
             tuple(payload["per_name_columns"]),
             {n: tuple(v) for n, v in payload["feature_names"].items()},
+            {n: tuple(v) for n, v in payload.get("source_columns", {}).items()},
         )
 
     def transform_sample(self, sample):
         sample = dict(sample)
         for family, scaler in self.families.items():
             prefix = "sidecar_" + family
+            if family in self.source_columns:
+                for suffix in ("values", "valid", "age_sessions"):
+                    key = prefix + "_" + suffix
+                    sample[key] = sample[key][..., self.source_columns[family]]
             sample[prefix + "_values"] = scaler.transform(
                 sample[prefix + "_values"], sample[prefix + "_valid"]
             )

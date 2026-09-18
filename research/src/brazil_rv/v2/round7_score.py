@@ -109,7 +109,7 @@ def score(
         enabled_sidecars=families,
         include_fast=False,
         include_intraday=False,
-        include_common_state=characteristic and bool(families),
+        include_common_state=characteristic and "cross_market" in families,
         compact_names=True,
         purpose="evaluation",
     )

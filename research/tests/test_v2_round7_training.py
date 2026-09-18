@@ -294,6 +294,7 @@ def test_selected_fit_resume_and_scoring_are_identical(
         compiled=False,
         export_scores=True,
         diagnostics=False,
+        ema_half_life_epochs=1.0,
     )
     full = tmp_path / "full"
     training.train(root, full, **options)
@@ -317,6 +318,13 @@ def test_selected_fit_resume_and_scoring_are_identical(
     assert a["epoch"] == [r["epoch"] for r in history if r["selected"]][-1]
     for key, value in a["model_state_dict"].items():
         torch.testing.assert_close(value, b["model_state_dict"][key], atol=0, rtol=0)
+    ema_a = torch.load(full / "selected_ema.pt", weights_only=True)
+    ema_b = torch.load(resumed / "selected_ema.pt", weights_only=True)
+    assert ema_a["epoch"] == ema_b["epoch"]
+    for key, value in ema_a["model_state_dict"].items():
+        torch.testing.assert_close(
+            value, ema_b["model_state_dict"][key], atol=0, rtol=0
+        )
     for filename in (
         "scores.npy",
         "score_mask.npy",
@@ -329,6 +337,14 @@ def test_selected_fit_resume_and_scoring_are_identical(
     assert training.train(root, resumed, **options)["status"] == "completed"
 
     if cell_name == "B3":
+        raw_only = tmp_path / "raw_only"
+        training.train(root, raw_only, **{**options, "ema_half_life_epochs": None})
+        raw = torch.load(raw_only / "selected.pt", weights_only=True)
+        assert raw["epoch"] == a["epoch"]
+        for key, value in a["model_state_dict"].items():
+            torch.testing.assert_close(
+                value, raw["model_state_dict"][key], atol=0, rtol=0
+            )
         selection_calls = 0
         original_readout = training.selection_readout
 
