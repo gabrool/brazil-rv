@@ -1,0 +1,33 @@
+{
+  "book_sources": {
+    "C6": {
+      "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_opportunity_056aad2_20260917\\C6\\books\\neutral\\book.json",
+      "sha256": "4c742437d57d8c355ec230a1df3757b23fa3c8e13bc6ee1f6cecc2badd90e6d7"
+    },
+    "TE_all": {
+      "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_opportunity_056aad2_20260917\\TE_all\\books\\neutral\\book.json",
+      "sha256": "6a1c4f4533d203f0fb1b26b686b72baf25fea81ad88e012bda345f1ad701abe8"
+    }
+  },
+  "daily_neutral_account_excess_return_correlation": 0.7554837422789789,
+  "first_date": "2018-01-02",
+  "forecast_sources": {
+    "C6": {
+      "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_opportunity_056aad2_20260917\\inputs\\C6.npz",
+      "sha256": "242dcc496ae5b02f1c31052444e7fecf072268b242bf11a36da2ef7ef0b72011"
+    },
+    "TE_all": {
+      "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_opportunity_056aad2_20260917\\inputs\\TE_all.npz",
+      "sha256": "6e5bf96e78bda78674e9055778a2f547d2df602552be052f20a2d9df744b832a"
+    }
+  },
+  "last_date": "2024-12-30",
+  "mean_daily_cross_sectional_pearson_of_mean_horizon_ranks": 0.7005809781522547,
+  "median_daily_correlation": 0.700824727936298,
+  "p10_p90_daily_correlation": [
+    0.5162624458431121,
+    0.8760177177325934
+  ],
+  "purpose": "Descriptive complementarity check only; no fitting, selection, new blend or economic replay. Lower correlation does not prove incremental alpha.",
+  "sessions": 1738
+}
