@@ -1,8 +1,66 @@
 import numpy as np
+import torch
 
 from brazil_rv.v2.artifacts import write_json_atomic
 from brazil_rv.v2.foundation_readouts import compare, paired_interval
 from brazil_rv.v2.portfolio_readouts import interval
+
+
+def test_original_average_uses_only_epochs_ending_at_raw_selection(tmp_path):
+    from brazil_rv.v2.artifacts import sha256_file
+    from brazil_rv.v2.foundation_averaging import prepare
+
+    source = tmp_path / "source"
+    source.mkdir()
+    contract = {"code": {"commit": "a" * 40}}
+    states = []
+    for epoch in (1, 2, 3, 4):
+        path = source / f"epoch_{epoch}.pt"
+        torch.save(
+            {
+                "stage": "F",
+                "fold": "F2",
+                "seed": 11,
+                "epoch": epoch,
+                "contract": contract,
+                "model_state_dict": {"weight": torch.tensor(float(epoch))},
+                "selection_ic": 0.03,
+            },
+            path,
+        )
+        if epoch <= 3:
+            states.append(
+                {
+                    "epoch": epoch,
+                    "path": str(path),
+                    "sha256": sha256_file(path),
+                    "available": True,
+                }
+            )
+    write_json_atomic(tmp_path / "frozen_design.json", {"store": {"root": "unused"}})
+    write_json_atomic(
+        tmp_path / "inventory.json",
+        {
+            "trajectories": {
+                "C6/F2/11": {
+                    "available": True,
+                    "selected_epoch": 3,
+                    "selected": {
+                        "path": str(source / "epoch_3.pt"),
+                        "sha256": sha256_file(source / "epoch_3.pt"),
+                    },
+                    "trailing_states": states,
+                }
+            }
+        },
+    )
+    prepare(tmp_path)
+    result = torch.load(
+        tmp_path / "checkpoint_average/C6/F2_seed_11/selected.pt", weights_only=True
+    )
+    assert result["model_state_dict"]["weight"] == 2.0
+    assert result["epoch"] == 3
+    prepare(tmp_path)  # Idempotent reuse is hash-bound.
 
 
 def test_paired_bounds_match_registered_block_sampling_and_preserve_constant_delta():

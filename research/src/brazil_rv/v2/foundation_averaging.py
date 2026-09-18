@@ -58,6 +58,7 @@ def prepare(root):
             if receipt["binding"] != binding or sha256_file(path) != receipt["sha256"]:
                 raise ValueError("saved checkpoint average changed")
         else:
+            output.mkdir(parents=True, exist_ok=True)
             payload = {
                 key: value
                 for key, value in source.items()
