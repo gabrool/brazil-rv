@@ -1,8 +1,8 @@
 # Direct portfolio-objective experiment: implementation and evidence
 
-Status: implementation, engineering admission and the 72-fit screen are complete;
-the sole admitted candidate is undergoing confirmation. This is an interim review,
-not a promotion decision.
+Status: all 132 fits, 742 fold books and sixteen continuous books are complete.
+The sole screen survivor fails the registered confirmation gate; no new loss or
+selector is promoted. Final audits and recovery are recorded in the run pointer.
 Resolve [the canonical run pointer](v2_portfolio_objective_run.json). The complete
 contract is [the registration](../research/preregistrations/v2_portfolio_objective.md);
 [progress and recovery instructions](v2_portfolio_objective_progress.md) identify
@@ -179,7 +179,7 @@ both selectors from saved history. A hidden supervisor prevents sleep during the
 campaign. The existing heartbeat monitors progress and handles final verification,
 review, recovery archiving and GitHub publication.
 
-## 7. Screen findings and pending confirmation
+## 7. Screen findings and confirmation design
 
 All 72 fits passed the trajectory audit, with zero zero-gradient blocks and zero
 AMP retries. The readout audit verified 168 forecasts and 392 books across eight
@@ -212,8 +212,171 @@ The registered confirmation started automatically: sixty TE_all fits, comprising
 rank and utility across the remaining ten folds and three seeds. No C6 or hybrid
 confirmation is run. No training contract was changed after observing the screen.
 
-The final review will add confirmation results, selector comparisons, economic
-and IC metrics, BRL/CDI, USD/EFFR and zero-rate Sharpes, winning/losing days, drawdown,
-exposure, costs and halves. It will state whether any candidate passes the registered
-gate and which assumptions limit the conclusion. No new objective or model is
-promoted at this interim checkpoint.
+## 8. Confirmation decision
+
+**Do not promote direct utility continuation or the economic checkpoint selector.**
+The primary candidate fails both the positive-confidence-bound requirement and
+seed stability: only seed 29 improves utility; seeds 11 and 47 worsen. This does
+not establish that economic learning is impossible. It rejects promotion of this
+specific bounded continuation recipe on the registered evidence.
+
+The confirmation covers 1,237 sessions in ten independent fold accounts. The
+screen's 501 sessions are excluded from this decision. The complete cells,
+fold metrics, seed effects, 20/40/60-session intervals and stresses are in the
+[results export](v2_portfolio_objective_results.json).
+
+| Training objective | Selector | Net above CDI, bps/day | Utility, bps/day | Net difference vs matched rank | 40-session 95% interval |
+|---|---|---:|---:|---:|---|
+| rank | ic | 5.323 | 4.869 | +0.000 | [0.000, 0.000] |
+| rank | utility_bps | 5.005 | 4.554 | +0.000 | [0.000, 0.000] |
+| utility | ic | 5.490 | 5.028 | +0.167 | [-0.515, 0.910] |
+| utility | utility_bps | 4.828 | 4.320 | -0.177 | [-2.467, 2.166] |
+
+The primary utility difference is -.233 bps/day, interval [-2.525, 2.110].
+Net intervals at block lengths 20 and 60 are [-2.583, 2.279] and [-2.335, 2.034].
+Changing the block length does not change the decision. Under the diagnostic IC
+selector, the utility-trained candidate gains only +.167 net bps/day and its
+interval also crosses zero. This diagnostic is not an alternative promotion route.
+
+Confirmation mean daily primary IC is .02663 for rank/IC, .02681 for
+rank/economic, .02750 for utility/IC and .01990 for utility/economic. The
+slightly higher utility/IC IC does not establish an economic advantage.
+
+Economic selection lowers confirmation net relative to IC selection by .318
+bps/day for ranking and .662 for utility training. Thus aligning the selection
+metric with P&L does not by itself make it a more reliable estimator. P&L is noisy,
+path-dependent and sensitive to a small number of observations and holdings.
+These results support caution about selection variance; they do not isolate a
+single causal failure mechanism.
+
+Utility differences by seed under the primary selector are -1.071, +.402 and
+-.135 bps/day for seeds 11/29/47. Fold utility differences range from -12.234 in
+F8 to +5.205 in F12; F7 is +5.144 and F5 is -3.453. Only five of ten folds improve.
+The average screen gain did not generalize consistently across regimes.
+
+## 9. Continuous history and the earlier roughly six-bps result
+
+These are sixteen uninterrupted accounts: two objectives, two selectors and
+three individual seeds plus their ensemble. Models switch at the fourteen fold
+boundaries, but holdings and cash carry through. Only the initial ten-session
+burn-in is excluded. The 1,738-session history includes the screen, so it is
+**descriptive full-history evidence, not the independent confirmation gate**.
+All books below use the neutral .05 net cap and the same accounting assumptions.
+
+| Objective / selector | Net above CDI bps/day | Sharpe BRL/CDI | Sharpe USD/US cash | Sharpe BRL/zero | BRL winning / losing days | BRL max drawdown | Daily turnover |
+|---|---:|---:|---:|---:|---|---:|---:|
+| rank / ic | 4.597 | 1.050 | 0.484 | 1.744 | 55.47% / 44.53% | -12.30% | 13.24% |
+| rank / utility_bps | 4.226 | 0.972 | 0.436 | 1.670 | 54.72% / 45.28% | -12.61% | 13.95% |
+| utility / ic | 4.514 | 1.028 | 0.473 | 1.720 | 55.58% / 44.42% | -12.81% | 13.49% |
+| utility / utility_bps | 4.323 | 0.871 | 0.421 | 1.483 | 56.44% / 43.56% | -13.50% | 12.47% |
+
+Utility/economic selection raises continuous mean net by only .097 bps/day versus
+the matched rank/economic control, while increasing volatility and worsening
+BRL/CDI Sharpe (.871 versus .972). The IC-selected ranking control remains stronger
+in this comparison. No flat BRL days occur; the JSON also reports excess-to-CDI
+winning/losing days, USD drawdowns and all individual seeds.
+
+The previous C6 6.71 and attention 5.94 bps/day results used the flexible .45 net
+cap; their neutral counterparts were about 4.00 and 4.50. The new neutral attention
+continuous values of 4.23–4.60 are consistent with that scale. The earlier screen
+values near 1–2 bps used different dates and separate accounts: they were not a
+collapse of full-history performance. Current confirmation flexible-net results
+are 6.28 (rank/economic) and 6.47 (utility/economic), but cover only the ten
+confirmation folds and are secondary sensitivities, not matched full-history
+replacements for the previous six-bps figures. No new continuous C6 fit was run
+because C6 failed the screen.
+
+Sharpes use sqrt(252), sample daily standard deviation and consistent currencies.
+USD returns use historical PTAX conversion before subtracting calendar-accrued
+EFFR (ACT/360); these are reporting benchmarks, never model inputs. PTAX is a
+valuation reference, not an executable FX price. Turnover counts buy and sell
+notional including the hedge, divided by NAV. It is not an actual holding-period
+statistic; no new holding-lot analysis was requested.
+
+## 10. Assumptions and training diagnostics
+
+On confirmation under the economic selector, doubling costs to 8 bps/side gives
+4.351 rank versus 4.253 utility net bps/day. Removing short-proceeds remuneration
+gives 1.939 versus 1.776. These frozen-forecast stresses do not reverse the primary
+conclusion. The large financing effect remains material. No change in training
+can validate an incorrect settlement or financing contract.
+
+All books retain economics_unresolved=true. The corporate-action and terminal
+settlement qualifications in section 3 remain; zero unresolved-claim balance is
+not proof that contractual settlement assumptions are verified. None of the
+reported returns is a verified live trading result.
+
+| Arm / objective | Fits | Reached 12 epochs | IC selected initial | Economic selector selected initial |
+|---|---:|---:|---:|---:|
+| C6:hybrid | 12 | 9 | 4 | 1 |
+| C6:rank | 12 | 6 | 8 | 2 |
+| C6:utility | 12 | 5 | 4 | 2 |
+| TE_all:hybrid | 12 | 4 | 10 | 6 |
+| TE_all:rank | 42 | 11 | 35 | 22 |
+| TE_all:utility | 42 | 12 | 28 | 12 |
+
+The ceiling is a continuation budget after inherited training, not a full-training
+budget. Attention IC selection retains initial weights in 35/42 ranking and 28/42
+utility trajectories. Economic selection changes weights much more often, but its
+confirmation economics are weaker. Extending every fit merely because some hit
+the ceiling is not supported by this result. Epoch zero is a deliberate protection
+against deterioration; it also limits what this study says about learning an
+economic representation from scratch. The exact selected-epoch arrays and epoch
+wall times are preserved in the results export.
+
+All 132 trajectories passed the matched-parent, zero-initial-head, artifact-hash,
+shared fit-only gradient scale and same-trajectory selector audit. There were no
+zero-gradient training blocks or AMP retries. Financial fitting and readouts ran
+from 13:28 UTC September 17 to 00:38 UTC September 18, approximately 11 hours
+10 minutes on the RTX 2060. Engineering and final documentation are additional.
+
+## 11. Interpretation and next decision
+
+This experiment successfully corrected a real backward-path defect and tested
+direct economic gradients through actual inventory accounting. It did not deliver
+a reproducible economic improvement. Do not conclude that the original learned
+controller's negative result proved ML unsuitable: that earlier result was affected
+by the inaccurate allocator derivative. Equally, fixing that derivative is not
+itself evidence that a learned controller will outperform.
+
+Retain the established predictor/policy references. Keep direct utility continuation
+as research evidence, without replacing the ranking objective or adopting economic
+checkpoint selection. Do not launch a broader loss, seed or architecture sweep on
+these results. A subsequent program should identify a specific learnable shortfall,
+control selection variance and verify the settlement/financing assumptions before
+claiming higher trading alpha. A from-scratch or differently constrained utility
+experiment would be a new registered question, not an automatic extension here.
+
+The experiment does not test a new regime detector, stop-loss system, intraday risk
+response or unconstrained directional allocator. Its neutral allocator was frozen
+to isolate objective changes; stronger timing claims would exceed the design.
+The repaired derivative, exact-account training and efficient execution are reusable
+engineering outputs even though no candidate is promoted.
+
+## 12. Final verification and recovery
+
+The final audit verifies 318 forecast archives, 742 fold books, sixteen continuous
+books and eighteen completed arm/fold panels. It checks checkpoint/design hashes,
+permanent-identity axes, every eligible stock-day, post-selection burn-in, exact
+calendar coverage, ledger reconciliation and recomputed currency-consistent
+performance metrics. Paired confirmation intervals are reconstructed from daily
+books at all three block lengths and reproduce the failed gate. The earlier
+132-fit audit verifies the training provenance and selectors.
+
+Continuous first-half / second-half net above CDI (equal session counts):
+
+| Objective / selector | First half bps/day | Second half bps/day |
+|---|---:|---:|
+| rank / ic | 2.882 | 6.312 |
+| rank / utility_bps | 2.935 | 5.518 |
+| utility / ic | 2.944 | 6.085 |
+| utility / utility_bps | 3.953 | 4.693 |
+
+These descriptive halves retain actual continuous account state and are not new
+selection criteria. The [recovery receipt](v2_portfolio_objective_recovery.json)
+records the D-drive archive, inventory and verification hashes. It includes the
+frozen source, all continuation checkpoints and resume state, forecasts, accounts,
+engineering evidence, diagnostics and logs. Accepted immutable datasets and prior
+warm-start/cache sources remain referenced by their original bindings and existing
+recovery records rather than duplicated. No Lambda or held-out consumer access
+was used; no forward capture or new trading-policy promotion was introduced.

@@ -11,6 +11,15 @@ primary comparison; compare IC and economic selectors on shared trajectories.
 This extends earlier restrictions on new neural experiments and economic losses,
 while preserving the held-out consumer ban, no forward capture and no deployment.
 
+The direct-objective program is complete: 72 screen and 60 confirmation fits.
+Only attention utility-only advanced, then failed confirmation: -.177 net bps/day
+versus matched ranking, 40-session 95% interval [-2.467, 2.166], with only one of
+three seeds improving utility. No loss or checkpoint-selector change is promoted.
+See the [combined review](docs/v2_PORTFOLIO_OBJECTIVE.md) and
+[results](docs/v2_portfolio_objective_results.json). This is a warm-start continuation
+comparison, not a rejection of economic learning from scratch. Settlement and
+financing assumptions remain unresolved.
+
 The user subsequently authorized the CPU-first
 [opportunity and portfolio-arrangement program](research/preregistrations/v2_opportunity_portfolios.md):
 attribute remaining losses, test conditional opportunity independently, compare

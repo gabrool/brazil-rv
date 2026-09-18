@@ -1,0 +1,11 @@
+{
+  "archive": "D:\\quant-data\\b3\\processed\\model_runs\\v2_portfolio_objective_e52be14_20260917\\archives\\portfolio_objective_complete.tar",
+  "bytes": 9780828160,
+  "inventory": "D:\\quant-data\\b3\\processed\\model_runs\\v2_portfolio_objective_e52be14_20260917\\archives\\inventory.json",
+  "inventory_sha256": "5466cd9ed12ffa5f3fc2d608777840a2368e72bb31def0eff5ef302f05fcaeca",
+  "members": 8443,
+  "scope": "All run files, frozen financial source tar, 132 continuation trajectories and resume states, 318 forecast archives, 758 fold/continuous books, engineering, closeout, final audits, review and logs. Immutable accepted store and previous checkpoint/cache roots are bound by training_design.json and existing recovery records, not duplicated. Local D-drive recovery; no cloud upload.",
+  "sha256": "2198f7e276e0e6dcc01438ea2fbd6d69363102605b0a24fbc22be7d3919cff63",
+  "source_root": "C:\\quant-data\\b3\\processed\\model_runs\\v2_portfolio_objective_e52be14_20260917",
+  "status": "verified"
+}

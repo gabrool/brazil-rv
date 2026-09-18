@@ -3,16 +3,32 @@
     "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_portfolio_objective_e52be14_20260917\\closeout_design.json",
     "sha256": "0bf47167aabb12a929cf1bca138efe426a9b7ae295d12a28651515347f7aa5fb"
   },
+  "completed_fit_audit": {
+    "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_portfolio_objective_e52be14_20260917\\completed_fit_audit.json",
+    "sha256": "4d8af4f46a6966a14dacac47b3b0cac94c1d81d88e17eb59bbf652198a59990e"
+  },
   "confirmation_candidates": {
     "TE_all": [
       "utility"
     ]
+  },
+  "confirmation_summary": {
+    "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_portfolio_objective_e52be14_20260917\\confirmation_summary.json",
+    "sha256": "fcc3928d97b8507a44976d777d25ed86c680c0c7f2f5810b688d47f6559dc6a4"
+  },
+  "continuous_summary": {
+    "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_portfolio_objective_e52be14_20260917\\continuous_summary.json",
+    "sha256": "a6f5fc8cd94d140918b24e1e232af3728634bb28d22556791ccd5c231a1c2995"
   },
   "engineering_acceptance": {
     "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_portfolio_objective_e52be14_20260917\\engineering_acceptance.json",
     "sha256": "e5294fa394d142b86f7c43938b50ca40733da1e9547bce7570d66f3da90e7908"
   },
   "engineering_root": "C:\\quant-data\\b3\\processed\\model_runs\\v2_portfolio_objective_e52be14_20260917\\engineering_295f416",
+  "final_readout_audit": {
+    "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_portfolio_objective_e52be14_20260917\\final_readout_audit.json",
+    "sha256": "c344307f7ad457a9aa8d2634f9521a5081266cbbf2eaea9eefcb3058ee6a49b5"
+  },
   "forward_capture": false,
   "heldout_accessed": false,
   "input_population_audit": {
@@ -23,6 +39,13 @@
     "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_portfolio_objective_e52be14_20260917\\local_execution.json",
     "sha256": "aa0ae6e0d8a2d4b025935300c2d9a82f98eb2677feb4c77ef4c62081ca3c7ffd"
   },
+  "recovery": "docs/v2_portfolio_objective_recovery.json",
+  "recovery_receipt": {
+    "path": "C:\\quant\\b3-quant\\docs\\v2_portfolio_objective_recovery.json",
+    "sha256": "e8c97ca70fc1ab90464158b60255fc72bbd61e43a15abaf0d5afd597bf51f0fa"
+  },
+  "report": "docs/v2_PORTFOLIO_OBJECTIVE.md",
+  "results": "docs/v2_portfolio_objective_results.json",
   "root": "C:\\quant-data\\b3\\processed\\model_runs\\v2_portfolio_objective_e52be14_20260917",
   "screen_readout_audit": {
     "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_portfolio_objective_e52be14_20260917\\screen_readout_audit.json",
@@ -32,7 +55,7 @@
     "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_portfolio_objective_e52be14_20260917\\screen_summary.json",
     "sha256": "b450ca1c8754972ea8c73fc22b69ab9d96a61f007e35b92187c6b51945e9a7fe"
   },
-  "status": "screen_complete_confirmation_running",
+  "status": "complete_no_objective_promoted",
   "training_design": {
     "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_portfolio_objective_e52be14_20260917\\training_design.json",
     "sha256": "eae29aafad44756c15c1e3e529c1f025491312ddbcdb486bcdd9354d43e5615d"

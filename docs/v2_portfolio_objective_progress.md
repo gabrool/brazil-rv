@@ -64,47 +64,38 @@ be reused for a warm-start neural model trained on those endpoints. This does no
 assert that the old frozen-OOS controller calibration leaked. The continuation
 budget and loss-scale rule are registered before runs.
 
-## Stage C — running
+## Stage C — financial work and audits complete
 
-All 72 screen fits are complete as of 2026-09-17 19:10 UTC. The completed-fit
-audit passes for every trajectory: artifact hashes, exact inherited initial
-weights, zero initial cardinal head, shared gradient scale, and both selectors
-reproduced from the saved epochs. The eight screen readout panels completed at
-19:37 UTC; all 168 forecast artifacts and 392 books pass the population/axis/hash
-audit. Attention utility-only is the sole admitted candidate: +.843 daily net bps
-and +.828 utility versus the matched rank/economic-selector control, with positive
-utility in three of four folds and all three seeds. Its primary net interval is
-[-.745, 2.418], so the screen does not establish improvement. Neither hybrid arm
-nor C6 utility passes. See [the screen export](v2_portfolio_objective_screen.json).
-The supervisor has started the 60 registered confirmation fits: TE_all rank/utility,
-ten remaining folds, three seeds. Both selectors reuse those trajectories. Financial
-source and contract are unchanged. Confirmation and final continuous books/audit
-remain pending.
+The screen completed 72 fits and admitted only TE_all utility-only. Confirmation
+completed the registered sixty matched rank/utility fits on the remaining ten
+folds. All 132 trajectories pass the final fit audit, including exact warm-start
+weights, zero initial cardinal head, shared fit-only loss scale, artifact hashes
+and both selectors reconstructed from the same saved trajectory. No zero-gradient
+blocks or AMP retries occurred.
 
-The matched 72-fit screen launched on 2026-09-17 at 13:28 UTC / 10:28 Brasilia.
-Its frozen clean worktree is `C:/quant/brazil-rv-portfolio-objective-33086be`.
-The source main branch may receive reports; do not modify this execution worktree.
-Resolve the run pointer, then check `local_execution.json` and actual command lines
-before any restart. `local_campaign.stdout.log` contains epoch progress;
-`local_campaign.stderr.log` and `local_runner_exit.json` report failures. The
-supervisor prevents sleep while running and restores the normal setting on exit.
-Do not launch a duplicate. The existing 15-minute heartbeat now follows this task.
+Confirmation fails: primary paired net -.177 bps/day, 40-session interval
+[-2.467, 2.166], paired utility -.233 [-2.525, 2.110], only one positive seed.
+Neither loss nor economic selector is promoted. The IC-selector diagnostic also
+has an interval crossing zero. No additional C6/hybrid fits were run.
 
-The first completed trajectories passed hash, matched-parent, zero-initial-head,
-shared loss-scale and both checkpoint-selector audits. The audit command can be
-repeated after all fits: `uv run --project research --no-sync python
-ops/audit_portfolio_objective.py fits --root <resolved-root>`. Its receipt is
-`completed_fit_audit.json`. Do not use early selection results to alter the design.
-The input-population audit also verifies identical dates/ISIN axes and all 363,314
-active stock-days in the economic cache's 2016-07-18 through 2024-12-30 interval.
-Neither arm's cached score masks remove any accepted active observation. This is
-the accounting interval, not the full 2010-onward store and feature-history span.
+The supervisor exited successfully at 00:38:46 UTC September 18 after all fold
+readouts and sixteen continuous accounts. Final verification passes for 318
+forecast archives, 742 fold books, sixteen continuous books and eighteen panels.
+Checks cover hashes, dates/ISIN axes, accepted eligible populations, ten-session
+post-selection burn-in, 1,738-session continuous coverage, reconciliation,
+recomputed benchmarks/Sharpes and reconstructed confirmation intervals/gate.
+The complete LLM review is docs/v2_PORTFOLIO_OBJECTIVE.md; all confirmation cells,
+stresses, seeds, continuous metrics and training diagnostics are exported in
+docs/v2_portfolio_objective_results.json. The actual financial source remains
+clean detached 33086be, not the later documentation commit.
 
-The supervisor compares both selectors on the same trajectories, admits candidates
-using the economic selector alone, and runs confirmation only for admitted pairs.
-`worker_complete.json` means financial readouts are finished, not that recovery and
-review are complete. Remaining: verify the screen and any triggered confirmation,
-all forecast populations/axes and hashes, paired conclusions, exact ledger and
-benchmark readouts; complete the LLM review; archive/hash recovery on D; commit/push
-and verify GitHub; pause the heartbeat. No new pretraining or Lambda. Re-read the
-registration after each stage. No held-out access or forward capture.
+Stages A/B/C have been checked against the registration. Financial limitations
+remain: contractual settlement and financing assumptions, reused development
+periods and warm-start continuation scope. Prior OSQP-gradient-dependent learned
+controller failures remain qualified; their forward books are unchanged.
+
+Recovery is complete: all 8,443 files in the 9.78 GB D-drive archive were read
+back and verified against the SHA-256 inventory. The recovery receipt binds both
+archive and inventory. Final documentation is committed/published with this state;
+the heartbeat is paused after verifying GitHub. Do not launch more experiments.
+No held-out consumer access, Lambda, forward capture or deployment.
