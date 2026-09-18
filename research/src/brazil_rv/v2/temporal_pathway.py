@@ -80,12 +80,13 @@ class PeerAttention(nn.Module):
 
 
 class TemporalPeerPathway(nn.Module):
-    """Same peer and temporal-pooling parameters; only their order changes."""
+    """Matched pooling with early, late or no additional peer interaction."""
 
     def __init__(self, width, dropout, timing):
         super().__init__()
         self.timing = timing
-        self.peer = PeerAttention(width, dropout)
+        if timing != "pool":
+            self.peer = PeerAttention(width, dropout)
         self.query = nn.Linear(width, width, bias=False)
 
     def pool(self, sequence, valid):
@@ -112,4 +113,4 @@ class TemporalPeerPathway(nn.Module):
             )
             return self.pool(sequence, valid)
         pooled = self.pool(sequence, valid)
-        return self.peer(pooled, valid.any(-1))
+        return pooled if self.timing == "pool" else self.peer(pooled, valid.any(-1))

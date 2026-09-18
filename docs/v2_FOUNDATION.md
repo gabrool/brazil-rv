@@ -99,6 +99,22 @@ bindings are in [the ensemble evidence](v2_foundation_ensemble.json). They are
 nominal reused-development intervals, not adjusted for all prior research or
 independent replication across overlapping seed pairs.
 
+## Completed fixed forecast-blend diagnostic
+
+The registered equal C6/attention forecast blend has now been replayed on all
+fourteen folds. The weight is fixed at .5 before outcomes. Its calibration is
+reused from the existing prior-only .5-blend trial; no evaluation dates fit a new
+mapping. Forecasts are combined before one joint allocation, not after separate
+books have earned returns.
+
+The blend earns 4.948 net bps/day above CDI on the same fold-reset accounts.
+Relative to C6, its paired mean differences are +.001181 IC (nominal 95% interval
+[-.001494, .003908]) and +.703 net bps/day ([-.791, 2.090]). Relative to attention,
+they are +.004089 IC ([.000948, .007170]) and +.690 net bps/day ([-.770, 2.083]).
+These 40-session intervals support forecast diversification, but do not establish
+economic superiority. Full evidence, alternative block lengths and all source
+books are in [the fixed-blend readout](v2_foundation_blend.json).
+
 ## Checkpoint averaging and GPU engineering
 
 All 84 original neutral F trajectories have hash-verified selected states and the
@@ -107,6 +123,10 @@ All 84 averages are prepared. They stop at the raw selected epoch; no late overf
 tail, independent-seed weight averaging or economic continuation is substituted.
 Average inference and matched economic results are still pending. The stored
 selector IC identifies the original cutoff, not the averaged predictor's IC.
+All 84 averaged graph contracts also load strictly into their original model
+classes. `ops/score_foundation_averages.py` reuses a compiled graph across compatible
+seeds/folds in the historical inference worktree. It must wait for the fit worker;
+there is only one GPU worker at a time.
 
 Six disposable full-population GPU checks passed: one complete P epoch and F2 epoch
 for each input cell. P padding is 160 names and F2 padding is 144, determined by
@@ -120,6 +140,16 @@ Its steady epochs after compilation took approximately 9-10 seconds; preparation
 compilation and scoring are additional costs. This is not a timing estimate for
 later, larger F windows or all remaining waves.
 
+The component experiment now has a pooling-only temporal pathway: it retains the
+same learned history pooling while omitting the early peer module. Using the old
+`none` setting would also replace learned pooling with the last historical state,
+confounding the peer ablation. Existing early/late paths retain their behavior.
+Sixteen targeted tests cover masks, permutation/padding invariance, date isolation,
+finite gradients and compilation, including exact pooling after a peer bypass.
+Later waves can bind their own immutable implementation and list only genuinely
+new fit cells, reusing eligible controls without refitting them. This does not
+change the source of the input wave currently running.
+
 ## Accounting evidence acquired; corrections remain outstanding
 
 Original issuer notices have now been downloaded and hash-bound in
@@ -132,7 +162,7 @@ accounting evidence, not additional model features.
 | Copel units | Last unit trading December 22, 2023; cancellation December 26; delivery of one CPLE3 plus four CPLE6 per unit, credited December 28 | Represent two successor legs and delivery timing; combine existing successor holdings without dropping inventory |
 | ALLOS | ALSO3 changes to ALOS3 on October 25, 2023 | Bind dated permanent identities and verify quote/holding continuity before adding a successor link |
 | ISA | TRPL3/TRPL4 change to ISAE3/ISAE4 on November 18, 2024 | Same identity and quote-continuity verification; a ticker rename is not evidence of cash redemption |
-| brMalls | December 19, 2022 notice specifies 0.398551577675763 ALSO share plus R$1.62899410177968 per BRML share; reference date January 6, 2023 and cash payment January 20 | Confirm effective share-delivery/tradability dates and represent stock plus cash without liquidating at a stale quote |
+| brMalls | December 19, 2022 notices specify 0.398551577675763 ALSO share plus R$1.62899410177968 per BRML share; reference date January 6, 2023, successor trading January 9, share credit January 11 and cash payment January 20 | Represent stock plus cash with distinct trading/credit/payment dates without liquidating at a stale quote |
 | Dommo | December 16, 2022 notice makes the non-electing default 0.0375 PRIO share plus R$0.4625 per DMMO share. January 6 notice specifies PRIO trading January 9, credit January 11 and default cash payment January 17 | Preserve default terms and distinguish the elective cash-only alternative; do not choose the better realized option retrospectively. Borrowed-share election obligations remain a source uncertainty |
 
 Sources: [Cielo trading cessation](https://www.rad.cvm.gov.br/ENETWeb/frmDownloadDocumento.aspx?CodigoInstituicao=1&Tela=ext&descTipo=IPE&numProtocolo=1275808),
@@ -144,9 +174,19 @@ Sources: [Cielo trading cessation](https://www.rad.cvm.gov.br/ENETWeb/frmDownloa
 Additional sources: [brMalls December notice](https://api.mziq.com/mzfilemanager/v2/d/330c258b-6212-45ce-8c13-557ea46cc23a/1830f410-c0a5-44b9-58c9-7c3b4bddeff9?origin=1),
 [Dommo December notice reproduced by its IR provider](https://mzgroup.com.br/fatosrelevantes/fato-relevante-periodo-de-opcao-procedimentos-e-data-de-fechamento/),
 [Dommo January payment notice](https://api.mziq.com/mzfilemanager/v2/d/848ef34b-7dd8-49fe-b128-ac48ffa6bf38/a180c284-337c-1a35-bbd2-6a062ffbb28b).
+The [brMalls delivery notice](https://financenews.com.br/wp-content/uploads/2022/12/022357000101011.pdf)
+is an archived issuer PDF mirrored by a news site; its amounts match the direct
+issuer-hosted December notice. Its schedule distinguishes trading from custody credit.
 The Dommo cash-only election paid R$1.90432468607 on January 13. That is not the
 automatic default. An earlier general description of .05 PRIO per DMMO would also
 miss the later stock/cash split; use the operative December/January notices.
+
+[B3 circular 188/2022-PRE](https://www.b3.com.br/data/files/C6/01/2D/98/58135810F534EB48AC094EA8/OC%20188-2022%20PRE%20%20DMMO%20%28PT%29.pdf)
+clarifies borrowed DMMO stock: qualifying lender cash-election requests close the
+loan quantity on December 26 with the cash claim provisioned; otherwise remaining
+loans convert to PRIO under the issuer's proportions, carrying cash/fractional
+obligations. The general treatment is now documented. Actual historical lender
+elections are still unknown and must be a labelled sensitivity where relevant.
 
 A cached index link initially resolved to Cielo's August conversion notice rather
 than September's redemption. Reading the actual PDF exposed the mismatch; the
@@ -162,17 +202,31 @@ consideration can determine realized cash, but cannot enter earlier decisions.
 All affected candidate/control accounts must use the same corrected, separately
 bound contract. No raw data or sealed financial result has been overwritten.
 
+The bounded [identity-boundary audit](v2_foundation_identity_boundaries.json) finds
+consecutive old/new quote dates on separate ISIN axes for ALLOS and ISA. Neither
+has a direct successor action in the accepted store. The new ALLOS axis has 60
+quoted but inactive dates before becoming eligible; the ISA preferred axis has
+28 by the development cutoff and is never eligible within this store. These
+counts warrant checking identity-continuous warm-up as well as settlement. They
+do not prove that every other universe requirement was met on those dates.
+Do not repair them by relabelling every historical ticker or changing the live
+fit store. Verify the dated share-class/ISIN succession first; bind any required
+target/history repair separately and report its effect on the comparison.
+
 ## Remaining authorized work
 
 1. Finish the matched input wave and its economic/IC readouts, then apply the
    registered improvement/noninferiority gates. A wide interval spanning zero is
    not evidence that deletion is harmless.
 2. Score fixed checkpoint averages using compatible original inference code;
-   finish EMA comparisons and the fixed cross-architecture blend diagnostic.
+   finish EMA comparisons (the fixed cross-architecture blend is complete).
 3. Test compact post-pooling readout, then matched encoder/peer contrasts and
    separate width/depth changes according to the registered conditional order.
 4. Resolve and quantify the specific accounting cases; do the bounded rich-data
    residual probe on genuine earlier OOS forecasts and the retained roster.
+   [Its implementation specification](../research/preregistrations/v2_foundation_residual.md)
+   freezes matched score-only/rich ridge and shallow-tree cells, prior selection,
+   correction strengths including zero, and equal-date weighting before new outcomes.
 5. Confirm admitted candidates only, report continuous accounts and all three
    currency-consistent Sharpes, archive recovery artifacts, and close each branch
    explicitly. No new model is promoted at this interim point.

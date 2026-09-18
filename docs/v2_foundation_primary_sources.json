@@ -17,6 +17,15 @@
     "sha256": "42027e66bca51417ad13ef7cc2abe85a20079e966582a40382eafb7c5a7df19e",
     "url": "https://publicidadelegal.valor.com.br/valor/2023/02/10/BRMALLS1567671810022023.pdf"
   },
+  "brmalls_delivery_20221219_mirror": {
+    "bytes": 274131,
+    "mime": "application/pdf",
+    "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_foundation_d21a93a_20260918\\primary_sources\\brmalls_delivery_20221219_mirror.pdf",
+    "resolved_url": "https://financenews.com.br/wp-content/uploads/2022/12/022357000101011.pdf",
+    "retrieved_at": "2026-09-18T22:28:53.285073+00:00",
+    "sha256": "0826781172779911f1a9bcce61ecd3e8c5b99d0a6280a86d0ccdd48058251146",
+    "url": "https://financenews.com.br/wp-content/uploads/2022/12/022357000101011.pdf"
+  },
   "brmalls_schedule_20221219": {
     "bytes": 223248,
     "mime": "application/pdf",
@@ -53,6 +62,15 @@
     "retrieved_at": "2026-09-18T21:59:19.452643+00:00",
     "sha256": "4d172d4853ebd3ee6e375f4e8a26fac6b5e2e8d479c1d4c0d578ddc3e7fd2510",
     "url": "https://api.mziq.com/mzfilemanager/v2/d/16a31b1b-5ecd-4214-a2e0-308a2393e330/a338bc96-aabd-f8e4-dc9d-3936484bff87"
+  },
+  "dommo_borrow_b3_20221220": {
+    "bytes": 119298,
+    "mime": "application/pdf",
+    "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_foundation_d21a93a_20260918\\primary_sources\\dommo_borrow_b3_20221220.pdf",
+    "resolved_url": "https://www.b3.com.br/data/files/C6/01/2D/98/58135810F534EB48AC094EA8/OC%20188-2022%20PRE%20%20DMMO%20%28PT%29.pdf",
+    "retrieved_at": "2026-09-18T22:28:52.580641+00:00",
+    "sha256": "c715e3bb9ad6480c44bdb85e3b47076c31ae68ba683eb220637f06a896dad062",
+    "url": "https://www.b3.com.br/data/files/C6/01/2D/98/58135810F534EB48AC094EA8/OC%20188-2022%20PRE%20%20DMMO%20%28PT%29.pdf"
   },
   "dommo_options_20221216": {
     "bytes": 149453,

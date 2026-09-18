@@ -29,6 +29,9 @@ quality and speed. Registration: `research/preregistrations/v2_foundation.md`.
   and .474 bps/day over its mean individual; C6 gains .000781 IC and -.019 bps/day.
   These are fold-reset reused-development diagnostics, not promotion results.
   See `v2_FOUNDATION.md` and `v2_foundation_ensemble.json`.
+- Fixed .5 forecast blend is complete from readout source `75a5b75`: 4.948 net
+  bps/day in fold-reset accounts, +.703 vs C6 and +.690 vs attention. Both economic
+  95% intervals include zero. Full evidence: `v2_foundation_blend.json`.
 - Fit-only correlation audit: no tested within-family pair exceeds absolute .97;
   common fields use one observation per date. Insufficiently observed pairs remain
   unassessed. This is not evidence that all fields are useful.
@@ -36,11 +39,27 @@ quality and speed. Registration: `research/preregistrations/v2_foundation.md`.
   Copel's two-share-class unit cancellation, and ALLOS/ISA ticker renames.
   These need separately bound account integration and matched replay; they have
   not changed the running fits or existing books. Broker financing remains unresolved.
+  BRML delivery/payment and DMMO default/elective/borrowed-share terms are now
+  archived too. `v2_foundation_identity_boundaries.json` identifies two separate
+  ISIN axes without successor actions and potential warm-up gaps (ALLOS 60 quoted
+  inactive dates, ISA 28). Verify dated identity continuity before account/target
+  repairs; do not silently change the accepted live training store.
 - Do not run saved-average GPU scoring concurrently with the fit worker.
   Worktree `C:/quant/brazil-rv-portfolio-objective-33086be` has verified identical
   inference dependencies to original neutral training source `b16732e`.
+- All nine input-wave P parents finished; 36 screen F fits now follow. Consult
+  live `input_training_progress.json`, not this snapshot, for the count.
+- Later peer-removal contrasts must use `peer_timing: pool`, preserving learned
+  history pooling. `none` would additionally change pooling. Sixteen pathway tests
+  pass. Later wave JSON can bind its own `implementation`, `fit_cells` and `folds`;
+  review and freeze the contrast before dispatch. The live d21a93a source stays intact.
+- Residual protocol detail is in `research/preregistrations/v2_foundation_residual.md`.
+  It includes the section-4.2 ridge comparison, matched score-only controls and
+  the shallow-tree revisit. All fit/selection forecasts must be genuinely OOS;
+  use verified earlier C6 P preludes and original neutral F anchors, never fitted
+  training predictions. Freeze the final feature roster before executing it.
 - Remaining: matched input wave/readouts; original-average inference/readouts;
-  fixed cross-architecture blend; averaging/compact-readout wave;
+  averaging/compact-readout wave;
   conditional component/capacity waves; residual information probe; confirmation,
   accounting uncertainty review, consolidated report and recovery archive.
 
@@ -51,3 +70,21 @@ Training worktree is immutable. Readout/report changes on main must not change t
 running fit code. The existing 15-minute continuation heartbeat has been updated
 for this whole program; it stays quiet on healthy unchanged progress. It is not a
 replacement for the explicit review and next-wave decision.
+
+Next dispatch details:
+
+1. When input training finishes, use the clean `75a5b75` readout worktree for
+   `foundation_readouts evaluate --root ROOT` and `summarize --root ROOT`.
+   Preserve that readout source for resumable base accounts. Each command's module
+   prefix is `python -u -m brazil_rv.v2.` through the shared `uv` environment.
+2. When the GPU is free, score averages using
+   `C:/quant/brazil-rv-foundation-readouts/ops/score_foundation_averages.py --root ROOT`,
+   but set PYTHONPATH and working directory to the verified historical
+   `C:/quant/brazil-rv-portfolio-objective-33086be` source. Use the established
+   single-thread and compiler-cache environment. Then run the readout worktree's
+   `foundation_readouts averages --root ROOT`. Do not confuse original neutral
+   controls with the fresh input-wave controls.
+3. Review the registration, input summary and EMA comparison. Freeze the retained
+   roster and the compact-readout contrast before the next dispatch. A later-wave
+   implementation binding is needed for the pooling-only contrast; do not mutate
+   the live original worktree or refit identical compatible controls needlessly.

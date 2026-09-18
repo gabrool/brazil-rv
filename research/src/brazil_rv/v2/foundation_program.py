@@ -223,7 +223,7 @@ def fit_wave(root, wave_name, *, smoke=False):
     torch.set_num_threads(1)
     design = read(root / "frozen_design.json")
     wave = read(root / "waves" / f"{wave_name}.json")
-    if _git_identity() != design["implementation"]:
+    if _git_identity() != wave.get("implementation", design["implementation"]):
         raise ValueError("run from the frozen foundation source")
     store = Path(design["store"]["root"])
     if sha256_file(store / "manifest.json") != design["store"]["manifest_sha256"]:
@@ -232,17 +232,18 @@ def fit_wave(root, wave_name, *, smoke=False):
         raise ValueError("foundation GPU admission has not passed")
     destination = root / ("smoke" if smoke else "fits")
     seeds = design["seeds"][:1] if smoke else design["seeds"]
-    folds = ["F2"] if smoke else design["screen_folds"]
+    folds = ["F2"] if smoke else wave.get("folds", design["screen_folds"])
+    cells = wave.get("fit_cells", list(wave["cells"]))
     jobs = [
         (name, "P", "pretrain_internal", seed)
         for seed in seeds
-        for name in wave["cells"]
+        for name in cells
     ]
     jobs += [
         (name, "F", fold, seed)
         for fold in folds
         for seed in seeds
-        for name in wave["cells"]
+        for name in cells
     ]
     progress = []
     for name, stage, fold, seed in jobs:

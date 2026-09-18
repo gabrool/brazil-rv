@@ -6,6 +6,7 @@ import torch
 from brazil_rv.v2.characteristic_model import CharacteristicConfig, CharacteristicModel
 from brazil_rv.v2.model import encode_slow_history
 from brazil_rv.v2.round7_training import TrainingObjective
+from brazil_rv.v2.temporal_pathway import TemporalPeerPathway
 from brazil_rv.v2.train import compile_forward, _unique_compiled_graphs
 
 
@@ -42,7 +43,8 @@ def test_restored_gru_last_state_exact_and_invalid_payload_ignored():
 
 
 @pytest.mark.parametrize(
-    "encoder,timing", [(e, t) for e in ("gru", "attention") for t in ("early", "late")]
+    "encoder,timing",
+    [(e, t) for e in ("gru", "attention") for t in ("early", "late", "pool")],
 )
 def test_peer_masks_permutation_padding_and_no_cross_date_leakage(encoder, timing):
     torch.set_num_threads(2)
@@ -96,7 +98,8 @@ def test_early_late_have_identical_parameter_contract(encoder):
 
 
 @pytest.mark.parametrize(
-    "encoder,timing", [(e, t) for e in ("gru", "attention") for t in ("early", "late")]
+    "encoder,timing",
+    [(e, t) for e in ("gru", "attention") for t in ("early", "late", "pool")],
 )
 def test_pathway_fullgraph_across_distinct_date_batch_sizes(encoder, timing):
     torch._dynamo.reset()
@@ -121,3 +124,34 @@ def test_pathway_fullgraph_across_distinct_date_batch_sizes(encoder, timing):
         compiled(sample).backward()
         model.zero_grad(set_to_none=True)
     assert _unique_compiled_graphs() - before == 1
+
+
+def test_peer_removal_preserves_learned_pooling_and_independent_stock_histories():
+    class PassThrough(torch.nn.Module):
+        def forward(self, values, valid):
+            return values
+
+    torch.manual_seed(7)
+    pooled = TemporalPeerPathway(8, 0, "pool")
+    early = TemporalPeerPathway(8, 0, "early")
+    early.query.load_state_dict(pooled.query.state_dict())
+    early.peer = PassThrough()
+    sequence = torch.randn(2, 4, 60, 8, requires_grad=True)
+    history = torch.ones(2, 4, 60, dtype=torch.bool)
+    history[:, 0] = False
+    history[:, 1, :20] = False
+    active = torch.ones(2, 4, dtype=torch.bool)
+    expected = pooled(sequence, history, active)
+    torch.testing.assert_close(
+        early(sequence, history, active), expected, atol=0, rtol=0
+    )
+    changed = sequence.detach().clone()
+    changed[:, 3] *= 100
+    torch.testing.assert_close(
+        pooled(changed, history, active)[:, :3], expected[:, :3], atol=0, rtol=0
+    )
+    assert (expected[:, 0] == 0).all()
+    expected.square().mean().backward()
+    assert torch.isfinite(sequence.grad).all()
+    assert pooled.query.weight.grad.norm() > 0
+    assert not hasattr(pooled, "peer")
