@@ -1,5 +1,11 @@
 # Research decision after the portfolio-objective experiments
 
+The user subsequently authorized all five foundation workstreams. Implementation
+and outcome-independent gates are in [the registration](../research/preregistrations/v2_foundation.md),
+with [progress](v2_foundation_progress.md) and [canonical run pointer](v2_foundation_run.json).
+The assessment below remains the rationale; later results belong in the progress
+record and combined report.
+
 2026-09-18, updated after the user's input-selection, architectural-synthesis, variance-reduction and scaling requests. Assessment and staged experimental design; financial runs still require a frozen implementation/registration. The completed financial source is 33086be; its final review and recovery were published in 193fe4d. No new model fitting, portfolio replay or held-out access was performed for this assessment. Descriptive forecast/account comparisons are in [the evidence file](v2_next_research_evidence.json); the new read-only input and parameter census is in [the model-design audit](v2_model_design_audit.json).
 
 ## 1. Decision

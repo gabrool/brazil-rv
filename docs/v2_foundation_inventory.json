@@ -1,0 +1,5073 @@
+{
+  "active_stock_days": 568815,
+  "design_sha256": "00c5120cccb91bad5a2878f03949d167cce5cbc4acaf0cfd58b3ac89cb39268e",
+  "fields": {
+    "sidecar_cross_market:adr_listed_flag": {
+      "active_stock_days": 568690,
+      "distinct_dates": 3716,
+      "distinct_dates_by_year": {
+        "2010": 246,
+        "2011": 249,
+        "2012": 246,
+        "2013": 248,
+        "2014": 248,
+        "2015": 246,
+        "2016": 249,
+        "2017": 246,
+        "2018": 245,
+        "2019": 248,
+        "2020": 249,
+        "2021": 247,
+        "2022": 250,
+        "2023": 248,
+        "2024": 251
+      },
+      "first_date": "2010-01-05",
+      "known_age_without_value_stock_days": 0,
+      "last_date": "2024-12-30",
+      "median_names_on_observed_date": 139.0
+    },
+    "sidecar_cross_market:adr_return_gap_1": {
+      "active_stock_days": 55489,
+      "distinct_dates": 3390,
+      "distinct_dates_by_year": {
+        "2010": 227,
+        "2011": 226,
+        "2012": 220,
+        "2013": 227,
+        "2014": 227,
+        "2015": 228,
+        "2016": 226,
+        "2017": 222,
+        "2018": 219,
+        "2019": 227,
+        "2020": 231,
+        "2021": 228,
+        "2022": 226,
+        "2023": 226,
+        "2024": 230
+      },
+      "first_date": "2010-01-06",
+      "known_age_without_value_stock_days": 0,
+      "last_date": "2024-12-30",
+      "median_names_on_observed_date": 17.0
+    },
+    "sidecar_cross_market:ewz_minus_bova11_1": {
+      "active_stock_days": 519010,
+      "distinct_dates": 3390,
+      "distinct_dates_by_year": {
+        "2010": 227,
+        "2011": 226,
+        "2012": 220,
+        "2013": 227,
+        "2014": 227,
+        "2015": 228,
+        "2016": 226,
+        "2017": 222,
+        "2018": 219,
+        "2019": 227,
+        "2020": 231,
+        "2021": 228,
+        "2022": 226,
+        "2023": 226,
+        "2024": 230
+      },
+      "first_date": "2010-01-06",
+      "known_age_without_value_stock_days": 0,
+      "last_date": "2024-12-30",
+      "median_names_on_observed_date": 139.0
+    },
+    "sidecar_cross_market:exposure_fx": {
+      "active_stock_days": 533357,
+      "distinct_dates": 3656,
+      "distinct_dates_by_year": {
+        "2010": 186,
+        "2011": 249,
+        "2012": 246,
+        "2013": 248,
+        "2014": 248,
+        "2015": 246,
+        "2016": 249,
+        "2017": 246,
+        "2018": 245,
+        "2019": 248,
+        "2020": 249,
+        "2021": 247,
+        "2022": 250,
+        "2023": 248,
+        "2024": 251
+      },
+      "first_date": "2010-04-05",
+      "known_age_without_value_stock_days": 0,
+      "last_date": "2024-12-30",
+      "median_names_on_observed_date": 133.0
+    },
+    "sidecar_cross_market:exposure_fx_times_shock_1": {
+      "active_stock_days": 533357,
+      "distinct_dates": 3656,
+      "distinct_dates_by_year": {
+        "2010": 186,
+        "2011": 249,
+        "2012": 246,
+        "2013": 248,
+        "2014": 248,
+        "2015": 246,
+        "2016": 249,
+        "2017": 246,
+        "2018": 245,
+        "2019": 248,
+        "2020": 249,
+        "2021": 247,
+        "2022": 250,
+        "2023": 248,
+        "2024": 251
+      },
+      "first_date": "2010-04-05",
+      "known_age_without_value_stock_days": 0,
+      "last_date": "2024-12-30",
+      "median_names_on_observed_date": 133.0
+    },
+    "sidecar_cross_market:exposure_fx_times_shock_5": {
+      "active_stock_days": 533357,
+      "distinct_dates": 3656,
+      "distinct_dates_by_year": {
+        "2010": 186,
+        "2011": 249,
+        "2012": 246,
+        "2013": 248,
+        "2014": 248,
+        "2015": 246,
+        "2016": 249,
+        "2017": 246,
+        "2018": 245,
+        "2019": 248,
+        "2020": 249,
+        "2021": 247,
+        "2022": 250,
+        "2023": 248,
+        "2024": 251
+      },
+      "first_date": "2010-04-05",
+      "known_age_without_value_stock_days": 0,
+      "last_date": "2024-12-30",
+      "median_names_on_observed_date": 133.0
+    },
+    "sidecar_cross_market:exposure_iron": {
+      "active_stock_days": 260180,
+      "distinct_dates": 1462,
+      "distinct_dates_by_year": {
+        "2010": 0,
+        "2011": 0,
+        "2012": 0,
+        "2013": 0,
+        "2014": 0,
+        "2015": 0,
+        "2016": 0,
+        "2017": 0,
+        "2018": 98,
+        "2019": 248,
+        "2020": 120,
+        "2021": 247,
+        "2022": 250,
+        "2023": 248,
+        "2024": 251
+      },
+      "first_date": "2018-08-06",
+      "known_age_without_value_stock_days": 0,
+      "last_date": "2024-12-30",
+      "median_names_on_observed_date": 183.0
+    },
+    "sidecar_cross_market:exposure_iron_times_shock_1": {
+      "active_stock_days": 260180,
+      "distinct_dates": 1462,
+      "distinct_dates_by_year": {
+        "2010": 0,
+        "2011": 0,
+        "2012": 0,
+        "2013": 0,
+        "2014": 0,
+        "2015": 0,
+        "2016": 0,
+        "2017": 0,
+        "2018": 98,
+        "2019": 248,
+        "2020": 120,
+        "2021": 247,
+        "2022": 250,
+        "2023": 248,
+        "2024": 251
+      },
+      "first_date": "2018-08-06",
+      "known_age_without_value_stock_days": 0,
+      "last_date": "2024-12-30",
+      "median_names_on_observed_date": 183.0
+    },
+    "sidecar_cross_market:exposure_iron_times_shock_5": {
+      "active_stock_days": 248458,
+      "distinct_dates": 1386,
+      "distinct_dates_by_year": {
+        "2010": 0,
+        "2011": 0,
+        "2012": 0,
+        "2013": 0,
+        "2014": 0,
+        "2015": 0,
+        "2016": 0,
+        "2017": 0,
+        "2018": 98,
+        "2019": 237,
+        "2020": 68,
+        "2021": 247,
+        "2022": 246,
+        "2023": 248,
+        "2024": 242
+      },
+      "first_date": "2018-08-06",
+      "known_age_without_value_stock_days": 0,
+      "last_date": "2024-12-30",
+      "median_names_on_observed_date": 184.0
+    },
+    "sidecar_cross_market:exposure_oil": {
+      "active_stock_days": 532340,
+      "distinct_dates": 3655,
+      "distinct_dates_by_year": {
+        "2010": 185,
+        "2011": 249,
+        "2012": 246,
+        "2013": 248,
+        "2014": 248,
+        "2015": 246,
+        "2016": 249,
+        "2017": 246,
+        "2018": 245,
+        "2019": 248,
+        "2020": 249,
+        "2021": 247,
+        "2022": 250,
+        "2023": 248,
+        "2024": 251
+      },
+      "first_date": "2010-04-06",
+      "known_age_without_value_stock_days": 0,
+      "last_date": "2024-12-30",
+      "median_names_on_observed_date": 133.0
+    },
+    "sidecar_cross_market:exposure_oil_times_shock_1": {
+      "active_stock_days": 532340,
+      "distinct_dates": 3655,
+      "distinct_dates_by_year": {
+        "2010": 185,
+        "2011": 249,
+        "2012": 246,
+        "2013": 248,
+        "2014": 248,
+        "2015": 246,
+        "2016": 249,
+        "2017": 246,
+        "2018": 245,
+        "2019": 248,
+        "2020": 249,
+        "2021": 247,
+        "2022": 250,
+        "2023": 248,
+        "2024": 251
+      },
+      "first_date": "2010-04-06",
+      "known_age_without_value_stock_days": 0,
+      "last_date": "2024-12-30",
+      "median_names_on_observed_date": 133.0
+    },
+    "sidecar_cross_market:exposure_oil_times_shock_5": {
+      "active_stock_days": 532340,
+      "distinct_dates": 3655,
+      "distinct_dates_by_year": {
+        "2010": 185,
+        "2011": 249,
+        "2012": 246,
+        "2013": 248,
+        "2014": 248,
+        "2015": 246,
+        "2016": 249,
+        "2017": 246,
+        "2018": 245,
+        "2019": 248,
+        "2020": 249,
+        "2021": 247,
+        "2022": 250,
+        "2023": 248,
+        "2024": 251
+      },
+      "first_date": "2010-04-06",
+      "known_age_without_value_stock_days": 0,
+      "last_date": "2024-12-30",
+      "median_names_on_observed_date": 133.0
+    },
+    "sidecar_cross_market:exposure_rates_br": {
+      "active_stock_days": 533330,
+      "distinct_dates": 3656,
+      "distinct_dates_by_year": {
+        "2010": 186,
+        "2011": 249,
+        "2012": 246,
+        "2013": 248,
+        "2014": 248,
+        "2015": 246,
+        "2016": 249,
+        "2017": 246,
+        "2018": 245,
+        "2019": 248,
+        "2020": 249,
+        "2021": 247,
+        "2022": 250,
+        "2023": 248,
+        "2024": 251
+      },
+      "first_date": "2010-04-05",
+      "known_age_without_value_stock_days": 0,
+      "last_date": "2024-12-30",
+      "median_names_on_observed_date": 133.0
+    },
+    "sidecar_cross_market:exposure_rates_br_times_shock_1": {
+      "active_stock_days": 533099,
+      "distinct_dates": 3654,
+      "distinct_dates_by_year": {
+        "2010": 186,
+        "2011": 249,
+        "2012": 246,
+        "2013": 248,
+        "2014": 247,
+        "2015": 245,
+        "2016": 249,
+        "2017": 246,
+        "2018": 245,
+        "2019": 248,
+        "2020": 249,
+        "2021": 247,
+        "2022": 250,
+        "2023": 248,
+        "2024": 251
+      },
+      "first_date": "2010-04-05",
+      "known_age_without_value_stock_days": 0,
+      "last_date": "2024-12-30",
+      "median_names_on_observed_date": 133.0
+    },
+    "sidecar_cross_market:exposure_rates_br_times_shock_5": {
+      "active_stock_days": 533103,
+      "distinct_dates": 3654,
+      "distinct_dates_by_year": {
+        "2010": 186,
+        "2011": 249,
+        "2012": 246,
+        "2013": 248,
+        "2014": 248,
+        "2015": 244,
+        "2016": 249,
+        "2017": 246,
+        "2018": 245,
+        "2019": 248,
+        "2020": 249,
+        "2021": 247,
+        "2022": 250,
+        "2023": 248,
+        "2024": 251
+      },
+      "first_date": "2010-04-05",
+      "known_age_without_value_stock_days": 0,
+      "last_date": "2024-12-30",
+      "median_names_on_observed_date": 133.0
+    },
+    "sidecar_cross_market:exposure_rates_us": {
+      "active_stock_days": 532351,
+      "distinct_dates": 3655,
+      "distinct_dates_by_year": {
+        "2010": 185,
+        "2011": 249,
+        "2012": 246,
+        "2013": 248,
+        "2014": 248,
+        "2015": 246,
+        "2016": 249,
+        "2017": 246,
+        "2018": 245,
+        "2019": 248,
+        "2020": 249,
+        "2021": 247,
+        "2022": 250,
+        "2023": 248,
+        "2024": 251
+      },
+      "first_date": "2010-04-06",
+      "known_age_without_value_stock_days": 0,
+      "last_date": "2024-12-30",
+      "median_names_on_observed_date": 133.0
+    },
+    "sidecar_cross_market:exposure_rates_us_times_shock_1": {
+      "active_stock_days": 532351,
+      "distinct_dates": 3655,
+      "distinct_dates_by_year": {
+        "2010": 185,
+        "2011": 249,
+        "2012": 246,
+        "2013": 248,
+        "2014": 248,
+        "2015": 246,
+        "2016": 249,
+        "2017": 246,
+        "2018": 245,
+        "2019": 248,
+        "2020": 249,
+        "2021": 247,
+        "2022": 250,
+        "2023": 248,
+        "2024": 251
+      },
+      "first_date": "2010-04-06",
+      "known_age_without_value_stock_days": 0,
+      "last_date": "2024-12-30",
+      "median_names_on_observed_date": 133.0
+    },
+    "sidecar_cross_market:exposure_rates_us_times_shock_5": {
+      "active_stock_days": 532351,
+      "distinct_dates": 3655,
+      "distinct_dates_by_year": {
+        "2010": 185,
+        "2011": 249,
+        "2012": 246,
+        "2013": 248,
+        "2014": 248,
+        "2015": 246,
+        "2016": 249,
+        "2017": 246,
+        "2018": 245,
+        "2019": 248,
+        "2020": 249,
+        "2021": 247,
+        "2022": 250,
+        "2023": 248,
+        "2024": 251
+      },
+      "first_date": "2010-04-06",
+      "known_age_without_value_stock_days": 0,
+      "last_date": "2024-12-30",
+      "median_names_on_observed_date": 133.0
+    },
+    "sidecar_cross_market:exposure_vix": {
+      "active_stock_days": 532630,
+      "distinct_dates": 3655,
+      "distinct_dates_by_year": {
+        "2010": 185,
+        "2011": 249,
+        "2012": 246,
+        "2013": 248,
+        "2014": 248,
+        "2015": 246,
+        "2016": 249,
+        "2017": 246,
+        "2018": 245,
+        "2019": 248,
+        "2020": 249,
+        "2021": 247,
+        "2022": 250,
+        "2023": 248,
+        "2024": 251
+      },
+      "first_date": "2010-04-06",
+      "known_age_without_value_stock_days": 0,
+      "last_date": "2024-12-30",
+      "median_names_on_observed_date": 133.0
+    },
+    "sidecar_cross_market:exposure_vix_times_shock_1": {
+      "active_stock_days": 532630,
+      "distinct_dates": 3655,
+      "distinct_dates_by_year": {
+        "2010": 185,
+        "2011": 249,
+        "2012": 246,
+        "2013": 248,
+        "2014": 248,
+        "2015": 246,
+        "2016": 249,
+        "2017": 246,
+        "2018": 245,
+        "2019": 248,
+        "2020": 249,
+        "2021": 247,
+        "2022": 250,
+        "2023": 248,
+        "2024": 251
+      },
+      "first_date": "2010-04-06",
+      "known_age_without_value_stock_days": 0,
+      "last_date": "2024-12-30",
+      "median_names_on_observed_date": 133.0
+    },
+    "sidecar_cross_market:exposure_vix_times_shock_5": {
+      "active_stock_days": 532630,
+      "distinct_dates": 3655,
+      "distinct_dates_by_year": {
+        "2010": 185,
+        "2011": 249,
+        "2012": 246,
+        "2013": 248,
+        "2014": 248,
+        "2015": 246,
+        "2016": 249,
+        "2017": 246,
+        "2018": 245,
+        "2019": 248,
+        "2020": 249,
+        "2021": 247,
+        "2022": 250,
+        "2023": 248,
+        "2024": 251
+      },
+      "first_date": "2010-04-06",
+      "known_age_without_value_stock_days": 0,
+      "last_date": "2024-12-30",
+      "median_names_on_observed_date": 133.0
+    },
+    "sidecar_cross_market:foreign_flow_1": {
+      "active_stock_days": 118927,
+      "distinct_dates": 603,
+      "distinct_dates_by_year": {
+        "2010": 0,
+        "2011": 0,
+        "2012": 0,
+        "2013": 0,
+        "2014": 0,
+        "2015": 0,
+        "2016": 0,
+        "2017": 0,
+        "2018": 0,
+        "2019": 0,
+        "2020": 0,
+        "2021": 0,
+        "2022": 185,
+        "2023": 174,
+        "2024": 244
+      },
+      "first_date": "2022-04-05",
+      "known_age_without_value_stock_days": 0,
+      "last_date": "2024-12-30",
+      "median_names_on_observed_date": 197.0
+    },
+    "sidecar_cross_market:foreign_flow_1_times_adr_listed_flag": {
+      "active_stock_days": 118927,
+      "distinct_dates": 603,
+      "distinct_dates_by_year": {
+        "2010": 0,
+        "2011": 0,
+        "2012": 0,
+        "2013": 0,
+        "2014": 0,
+        "2015": 0,
+        "2016": 0,
+        "2017": 0,
+        "2018": 0,
+        "2019": 0,
+        "2020": 0,
+        "2021": 0,
+        "2022": 185,
+        "2023": 174,
+        "2024": 244
+      },
+      "first_date": "2022-04-05",
+      "known_age_without_value_stock_days": 0,
+      "last_date": "2024-12-30",
+      "median_names_on_observed_date": 197.0
+    },
+    "sidecar_cross_market:foreign_flow_1_times_log_volume_mean_20": {
+      "active_stock_days": 118927,
+      "distinct_dates": 603,
+      "distinct_dates_by_year": {
+        "2010": 0,
+        "2011": 0,
+        "2012": 0,
+        "2013": 0,
+        "2014": 0,
+        "2015": 0,
+        "2016": 0,
+        "2017": 0,
+        "2018": 0,
+        "2019": 0,
+        "2020": 0,
+        "2021": 0,
+        "2022": 185,
+        "2023": 174,
+        "2024": 244
+      },
+      "first_date": "2022-04-05",
+      "known_age_without_value_stock_days": 0,
+      "last_date": "2024-12-30",
+      "median_names_on_observed_date": 197.0
+    },
+    "sidecar_cross_market:foreign_flow_5": {
+      "active_stock_days": 100364,
+      "distinct_dates": 509,
+      "distinct_dates_by_year": {
+        "2010": 0,
+        "2011": 0,
+        "2012": 0,
+        "2013": 0,
+        "2014": 0,
+        "2015": 0,
+        "2016": 0,
+        "2017": 0,
+        "2018": 0,
+        "2019": 0,
+        "2020": 0,
+        "2021": 0,
+        "2022": 177,
+        "2023": 114,
+        "2024": 218
+      },
+      "first_date": "2022-04-11",
+      "known_age_without_value_stock_days": 0,
+      "last_date": "2024-12-30",
+      "median_names_on_observed_date": 197.0
+    },
+    "sidecar_cross_market:foreign_flow_5_times_adr_listed_flag": {
+      "active_stock_days": 100364,
+      "distinct_dates": 509,
+      "distinct_dates_by_year": {
+        "2010": 0,
+        "2011": 0,
+        "2012": 0,
+        "2013": 0,
+        "2014": 0,
+        "2015": 0,
+        "2016": 0,
+        "2017": 0,
+        "2018": 0,
+        "2019": 0,
+        "2020": 0,
+        "2021": 0,
+        "2022": 177,
+        "2023": 114,
+        "2024": 218
+      },
+      "first_date": "2022-04-11",
+      "known_age_without_value_stock_days": 0,
+      "last_date": "2024-12-30",
+      "median_names_on_observed_date": 197.0
+    },
+    "sidecar_cross_market:foreign_flow_5_times_log_volume_mean_20": {
+      "active_stock_days": 100364,
+      "distinct_dates": 509,
+      "distinct_dates_by_year": {
+        "2010": 0,
+        "2011": 0,
+        "2012": 0,
+        "2013": 0,
+        "2014": 0,
+        "2015": 0,
+        "2016": 0,
+        "2017": 0,
+        "2018": 0,
+        "2019": 0,
+        "2020": 0,
+        "2021": 0,
+        "2022": 177,
+        "2023": 114,
+        "2024": 218
+      },
+      "first_date": "2022-04-11",
+      "known_age_without_value_stock_days": 0,
+      "last_date": "2024-12-30",
+      "median_names_on_observed_date": 197.0
+    },
+    "sidecar_cross_market:foreign_flow_methodology_change": {
+      "active_stock_days": 135063,
+      "distinct_dates": 686,
+      "distinct_dates_by_year": {
+        "2010": 0,
+        "2011": 0,
+        "2012": 0,
+        "2013": 0,
+        "2014": 0,
+        "2015": 0,
+        "2016": 0,
+        "2017": 0,
+        "2018": 0,
+        "2019": 0,
+        "2020": 0,
+        "2021": 0,
+        "2022": 187,
+        "2023": 248,
+        "2024": 251
+      },
+      "first_date": "2022-04-04",
+      "known_age_without_value_stock_days": 0,
+      "last_date": "2024-12-30",
+      "median_names_on_observed_date": 195.0
+    },
+    "sidecar_cross_market:foreign_flow_month_reset": {
+      "active_stock_days": 135063,
+      "distinct_dates": 686,
+      "distinct_dates_by_year": {
+        "2010": 0,
+        "2011": 0,
+        "2012": 0,
+        "2013": 0,
+        "2014": 0,
+        "2015": 0,
+        "2016": 0,
+        "2017": 0,
+        "2018": 0,
+        "2019": 0,
+        "2020": 0,
+        "2021": 0,
+        "2022": 187,
+        "2023": 248,
+        "2024": 251
+      },
+      "first_date": "2022-04-04",
+      "known_age_without_value_stock_days": 0,
+      "last_date": "2024-12-30",
+      "median_names_on_observed_date": 195.0
+    },
+    "sidecar_cross_market:shock_ewz_1": {
+      "active_stock_days": 568567,
+      "distinct_dates": 3715,
+      "distinct_dates_by_year": {
+        "2010": 245,
+        "2011": 249,
+        "2012": 246,
+        "2013": 248,
+        "2014": 248,
+        "2015": 246,
+        "2016": 249,
+        "2017": 246,
+        "2018": 245,
+        "2019": 248,
+        "2020": 249,
+        "2021": 247,
+        "2022": 250,
+        "2023": 248,
+        "2024": 251
+      },
+      "first_date": "2010-01-06",
+      "known_age_without_value_stock_days": 0,
+      "last_date": "2024-12-30",
+      "median_names_on_observed_date": 139.0
+    },
+    "sidecar_cross_market:shock_ewz_5": {
+      "active_stock_days": 568064,
+      "distinct_dates": 3711,
+      "distinct_dates_by_year": {
+        "2010": 241,
+        "2011": 249,
+        "2012": 246,
+        "2013": 248,
+        "2014": 248,
+        "2015": 246,
+        "2016": 249,
+        "2017": 246,
+        "2018": 245,
+        "2019": 248,
+        "2020": 249,
+        "2021": 247,
+        "2022": 250,
+        "2023": 248,
+        "2024": 251
+      },
+      "first_date": "2010-01-12",
+      "known_age_without_value_stock_days": 0,
+      "last_date": "2024-12-30",
+      "median_names_on_observed_date": 139.0
+    },
+    "sidecar_cross_market:shock_fx_1": {
+      "active_stock_days": 568567,
+      "distinct_dates": 3715,
+      "distinct_dates_by_year": {
+        "2010": 245,
+        "2011": 249,
+        "2012": 246,
+        "2013": 248,
+        "2014": 248,
+        "2015": 246,
+        "2016": 249,
+        "2017": 246,
+        "2018": 245,
+        "2019": 248,
+        "2020": 249,
+        "2021": 247,
+        "2022": 250,
+        "2023": 248,
+        "2024": 251
+      },
+      "first_date": "2010-01-06",
+      "known_age_without_value_stock_days": 0,
+      "last_date": "2024-12-30",
+      "median_names_on_observed_date": 139.0
+    },
+    "sidecar_cross_market:shock_fx_5": {
+      "active_stock_days": 568064,
+      "distinct_dates": 3711,
+      "distinct_dates_by_year": {
+        "2010": 241,
+        "2011": 249,
+        "2012": 246,
+        "2013": 248,
+        "2014": 248,
+        "2015": 246,
+        "2016": 249,
+        "2017": 246,
+        "2018": 245,
+        "2019": 248,
+        "2020": 249,
+        "2021": 247,
+        "2022": 250,
+        "2023": 248,
+        "2024": 251
+      },
+      "first_date": "2010-01-12",
+      "known_age_without_value_stock_days": 0,
+      "last_date": "2024-12-30",
+      "median_names_on_observed_date": 139.0
+    },
+    "sidecar_cross_market:shock_hrc_1": {
+      "active_stock_days": 432105,
+      "distinct_dates": 2672,
+      "distinct_dates_by_year": {
+        "2010": 0,
+        "2011": 0,
+        "2012": 0,
+        "2013": 0,
+        "2014": 193,
+        "2015": 246,
+        "2016": 249,
+        "2017": 246,
+        "2018": 245,
+        "2019": 248,
+        "2020": 249,
+        "2021": 247,
+        "2022": 250,
+        "2023": 248,
+        "2024": 251
+      },
+      "first_date": "2014-03-24",
+      "known_age_without_value_stock_days": 0,
+      "last_date": "2024-12-30",
+      "median_names_on_observed_date": 153.0
+    },
+    "sidecar_cross_market:shock_hrc_5": {
+      "active_stock_days": 428874,
+      "distinct_dates": 2648,
+      "distinct_dates_by_year": {
+        "2010": 0,
+        "2011": 0,
+        "2012": 0,
+        "2013": 0,
+        "2014": 169,
+        "2015": 246,
+        "2016": 249,
+        "2017": 246,
+        "2018": 245,
+        "2019": 248,
+        "2020": 249,
+        "2021": 247,
+        "2022": 250,
+        "2023": 248,
+        "2024": 251
+      },
+      "first_date": "2014-03-28",
+      "known_age_without_value_stock_days": 0,
+      "last_date": "2024-12-30",
+      "median_names_on_observed_date": 153.0
+    },
+    "sidecar_cross_market:shock_iron_1": {
+      "active_stock_days": 307592,
+      "distinct_dates": 1653,
+      "distinct_dates_by_year": {
+        "2010": 0,
+        "2011": 0,
+        "2012": 0,
+        "2013": 0,
+        "2014": 0,
+        "2015": 0,
+        "2016": 0,
+        "2017": 0,
+        "2018": 160,
+        "2019": 248,
+        "2020": 249,
+        "2021": 247,
+        "2022": 250,
+        "2023": 248,
+        "2024": 251
+      },
+      "first_date": "2018-05-08",
+      "known_age_without_value_stock_days": 0,
+      "last_date": "2024-12-30",
+      "median_names_on_observed_date": 189.0
+    },
+    "sidecar_cross_market:shock_iron_5": {
+      "active_stock_days": 281712,
+      "distinct_dates": 1502,
+      "distinct_dates_by_year": {
+        "2010": 0,
+        "2011": 0,
+        "2012": 0,
+        "2013": 0,
+        "2014": 0,
+        "2015": 0,
+        "2016": 0,
+        "2017": 0,
+        "2018": 152,
+        "2019": 237,
+        "2020": 130,
+        "2021": 247,
+        "2022": 246,
+        "2023": 248,
+        "2024": 242
+      },
+      "first_date": "2018-05-14",
+      "known_age_without_value_stock_days": 0,
+      "last_date": "2024-12-30",
+      "median_names_on_observed_date": 191.0
+    },
+    "sidecar_cross_market:shock_oil_1": {
+      "active_stock_days": 568567,
+      "distinct_dates": 3715,
+      "distinct_dates_by_year": {
+        "2010": 245,
+        "2011": 249,
+        "2012": 246,
+        "2013": 248,
+        "2014": 248,
+        "2015": 246,
+        "2016": 249,
+        "2017": 246,
+        "2018": 245,
+        "2019": 248,
+        "2020": 249,
+        "2021": 247,
+        "2022": 250,
+        "2023": 248,
+        "2024": 251
+      },
+      "first_date": "2010-01-06",
+      "known_age_without_value_stock_days": 0,
+      "last_date": "2024-12-30",
+      "median_names_on_observed_date": 139.0
+    },
+    "sidecar_cross_market:shock_oil_5": {
+      "active_stock_days": 568064,
+      "distinct_dates": 3711,
+      "distinct_dates_by_year": {
+        "2010": 241,
+        "2011": 249,
+        "2012": 246,
+        "2013": 248,
+        "2014": 248,
+        "2015": 246,
+        "2016": 249,
+        "2017": 246,
+        "2018": 245,
+        "2019": 248,
+        "2020": 249,
+        "2021": 247,
+        "2022": 250,
+        "2023": 248,
+        "2024": 251
+      },
+      "first_date": "2010-01-12",
+      "known_age_without_value_stock_days": 0,
+      "last_date": "2024-12-30",
+      "median_names_on_observed_date": 139.0
+    },
+    "sidecar_cross_market:shock_pulp_1": {
+      "active_stock_days": 288197,
+      "distinct_dates": 1514,
+      "distinct_dates_by_year": {
+        "2010": 0,
+        "2011": 0,
+        "2012": 0,
+        "2013": 0,
+        "2014": 0,
+        "2015": 0,
+        "2016": 0,
+        "2017": 0,
+        "2018": 21,
+        "2019": 248,
+        "2020": 249,
+        "2021": 247,
+        "2022": 250,
+        "2023": 248,
+        "2024": 251
+      },
+      "first_date": "2018-11-28",
+      "known_age_without_value_stock_days": 0,
+      "last_date": "2024-12-30",
+      "median_names_on_observed_date": 191.0
+    },
+    "sidecar_cross_market:shock_pulp_5": {
+      "active_stock_days": 287609,
+      "distinct_dates": 1510,
+      "distinct_dates_by_year": {
+        "2010": 0,
+        "2011": 0,
+        "2012": 0,
+        "2013": 0,
+        "2014": 0,
+        "2015": 0,
+        "2016": 0,
+        "2017": 0,
+        "2018": 17,
+        "2019": 248,
+        "2020": 249,
+        "2021": 247,
+        "2022": 250,
+        "2023": 248,
+        "2024": 251
+      },
+      "first_date": "2018-12-04",
+      "known_age_without_value_stock_days": 0,
+      "last_date": "2024-12-30",
+      "median_names_on_observed_date": 191.0
+    },
+    "sidecar_cross_market:shock_rates_br_1080_1": {
+      "active_stock_days": 568452,
+      "distinct_dates": 3714,
+      "distinct_dates_by_year": {
+        "2010": 245,
+        "2011": 249,
+        "2012": 246,
+        "2013": 248,
+        "2014": 248,
+        "2015": 245,
+        "2016": 249,
+        "2017": 246,
+        "2018": 245,
+        "2019": 248,
+        "2020": 249,
+        "2021": 247,
+        "2022": 250,
+        "2023": 248,
+        "2024": 251
+      },
+      "first_date": "2010-01-06",
+      "known_age_without_value_stock_days": 0,
+      "last_date": "2024-12-30",
+      "median_names_on_observed_date": 139.0
+    },
+    "sidecar_cross_market:shock_rates_br_1080_5": {
+      "active_stock_days": 567951,
+      "distinct_dates": 3710,
+      "distinct_dates_by_year": {
+        "2010": 241,
+        "2011": 249,
+        "2012": 246,
+        "2013": 248,
+        "2014": 248,
+        "2015": 245,
+        "2016": 249,
+        "2017": 246,
+        "2018": 245,
+        "2019": 248,
+        "2020": 249,
+        "2021": 247,
+        "2022": 250,
+        "2023": 248,
+        "2024": 251
+      },
+      "first_date": "2010-01-12",
+      "known_age_without_value_stock_days": 0,
+      "last_date": "2024-12-30",
+      "median_names_on_observed_date": 139.0
+    },
+    "sidecar_cross_market:shock_rates_br_180_1": {
+      "active_stock_days": 568452,
+      "distinct_dates": 3714,
+      "distinct_dates_by_year": {
+        "2010": 245,
+        "2011": 249,
+        "2012": 246,
+        "2013": 248,
+        "2014": 248,
+        "2015": 245,
+        "2016": 249,
+        "2017": 246,
+        "2018": 245,
+        "2019": 248,
+        "2020": 249,
+        "2021": 247,
+        "2022": 250,
+        "2023": 248,
+        "2024": 251
+      },
+      "first_date": "2010-01-06",
+      "known_age_without_value_stock_days": 0,
+      "last_date": "2024-12-30",
+      "median_names_on_observed_date": 139.0
+    },
+    "sidecar_cross_market:shock_rates_br_180_5": {
+      "active_stock_days": 567951,
+      "distinct_dates": 3710,
+      "distinct_dates_by_year": {
+        "2010": 241,
+        "2011": 249,
+        "2012": 246,
+        "2013": 248,
+        "2014": 248,
+        "2015": 245,
+        "2016": 249,
+        "2017": 246,
+        "2018": 245,
+        "2019": 248,
+        "2020": 249,
+        "2021": 247,
+        "2022": 250,
+        "2023": 248,
+        "2024": 251
+      },
+      "first_date": "2010-01-12",
+      "known_age_without_value_stock_days": 0,
+      "last_date": "2024-12-30",
+      "median_names_on_observed_date": 139.0
+    },
+    "sidecar_cross_market:shock_rates_br_30_1": {
+      "active_stock_days": 568452,
+      "distinct_dates": 3714,
+      "distinct_dates_by_year": {
+        "2010": 245,
+        "2011": 249,
+        "2012": 246,
+        "2013": 248,
+        "2014": 248,
+        "2015": 245,
+        "2016": 249,
+        "2017": 246,
+        "2018": 245,
+        "2019": 248,
+        "2020": 249,
+        "2021": 247,
+        "2022": 250,
+        "2023": 248,
+        "2024": 251
+      },
+      "first_date": "2010-01-06",
+      "known_age_without_value_stock_days": 0,
+      "last_date": "2024-12-30",
+      "median_names_on_observed_date": 139.0
+    },
+    "sidecar_cross_market:shock_rates_br_30_5": {
+      "active_stock_days": 567951,
+      "distinct_dates": 3710,
+      "distinct_dates_by_year": {
+        "2010": 241,
+        "2011": 249,
+        "2012": 246,
+        "2013": 248,
+        "2014": 248,
+        "2015": 245,
+        "2016": 249,
+        "2017": 246,
+        "2018": 245,
+        "2019": 248,
+        "2020": 249,
+        "2021": 247,
+        "2022": 250,
+        "2023": 248,
+        "2024": 251
+      },
+      "first_date": "2010-01-12",
+      "known_age_without_value_stock_days": 0,
+      "last_date": "2024-12-30",
+      "median_names_on_observed_date": 139.0
+    },
+    "sidecar_cross_market:shock_rates_br_360_1": {
+      "active_stock_days": 568331,
+      "distinct_dates": 3713,
+      "distinct_dates_by_year": {
+        "2010": 245,
+        "2011": 249,
+        "2012": 246,
+        "2013": 248,
+        "2014": 247,
+        "2015": 245,
+        "2016": 249,
+        "2017": 246,
+        "2018": 245,
+        "2019": 248,
+        "2020": 249,
+        "2021": 247,
+        "2022": 250,
+        "2023": 248,
+        "2024": 251
+      },
+      "first_date": "2010-01-06",
+      "known_age_without_value_stock_days": 0,
+      "last_date": "2024-12-30",
+      "median_names_on_observed_date": 139.0
+    },
+    "sidecar_cross_market:shock_rates_br_360_5": {
+      "active_stock_days": 567832,
+      "distinct_dates": 3709,
+      "distinct_dates_by_year": {
+        "2010": 241,
+        "2011": 249,
+        "2012": 246,
+        "2013": 248,
+        "2014": 248,
+        "2015": 244,
+        "2016": 249,
+        "2017": 246,
+        "2018": 245,
+        "2019": 248,
+        "2020": 249,
+        "2021": 247,
+        "2022": 250,
+        "2023": 248,
+        "2024": 251
+      },
+      "first_date": "2010-01-12",
+      "known_age_without_value_stock_days": 0,
+      "last_date": "2024-12-30",
+      "median_names_on_observed_date": 139.0
+    },
+    "sidecar_cross_market:shock_rates_br_720_1": {
+      "active_stock_days": 568452,
+      "distinct_dates": 3714,
+      "distinct_dates_by_year": {
+        "2010": 245,
+        "2011": 249,
+        "2012": 246,
+        "2013": 248,
+        "2014": 248,
+        "2015": 245,
+        "2016": 249,
+        "2017": 246,
+        "2018": 245,
+        "2019": 248,
+        "2020": 249,
+        "2021": 247,
+        "2022": 250,
+        "2023": 248,
+        "2024": 251
+      },
+      "first_date": "2010-01-06",
+      "known_age_without_value_stock_days": 0,
+      "last_date": "2024-12-30",
+      "median_names_on_observed_date": 139.0
+    },
+    "sidecar_cross_market:shock_rates_br_720_5": {
+      "active_stock_days": 567951,
+      "distinct_dates": 3710,
+      "distinct_dates_by_year": {
+        "2010": 241,
+        "2011": 249,
+        "2012": 246,
+        "2013": 248,
+        "2014": 248,
+        "2015": 245,
+        "2016": 249,
+        "2017": 246,
+        "2018": 245,
+        "2019": 248,
+        "2020": 249,
+        "2021": 247,
+        "2022": 250,
+        "2023": 248,
+        "2024": 251
+      },
+      "first_date": "2010-01-12",
+      "known_age_without_value_stock_days": 0,
+      "last_date": "2024-12-30",
+      "median_names_on_observed_date": 139.0
+    },
+    "sidecar_cross_market:shock_rates_br_90_1": {
+      "active_stock_days": 568200,
+      "distinct_dates": 3712,
+      "distinct_dates_by_year": {
+        "2010": 245,
+        "2011": 249,
+        "2012": 245,
+        "2013": 248,
+        "2014": 247,
+        "2015": 245,
+        "2016": 249,
+        "2017": 246,
+        "2018": 245,
+        "2019": 248,
+        "2020": 249,
+        "2021": 247,
+        "2022": 250,
+        "2023": 248,
+        "2024": 251
+      },
+      "first_date": "2010-01-06",
+      "known_age_without_value_stock_days": 0,
+      "last_date": "2024-12-30",
+      "median_names_on_observed_date": 139.0
+    },
+    "sidecar_cross_market:shock_rates_br_90_5": {
+      "active_stock_days": 567702,
+      "distinct_dates": 3708,
+      "distinct_dates_by_year": {
+        "2010": 241,
+        "2011": 249,
+        "2012": 245,
+        "2013": 248,
+        "2014": 248,
+        "2015": 244,
+        "2016": 249,
+        "2017": 246,
+        "2018": 245,
+        "2019": 248,
+        "2020": 249,
+        "2021": 247,
+        "2022": 250,
+        "2023": 248,
+        "2024": 251
+      },
+      "first_date": "2010-01-12",
+      "known_age_without_value_stock_days": 0,
+      "last_date": "2024-12-30",
+      "median_names_on_observed_date": 139.0
+    },
+    "sidecar_cross_market:shock_rates_us_10y_1": {
+      "active_stock_days": 568567,
+      "distinct_dates": 3715,
+      "distinct_dates_by_year": {
+        "2010": 245,
+        "2011": 249,
+        "2012": 246,
+        "2013": 248,
+        "2014": 248,
+        "2015": 246,
+        "2016": 249,
+        "2017": 246,
+        "2018": 245,
+        "2019": 248,
+        "2020": 249,
+        "2021": 247,
+        "2022": 250,
+        "2023": 248,
+        "2024": 251
+      },
+      "first_date": "2010-01-06",
+      "known_age_without_value_stock_days": 0,
+      "last_date": "2024-12-30",
+      "median_names_on_observed_date": 139.0
+    },
+    "sidecar_cross_market:shock_rates_us_10y_5": {
+      "active_stock_days": 568064,
+      "distinct_dates": 3711,
+      "distinct_dates_by_year": {
+        "2010": 241,
+        "2011": 249,
+        "2012": 246,
+        "2013": 248,
+        "2014": 248,
+        "2015": 246,
+        "2016": 249,
+        "2017": 246,
+        "2018": 245,
+        "2019": 248,
+        "2020": 249,
+        "2021": 247,
+        "2022": 250,
+        "2023": 248,
+        "2024": 251
+      },
+      "first_date": "2010-01-12",
+      "known_age_without_value_stock_days": 0,
+      "last_date": "2024-12-30",
+      "median_names_on_observed_date": 139.0
+    },
+    "sidecar_cross_market:shock_rates_us_2y_1": {
+      "active_stock_days": 568567,
+      "distinct_dates": 3715,
+      "distinct_dates_by_year": {
+        "2010": 245,
+        "2011": 249,
+        "2012": 246,
+        "2013": 248,
+        "2014": 248,
+        "2015": 246,
+        "2016": 249,
+        "2017": 246,
+        "2018": 245,
+        "2019": 248,
+        "2020": 249,
+        "2021": 247,
+        "2022": 250,
+        "2023": 248,
+        "2024": 251
+      },
+      "first_date": "2010-01-06",
+      "known_age_without_value_stock_days": 0,
+      "last_date": "2024-12-30",
+      "median_names_on_observed_date": 139.0
+    },
+    "sidecar_cross_market:shock_rates_us_2y_5": {
+      "active_stock_days": 568064,
+      "distinct_dates": 3711,
+      "distinct_dates_by_year": {
+        "2010": 241,
+        "2011": 249,
+        "2012": 246,
+        "2013": 248,
+        "2014": 248,
+        "2015": 246,
+        "2016": 249,
+        "2017": 246,
+        "2018": 245,
+        "2019": 248,
+        "2020": 249,
+        "2021": 247,
+        "2022": 250,
+        "2023": 248,
+        "2024": 251
+      },
+      "first_date": "2010-01-12",
+      "known_age_without_value_stock_days": 0,
+      "last_date": "2024-12-30",
+      "median_names_on_observed_date": 139.0
+    },
+    "sidecar_cross_market:shock_rates_us_3m_1": {
+      "active_stock_days": 568567,
+      "distinct_dates": 3715,
+      "distinct_dates_by_year": {
+        "2010": 245,
+        "2011": 249,
+        "2012": 246,
+        "2013": 248,
+        "2014": 248,
+        "2015": 246,
+        "2016": 249,
+        "2017": 246,
+        "2018": 245,
+        "2019": 248,
+        "2020": 249,
+        "2021": 247,
+        "2022": 250,
+        "2023": 248,
+        "2024": 251
+      },
+      "first_date": "2010-01-06",
+      "known_age_without_value_stock_days": 0,
+      "last_date": "2024-12-30",
+      "median_names_on_observed_date": 139.0
+    },
+    "sidecar_cross_market:shock_rates_us_3m_5": {
+      "active_stock_days": 568064,
+      "distinct_dates": 3711,
+      "distinct_dates_by_year": {
+        "2010": 241,
+        "2011": 249,
+        "2012": 246,
+        "2013": 248,
+        "2014": 248,
+        "2015": 246,
+        "2016": 249,
+        "2017": 246,
+        "2018": 245,
+        "2019": 248,
+        "2020": 249,
+        "2021": 247,
+        "2022": 250,
+        "2023": 248,
+        "2024": 251
+      },
+      "first_date": "2010-01-12",
+      "known_age_without_value_stock_days": 0,
+      "last_date": "2024-12-30",
+      "median_names_on_observed_date": 139.0
+    },
+    "sidecar_cross_market:shock_rates_us_5y_1": {
+      "active_stock_days": 568567,
+      "distinct_dates": 3715,
+      "distinct_dates_by_year": {
+        "2010": 245,
+        "2011": 249,
+        "2012": 246,
+        "2013": 248,
+        "2014": 248,
+        "2015": 246,
+        "2016": 249,
+        "2017": 246,
+        "2018": 245,
+        "2019": 248,
+        "2020": 249,
+        "2021": 247,
+        "2022": 250,
+        "2023": 248,
+        "2024": 251
+      },
+      "first_date": "2010-01-06",
+      "known_age_without_value_stock_days": 0,
+      "last_date": "2024-12-30",
+      "median_names_on_observed_date": 139.0
+    },
+    "sidecar_cross_market:shock_rates_us_5y_5": {
+      "active_stock_days": 568064,
+      "distinct_dates": 3711,
+      "distinct_dates_by_year": {
+        "2010": 241,
+        "2011": 249,
+        "2012": 246,
+        "2013": 248,
+        "2014": 248,
+        "2015": 246,
+        "2016": 249,
+        "2017": 246,
+        "2018": 245,
+        "2019": 248,
+        "2020": 249,
+        "2021": 247,
+        "2022": 250,
+        "2023": 248,
+        "2024": 251
+      },
+      "first_date": "2010-01-12",
+      "known_age_without_value_stock_days": 0,
+      "last_date": "2024-12-30",
+      "median_names_on_observed_date": 139.0
+    },
+    "sidecar_cross_market:shock_rebar_1": {
+      "active_stock_days": 474083,
+      "distinct_dates": 2972,
+      "distinct_dates_by_year": {
+        "2010": 0,
+        "2011": 0,
+        "2012": 0,
+        "2013": 245,
+        "2014": 248,
+        "2015": 246,
+        "2016": 249,
+        "2017": 246,
+        "2018": 245,
+        "2019": 248,
+        "2020": 249,
+        "2021": 247,
+        "2022": 250,
+        "2023": 248,
+        "2024": 251
+      },
+      "first_date": "2013-01-07",
+      "known_age_without_value_stock_days": 0,
+      "last_date": "2024-12-30",
+      "median_names_on_observed_date": 145.0
+    },
+    "sidecar_cross_market:shock_rebar_5": {
+      "active_stock_days": 466355,
+      "distinct_dates": 2916,
+      "distinct_dates_by_year": {
+        "2010": 0,
+        "2011": 0,
+        "2012": 0,
+        "2013": 217,
+        "2014": 220,
+        "2015": 246,
+        "2016": 249,
+        "2017": 246,
+        "2018": 245,
+        "2019": 248,
+        "2020": 249,
+        "2021": 247,
+        "2022": 250,
+        "2023": 248,
+        "2024": 251
+      },
+      "first_date": "2013-01-11",
+      "known_age_without_value_stock_days": 0,
+      "last_date": "2024-12-30",
+      "median_names_on_observed_date": 146.0
+    },
+    "sidecar_cross_market:shock_vix_1": {
+      "active_stock_days": 568567,
+      "distinct_dates": 3715,
+      "distinct_dates_by_year": {
+        "2010": 245,
+        "2011": 249,
+        "2012": 246,
+        "2013": 248,
+        "2014": 248,
+        "2015": 246,
+        "2016": 249,
+        "2017": 246,
+        "2018": 245,
+        "2019": 248,
+        "2020": 249,
+        "2021": 247,
+        "2022": 250,
+        "2023": 248,
+        "2024": 251
+      },
+      "first_date": "2010-01-06",
+      "known_age_without_value_stock_days": 0,
+      "last_date": "2024-12-30",
+      "median_names_on_observed_date": 139.0
+    },
+    "sidecar_cross_market:shock_vix_5": {
+      "active_stock_days": 568064,
+      "distinct_dates": 3711,
+      "distinct_dates_by_year": {
+        "2010": 241,
+        "2011": 249,
+        "2012": 246,
+        "2013": 248,
+        "2014": 248,
+        "2015": 246,
+        "2016": 249,
+        "2017": 246,
+        "2018": 245,
+        "2019": 248,
+        "2020": 249,
+        "2021": 247,
+        "2022": 250,
+        "2023": 248,
+        "2024": 251
+      },
+      "first_date": "2010-01-12",
+      "known_age_without_value_stock_days": 0,
+      "last_date": "2024-12-30",
+      "median_names_on_observed_date": 139.0
+    },
+    "sidecar_events:dividend_announcement_age": {
+      "active_stock_days": 282532,
+      "distinct_dates": 3669,
+      "distinct_dates_by_year": {
+        "2010": 199,
+        "2011": 249,
+        "2012": 246,
+        "2013": 248,
+        "2014": 248,
+        "2015": 246,
+        "2016": 249,
+        "2017": 246,
+        "2018": 245,
+        "2019": 248,
+        "2020": 249,
+        "2021": 247,
+        "2022": 250,
+        "2023": 248,
+        "2024": 251
+      },
+      "first_date": "2010-03-16",
+      "known_age_without_value_stock_days": 0,
+      "last_date": "2024-12-30",
+      "median_names_on_observed_date": 37.0
+    },
+    "sidecar_events:filing_is_dfp": {
+      "active_stock_days": 310858,
+      "distinct_dates": 3671,
+      "distinct_dates_by_year": {
+        "2010": 201,
+        "2011": 249,
+        "2012": 246,
+        "2013": 248,
+        "2014": 248,
+        "2015": 246,
+        "2016": 249,
+        "2017": 246,
+        "2018": 245,
+        "2019": 248,
+        "2020": 249,
+        "2021": 247,
+        "2022": 250,
+        "2023": 248,
+        "2024": 251
+      },
+      "first_date": "2010-03-12",
+      "known_age_without_value_stock_days": 0,
+      "last_date": "2024-12-30",
+      "median_names_on_observed_date": 40.0
+    },
+    "sidecar_events:material_fact_count_20": {
+      "active_stock_days": 310858,
+      "distinct_dates": 3671,
+      "distinct_dates_by_year": {
+        "2010": 201,
+        "2011": 249,
+        "2012": 246,
+        "2013": 248,
+        "2014": 248,
+        "2015": 246,
+        "2016": 249,
+        "2017": 246,
+        "2018": 245,
+        "2019": 248,
+        "2020": 249,
+        "2021": 247,
+        "2022": 250,
+        "2023": 248,
+        "2024": 251
+      },
+      "first_date": "2010-03-12",
+      "known_age_without_value_stock_days": 0,
+      "last_date": "2024-12-30",
+      "median_names_on_observed_date": 40.0
+    },
+    "sidecar_events:offering_or_buyback_flag": {
+      "active_stock_days": 310858,
+      "distinct_dates": 3671,
+      "distinct_dates_by_year": {
+        "2010": 201,
+        "2011": 249,
+        "2012": 246,
+        "2013": 248,
+        "2014": 248,
+        "2015": 246,
+        "2016": 249,
+        "2017": 246,
+        "2018": 245,
+        "2019": 248,
+        "2020": 249,
+        "2021": 247,
+        "2022": 250,
+        "2023": 248,
+        "2024": 251
+      },
+      "first_date": "2010-03-12",
+      "known_age_without_value_stock_days": 0,
+      "last_date": "2024-12-30",
+      "median_names_on_observed_date": 40.0
+    },
+    "sidecar_events:sessions_since_financial_filing": {
+      "active_stock_days": 310858,
+      "distinct_dates": 3671,
+      "distinct_dates_by_year": {
+        "2010": 201,
+        "2011": 249,
+        "2012": 246,
+        "2013": 248,
+        "2014": 248,
+        "2015": 246,
+        "2016": 249,
+        "2017": 246,
+        "2018": 245,
+        "2019": 248,
+        "2020": 249,
+        "2021": 247,
+        "2022": 250,
+        "2023": 248,
+        "2024": 251
+      },
+      "first_date": "2010-03-12",
+      "known_age_without_value_stock_days": 0,
+      "last_date": "2024-12-30",
+      "median_names_on_observed_date": 40.0
+    },
+    "sidecar_events:sessions_since_material_fact": {
+      "active_stock_days": 309367,
+      "distinct_dates": 3671,
+      "distinct_dates_by_year": {
+        "2010": 201,
+        "2011": 249,
+        "2012": 246,
+        "2013": 248,
+        "2014": 248,
+        "2015": 246,
+        "2016": 249,
+        "2017": 246,
+        "2018": 245,
+        "2019": 248,
+        "2020": 249,
+        "2021": 247,
+        "2022": 250,
+        "2023": 248,
+        "2024": 251
+      },
+      "first_date": "2010-03-12",
+      "known_age_without_value_stock_days": 0,
+      "last_date": "2024-12-30",
+      "median_names_on_observed_date": 40.0
+    },
+    "sidecar_events:sessions_until_expected_filing": {
+      "active_stock_days": 298053,
+      "distinct_dates": 3266,
+      "distinct_dates_by_year": {
+        "2010": 0,
+        "2011": 45,
+        "2012": 246,
+        "2013": 248,
+        "2014": 248,
+        "2015": 246,
+        "2016": 249,
+        "2017": 246,
+        "2018": 245,
+        "2019": 248,
+        "2020": 249,
+        "2021": 247,
+        "2022": 250,
+        "2023": 248,
+        "2024": 251
+      },
+      "first_date": "2011-10-26",
+      "known_age_without_value_stock_days": 0,
+      "last_date": "2024-12-30",
+      "median_names_on_observed_date": 94.0
+    },
+    "sidecar_fundamentals:accruals_to_assets": {
+      "active_stock_days": 266625,
+      "distinct_dates": 3200,
+      "distinct_dates_by_year": {
+        "2010": 0,
+        "2011": 0,
+        "2012": 225,
+        "2013": 248,
+        "2014": 248,
+        "2015": 246,
+        "2016": 249,
+        "2017": 246,
+        "2018": 245,
+        "2019": 248,
+        "2020": 249,
+        "2021": 247,
+        "2022": 250,
+        "2023": 248,
+        "2024": 251
+      },
+      "first_date": "2012-02-01",
+      "known_age_without_value_stock_days": 0,
+      "last_date": "2024-12-30",
+      "median_names_on_observed_date": 89.0
+    },
+    "sidecar_fundamentals:book_to_market": {
+      "active_stock_days": 140369,
+      "distinct_dates": 3450,
+      "distinct_dates_by_year": {
+        "2010": 0,
+        "2011": 229,
+        "2012": 246,
+        "2013": 248,
+        "2014": 248,
+        "2015": 246,
+        "2016": 249,
+        "2017": 246,
+        "2018": 245,
+        "2019": 248,
+        "2020": 249,
+        "2021": 247,
+        "2022": 250,
+        "2023": 248,
+        "2024": 251
+      },
+      "first_date": "2011-02-01",
+      "known_age_without_value_stock_days": 163828,
+      "last_date": "2024-12-30",
+      "median_names_on_observed_date": 23.0
+    },
+    "sidecar_fundamentals:earnings_negative_flag": {
+      "active_stock_days": 303410,
+      "distinct_dates": 3450,
+      "distinct_dates_by_year": {
+        "2010": 0,
+        "2011": 229,
+        "2012": 246,
+        "2013": 248,
+        "2014": 248,
+        "2015": 246,
+        "2016": 249,
+        "2017": 246,
+        "2018": 245,
+        "2019": 248,
+        "2020": 249,
+        "2021": 247,
+        "2022": 250,
+        "2023": 248,
+        "2024": 251
+      },
+      "first_date": "2011-02-01",
+      "known_age_without_value_stock_days": 0,
+      "last_date": "2024-12-30",
+      "median_names_on_observed_date": 43.0
+    },
+    "sidecar_fundamentals:earnings_yield_ttm": {
+      "active_stock_days": 139853,
+      "distinct_dates": 3450,
+      "distinct_dates_by_year": {
+        "2010": 0,
+        "2011": 229,
+        "2012": 246,
+        "2013": 248,
+        "2014": 248,
+        "2015": 246,
+        "2016": 249,
+        "2017": 246,
+        "2018": 245,
+        "2019": 248,
+        "2020": 249,
+        "2021": 247,
+        "2022": 250,
+        "2023": 248,
+        "2024": 251
+      },
+      "first_date": "2011-02-01",
+      "known_age_without_value_stock_days": 164344,
+      "last_date": "2024-12-30",
+      "median_names_on_observed_date": 23.0
+    },
+    "sidecar_fundamentals:fundamental_consolidated_flag": {
+      "active_stock_days": 304197,
+      "distinct_dates": 3450,
+      "distinct_dates_by_year": {
+        "2010": 0,
+        "2011": 229,
+        "2012": 246,
+        "2013": 248,
+        "2014": 248,
+        "2015": 246,
+        "2016": 249,
+        "2017": 246,
+        "2018": 245,
+        "2019": 248,
+        "2020": 249,
+        "2021": 247,
+        "2022": 250,
+        "2023": 248,
+        "2024": 251
+      },
+      "first_date": "2011-02-01",
+      "known_age_without_value_stock_days": 0,
+      "last_date": "2024-12-30",
+      "median_names_on_observed_date": 43.0
+    },
+    "sidecar_fundamentals:fundamental_financial_flag": {
+      "active_stock_days": 304197,
+      "distinct_dates": 3450,
+      "distinct_dates_by_year": {
+        "2010": 0,
+        "2011": 229,
+        "2012": 246,
+        "2013": 248,
+        "2014": 248,
+        "2015": 246,
+        "2016": 249,
+        "2017": 246,
+        "2018": 245,
+        "2019": 248,
+        "2020": 249,
+        "2021": 247,
+        "2022": 250,
+        "2023": 248,
+        "2024": 251
+      },
+      "first_date": "2011-02-01",
+      "known_age_without_value_stock_days": 0,
+      "last_date": "2024-12-30",
+      "median_names_on_observed_date": 43.0
+    },
+    "sidecar_fundamentals:gross_profitability": {
+      "active_stock_days": 289711,
+      "distinct_dates": 3450,
+      "distinct_dates_by_year": {
+        "2010": 0,
+        "2011": 229,
+        "2012": 246,
+        "2013": 248,
+        "2014": 248,
+        "2015": 246,
+        "2016": 249,
+        "2017": 246,
+        "2018": 245,
+        "2019": 248,
+        "2020": 249,
+        "2021": 247,
+        "2022": 250,
+        "2023": 248,
+        "2024": 251
+      },
+      "first_date": "2011-02-01",
+      "known_age_without_value_stock_days": 13335,
+      "last_date": "2024-12-30",
+      "median_names_on_observed_date": 41.0
+    },
+    "sidecar_fundamentals:incomplete_latest_statement_flag": {
+      "active_stock_days": 304197,
+      "distinct_dates": 3450,
+      "distinct_dates_by_year": {
+        "2010": 0,
+        "2011": 229,
+        "2012": 246,
+        "2013": 248,
+        "2014": 248,
+        "2015": 246,
+        "2016": 249,
+        "2017": 246,
+        "2018": 245,
+        "2019": 248,
+        "2020": 249,
+        "2021": 247,
+        "2022": 250,
+        "2023": 248,
+        "2024": 251
+      },
+      "first_date": "2011-02-01",
+      "known_age_without_value_stock_days": 0,
+      "last_date": "2024-12-30",
+      "median_names_on_observed_date": 43.0
+    },
+    "sidecar_fundamentals:liabilities_to_assets": {
+      "active_stock_days": 304197,
+      "distinct_dates": 3450,
+      "distinct_dates_by_year": {
+        "2010": 0,
+        "2011": 229,
+        "2012": 246,
+        "2013": 248,
+        "2014": 248,
+        "2015": 246,
+        "2016": 249,
+        "2017": 246,
+        "2018": 245,
+        "2019": 248,
+        "2020": 249,
+        "2021": 247,
+        "2022": 250,
+        "2023": 248,
+        "2024": 251
+      },
+      "first_date": "2011-02-01",
+      "known_age_without_value_stock_days": 0,
+      "last_date": "2024-12-30",
+      "median_names_on_observed_date": 43.0
+    },
+    "sidecar_fundamentals:log_market_cap": {
+      "active_stock_days": 140378,
+      "distinct_dates": 3450,
+      "distinct_dates_by_year": {
+        "2010": 0,
+        "2011": 229,
+        "2012": 246,
+        "2013": 248,
+        "2014": 248,
+        "2015": 246,
+        "2016": 249,
+        "2017": 246,
+        "2018": 245,
+        "2019": 248,
+        "2020": 249,
+        "2021": 247,
+        "2022": 250,
+        "2023": 248,
+        "2024": 251
+      },
+      "first_date": "2011-02-01",
+      "known_age_without_value_stock_days": 163819,
+      "last_date": "2024-12-30",
+      "median_names_on_observed_date": 23.0
+    },
+    "sidecar_fundamentals:revenue_growth_yoy": {
+      "active_stock_days": 264520,
+      "distinct_dates": 3200,
+      "distinct_dates_by_year": {
+        "2010": 0,
+        "2011": 0,
+        "2012": 225,
+        "2013": 248,
+        "2014": 248,
+        "2015": 246,
+        "2016": 249,
+        "2017": 246,
+        "2018": 245,
+        "2019": 248,
+        "2020": 249,
+        "2021": 247,
+        "2022": 250,
+        "2023": 248,
+        "2024": 251
+      },
+      "first_date": "2012-02-01",
+      "known_age_without_value_stock_days": 0,
+      "last_date": "2024-12-30",
+      "median_names_on_observed_date": 89.0
+    },
+    "sidecar_fundamentals:statement_age_sessions": {
+      "active_stock_days": 304197,
+      "distinct_dates": 3450,
+      "distinct_dates_by_year": {
+        "2010": 0,
+        "2011": 229,
+        "2012": 246,
+        "2013": 248,
+        "2014": 248,
+        "2015": 246,
+        "2016": 249,
+        "2017": 246,
+        "2018": 245,
+        "2019": 248,
+        "2020": 249,
+        "2021": 247,
+        "2022": 250,
+        "2023": 248,
+        "2024": 251
+      },
+      "first_date": "2011-02-01",
+      "known_age_without_value_stock_days": 0,
+      "last_date": "2024-12-30",
+      "median_names_on_observed_date": 43.0
+    },
+    "sidecar_fundamentals:sue": {
+      "active_stock_days": 245947,
+      "distinct_dates": 2652,
+      "distinct_dates_by_year": {
+        "2010": 0,
+        "2011": 0,
+        "2012": 0,
+        "2013": 0,
+        "2014": 173,
+        "2015": 246,
+        "2016": 249,
+        "2017": 246,
+        "2018": 245,
+        "2019": 248,
+        "2020": 249,
+        "2021": 247,
+        "2022": 250,
+        "2023": 248,
+        "2024": 251
+      },
+      "first_date": "2014-04-23",
+      "known_age_without_value_stock_days": 0,
+      "last_date": "2024-12-30",
+      "median_names_on_observed_date": 107.0
+    },
+    "sidecar_fundamentals:valuation_available_flag": {
+      "active_stock_days": 310858,
+      "distinct_dates": 3671,
+      "distinct_dates_by_year": {
+        "2010": 201,
+        "2011": 249,
+        "2012": 246,
+        "2013": 248,
+        "2014": 248,
+        "2015": 246,
+        "2016": 249,
+        "2017": 246,
+        "2018": 245,
+        "2019": 248,
+        "2020": 249,
+        "2021": 247,
+        "2022": 250,
+        "2023": 248,
+        "2024": 251
+      },
+      "first_date": "2010-03-12",
+      "known_age_without_value_stock_days": 0,
+      "last_date": "2024-12-30",
+      "median_names_on_observed_date": 40.0
+    },
+    "sidecar_lending:loan_balance_change_1": {
+      "active_stock_days": 176377,
+      "distinct_dates": 1074,
+      "distinct_dates_by_year": {
+        "2010": 0,
+        "2011": 0,
+        "2012": 0,
+        "2013": 0,
+        "2014": 0,
+        "2015": 0,
+        "2016": 0,
+        "2017": 0,
+        "2018": 0,
+        "2019": 55,
+        "2020": 192,
+        "2021": 211,
+        "2022": 246,
+        "2023": 121,
+        "2024": 249
+      },
+      "first_date": "2019-10-03",
+      "known_age_without_value_stock_days": 0,
+      "last_date": "2024-12-30",
+      "median_names_on_observed_date": 140.0
+    },
+    "sidecar_lending:loan_balance_change_5": {
+      "active_stock_days": 173342,
+      "distinct_dates": 1054,
+      "distinct_dates_by_year": {
+        "2010": 0,
+        "2011": 0,
+        "2012": 0,
+        "2013": 0,
+        "2014": 0,
+        "2015": 0,
+        "2016": 0,
+        "2017": 0,
+        "2018": 0,
+        "2019": 51,
+        "2020": 192,
+        "2021": 208,
+        "2022": 245,
+        "2023": 109,
+        "2024": 249
+      },
+      "first_date": "2019-10-09",
+      "known_age_without_value_stock_days": 0,
+      "last_date": "2024-12-30",
+      "median_names_on_observed_date": 140.0
+    },
+    "sidecar_lending:loan_balance_to_volume_20": {
+      "active_stock_days": 182622,
+      "distinct_dates": 1108,
+      "distinct_dates_by_year": {
+        "2010": 0,
+        "2011": 0,
+        "2012": 0,
+        "2013": 0,
+        "2014": 0,
+        "2015": 0,
+        "2016": 0,
+        "2017": 0,
+        "2018": 0,
+        "2019": 60,
+        "2020": 203,
+        "2021": 221,
+        "2022": 248,
+        "2023": 126,
+        "2024": 250
+      },
+      "first_date": "2019-10-02",
+      "known_age_without_value_stock_days": 0,
+      "last_date": "2024-12-30",
+      "median_names_on_observed_date": 141.0
+    },
+    "sidecar_lending:loan_rate": {
+      "active_stock_days": 42852,
+      "distinct_dates": 318,
+      "distinct_dates_by_year": {
+        "2010": 0,
+        "2011": 0,
+        "2012": 0,
+        "2013": 0,
+        "2014": 0,
+        "2015": 0,
+        "2016": 0,
+        "2017": 0,
+        "2018": 0,
+        "2019": 0,
+        "2020": 0,
+        "2021": 0,
+        "2022": 0,
+        "2023": 93,
+        "2024": 225
+      },
+      "first_date": "2023-07-11",
+      "known_age_without_value_stock_days": 0,
+      "last_date": "2024-12-30",
+      "median_names_on_observed_date": 132.0
+    },
+    "sidecar_lending:loan_rate_change_5": {
+      "active_stock_days": 37787,
+      "distinct_dates": 287,
+      "distinct_dates_by_year": {
+        "2010": 0,
+        "2011": 0,
+        "2012": 0,
+        "2013": 0,
+        "2014": 0,
+        "2015": 0,
+        "2016": 0,
+        "2017": 0,
+        "2018": 0,
+        "2019": 0,
+        "2020": 0,
+        "2021": 0,
+        "2022": 0,
+        "2023": 83,
+        "2024": 204
+      },
+      "first_date": "2023-07-18",
+      "known_age_without_value_stock_days": 0,
+      "last_date": "2024-12-30",
+      "median_names_on_observed_date": 131.0
+    },
+    "sidecar_lending:new_loan_volume_surprise": {
+      "active_stock_days": 33625,
+      "distinct_dates": 259,
+      "distinct_dates_by_year": {
+        "2010": 0,
+        "2011": 0,
+        "2012": 0,
+        "2013": 0,
+        "2014": 0,
+        "2015": 0,
+        "2016": 0,
+        "2017": 0,
+        "2018": 0,
+        "2019": 0,
+        "2020": 0,
+        "2021": 0,
+        "2022": 0,
+        "2023": 69,
+        "2024": 190
+      },
+      "first_date": "2023-09-19",
+      "known_age_without_value_stock_days": 0,
+      "last_date": "2024-12-30",
+      "median_names_on_observed_date": 132.0
+    },
+    "sidecar_lending:utilization_proxy": {
+      "active_stock_days": 16779,
+      "distinct_dates": 1109,
+      "distinct_dates_by_year": {
+        "2010": 0,
+        "2011": 0,
+        "2012": 0,
+        "2013": 0,
+        "2014": 0,
+        "2015": 0,
+        "2016": 0,
+        "2017": 0,
+        "2018": 0,
+        "2019": 60,
+        "2020": 204,
+        "2021": 221,
+        "2022": 248,
+        "2023": 126,
+        "2024": 250
+      },
+      "first_date": "2019-10-02",
+      "known_age_without_value_stock_days": 0,
+      "last_date": "2024-12-30",
+      "median_names_on_observed_date": 12.0
+    },
+    "sidecar_magnitudes:daily_vol_20_raw": {
+      "active_stock_days": 565354,
+      "distinct_dates": 3696,
+      "distinct_dates_by_year": {
+        "2010": 226,
+        "2011": 249,
+        "2012": 246,
+        "2013": 248,
+        "2014": 248,
+        "2015": 246,
+        "2016": 249,
+        "2017": 246,
+        "2018": 245,
+        "2019": 248,
+        "2020": 249,
+        "2021": 247,
+        "2022": 250,
+        "2023": 248,
+        "2024": 251
+      },
+      "first_date": "2010-02-03",
+      "known_age_without_value_stock_days": 0,
+      "last_date": "2024-12-30",
+      "median_names_on_observed_date": 139.0
+    },
+    "sidecar_magnitudes:economic_beta_60": {
+      "active_stock_days": 563277,
+      "distinct_dates": 3676,
+      "distinct_dates_by_year": {
+        "2010": 206,
+        "2011": 249,
+        "2012": 246,
+        "2013": 248,
+        "2014": 248,
+        "2015": 246,
+        "2016": 249,
+        "2017": 246,
+        "2018": 245,
+        "2019": 248,
+        "2020": 249,
+        "2021": 247,
+        "2022": 250,
+        "2023": 248,
+        "2024": 251
+      },
+      "first_date": "2010-03-05",
+      "known_age_without_value_stock_days": 0,
+      "last_date": "2024-12-30",
+      "median_names_on_observed_date": 139.0
+    },
+    "sidecar_magnitudes:log_traded_value_20": {
+      "active_stock_days": 566292,
+      "distinct_dates": 3697,
+      "distinct_dates_by_year": {
+        "2010": 227,
+        "2011": 249,
+        "2012": 246,
+        "2013": 248,
+        "2014": 248,
+        "2015": 246,
+        "2016": 249,
+        "2017": 246,
+        "2018": 245,
+        "2019": 248,
+        "2020": 249,
+        "2021": 247,
+        "2022": 250,
+        "2023": 248,
+        "2024": 251
+      },
+      "first_date": "2010-02-02",
+      "known_age_without_value_stock_days": 0,
+      "last_date": "2024-12-30",
+      "median_names_on_observed_date": 139.0
+    },
+    "sidecar_magnitudes:return_1_over_vol_20": {
+      "active_stock_days": 565354,
+      "distinct_dates": 3696,
+      "distinct_dates_by_year": {
+        "2010": 226,
+        "2011": 249,
+        "2012": 246,
+        "2013": 248,
+        "2014": 248,
+        "2015": 246,
+        "2016": 249,
+        "2017": 246,
+        "2018": 245,
+        "2019": 248,
+        "2020": 249,
+        "2021": 247,
+        "2022": 250,
+        "2023": 248,
+        "2024": 251
+      },
+      "first_date": "2010-02-03",
+      "known_age_without_value_stock_days": 0,
+      "last_date": "2024-12-30",
+      "median_names_on_observed_date": 139.0
+    },
+    "sidecar_microstructure:after_hours_volume_share_5": {
+      "active_stock_days": 253025,
+      "distinct_dates": 1278,
+      "distinct_dates_by_year": {
+        "2010": 0,
+        "2011": 0,
+        "2012": 0,
+        "2013": 0,
+        "2014": 0,
+        "2015": 0,
+        "2016": 0,
+        "2017": 0,
+        "2018": 0,
+        "2019": 33,
+        "2020": 249,
+        "2021": 247,
+        "2022": 250,
+        "2023": 248,
+        "2024": 251
+      },
+      "first_date": "2019-11-08",
+      "known_age_without_value_stock_days": 0,
+      "last_date": "2024-12-30",
+      "median_names_on_observed_date": 196.0
+    },
+    "sidecar_microstructure:avg_trade_size_20": {
+      "active_stock_days": 565501,
+      "distinct_dates": 3697,
+      "distinct_dates_by_year": {
+        "2010": 227,
+        "2011": 249,
+        "2012": 246,
+        "2013": 248,
+        "2014": 248,
+        "2015": 246,
+        "2016": 249,
+        "2017": 246,
+        "2018": 245,
+        "2019": 248,
+        "2020": 249,
+        "2021": 247,
+        "2022": 250,
+        "2023": 248,
+        "2024": 251
+      },
+      "first_date": "2010-02-02",
+      "known_age_without_value_stock_days": 0,
+      "last_date": "2024-12-30",
+      "median_names_on_observed_date": 139.0
+    },
+    "sidecar_oddlot:oddlot_volume_share": {
+      "active_stock_days": 568218,
+      "distinct_dates": 3717,
+      "distinct_dates_by_year": {
+        "2010": 247,
+        "2011": 249,
+        "2012": 246,
+        "2013": 248,
+        "2014": 248,
+        "2015": 246,
+        "2016": 249,
+        "2017": 246,
+        "2018": 245,
+        "2019": 248,
+        "2020": 249,
+        "2021": 247,
+        "2022": 250,
+        "2023": 248,
+        "2024": 251
+      },
+      "first_date": "2010-01-04",
+      "known_age_without_value_stock_days": 0,
+      "last_date": "2024-12-30",
+      "median_names_on_observed_date": 139.0
+    },
+    "sidecar_oddlot:oddlot_volume_share_change_5": {
+      "active_stock_days": 568211,
+      "distinct_dates": 3717,
+      "distinct_dates_by_year": {
+        "2010": 247,
+        "2011": 249,
+        "2012": 246,
+        "2013": 248,
+        "2014": 248,
+        "2015": 246,
+        "2016": 249,
+        "2017": 246,
+        "2018": 245,
+        "2019": 248,
+        "2020": 249,
+        "2021": 247,
+        "2022": 250,
+        "2023": 248,
+        "2024": 251
+      },
+      "first_date": "2010-01-04",
+      "known_age_without_value_stock_days": 7,
+      "last_date": "2024-12-30",
+      "median_names_on_observed_date": 139.0
+    },
+    "sidecar_options:delta_oi_to_volume_1": {
+      "active_stock_days": 409,
+      "distinct_dates": 385,
+      "distinct_dates_by_year": {
+        "2010": 0,
+        "2011": 0,
+        "2012": 0,
+        "2013": 0,
+        "2014": 0,
+        "2015": 0,
+        "2016": 0,
+        "2017": 0,
+        "2018": 0,
+        "2019": 0,
+        "2020": 137,
+        "2021": 59,
+        "2022": 112,
+        "2023": 71,
+        "2024": 6
+      },
+      "first_date": "2020-02-20",
+      "known_age_without_value_stock_days": 0,
+      "last_date": "2024-01-30",
+      "median_names_on_observed_date": 1.0
+    },
+    "sidecar_options:observed_series_oi_coverage": {
+      "active_stock_days": 202458,
+      "distinct_dates": 1281,
+      "distinct_dates_by_year": {
+        "2010": 0,
+        "2011": 0,
+        "2012": 0,
+        "2013": 0,
+        "2014": 0,
+        "2015": 0,
+        "2016": 0,
+        "2017": 0,
+        "2018": 0,
+        "2019": 37,
+        "2020": 249,
+        "2021": 247,
+        "2022": 250,
+        "2023": 247,
+        "2024": 251
+      },
+      "first_date": "2019-11-04",
+      "known_age_without_value_stock_days": 0,
+      "last_date": "2024-12-30",
+      "median_names_on_observed_date": 165.0
+    },
+    "sidecar_options:observed_series_put_call_oi_log_ratio": {
+      "active_stock_days": 178026,
+      "distinct_dates": 1281,
+      "distinct_dates_by_year": {
+        "2010": 0,
+        "2011": 0,
+        "2012": 0,
+        "2013": 0,
+        "2014": 0,
+        "2015": 0,
+        "2016": 0,
+        "2017": 0,
+        "2018": 0,
+        "2019": 37,
+        "2020": 249,
+        "2021": 247,
+        "2022": 250,
+        "2023": 247,
+        "2024": 251
+      },
+      "first_date": "2019-11-04",
+      "known_age_without_value_stock_days": 0,
+      "last_date": "2024-12-30",
+      "median_names_on_observed_date": 153.0
+    },
+    "sidecar_options:option_to_stock_volume_20": {
+      "active_stock_days": 251487,
+      "distinct_dates": 3697,
+      "distinct_dates_by_year": {
+        "2010": 227,
+        "2011": 249,
+        "2012": 246,
+        "2013": 248,
+        "2014": 248,
+        "2015": 246,
+        "2016": 249,
+        "2017": 246,
+        "2018": 245,
+        "2019": 248,
+        "2020": 249,
+        "2021": 247,
+        "2022": 250,
+        "2023": 248,
+        "2024": 251
+      },
+      "first_date": "2010-02-02",
+      "known_age_without_value_stock_days": 0,
+      "last_date": "2024-12-30",
+      "median_names_on_observed_date": 26.0
+    },
+    "sidecar_options:put_call_oi_log_ratio": {
+      "active_stock_days": 442,
+      "distinct_dates": 409,
+      "distinct_dates_by_year": {
+        "2010": 0,
+        "2011": 0,
+        "2012": 0,
+        "2013": 0,
+        "2014": 0,
+        "2015": 0,
+        "2016": 0,
+        "2017": 0,
+        "2018": 0,
+        "2019": 0,
+        "2020": 140,
+        "2021": 63,
+        "2022": 121,
+        "2023": 78,
+        "2024": 7
+      },
+      "first_date": "2020-02-19",
+      "known_age_without_value_stock_days": 0,
+      "last_date": "2024-01-30",
+      "median_names_on_observed_date": 1.0
+    },
+    "sidecar_options:put_call_volume_ratio_5": {
+      "active_stock_days": 233984,
+      "distinct_dates": 3712,
+      "distinct_dates_by_year": {
+        "2010": 242,
+        "2011": 249,
+        "2012": 246,
+        "2013": 248,
+        "2014": 248,
+        "2015": 246,
+        "2016": 249,
+        "2017": 246,
+        "2018": 245,
+        "2019": 248,
+        "2020": 249,
+        "2021": 247,
+        "2022": 250,
+        "2023": 248,
+        "2024": 251
+      },
+      "first_date": "2010-01-11",
+      "known_age_without_value_stock_days": 0,
+      "last_date": "2024-12-30",
+      "median_names_on_observed_date": 32.0
+    },
+    "sidecar_options:uncovered_call_share": {
+      "active_stock_days": 0,
+      "distinct_dates": 0,
+      "distinct_dates_by_year": {
+        "2010": 0,
+        "2011": 0,
+        "2012": 0,
+        "2013": 0,
+        "2014": 0,
+        "2015": 0,
+        "2016": 0,
+        "2017": 0,
+        "2018": 0,
+        "2019": 0,
+        "2020": 0,
+        "2021": 0,
+        "2022": 0,
+        "2023": 0,
+        "2024": 0
+      },
+      "first_date": null,
+      "known_age_without_value_stock_days": 0,
+      "last_date": null,
+      "median_names_on_observed_date": 0
+    },
+    "sidecar_rebalance:index_event_age": {
+      "active_stock_days": 65272,
+      "distinct_dates": 357,
+      "distinct_dates_by_year": {
+        "2010": 0,
+        "2011": 0,
+        "2012": 0,
+        "2013": 0,
+        "2014": 0,
+        "2015": 0,
+        "2016": 0,
+        "2017": 0,
+        "2018": 62,
+        "2019": 43,
+        "2020": 40,
+        "2021": 43,
+        "2022": 62,
+        "2023": 42,
+        "2024": 65
+      },
+      "first_date": "2018-04-03",
+      "known_age_without_value_stock_days": 0,
+      "last_date": "2024-12-30",
+      "median_names_on_observed_date": 189.0
+    },
+    "sidecar_rebalance:index_pressure": {
+      "active_stock_days": 65272,
+      "distinct_dates": 357,
+      "distinct_dates_by_year": {
+        "2010": 0,
+        "2011": 0,
+        "2012": 0,
+        "2013": 0,
+        "2014": 0,
+        "2015": 0,
+        "2016": 0,
+        "2017": 0,
+        "2018": 62,
+        "2019": 43,
+        "2020": 40,
+        "2021": 43,
+        "2022": 62,
+        "2023": 42,
+        "2024": 65
+      },
+      "first_date": "2018-04-03",
+      "known_age_without_value_stock_days": 0,
+      "last_date": "2024-12-30",
+      "median_names_on_observed_date": 189.0
+    },
+    "sidecar_sector:name_minus_sector_return_21": {
+      "active_stock_days": 206908,
+      "distinct_dates": 3533,
+      "distinct_dates_by_year": {
+        "2010": 122,
+        "2011": 220,
+        "2012": 216,
+        "2013": 248,
+        "2014": 248,
+        "2015": 246,
+        "2016": 249,
+        "2017": 246,
+        "2018": 245,
+        "2019": 248,
+        "2020": 249,
+        "2021": 247,
+        "2022": 250,
+        "2023": 248,
+        "2024": 251
+      },
+      "first_date": "2010-06-01",
+      "known_age_without_value_stock_days": 0,
+      "last_date": "2024-12-30",
+      "median_names_on_observed_date": 10.0
+    },
+    "sidecar_sector:name_minus_sector_return_5": {
+      "active_stock_days": 206994,
+      "distinct_dates": 3533,
+      "distinct_dates_by_year": {
+        "2010": 122,
+        "2011": 220,
+        "2012": 216,
+        "2013": 248,
+        "2014": 248,
+        "2015": 246,
+        "2016": 249,
+        "2017": 246,
+        "2018": 245,
+        "2019": 248,
+        "2020": 249,
+        "2021": 247,
+        "2022": 250,
+        "2023": 248,
+        "2024": 251
+      },
+      "first_date": "2010-06-01",
+      "known_age_without_value_stock_days": 0,
+      "last_date": "2024-12-30",
+      "median_names_on_observed_date": 10.0
+    },
+    "sidecar_sector:sector_momentum_12_1": {
+      "active_stock_days": 187951,
+      "distinct_dates": 3332,
+      "distinct_dates_by_year": {
+        "2010": 0,
+        "2011": 214,
+        "2012": 143,
+        "2013": 248,
+        "2014": 248,
+        "2015": 246,
+        "2016": 249,
+        "2017": 246,
+        "2018": 245,
+        "2019": 248,
+        "2020": 249,
+        "2021": 247,
+        "2022": 250,
+        "2023": 248,
+        "2024": 251
+      },
+      "first_date": "2011-01-11",
+      "known_age_without_value_stock_days": 0,
+      "last_date": "2024-12-30",
+      "median_names_on_observed_date": 39.0
+    }
+  },
+  "labels_accessed": false,
+  "maximum_active_names": 243,
+  "trajectories": {
+    "C6/F1/11": {
+      "available": true,
+      "fit_manifest_sha256": "404cd72d25617b08bddeee38ae7db8a47c8bd33d830420c2da310f85fa49b67e",
+      "selected": {
+        "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\C6\\neutral\\F1_seed_11\\selected.pt",
+        "sha256": "01cc3b5f92b4a6dd2717f54e8b4fded0635b88181be4fe3222920829e7e25bab"
+      },
+      "selected_epoch": 12,
+      "trailing_states": [
+        {
+          "available": true,
+          "epoch": 10,
+          "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\C6\\neutral\\F1_seed_11\\epochs\\epoch_010.pt",
+          "sha256": "970077e4488e0416afe2940f4e7a708df78158b27ee6e8122bc2eaf48bdf16f4"
+        },
+        {
+          "available": true,
+          "epoch": 11,
+          "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\C6\\neutral\\F1_seed_11\\epochs\\epoch_011.pt",
+          "sha256": "140dedebbdcfaa2d4998bd0052c11cde84d3f625d7a97535f1eaf327fedc60bd"
+        },
+        {
+          "available": true,
+          "epoch": 12,
+          "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\C6\\neutral\\F1_seed_11\\epochs\\epoch_012.pt",
+          "sha256": "6ddfe5eeec1c531c6b3c2285e203ba513b0a7f3b801dafc9b99f66ba7a5d5b00"
+        }
+      ]
+    },
+    "C6/F1/29": {
+      "available": true,
+      "fit_manifest_sha256": "861b020c0f8f0dacd629ac6175d704049a254d933904fd51ed264e7b91e64a3d",
+      "selected": {
+        "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\C6\\neutral\\F1_seed_29\\selected.pt",
+        "sha256": "84218bd67338e0ff4c2db3dff779cddb108a9764af45a21e8d35fb2a3d81117c"
+      },
+      "selected_epoch": 8,
+      "trailing_states": [
+        {
+          "available": true,
+          "epoch": 6,
+          "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\C6\\neutral\\F1_seed_29\\epochs\\epoch_006.pt",
+          "sha256": "757f38f4a2995e355b929f97f5ae7442025ca38ca1f8eabb6e87b8a9d6b3f3e5"
+        },
+        {
+          "available": true,
+          "epoch": 7,
+          "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\C6\\neutral\\F1_seed_29\\epochs\\epoch_007.pt",
+          "sha256": "640c6b91ae53562fea1bc4ba47656491538434407b741262d24ecaf9aec83e0a"
+        },
+        {
+          "available": true,
+          "epoch": 8,
+          "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\C6\\neutral\\F1_seed_29\\epochs\\epoch_008.pt",
+          "sha256": "067ed3400d1c53c44aac7fd646dbf34aa509968de1221a9046555bf65de7026f"
+        }
+      ]
+    },
+    "C6/F1/47": {
+      "available": true,
+      "fit_manifest_sha256": "c92f1bc38d6158c00f7878ba753fb06cc63ab17d653e1018b2c59da2728d0696",
+      "selected": {
+        "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\C6\\neutral\\F1_seed_47\\selected.pt",
+        "sha256": "c7ceacdf95d10e950d926aa3e4b290853fc8ad09b32e047b1c388eb4454310a7"
+      },
+      "selected_epoch": 10,
+      "trailing_states": [
+        {
+          "available": true,
+          "epoch": 8,
+          "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\C6\\neutral\\F1_seed_47\\epochs\\epoch_008.pt",
+          "sha256": "ade9dcce49a3baa12f1507b91f41a53368eb73ef89ad543125eab86c8e0e5e47"
+        },
+        {
+          "available": true,
+          "epoch": 9,
+          "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\C6\\neutral\\F1_seed_47\\epochs\\epoch_009.pt",
+          "sha256": "01372483dc90922e3281d24ad5f2dfd6ddce4165aeeb24079af0321ac3d8320b"
+        },
+        {
+          "available": true,
+          "epoch": 10,
+          "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\C6\\neutral\\F1_seed_47\\epochs\\epoch_010.pt",
+          "sha256": "93b54e976451a05f9f0326abe64289246ff2d7daca3439b17ca94a4ead06d167"
+        }
+      ]
+    },
+    "C6/F10/11": {
+      "available": true,
+      "fit_manifest_sha256": "ac8c1a6fecbc6e64d7af1422c83a205025b630b2ddb9a76e51a93e25ffe490db",
+      "selected": {
+        "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\C6\\neutral\\F10_seed_11\\selected.pt",
+        "sha256": "ae827f68a7145402c63a4175b33f251f8d3dce96307f266b19d8ec1c0667275c"
+      },
+      "selected_epoch": 10,
+      "trailing_states": [
+        {
+          "available": true,
+          "epoch": 8,
+          "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\C6\\neutral\\F10_seed_11\\epochs\\epoch_008.pt",
+          "sha256": "0219ee6f30575ca6f1ece0216a6c3455e1f4fef53bb3e9c50c957d45a594dad3"
+        },
+        {
+          "available": true,
+          "epoch": 9,
+          "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\C6\\neutral\\F10_seed_11\\epochs\\epoch_009.pt",
+          "sha256": "ce78c0f1d3c120484cabf459a60bf95bafdb84ac1a2800bf389d93d2e929d87b"
+        },
+        {
+          "available": true,
+          "epoch": 10,
+          "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\C6\\neutral\\F10_seed_11\\epochs\\epoch_010.pt",
+          "sha256": "d15a2157a9d2aa58fc15c598ff149ac3838f0adec619bcf7597e42977897258b"
+        }
+      ]
+    },
+    "C6/F10/29": {
+      "available": true,
+      "fit_manifest_sha256": "1698d5cfeb9d087ed7488c1057ce5783751e2454b617832e82ca2eb24dcbff4c",
+      "selected": {
+        "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\C6\\neutral\\F10_seed_29\\selected.pt",
+        "sha256": "db8efcd56eea38f9a16b7f117eb74871e2a9842b637e130c8bccfcb70f75700b"
+      },
+      "selected_epoch": 34,
+      "trailing_states": [
+        {
+          "available": true,
+          "epoch": 32,
+          "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\C6\\neutral\\F10_seed_29\\epochs\\epoch_032.pt",
+          "sha256": "3b30d948a1c9abc67c738b8573f629b4826698dbf175c26f099dca5c31bfc63c"
+        },
+        {
+          "available": true,
+          "epoch": 33,
+          "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\C6\\neutral\\F10_seed_29\\epochs\\epoch_033.pt",
+          "sha256": "18a6b2f22263f80ae381f794c20d82a68bd194fe7a56185fa5009b5c1b02d73d"
+        },
+        {
+          "available": true,
+          "epoch": 34,
+          "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\C6\\neutral\\F10_seed_29\\epochs\\epoch_034.pt",
+          "sha256": "618d1ba6cb599fa02ed5f6438773e746956221bc61d94a974c5e92b81e702e0d"
+        }
+      ]
+    },
+    "C6/F10/47": {
+      "available": true,
+      "fit_manifest_sha256": "6e58720e34d35b19352d5678289fa697d2429e568331b049cf535737cb80f638",
+      "selected": {
+        "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\C6\\neutral\\F10_seed_47\\selected.pt",
+        "sha256": "340373cb2d4bb7501558bd47a8c14d5b5630b047ab42e03a3dcce659b542c5a9"
+      },
+      "selected_epoch": 7,
+      "trailing_states": [
+        {
+          "available": true,
+          "epoch": 5,
+          "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\C6\\neutral\\F10_seed_47\\epochs\\epoch_005.pt",
+          "sha256": "8acd51cd8490f5a501407e3c8a4598e8e55fe3bcd551c46750161c9285ca65e5"
+        },
+        {
+          "available": true,
+          "epoch": 6,
+          "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\C6\\neutral\\F10_seed_47\\epochs\\epoch_006.pt",
+          "sha256": "1fe425d581bd0cd49d750fbda4deff59a7c323e9d73c22ce34dfadd684479c53"
+        },
+        {
+          "available": true,
+          "epoch": 7,
+          "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\C6\\neutral\\F10_seed_47\\epochs\\epoch_007.pt",
+          "sha256": "250cd1c9871f240b37e4094223881d6c1e5a699890580e461bded2063c0b1765"
+        }
+      ]
+    },
+    "C6/F11/11": {
+      "available": true,
+      "fit_manifest_sha256": "854ea6201cae5a10223f4f81820fc91bbb38b059ea738651649eeaed924b4cd5",
+      "selected": {
+        "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\C6\\neutral\\F11_seed_11\\selected.pt",
+        "sha256": "f4579b0a80dd7bc2f9371ddba3a8ca0bfc82dc409f466760f02c86de07f8067b"
+      },
+      "selected_epoch": 26,
+      "trailing_states": [
+        {
+          "available": true,
+          "epoch": 24,
+          "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\C6\\neutral\\F11_seed_11\\epochs\\epoch_024.pt",
+          "sha256": "72307544e9e62e938976125e804ed2524c90757921a13bd32f339f26de2efca1"
+        },
+        {
+          "available": true,
+          "epoch": 25,
+          "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\C6\\neutral\\F11_seed_11\\epochs\\epoch_025.pt",
+          "sha256": "6d39142731d16976f8cd3067a7b68fa7d9a4c896dd531443281a873e7f14ad1c"
+        },
+        {
+          "available": true,
+          "epoch": 26,
+          "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\C6\\neutral\\F11_seed_11\\epochs\\epoch_026.pt",
+          "sha256": "af01e34bb161cad48dfd102435e770b831a2493be142847e28ea37392f31777f"
+        }
+      ]
+    },
+    "C6/F11/29": {
+      "available": true,
+      "fit_manifest_sha256": "5495abb87cf2e4e1504bee9f0b6d11079c70ab83937bf3cad562c8bd08522c66",
+      "selected": {
+        "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\C6\\neutral\\F11_seed_29\\selected.pt",
+        "sha256": "3267c342efa7078bfb239d2bffdcf9c920cbeafa9685c2333fa5c2d7e2d4e67f"
+      },
+      "selected_epoch": 22,
+      "trailing_states": [
+        {
+          "available": true,
+          "epoch": 20,
+          "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\C6\\neutral\\F11_seed_29\\epochs\\epoch_020.pt",
+          "sha256": "e19c892b38cf2cc8465a2474372b772d942fc0159c081221f29da2ec5720884a"
+        },
+        {
+          "available": true,
+          "epoch": 21,
+          "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\C6\\neutral\\F11_seed_29\\epochs\\epoch_021.pt",
+          "sha256": "919d5134466f5939c2b100516c8b7fb18af47f6ecd7f8218f09967a4867f94da"
+        },
+        {
+          "available": true,
+          "epoch": 22,
+          "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\C6\\neutral\\F11_seed_29\\epochs\\epoch_022.pt",
+          "sha256": "055f374d1417faab70059c4e18052662740c2f3ca4d6e01d43f4eb9157943876"
+        }
+      ]
+    },
+    "C6/F11/47": {
+      "available": true,
+      "fit_manifest_sha256": "1597bc98b0649a0a88399b867cafd220f8bbaad1e006d21c8881438dbe7494bc",
+      "selected": {
+        "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\C6\\neutral\\F11_seed_47\\selected.pt",
+        "sha256": "7433a7ab0be8ec72ad15122bc54ef1283693a3672802b80bc103dc44b2e2f1af"
+      },
+      "selected_epoch": 17,
+      "trailing_states": [
+        {
+          "available": true,
+          "epoch": 15,
+          "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\C6\\neutral\\F11_seed_47\\epochs\\epoch_015.pt",
+          "sha256": "d1d999d86083cab22b445ccdaf29cf2f75213d25585b92ec66770e0e32337db6"
+        },
+        {
+          "available": true,
+          "epoch": 16,
+          "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\C6\\neutral\\F11_seed_47\\epochs\\epoch_016.pt",
+          "sha256": "a64bdf59bbc5c8c302a8b5f79171839aada99619e2bbd4520e961e6a93fcd65f"
+        },
+        {
+          "available": true,
+          "epoch": 17,
+          "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\C6\\neutral\\F11_seed_47\\epochs\\epoch_017.pt",
+          "sha256": "4edbfb6052f7cc006910361b3c9f14938c7d57edc72326ae744d459cacdd21c1"
+        }
+      ]
+    },
+    "C6/F12/11": {
+      "available": true,
+      "fit_manifest_sha256": "8ba11df0279ae9378a87925883811771f179706499974e7e3215e3d269f4da61",
+      "selected": {
+        "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\C6\\neutral\\F12_seed_11\\selected.pt",
+        "sha256": "b55c0e2a9878d793323281f2b4060eaabc956c0c25f561d28dded360d73a0a1d"
+      },
+      "selected_epoch": 17,
+      "trailing_states": [
+        {
+          "available": true,
+          "epoch": 15,
+          "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\C6\\neutral\\F12_seed_11\\epochs\\epoch_015.pt",
+          "sha256": "88e4b5bbe88d8ed2334c4e8223821f7812f885615a6f7db235dbfd65ef3958ce"
+        },
+        {
+          "available": true,
+          "epoch": 16,
+          "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\C6\\neutral\\F12_seed_11\\epochs\\epoch_016.pt",
+          "sha256": "ce7287f3f7ef18ab222666b1428d9cd0a37fbdb83370e08f4d2f1efa52f6e46d"
+        },
+        {
+          "available": true,
+          "epoch": 17,
+          "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\C6\\neutral\\F12_seed_11\\epochs\\epoch_017.pt",
+          "sha256": "56c4496eb24e857b83b9320921eaf993bd79bc7f119ec6b49715285943ac5edd"
+        }
+      ]
+    },
+    "C6/F12/29": {
+      "available": true,
+      "fit_manifest_sha256": "90e0f66ee2fb0d964cb6a1715b549cc71794fc3d20dda5ae4f5a500e38a379c3",
+      "selected": {
+        "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\C6\\neutral\\F12_seed_29\\selected.pt",
+        "sha256": "5d724c32390bf38fad152eb44738afc730a375453d6e6f45784467423e95e544"
+      },
+      "selected_epoch": 23,
+      "trailing_states": [
+        {
+          "available": true,
+          "epoch": 21,
+          "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\C6\\neutral\\F12_seed_29\\epochs\\epoch_021.pt",
+          "sha256": "710a17f07a54396c499a63e025de331977c03c788a1ffbbb183b4467fe04cab2"
+        },
+        {
+          "available": true,
+          "epoch": 22,
+          "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\C6\\neutral\\F12_seed_29\\epochs\\epoch_022.pt",
+          "sha256": "05a363caa53f2b2c26076eabe144f23dd1e8fb3fda2efe465cace3759fb525f4"
+        },
+        {
+          "available": true,
+          "epoch": 23,
+          "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\C6\\neutral\\F12_seed_29\\epochs\\epoch_023.pt",
+          "sha256": "f606072381b01ef8720a7c927d18129bcfbfde4b0fc91f74626fbb31f89cea07"
+        }
+      ]
+    },
+    "C6/F12/47": {
+      "available": true,
+      "fit_manifest_sha256": "a60b6e0cc72877fb48493815af4470fbcbc1908da8f9c3e5febd918c4ca90c9e",
+      "selected": {
+        "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\C6\\neutral\\F12_seed_47\\selected.pt",
+        "sha256": "1124d9faf591be44dc4a19888d5a43432f609859ca2e7ca01a9888937366c92d"
+      },
+      "selected_epoch": 17,
+      "trailing_states": [
+        {
+          "available": true,
+          "epoch": 15,
+          "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\C6\\neutral\\F12_seed_47\\epochs\\epoch_015.pt",
+          "sha256": "29c7c679fef321d3343e9d0e8e87a341a6f8192b75b885b20f4a01424a4659f9"
+        },
+        {
+          "available": true,
+          "epoch": 16,
+          "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\C6\\neutral\\F12_seed_47\\epochs\\epoch_016.pt",
+          "sha256": "2e54418cc987268212d3166f72d25bf697d087b7d8d6227fc87c9a826fa6c226"
+        },
+        {
+          "available": true,
+          "epoch": 17,
+          "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\C6\\neutral\\F12_seed_47\\epochs\\epoch_017.pt",
+          "sha256": "eb7a0c96fb2896a6a0a173114654b4efa670603dc49e42d2146ba11b3a4ead2b"
+        }
+      ]
+    },
+    "C6/F13/11": {
+      "available": true,
+      "fit_manifest_sha256": "fd4b756f542b872ff7b1c5152e6ad274c9a1e640dca869e571414cfc696f4e5e",
+      "selected": {
+        "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\C6\\neutral\\F13_seed_11\\selected.pt",
+        "sha256": "ee87eea895f63c336e224dfbd576bb60d0df125e7c0375ff80c7b7a4e695c106"
+      },
+      "selected_epoch": 33,
+      "trailing_states": [
+        {
+          "available": true,
+          "epoch": 31,
+          "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\C6\\neutral\\F13_seed_11\\epochs\\epoch_031.pt",
+          "sha256": "75025b2b1e1fa5e872ea5908efa7eab4f18f6012f1dd66270c9ece1e41e84c19"
+        },
+        {
+          "available": true,
+          "epoch": 32,
+          "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\C6\\neutral\\F13_seed_11\\epochs\\epoch_032.pt",
+          "sha256": "96fe0f7ec61ee82a51fd72122947f2537122955b7fc9718d63136732ea49d102"
+        },
+        {
+          "available": true,
+          "epoch": 33,
+          "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\C6\\neutral\\F13_seed_11\\epochs\\epoch_033.pt",
+          "sha256": "ad0e1fd06facced4176cfbe3a77b5ee4b107a820890f76441a696d69054b9880"
+        }
+      ]
+    },
+    "C6/F13/29": {
+      "available": true,
+      "fit_manifest_sha256": "ee85fd91ed0ab96efe2b1da9756a57b295c2866d73d7bdebdae62ce35f349d4e",
+      "selected": {
+        "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\C6\\neutral\\F13_seed_29\\selected.pt",
+        "sha256": "f39e82559193fed7d68bd99f1c2e768126fbf7a7935a18549e512b92994c9ada"
+      },
+      "selected_epoch": 24,
+      "trailing_states": [
+        {
+          "available": true,
+          "epoch": 22,
+          "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\C6\\neutral\\F13_seed_29\\epochs\\epoch_022.pt",
+          "sha256": "34785abfc4b60a5f791601534812629710dba0ad5a55ec6c6e299280746f524f"
+        },
+        {
+          "available": true,
+          "epoch": 23,
+          "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\C6\\neutral\\F13_seed_29\\epochs\\epoch_023.pt",
+          "sha256": "7549751d0b6f5afd223dc4f39a6fda28dabd01d7b483551cf55b6acd2c88d3e4"
+        },
+        {
+          "available": true,
+          "epoch": 24,
+          "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\C6\\neutral\\F13_seed_29\\epochs\\epoch_024.pt",
+          "sha256": "80d76b95fcf802ad1849e1a4082768f7bac954b60dd81e1c78c9031882ca9cc4"
+        }
+      ]
+    },
+    "C6/F13/47": {
+      "available": true,
+      "fit_manifest_sha256": "79722b21cf2cd79453ed88370498330358907867c248ceb8159acd67d7419b22",
+      "selected": {
+        "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\C6\\neutral\\F13_seed_47\\selected.pt",
+        "sha256": "79e5ce4663c915e75107f163d653e7620469e2cef0a7e0835f33eaf1c9d6dc10"
+      },
+      "selected_epoch": 39,
+      "trailing_states": [
+        {
+          "available": true,
+          "epoch": 37,
+          "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\C6\\neutral\\F13_seed_47\\epochs\\epoch_037.pt",
+          "sha256": "4d0a7cbde8a503190c7c0dc3f8bd5624b92ffcd55a8a5ca75cc3f76d09abfe4d"
+        },
+        {
+          "available": true,
+          "epoch": 38,
+          "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\C6\\neutral\\F13_seed_47\\epochs\\epoch_038.pt",
+          "sha256": "11398e486bb138081d4e0193565c3a35da1842baf8f23c967ae76b4f8fc2b0e8"
+        },
+        {
+          "available": true,
+          "epoch": 39,
+          "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\C6\\neutral\\F13_seed_47\\epochs\\epoch_039.pt",
+          "sha256": "a2df1569e387637b6da3bddfa06e97dd375bb32e80071d14ecfaa8fb8fc1fa6a"
+        }
+      ]
+    },
+    "C6/F14/11": {
+      "available": true,
+      "fit_manifest_sha256": "567d1a0248b36108aeb0c5242aaaa0e436297b6640d125b9095e86f5c4f9bd2f",
+      "selected": {
+        "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\C6\\neutral\\F14_seed_11\\selected.pt",
+        "sha256": "978b77d59f58250efa39a8e64acfc9031b120baeb7173dc1453d7a3eebf471ea"
+      },
+      "selected_epoch": 1,
+      "trailing_states": [
+        {
+          "available": true,
+          "epoch": 1,
+          "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\C6\\neutral\\F14_seed_11\\epochs\\epoch_001.pt",
+          "sha256": "baa97bf581b3b60c2d52a91433f3ee5c86cffcc606c415fd369c66ef431c915c"
+        }
+      ]
+    },
+    "C6/F14/29": {
+      "available": true,
+      "fit_manifest_sha256": "4ea2187acf31e3d1a53d276f9511a9efe8a9029934c146ff66a6d908948119c9",
+      "selected": {
+        "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\C6\\neutral\\F14_seed_29\\selected.pt",
+        "sha256": "a82d460d676b4f412fb2179cd411e427b3bb399b261bcf3ca55c37eecde4c3a5"
+      },
+      "selected_epoch": 1,
+      "trailing_states": [
+        {
+          "available": true,
+          "epoch": 1,
+          "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\C6\\neutral\\F14_seed_29\\epochs\\epoch_001.pt",
+          "sha256": "18a010e0514fc387c8c8bc672a5f12d3439fe21cb168f644e6c9b79806b7cbd0"
+        }
+      ]
+    },
+    "C6/F14/47": {
+      "available": true,
+      "fit_manifest_sha256": "44e7ddee685e085e5e81e101c25be41d1ea43cb3c344d6fe1f6178712d836b85",
+      "selected": {
+        "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\C6\\neutral\\F14_seed_47\\selected.pt",
+        "sha256": "7a24f59f6cefa482332e839fa09a889ac8f76d3678338f16965e995073e20536"
+      },
+      "selected_epoch": 1,
+      "trailing_states": [
+        {
+          "available": true,
+          "epoch": 1,
+          "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\C6\\neutral\\F14_seed_47\\epochs\\epoch_001.pt",
+          "sha256": "8f1b9e97cd1009180695ad2d11b6eaa3994bda7cc2ee5f2a659421ee7b6e7edf"
+        }
+      ]
+    },
+    "C6/F2/11": {
+      "available": true,
+      "fit_manifest_sha256": "295f9f4483086bed87bad6b4c32ae0cec63921fb3499117ce27bd36231eed74c",
+      "selected": {
+        "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\C6\\neutral\\F2_seed_11\\selected.pt",
+        "sha256": "0d2d856f6806cf075830f17859c236f42602e125e9f9c6b6703ea3a5f318a88a"
+      },
+      "selected_epoch": 53,
+      "trailing_states": [
+        {
+          "available": true,
+          "epoch": 51,
+          "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\C6\\neutral\\F2_seed_11\\epochs\\epoch_051.pt",
+          "sha256": "5a3f408519aac574bcd2f2642e48277408f4b839e3793bcf8aa78731731e206f"
+        },
+        {
+          "available": true,
+          "epoch": 52,
+          "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\C6\\neutral\\F2_seed_11\\epochs\\epoch_052.pt",
+          "sha256": "9d5696566e473525c3d87b5bb8e4f0d65a952233f0a77efb3b989d4e893d4efe"
+        },
+        {
+          "available": true,
+          "epoch": 53,
+          "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\C6\\neutral\\F2_seed_11\\epochs\\epoch_053.pt",
+          "sha256": "9a9f833ccfd051c64cc6a267effca62053f5a8dd61aecbd2f6c3e5b10b7b21aa"
+        }
+      ]
+    },
+    "C6/F2/29": {
+      "available": true,
+      "fit_manifest_sha256": "722bbe7151b00dde502ccc978ec70eda6c3dc422c939942c69e49bb99be1b49f",
+      "selected": {
+        "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\C6\\neutral\\F2_seed_29\\selected.pt",
+        "sha256": "031cb25077639b9c1de08511e869af50f028e66669c017d835998ec4c82be678"
+      },
+      "selected_epoch": 60,
+      "trailing_states": [
+        {
+          "available": true,
+          "epoch": 58,
+          "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\C6\\neutral\\F2_seed_29\\epochs\\epoch_058.pt",
+          "sha256": "e6e78fdcb2226eb5bdb101683206bafa7cd998ba6a22a5b15481ec6877d4264f"
+        },
+        {
+          "available": true,
+          "epoch": 59,
+          "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\C6\\neutral\\F2_seed_29\\epochs\\epoch_059.pt",
+          "sha256": "338cc5120eae1a9953cef9747a2f8f4818913836140230e2ce2cfada07fe51c7"
+        },
+        {
+          "available": true,
+          "epoch": 60,
+          "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\C6\\neutral\\F2_seed_29\\epochs\\epoch_060.pt",
+          "sha256": "41b4b53cc95b8b00aa11a32c38040ea0581be91746a766960a695170f2bd05be"
+        }
+      ]
+    },
+    "C6/F2/47": {
+      "available": true,
+      "fit_manifest_sha256": "7a4cd9e66f8aa7652078c8f554f0a0ae8f222528edd8bcbe7356fab43ea558e5",
+      "selected": {
+        "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\C6\\neutral\\F2_seed_47\\selected.pt",
+        "sha256": "648462914feaf9cc6707b049f727889711defb74f0a3dff6c1c85e3b8d6a0ea3"
+      },
+      "selected_epoch": 40,
+      "trailing_states": [
+        {
+          "available": true,
+          "epoch": 38,
+          "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\C6\\neutral\\F2_seed_47\\epochs\\epoch_038.pt",
+          "sha256": "4c652507bb5978f3a001d9e570e17c9887e29e39cc3af5e23455d52f2ca62318"
+        },
+        {
+          "available": true,
+          "epoch": 39,
+          "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\C6\\neutral\\F2_seed_47\\epochs\\epoch_039.pt",
+          "sha256": "391c6a6b535d2ed2a52f90c21d865cf0411a40550f1eaf11d5cb18836654a8c5"
+        },
+        {
+          "available": true,
+          "epoch": 40,
+          "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\C6\\neutral\\F2_seed_47\\epochs\\epoch_040.pt",
+          "sha256": "6db92953b5681b2aac431799ae0b695aa7f074b7d463ce9389b2d7775c77b91f"
+        }
+      ]
+    },
+    "C6/F3/11": {
+      "available": true,
+      "fit_manifest_sha256": "9a3c62ee90f6425e77d0ee260083e0897208bc2b1e05da154a813979ac5382c6",
+      "selected": {
+        "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\C6\\neutral\\F3_seed_11\\selected.pt",
+        "sha256": "cf8d2a014fb3f3b6f3556d75dcbd0d3402d9af922ccb5fcd2f766421a46598e5"
+      },
+      "selected_epoch": 2,
+      "trailing_states": [
+        {
+          "available": true,
+          "epoch": 1,
+          "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\C6\\neutral\\F3_seed_11\\epochs\\epoch_001.pt",
+          "sha256": "05ac4279fec5bba42f25141f382e8fd190cf077eba7f42b0685e98f2498b8563"
+        },
+        {
+          "available": true,
+          "epoch": 2,
+          "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\C6\\neutral\\F3_seed_11\\epochs\\epoch_002.pt",
+          "sha256": "73a25bb770333a667e891d8f8e4fd3f20e84275abe61084d2fd2ac09d5a571a6"
+        }
+      ]
+    },
+    "C6/F3/29": {
+      "available": true,
+      "fit_manifest_sha256": "705bf899957595c9f027c035bdb705a48ae57445c9c1c0bcccd7c104601169c6",
+      "selected": {
+        "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\C6\\neutral\\F3_seed_29\\selected.pt",
+        "sha256": "55871591ca11266a2a29c9cbd3c60f566e59e247b2e82599be845c705684c76a"
+      },
+      "selected_epoch": 1,
+      "trailing_states": [
+        {
+          "available": true,
+          "epoch": 1,
+          "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\C6\\neutral\\F3_seed_29\\epochs\\epoch_001.pt",
+          "sha256": "de0b31b856767422eaa6c9c3726d7c3c99607880062b091b08670512daa44989"
+        }
+      ]
+    },
+    "C6/F3/47": {
+      "available": true,
+      "fit_manifest_sha256": "1f97eef6f42aa96bd251986ce24bb42781801d01ed1050008f17520a1c6706b9",
+      "selected": {
+        "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\C6\\neutral\\F3_seed_47\\selected.pt",
+        "sha256": "ba62333815821b1365d1ac18da9f6e0d68556e6edf06aaf8fd1bad4bd4ba081f"
+      },
+      "selected_epoch": 9,
+      "trailing_states": [
+        {
+          "available": true,
+          "epoch": 7,
+          "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\C6\\neutral\\F3_seed_47\\epochs\\epoch_007.pt",
+          "sha256": "de32ff95e8eecbefe2870f0bfc050e00cc178cb4ef85117bc83af86a1bf9c33c"
+        },
+        {
+          "available": true,
+          "epoch": 8,
+          "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\C6\\neutral\\F3_seed_47\\epochs\\epoch_008.pt",
+          "sha256": "2781a0e93633c90afc520ef970ba3584040c870edb741c39a64b62c32c6e3b61"
+        },
+        {
+          "available": true,
+          "epoch": 9,
+          "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\C6\\neutral\\F3_seed_47\\epochs\\epoch_009.pt",
+          "sha256": "e63c51d3dee0b9baa64eb938fc528e076540173b0bb0b56c54d27f9419617948"
+        }
+      ]
+    },
+    "C6/F4/11": {
+      "available": true,
+      "fit_manifest_sha256": "254ad13b81fd4494322ed3fa0127098559d7031c568296bc8b62cc697aa4d3c3",
+      "selected": {
+        "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\C6\\neutral\\F4_seed_11\\selected.pt",
+        "sha256": "3267d8807811beba431dc45b504d8ae2a3b801ceaa857ba2239ec00692d00ba6"
+      },
+      "selected_epoch": 5,
+      "trailing_states": [
+        {
+          "available": true,
+          "epoch": 3,
+          "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\C6\\neutral\\F4_seed_11\\epochs\\epoch_003.pt",
+          "sha256": "29e926f459c1240c316aff40c326566db207125b3b4354977a9d8472cb793d79"
+        },
+        {
+          "available": true,
+          "epoch": 4,
+          "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\C6\\neutral\\F4_seed_11\\epochs\\epoch_004.pt",
+          "sha256": "71870308ea049e6b8ace0b36002011daa4e70f62108a5187922af95ac1fc1d15"
+        },
+        {
+          "available": true,
+          "epoch": 5,
+          "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\C6\\neutral\\F4_seed_11\\epochs\\epoch_005.pt",
+          "sha256": "b8a84aba7563ec1e1ac006ed8f13570eec06ca3097d38bb27ccd62ad0100fd35"
+        }
+      ]
+    },
+    "C6/F4/29": {
+      "available": true,
+      "fit_manifest_sha256": "f2dacfe96968b1cbdefc34e09ccdb85f28c41369fcfde54f61bce02512183185",
+      "selected": {
+        "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\C6\\neutral\\F4_seed_29\\selected.pt",
+        "sha256": "0c8761c376f7a967986ab43fb596c1e7f38ce71f2129c0a18fc697f4939f8a39"
+      },
+      "selected_epoch": 8,
+      "trailing_states": [
+        {
+          "available": true,
+          "epoch": 6,
+          "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\C6\\neutral\\F4_seed_29\\epochs\\epoch_006.pt",
+          "sha256": "2147bb97e443bb7f07dd70cd28343c4baaef9bee38ecbbeb7d4bf1ec78a0cb1c"
+        },
+        {
+          "available": true,
+          "epoch": 7,
+          "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\C6\\neutral\\F4_seed_29\\epochs\\epoch_007.pt",
+          "sha256": "df44714bc4ebd036d05e1904bcb03f62f2a4f89b172fa11aaf7b13681bcf6ecd"
+        },
+        {
+          "available": true,
+          "epoch": 8,
+          "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\C6\\neutral\\F4_seed_29\\epochs\\epoch_008.pt",
+          "sha256": "08d9d884e67aaf832986ebeee6813fabc0e5cd2a07f2aef38b8ed656f2dff8ad"
+        }
+      ]
+    },
+    "C6/F4/47": {
+      "available": true,
+      "fit_manifest_sha256": "95dc1f2f460a32ca33e9380d1a82d1dbaeb2ca8f74df88e32e29ba53ea64dbb7",
+      "selected": {
+        "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\C6\\neutral\\F4_seed_47\\selected.pt",
+        "sha256": "f29d72b014f9b733d05cfa239f0d6ae82dd95bed38a2ba4b45ff9c820019dbd0"
+      },
+      "selected_epoch": 4,
+      "trailing_states": [
+        {
+          "available": true,
+          "epoch": 2,
+          "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\C6\\neutral\\F4_seed_47\\epochs\\epoch_002.pt",
+          "sha256": "caf3c0739eb4bc7d538f07a96582fcef702e42586ede9de9447c0ad83b25f363"
+        },
+        {
+          "available": true,
+          "epoch": 3,
+          "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\C6\\neutral\\F4_seed_47\\epochs\\epoch_003.pt",
+          "sha256": "c3d91eb5b3e893ddb417674b2b4d142f6ecdd70bb7efc7cc53119ca020e22efb"
+        },
+        {
+          "available": true,
+          "epoch": 4,
+          "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\C6\\neutral\\F4_seed_47\\epochs\\epoch_004.pt",
+          "sha256": "591e85545fc7b4443f40c6cbadea76213a3241611f0db249e80ff68320e020ff"
+        }
+      ]
+    },
+    "C6/F5/11": {
+      "available": true,
+      "fit_manifest_sha256": "e1cc2094f791317ac28a63e23e964c1afe9878bef214ad8c1e1232326dde080c",
+      "selected": {
+        "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\C6\\neutral\\F5_seed_11\\selected.pt",
+        "sha256": "42f242c10501bd5131e32dd8960af2b877b67bff3a66e15430e58c2f86cddea9"
+      },
+      "selected_epoch": 15,
+      "trailing_states": [
+        {
+          "available": true,
+          "epoch": 13,
+          "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\C6\\neutral\\F5_seed_11\\epochs\\epoch_013.pt",
+          "sha256": "d6f652bf1aab4094c760490ea5ee780d83462143e359c791e84c47e79a87afc2"
+        },
+        {
+          "available": true,
+          "epoch": 14,
+          "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\C6\\neutral\\F5_seed_11\\epochs\\epoch_014.pt",
+          "sha256": "1b02f6e7383dfc38459e2a0560911fab8bc47af94a98bc1376ec524467196a7d"
+        },
+        {
+          "available": true,
+          "epoch": 15,
+          "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\C6\\neutral\\F5_seed_11\\epochs\\epoch_015.pt",
+          "sha256": "23af2fd1f8cb99d54fdad315dbbc4f6720a2618f87b1b3976ddfed13ad718d81"
+        }
+      ]
+    },
+    "C6/F5/29": {
+      "available": true,
+      "fit_manifest_sha256": "073329386041f8c7679051befb59eca6e3601c3afa49bff6cd2dfe21a427def5",
+      "selected": {
+        "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\C6\\neutral\\F5_seed_29\\selected.pt",
+        "sha256": "6d37e41b6aa72c49b9c2c34dd62688071da266d14d3bb6fb8d8d66cbacf93033"
+      },
+      "selected_epoch": 15,
+      "trailing_states": [
+        {
+          "available": true,
+          "epoch": 13,
+          "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\C6\\neutral\\F5_seed_29\\epochs\\epoch_013.pt",
+          "sha256": "5aaff937adf92807b1ddfe5385bd2ba46dce693a27d903118e46aff092b16ccd"
+        },
+        {
+          "available": true,
+          "epoch": 14,
+          "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\C6\\neutral\\F5_seed_29\\epochs\\epoch_014.pt",
+          "sha256": "86c24ed8ed9f0e50e51442657ccdd14588b71e9c32bc99e563e583254798e2f4"
+        },
+        {
+          "available": true,
+          "epoch": 15,
+          "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\C6\\neutral\\F5_seed_29\\epochs\\epoch_015.pt",
+          "sha256": "97d7b07a1296193a6f48eaaadc174b549b5bfd0504f250a2a0baf0ba2f341983"
+        }
+      ]
+    },
+    "C6/F5/47": {
+      "available": true,
+      "fit_manifest_sha256": "58d19b6be7a28f678394093cdcf9919fae99ff6fd6312501d2620ecd3b893870",
+      "selected": {
+        "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\C6\\neutral\\F5_seed_47\\selected.pt",
+        "sha256": "7340017889bf7ac4c1d140db37edf41ce52df9fa7c0cfa43ce47399dd1f5964f"
+      },
+      "selected_epoch": 14,
+      "trailing_states": [
+        {
+          "available": true,
+          "epoch": 12,
+          "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\C6\\neutral\\F5_seed_47\\epochs\\epoch_012.pt",
+          "sha256": "632ff0ece3c25dc2c5cc8531ec81ee0e6e4228d6a7031a7d948587ffe9d15c10"
+        },
+        {
+          "available": true,
+          "epoch": 13,
+          "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\C6\\neutral\\F5_seed_47\\epochs\\epoch_013.pt",
+          "sha256": "7888ee92d768ce0ce3c73353c1ec7bcac1d4d31af75b522d0297bf23e5c7ab14"
+        },
+        {
+          "available": true,
+          "epoch": 14,
+          "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\C6\\neutral\\F5_seed_47\\epochs\\epoch_014.pt",
+          "sha256": "eb373a9b53108b5b38a4ee3c74d9b3fcbb847d18f49eccb455c6f7d9529729cd"
+        }
+      ]
+    },
+    "C6/F6/11": {
+      "available": true,
+      "fit_manifest_sha256": "0f136ac85887ae28423484edd22bb78b7b6237b0dd366da05a477d582d1f5b23",
+      "selected": {
+        "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\C6\\neutral\\F6_seed_11\\selected.pt",
+        "sha256": "5ae4c118af05f4cdfb8fbf737c6ea52fda92a56fe0b48819c9a3c671ca9f83be"
+      },
+      "selected_epoch": 1,
+      "trailing_states": [
+        {
+          "available": true,
+          "epoch": 1,
+          "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\C6\\neutral\\F6_seed_11\\epochs\\epoch_001.pt",
+          "sha256": "16e5dacf3d334b6d66d5206b2a852cfaf19f3d0d1c8d53a187092ae1c6916237"
+        }
+      ]
+    },
+    "C6/F6/29": {
+      "available": true,
+      "fit_manifest_sha256": "d210436f140ca0b6b142e4bdb8150ce832aa8ab0c8137fa6a1c6f89f0f71d718",
+      "selected": {
+        "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\C6\\neutral\\F6_seed_29\\selected.pt",
+        "sha256": "5314bc957bfeee869e2d4383ee215fe2b56f2a27c070fa7a84d853b2d5ecfe89"
+      },
+      "selected_epoch": 1,
+      "trailing_states": [
+        {
+          "available": true,
+          "epoch": 1,
+          "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\C6\\neutral\\F6_seed_29\\epochs\\epoch_001.pt",
+          "sha256": "128f7211ad75d4a1eac3386f90624ce7158e892781982e49ec56dd88168ef8bf"
+        }
+      ]
+    },
+    "C6/F6/47": {
+      "available": true,
+      "fit_manifest_sha256": "432801b4db2b84b84066d4f143727ddb4e5c839368fa3f9265dfe76ec3ef125c",
+      "selected": {
+        "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\C6\\neutral\\F6_seed_47\\selected.pt",
+        "sha256": "a5c44209a031b44f04a5aa34ac10dcc930398d9b093ebe8b54109ecc7f58bdc1"
+      },
+      "selected_epoch": 1,
+      "trailing_states": [
+        {
+          "available": true,
+          "epoch": 1,
+          "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\C6\\neutral\\F6_seed_47\\epochs\\epoch_001.pt",
+          "sha256": "9a71696190170653f5dd50c140306b68c40b389f6e00990a8c2b979197f9632c"
+        }
+      ]
+    },
+    "C6/F7/11": {
+      "available": true,
+      "fit_manifest_sha256": "988f8c943eb88e5fdb3c1d582c2f8c6b98d1ec606f287ca03e47f01941ea66ae",
+      "selected": {
+        "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\C6\\neutral\\F7_seed_11\\selected.pt",
+        "sha256": "e4e0e4e68985b37c65ca6a4171e1d9fbec6699bf1ab534f00492c00d4a27fbd5"
+      },
+      "selected_epoch": 32,
+      "trailing_states": [
+        {
+          "available": true,
+          "epoch": 30,
+          "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\C6\\neutral\\F7_seed_11\\epochs\\epoch_030.pt",
+          "sha256": "943c1b4d7ddfa8236e3f0b6ce1437d596ed8ec4d8080944527764d3e87d1a4d1"
+        },
+        {
+          "available": true,
+          "epoch": 31,
+          "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\C6\\neutral\\F7_seed_11\\epochs\\epoch_031.pt",
+          "sha256": "37607a43c72e7399bd196f42da56595951ab6075e88488caec4cde7f5fbfc77d"
+        },
+        {
+          "available": true,
+          "epoch": 32,
+          "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\C6\\neutral\\F7_seed_11\\epochs\\epoch_032.pt",
+          "sha256": "e5893a33f61e330898a0a08715817c1742c631924debc7519d694501826ef973"
+        }
+      ]
+    },
+    "C6/F7/29": {
+      "available": true,
+      "fit_manifest_sha256": "d89096ce0fc513f62e9040f0c86a0d77489e159fe4ff3a9b870e19d3f0198b68",
+      "selected": {
+        "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\C6\\neutral\\F7_seed_29\\selected.pt",
+        "sha256": "d6e73d10709041aae1da36c16e650f73f63ad0aea8405430540da9f92ac325b7"
+      },
+      "selected_epoch": 24,
+      "trailing_states": [
+        {
+          "available": true,
+          "epoch": 22,
+          "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\C6\\neutral\\F7_seed_29\\epochs\\epoch_022.pt",
+          "sha256": "0cdb51fe3d4b9ff1df4a1729ccab0f9f8b2e55bf6fab5fce052e4a3773927a8d"
+        },
+        {
+          "available": true,
+          "epoch": 23,
+          "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\C6\\neutral\\F7_seed_29\\epochs\\epoch_023.pt",
+          "sha256": "7ef8138e229bc0a5a345a19da4b38731b5c34fa4f42dc6862dcc431415bfe021"
+        },
+        {
+          "available": true,
+          "epoch": 24,
+          "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\C6\\neutral\\F7_seed_29\\epochs\\epoch_024.pt",
+          "sha256": "265185f8cb9acdb18cf6a4907b13f6bc022434d11f6998985016a1d5e6939807"
+        }
+      ]
+    },
+    "C6/F7/47": {
+      "available": true,
+      "fit_manifest_sha256": "add71696799da9c23199171493acfc7ab6c47860aaf924bc5c264f82745c2b98",
+      "selected": {
+        "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\C6\\neutral\\F7_seed_47\\selected.pt",
+        "sha256": "d32f1a7e26309309a7f21a07b25100a052af443bb413eb3decce0c6c3e5ce3c1"
+      },
+      "selected_epoch": 31,
+      "trailing_states": [
+        {
+          "available": true,
+          "epoch": 29,
+          "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\C6\\neutral\\F7_seed_47\\epochs\\epoch_029.pt",
+          "sha256": "283f64dd56657e47d4ea16e1d2dea17bf43c843ef01e99c5bc37fe72aa87f15c"
+        },
+        {
+          "available": true,
+          "epoch": 30,
+          "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\C6\\neutral\\F7_seed_47\\epochs\\epoch_030.pt",
+          "sha256": "9e63866d4e70ac8ef100d64b998ed11635b6b1f9b1262a6f94608ada6e4cc31c"
+        },
+        {
+          "available": true,
+          "epoch": 31,
+          "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\C6\\neutral\\F7_seed_47\\epochs\\epoch_031.pt",
+          "sha256": "5cfdafc352460f5455cbf1d25e8c626fa78f49eec9fd9ce2444ea2ef571be398"
+        }
+      ]
+    },
+    "C6/F8/11": {
+      "available": true,
+      "fit_manifest_sha256": "465998c07f2760b7ce57d8696d78d5efe93420d5f62300c7ffef1b6c1dd45b9b",
+      "selected": {
+        "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\C6\\neutral\\F8_seed_11\\selected.pt",
+        "sha256": "609a2642414b6841ae1a796ef96460021a0a9c0b3074067cafb99bf76cbfe871"
+      },
+      "selected_epoch": 1,
+      "trailing_states": [
+        {
+          "available": true,
+          "epoch": 1,
+          "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\C6\\neutral\\F8_seed_11\\epochs\\epoch_001.pt",
+          "sha256": "beae21e01239525d26dd6cd1af940895d12d516fcf32dd2ae45b96eb90f646c3"
+        }
+      ]
+    },
+    "C6/F8/29": {
+      "available": true,
+      "fit_manifest_sha256": "c11d74beac63d5ca9c2a238969a6efeb0accd23c1f6802f66494411f5bde8b9b",
+      "selected": {
+        "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\C6\\neutral\\F8_seed_29\\selected.pt",
+        "sha256": "c890dd3ff576fc2ec018d747305d51a38d68086f61a4cdaad9ec21f83b561ca5"
+      },
+      "selected_epoch": 7,
+      "trailing_states": [
+        {
+          "available": true,
+          "epoch": 5,
+          "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\C6\\neutral\\F8_seed_29\\epochs\\epoch_005.pt",
+          "sha256": "55635adcadab8cf6ea1192335ad8c870b949ac1d81df1c2dbaa75f30da0eb38d"
+        },
+        {
+          "available": true,
+          "epoch": 6,
+          "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\C6\\neutral\\F8_seed_29\\epochs\\epoch_006.pt",
+          "sha256": "1c88198db544458ee641e00314983d718090016eef8acece2e092ef134592f4e"
+        },
+        {
+          "available": true,
+          "epoch": 7,
+          "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\C6\\neutral\\F8_seed_29\\epochs\\epoch_007.pt",
+          "sha256": "5b692f6a798e8fa749034456b3e74766dca9b62ee08fe72deec94588296cb944"
+        }
+      ]
+    },
+    "C6/F8/47": {
+      "available": true,
+      "fit_manifest_sha256": "00952fd6ea7c8771024590f34f22d582dba63c8086618b30803850c2bb25c829",
+      "selected": {
+        "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\C6\\neutral\\F8_seed_47\\selected.pt",
+        "sha256": "5eac49d52e2e6778598640b8437b2b35347acb39c2766952c3e6e446f3eb7d54"
+      },
+      "selected_epoch": 1,
+      "trailing_states": [
+        {
+          "available": true,
+          "epoch": 1,
+          "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\C6\\neutral\\F8_seed_47\\epochs\\epoch_001.pt",
+          "sha256": "9662e53821b95953f19d5020738981995b66ca7a39c98b00d71ad3c6c72cae83"
+        }
+      ]
+    },
+    "C6/F9/11": {
+      "available": true,
+      "fit_manifest_sha256": "a19eb4090ac34a2926e5121ca367452cf91d1abf1edea4014036ce1d9aac8597",
+      "selected": {
+        "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\C6\\neutral\\F9_seed_11\\selected.pt",
+        "sha256": "efffb1add4614c9babc6cef9cb51538d7d0e34a0452826c04b3ce581b9da70c9"
+      },
+      "selected_epoch": 38,
+      "trailing_states": [
+        {
+          "available": true,
+          "epoch": 36,
+          "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\C6\\neutral\\F9_seed_11\\epochs\\epoch_036.pt",
+          "sha256": "549abe7a2217efbe75d24c1dbb94aaa9b8ea7c9b75741f94a6c822f320a52a80"
+        },
+        {
+          "available": true,
+          "epoch": 37,
+          "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\C6\\neutral\\F9_seed_11\\epochs\\epoch_037.pt",
+          "sha256": "ccbd80080b8e853f6f2a9b81be73a6041f51f411a71af383dd2feef10414a83b"
+        },
+        {
+          "available": true,
+          "epoch": 38,
+          "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\C6\\neutral\\F9_seed_11\\epochs\\epoch_038.pt",
+          "sha256": "a30e3943ac1cb3020da76e1f0b3143023b42b1b61a6edfb29b3e08895d95714e"
+        }
+      ]
+    },
+    "C6/F9/29": {
+      "available": true,
+      "fit_manifest_sha256": "85bcee7bd8073552dcdc26dc1f1e837e8c0a1c8caaa98aa7a4e31b4d597657e1",
+      "selected": {
+        "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\C6\\neutral\\F9_seed_29\\selected.pt",
+        "sha256": "dad3ea657bcd2c0908e9ada21e26d5b7e601527372ee678baa7ff9be12d597d9"
+      },
+      "selected_epoch": 36,
+      "trailing_states": [
+        {
+          "available": true,
+          "epoch": 34,
+          "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\C6\\neutral\\F9_seed_29\\epochs\\epoch_034.pt",
+          "sha256": "adc8fc1db5d775913dedb56123db8f4500df7964ca36c1705bc1cd94b42960ff"
+        },
+        {
+          "available": true,
+          "epoch": 35,
+          "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\C6\\neutral\\F9_seed_29\\epochs\\epoch_035.pt",
+          "sha256": "4d851fdc18ad39acf3dea90519a2c7af947bc93ca69275b4c30ba53a6263e17c"
+        },
+        {
+          "available": true,
+          "epoch": 36,
+          "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\C6\\neutral\\F9_seed_29\\epochs\\epoch_036.pt",
+          "sha256": "5aeb8d30e014b8103bae2092d94f1f733fdcf3f992462a92fc0fb94525dac357"
+        }
+      ]
+    },
+    "C6/F9/47": {
+      "available": true,
+      "fit_manifest_sha256": "c54e1ac57592f6b678c108573e4f32d4d97f999e7fc8872703bda16f085bc228",
+      "selected": {
+        "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\C6\\neutral\\F9_seed_47\\selected.pt",
+        "sha256": "c6317db929fad96fcce00ecbe7d024ce6e28c2ece26f2b266c5891f5018ef8b6"
+      },
+      "selected_epoch": 33,
+      "trailing_states": [
+        {
+          "available": true,
+          "epoch": 31,
+          "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\C6\\neutral\\F9_seed_47\\epochs\\epoch_031.pt",
+          "sha256": "4ebc4fda74524a86c81963ac105546bcf3f781bb9d77fab07b5222c9dea8d0f5"
+        },
+        {
+          "available": true,
+          "epoch": 32,
+          "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\C6\\neutral\\F9_seed_47\\epochs\\epoch_032.pt",
+          "sha256": "bf7d9171d6ceec81728455503520ec1691ffd8b51667cbd67c13d7ea7b414f26"
+        },
+        {
+          "available": true,
+          "epoch": 33,
+          "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\C6\\neutral\\F9_seed_47\\epochs\\epoch_033.pt",
+          "sha256": "139f8f2e16a4c3433467dcdf89b269766165c4f35676340c96ec37460f622fd7"
+        }
+      ]
+    },
+    "TE_all/F1/11": {
+      "available": true,
+      "fit_manifest_sha256": "980d9749ac0148335d35bb397a2253a581d786005b86f7a6b007df5d01f8316b",
+      "selected": {
+        "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\TE_all\\neutral\\F1_seed_11\\selected.pt",
+        "sha256": "205e97950ddc396ad81436ac9d27a8e2a76d38e5baff75dd2791d171372ddf4f"
+      },
+      "selected_epoch": 5,
+      "trailing_states": [
+        {
+          "available": true,
+          "epoch": 3,
+          "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\TE_all\\neutral\\F1_seed_11\\epochs\\epoch_003.pt",
+          "sha256": "14fc3d23bd07b8d28dbbd34b6d9fd69a6a1dc019132347c72d1ddbb421290589"
+        },
+        {
+          "available": true,
+          "epoch": 4,
+          "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\TE_all\\neutral\\F1_seed_11\\epochs\\epoch_004.pt",
+          "sha256": "d4c2933a2aa35a08fee8295fb005cc542c2468edc059e3782c596c708dd1544d"
+        },
+        {
+          "available": true,
+          "epoch": 5,
+          "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\TE_all\\neutral\\F1_seed_11\\epochs\\epoch_005.pt",
+          "sha256": "a9cda71fe4191f6015e6949b1f005659a69512d0ffc4204c7fb6df8a68237b0e"
+        }
+      ]
+    },
+    "TE_all/F1/29": {
+      "available": true,
+      "fit_manifest_sha256": "bf3660231581f7253eca491f284bf2a5076e57a1439f9842ce12b805fa4ff7de",
+      "selected": {
+        "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\TE_all\\neutral\\F1_seed_29\\selected.pt",
+        "sha256": "01ffc115bb3628a977dd6ca9a7e4e638d62be3e9ce30974e326f1d6f16d61650"
+      },
+      "selected_epoch": 6,
+      "trailing_states": [
+        {
+          "available": true,
+          "epoch": 4,
+          "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\TE_all\\neutral\\F1_seed_29\\epochs\\epoch_004.pt",
+          "sha256": "2274115d13900df414113f02ec8ee444625aff1c25e1677e66cf1ce5e76c89cc"
+        },
+        {
+          "available": true,
+          "epoch": 5,
+          "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\TE_all\\neutral\\F1_seed_29\\epochs\\epoch_005.pt",
+          "sha256": "a86bffab4584918b81c28cb0ed94bbc127c3fe347bd381b1fd8d6956eb94f1bb"
+        },
+        {
+          "available": true,
+          "epoch": 6,
+          "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\TE_all\\neutral\\F1_seed_29\\epochs\\epoch_006.pt",
+          "sha256": "359118bb7fd0e7dfc92e528adf4ac60f389b331a45d06f5f9e9c6088d61e6121"
+        }
+      ]
+    },
+    "TE_all/F1/47": {
+      "available": true,
+      "fit_manifest_sha256": "c1da27c05507a122127c2e5596325112d5fdd35b448522d9911b8794b6641da4",
+      "selected": {
+        "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\TE_all\\neutral\\F1_seed_47\\selected.pt",
+        "sha256": "40b4c53fcf41ec4ccb886367a57a257f4b64cd7c35aad985e585aef8fe7aab4b"
+      },
+      "selected_epoch": 5,
+      "trailing_states": [
+        {
+          "available": true,
+          "epoch": 3,
+          "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\TE_all\\neutral\\F1_seed_47\\epochs\\epoch_003.pt",
+          "sha256": "65d83188f7ee42409473b628c9fe6ec97f6ffa66f8128ec54e1e2176b20e4e44"
+        },
+        {
+          "available": true,
+          "epoch": 4,
+          "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\TE_all\\neutral\\F1_seed_47\\epochs\\epoch_004.pt",
+          "sha256": "cc315bcf3402788ccc71ff01f17f118643736d9e59aa65f10fcbc31aa2e9cedf"
+        },
+        {
+          "available": true,
+          "epoch": 5,
+          "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\TE_all\\neutral\\F1_seed_47\\epochs\\epoch_005.pt",
+          "sha256": "c999db79d414c7edfc742d57847f8cdb762c379a40ee8291686d218630416118"
+        }
+      ]
+    },
+    "TE_all/F10/11": {
+      "available": true,
+      "fit_manifest_sha256": "50031ade73091f9432debb5cde10bb407b2ce56376a180b73429f7a4f777cc05",
+      "selected": {
+        "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\TE_all\\neutral\\F10_seed_11\\selected.pt",
+        "sha256": "87cb60227d2f1add11997598237a2a5ae1e24cfc41a6fadef95e5a7e012abd38"
+      },
+      "selected_epoch": 6,
+      "trailing_states": [
+        {
+          "available": true,
+          "epoch": 4,
+          "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\TE_all\\neutral\\F10_seed_11\\epochs\\epoch_004.pt",
+          "sha256": "57b1f796760af051c07c00fe580aefc5f9be3876efce7c33e30062953a01cf72"
+        },
+        {
+          "available": true,
+          "epoch": 5,
+          "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\TE_all\\neutral\\F10_seed_11\\epochs\\epoch_005.pt",
+          "sha256": "d4c317d9a6caa46a8948cc68ca55c041d811b67dee1e13ec7f8cedca361e8a8d"
+        },
+        {
+          "available": true,
+          "epoch": 6,
+          "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\TE_all\\neutral\\F10_seed_11\\epochs\\epoch_006.pt",
+          "sha256": "65d7f5d234af5aeb1699640bae0f5587441023068cb75cc8e67254c7742cb5f1"
+        }
+      ]
+    },
+    "TE_all/F10/29": {
+      "available": true,
+      "fit_manifest_sha256": "9feee9c98c4fc55c2f84cad3e3b6c41abab269427f19588aa00b8bfeeddae2a3",
+      "selected": {
+        "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\TE_all\\neutral\\F10_seed_29\\selected.pt",
+        "sha256": "9454124d8e95de6c1e0c305dca582ad01f741ac1018d2cc60e5c793855728cf8"
+      },
+      "selected_epoch": 6,
+      "trailing_states": [
+        {
+          "available": true,
+          "epoch": 4,
+          "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\TE_all\\neutral\\F10_seed_29\\epochs\\epoch_004.pt",
+          "sha256": "2718862b367ad278219ea315a2cd496c1bec5d526afcf86c27d60bcac33b5291"
+        },
+        {
+          "available": true,
+          "epoch": 5,
+          "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\TE_all\\neutral\\F10_seed_29\\epochs\\epoch_005.pt",
+          "sha256": "479358eebf40055724d371ae4179ae9967f93d139a94c3731384d0517ba1268b"
+        },
+        {
+          "available": true,
+          "epoch": 6,
+          "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\TE_all\\neutral\\F10_seed_29\\epochs\\epoch_006.pt",
+          "sha256": "e0c66cc10555402a853f6e172e84a341773d27bf984b73c102648897f4126a30"
+        }
+      ]
+    },
+    "TE_all/F10/47": {
+      "available": true,
+      "fit_manifest_sha256": "0481c72d9e3473bbceda187fa7836c0651fe3acd1d7e479f182462f9faa28ebc",
+      "selected": {
+        "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\TE_all\\neutral\\F10_seed_47\\selected.pt",
+        "sha256": "c7a3d416066486eec2c5734f95da5bccab4459dc3c326323df2fc7bad0100afa"
+      },
+      "selected_epoch": 6,
+      "trailing_states": [
+        {
+          "available": true,
+          "epoch": 4,
+          "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\TE_all\\neutral\\F10_seed_47\\epochs\\epoch_004.pt",
+          "sha256": "0300360c1062410637b8f6330b6fdc5da96a3e182efb4b12c4d0e9a2522a25eb"
+        },
+        {
+          "available": true,
+          "epoch": 5,
+          "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\TE_all\\neutral\\F10_seed_47\\epochs\\epoch_005.pt",
+          "sha256": "3a717e086e34c8951189be0970014cb30afc4b8168139ae6aab7a6b9ffeeda31"
+        },
+        {
+          "available": true,
+          "epoch": 6,
+          "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\TE_all\\neutral\\F10_seed_47\\epochs\\epoch_006.pt",
+          "sha256": "d541f6085daa5500fd5cbf11f6eb0ebc5bf4344542859ea8d1b23415888dd654"
+        }
+      ]
+    },
+    "TE_all/F11/11": {
+      "available": true,
+      "fit_manifest_sha256": "6824a245f7c876581308494cb57487b8eab26d56f8965350e907cbf9df212484",
+      "selected": {
+        "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\TE_all\\neutral\\F11_seed_11\\selected.pt",
+        "sha256": "799ab92db7eecf2b76f9cd8bb658ef865978238896b886abb2b894a9b8084279"
+      },
+      "selected_epoch": 18,
+      "trailing_states": [
+        {
+          "available": true,
+          "epoch": 16,
+          "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\TE_all\\neutral\\F11_seed_11\\epochs\\epoch_016.pt",
+          "sha256": "a643639f171bdf5abb3a70fa7262b04c53727d3e11a3e3af39b2df35ddab3a7a"
+        },
+        {
+          "available": true,
+          "epoch": 17,
+          "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\TE_all\\neutral\\F11_seed_11\\epochs\\epoch_017.pt",
+          "sha256": "a7875a076972ff48a8a555c85a4e1c3213d1ca1ea6777b4d9d757c2cf4a76180"
+        },
+        {
+          "available": true,
+          "epoch": 18,
+          "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\TE_all\\neutral\\F11_seed_11\\epochs\\epoch_018.pt",
+          "sha256": "6a6768615b253168c7b637b301a9cccb43eb8ad5c924010ba5497620ae7342f7"
+        }
+      ]
+    },
+    "TE_all/F11/29": {
+      "available": true,
+      "fit_manifest_sha256": "ad986754bd8a44d386f607b774fabd1c2a3cf15acdae469777650137639c5d6a",
+      "selected": {
+        "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\TE_all\\neutral\\F11_seed_29\\selected.pt",
+        "sha256": "201233fd07d624fd3efdc3b5d35133205a8e7b8e3e1fafea439d89d3ef373eca"
+      },
+      "selected_epoch": 11,
+      "trailing_states": [
+        {
+          "available": true,
+          "epoch": 9,
+          "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\TE_all\\neutral\\F11_seed_29\\epochs\\epoch_009.pt",
+          "sha256": "53352d70fe680979dfdb3835fd784ee32556f76a392b3436c9da84c014c692c5"
+        },
+        {
+          "available": true,
+          "epoch": 10,
+          "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\TE_all\\neutral\\F11_seed_29\\epochs\\epoch_010.pt",
+          "sha256": "d8fcdbd42bcb0057afee1da1c1fbc4e824be53c447179a3f2479cf2faeeaade0"
+        },
+        {
+          "available": true,
+          "epoch": 11,
+          "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\TE_all\\neutral\\F11_seed_29\\epochs\\epoch_011.pt",
+          "sha256": "2054f1f5ec3141b3dd4b86d79fe597b42051b7a9014a30df1f9dd12f7f5316be"
+        }
+      ]
+    },
+    "TE_all/F11/47": {
+      "available": true,
+      "fit_manifest_sha256": "7f78ea99be96a676168e9e896c0db549eb01fd5fc12e711a60798955ce44ab73",
+      "selected": {
+        "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\TE_all\\neutral\\F11_seed_47\\selected.pt",
+        "sha256": "d85517db804b32213f700ba38a87bfd92f092eb4721f377a0e7da1b1c20ff7fa"
+      },
+      "selected_epoch": 11,
+      "trailing_states": [
+        {
+          "available": true,
+          "epoch": 9,
+          "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\TE_all\\neutral\\F11_seed_47\\epochs\\epoch_009.pt",
+          "sha256": "7d0e2f9f581921be3907795253f9f441a1caca0d8089da48ee6c881b8af72ecb"
+        },
+        {
+          "available": true,
+          "epoch": 10,
+          "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\TE_all\\neutral\\F11_seed_47\\epochs\\epoch_010.pt",
+          "sha256": "7fba4ca3337f3aed798e2c459300516d794292a00d33c1dcbb69f8b74736b75a"
+        },
+        {
+          "available": true,
+          "epoch": 11,
+          "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\TE_all\\neutral\\F11_seed_47\\epochs\\epoch_011.pt",
+          "sha256": "e267605644e490fb68c437c50bd7e63f9ea41dbe6a9638e25aadaa4a7212d2e2"
+        }
+      ]
+    },
+    "TE_all/F12/11": {
+      "available": true,
+      "fit_manifest_sha256": "75aadc95ced573fd4bcbda1b10a2a8cd012cb340ef5b9cc8746c0221afdc0f2d",
+      "selected": {
+        "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\TE_all\\neutral\\F12_seed_11\\selected.pt",
+        "sha256": "60a43d79b13100a6b45a31106e25af18c26a8541f19b34ebc7495aa77deb70e8"
+      },
+      "selected_epoch": 11,
+      "trailing_states": [
+        {
+          "available": true,
+          "epoch": 9,
+          "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\TE_all\\neutral\\F12_seed_11\\epochs\\epoch_009.pt",
+          "sha256": "ef1dfa256d0969b4368f9f0c32c115dd66ba7f9ddd30725ca32f0a643eaabb8b"
+        },
+        {
+          "available": true,
+          "epoch": 10,
+          "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\TE_all\\neutral\\F12_seed_11\\epochs\\epoch_010.pt",
+          "sha256": "fd5fbf24dcf11290f4183dfb2add0576f554fd16bbe6a4084c38545a8eb9a6cc"
+        },
+        {
+          "available": true,
+          "epoch": 11,
+          "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\TE_all\\neutral\\F12_seed_11\\epochs\\epoch_011.pt",
+          "sha256": "6e8ebc0c87340b33699431e85e6ca5643d290442dea166efc82c92f24084f64e"
+        }
+      ]
+    },
+    "TE_all/F12/29": {
+      "available": true,
+      "fit_manifest_sha256": "3f19251228b630a34965ab80a4bf27a0498cbe1627767b798bfc712e82fd27a8",
+      "selected": {
+        "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\TE_all\\neutral\\F12_seed_29\\selected.pt",
+        "sha256": "8c6b02384c6001b46e6ecdbd56dd5ca4326e607262c73c337dbca0262f6881ce"
+      },
+      "selected_epoch": 8,
+      "trailing_states": [
+        {
+          "available": true,
+          "epoch": 6,
+          "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\TE_all\\neutral\\F12_seed_29\\epochs\\epoch_006.pt",
+          "sha256": "3a684705ce4f6b68233f06a8170c10aa40a2aed25f88c2c95302c07b4d61e94a"
+        },
+        {
+          "available": true,
+          "epoch": 7,
+          "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\TE_all\\neutral\\F12_seed_29\\epochs\\epoch_007.pt",
+          "sha256": "3277b8b522983dd5a3ad774a180a53e11fe6dde7d04329343cade53aedf489e4"
+        },
+        {
+          "available": true,
+          "epoch": 8,
+          "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\TE_all\\neutral\\F12_seed_29\\epochs\\epoch_008.pt",
+          "sha256": "30f269a9f82a83ad2e031808f2d89f9baececee3346b2b217a53f3247440f24b"
+        }
+      ]
+    },
+    "TE_all/F12/47": {
+      "available": true,
+      "fit_manifest_sha256": "273f61baa9c511fe0aaf817602e471b646ee9cdaef4a2c2f854e24e1aa78ccce",
+      "selected": {
+        "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\TE_all\\neutral\\F12_seed_47\\selected.pt",
+        "sha256": "d0e2587f4e9d8a6553bdf36f52b3fb6ee8864847d37fba992b95b37d6e6e813e"
+      },
+      "selected_epoch": 13,
+      "trailing_states": [
+        {
+          "available": true,
+          "epoch": 11,
+          "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\TE_all\\neutral\\F12_seed_47\\epochs\\epoch_011.pt",
+          "sha256": "e8526db439b515c1f6f19c9070e105f45d87d4c04ea8f3519d136374e9a3c5e2"
+        },
+        {
+          "available": true,
+          "epoch": 12,
+          "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\TE_all\\neutral\\F12_seed_47\\epochs\\epoch_012.pt",
+          "sha256": "369c067abace196a0d034a1214b18d67a74d1a6d1d2062b388484e07dec354e8"
+        },
+        {
+          "available": true,
+          "epoch": 13,
+          "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\TE_all\\neutral\\F12_seed_47\\epochs\\epoch_013.pt",
+          "sha256": "5086957f34885db140971ee25c35987246b62b6d82ebdbd64e5f07dd4450df54"
+        }
+      ]
+    },
+    "TE_all/F13/11": {
+      "available": true,
+      "fit_manifest_sha256": "c06564798569401851a8bbbd4208a30eeef453bc76e7bbd88825c8ab66a521b3",
+      "selected": {
+        "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\TE_all\\neutral\\F13_seed_11\\selected.pt",
+        "sha256": "494bbad362d1505f73d92318e638477345c867413233c2b82ad006766bf83320"
+      },
+      "selected_epoch": 17,
+      "trailing_states": [
+        {
+          "available": true,
+          "epoch": 15,
+          "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\TE_all\\neutral\\F13_seed_11\\epochs\\epoch_015.pt",
+          "sha256": "64d47512cb6972b6b6cb04b2eb69848c1619fa874803c0eae78d4a3e71a131de"
+        },
+        {
+          "available": true,
+          "epoch": 16,
+          "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\TE_all\\neutral\\F13_seed_11\\epochs\\epoch_016.pt",
+          "sha256": "22bd48324df3195677d71fffbfc18a14e834f0cdfca071274e8c9fbe5fc029ee"
+        },
+        {
+          "available": true,
+          "epoch": 17,
+          "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\TE_all\\neutral\\F13_seed_11\\epochs\\epoch_017.pt",
+          "sha256": "9ff34e87c808a1a0f74d841f4345303f784abc7ffbbacc4aac22294414be9fda"
+        }
+      ]
+    },
+    "TE_all/F13/29": {
+      "available": true,
+      "fit_manifest_sha256": "cbe2715340146f3a7a76658f9a708f8a040c490b9a6b89008303332f366d64af",
+      "selected": {
+        "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\TE_all\\neutral\\F13_seed_29\\selected.pt",
+        "sha256": "7084f05a27b0129baf08707f944d38f067e3a025fe955b685336d10b7a7ad10a"
+      },
+      "selected_epoch": 10,
+      "trailing_states": [
+        {
+          "available": true,
+          "epoch": 8,
+          "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\TE_all\\neutral\\F13_seed_29\\epochs\\epoch_008.pt",
+          "sha256": "e0d316f30b7628fd8a91ea447c30b66bdabd4673a5cfb190d8aa2c7c2b2405b8"
+        },
+        {
+          "available": true,
+          "epoch": 9,
+          "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\TE_all\\neutral\\F13_seed_29\\epochs\\epoch_009.pt",
+          "sha256": "33da3d6e35e4d4738ea245cccb992e48459e919ba96d77eaad0ba99095bdd6fa"
+        },
+        {
+          "available": true,
+          "epoch": 10,
+          "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\TE_all\\neutral\\F13_seed_29\\epochs\\epoch_010.pt",
+          "sha256": "9667395d1cbc98306b41ac51bed3a10a12a5d4c5744730e3a08f60313d7fd816"
+        }
+      ]
+    },
+    "TE_all/F13/47": {
+      "available": true,
+      "fit_manifest_sha256": "644ed728413656d3a59c2a63cb5017cab8bb22c5005dea2f70cf8ce565cfea2c",
+      "selected": {
+        "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\TE_all\\neutral\\F13_seed_47\\selected.pt",
+        "sha256": "466114712597af1133a1a7b039c5cc146d8d484edf77a256a94c2bb06d2aa82d"
+      },
+      "selected_epoch": 4,
+      "trailing_states": [
+        {
+          "available": true,
+          "epoch": 2,
+          "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\TE_all\\neutral\\F13_seed_47\\epochs\\epoch_002.pt",
+          "sha256": "31ac8683c70090ae6eec647ef419d536e73850eba84721fd596f572bf365733d"
+        },
+        {
+          "available": true,
+          "epoch": 3,
+          "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\TE_all\\neutral\\F13_seed_47\\epochs\\epoch_003.pt",
+          "sha256": "6c3dc1f6e5fed756415ebe2989749df9985bed4792cad9fbab3be683896fda32"
+        },
+        {
+          "available": true,
+          "epoch": 4,
+          "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\TE_all\\neutral\\F13_seed_47\\epochs\\epoch_004.pt",
+          "sha256": "d92ba14715d5b1dfce5b64a40dc32eaa74b192d680a444cbc5b2a023cd775791"
+        }
+      ]
+    },
+    "TE_all/F14/11": {
+      "available": true,
+      "fit_manifest_sha256": "c76e4d31827dda9d6fd0730f12fb3f94cae1b4547e07c6f62d12c00ee5502659",
+      "selected": {
+        "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\TE_all\\neutral\\F14_seed_11\\selected.pt",
+        "sha256": "e662105b39a579c27d97c917645e0afd095afd7ac6940305bf186e4b3704dc99"
+      },
+      "selected_epoch": 2,
+      "trailing_states": [
+        {
+          "available": true,
+          "epoch": 1,
+          "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\TE_all\\neutral\\F14_seed_11\\epochs\\epoch_001.pt",
+          "sha256": "66bce3ce8ea6a74853c083625cc1d104092cdfdcd8e0ebbfca246b9457a8645f"
+        },
+        {
+          "available": true,
+          "epoch": 2,
+          "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\TE_all\\neutral\\F14_seed_11\\epochs\\epoch_002.pt",
+          "sha256": "2f294675b372fee84b0007118f7a08e857f7e88c433cd95fd0a63a221174e7a4"
+        }
+      ]
+    },
+    "TE_all/F14/29": {
+      "available": true,
+      "fit_manifest_sha256": "c354d689f02c81c50056f05c8d97221e6698aa0cb070feace4735c3eb2bae4a1",
+      "selected": {
+        "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\TE_all\\neutral\\F14_seed_29\\selected.pt",
+        "sha256": "56f037db3d03f1fc0b13205b4eb2501ef9540abfce6197b9f54d3a47aacbece4"
+      },
+      "selected_epoch": 2,
+      "trailing_states": [
+        {
+          "available": true,
+          "epoch": 1,
+          "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\TE_all\\neutral\\F14_seed_29\\epochs\\epoch_001.pt",
+          "sha256": "e15e1464c09f0a86f101453a7bfbb4bcc0ce65fbab43012d7e3c17cb7acd7026"
+        },
+        {
+          "available": true,
+          "epoch": 2,
+          "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\TE_all\\neutral\\F14_seed_29\\epochs\\epoch_002.pt",
+          "sha256": "61774e23fd479b7a13b2cc9119597da9edd655260fd6cc3ab76ccd209f35b26f"
+        }
+      ]
+    },
+    "TE_all/F14/47": {
+      "available": true,
+      "fit_manifest_sha256": "9ebc90cf3611ef73f6ba22c7416a125db70e873e73a6c3feaf96d947b793fa32",
+      "selected": {
+        "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\TE_all\\neutral\\F14_seed_47\\selected.pt",
+        "sha256": "3a8c934691b51af012390b6d6d8de4c4f97ac25e58832fca624deadf51b323e3"
+      },
+      "selected_epoch": 4,
+      "trailing_states": [
+        {
+          "available": true,
+          "epoch": 2,
+          "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\TE_all\\neutral\\F14_seed_47\\epochs\\epoch_002.pt",
+          "sha256": "89f9ae7e71d85e63492100940115e330fe57b12ba9130ed05ca3b71fbbe66f22"
+        },
+        {
+          "available": true,
+          "epoch": 3,
+          "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\TE_all\\neutral\\F14_seed_47\\epochs\\epoch_003.pt",
+          "sha256": "62eed49fd3d445e053aa6576c0390a7f15cf5d597107cce9d47ead6cef01b17d"
+        },
+        {
+          "available": true,
+          "epoch": 4,
+          "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\TE_all\\neutral\\F14_seed_47\\epochs\\epoch_004.pt",
+          "sha256": "611186510246f6340d44885fba2a90b23b759d02f8b4c81ceaac301c471f1284"
+        }
+      ]
+    },
+    "TE_all/F2/11": {
+      "available": true,
+      "fit_manifest_sha256": "6593378826a0913b3632c891c337397677883f52d140e96b30f31168894205f3",
+      "selected": {
+        "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\TE_all\\neutral\\F2_seed_11\\selected.pt",
+        "sha256": "8352db5d190c36d3366563ad2c464a33419d75e01498bb4d3e626b16a427d47f"
+      },
+      "selected_epoch": 9,
+      "trailing_states": [
+        {
+          "available": true,
+          "epoch": 7,
+          "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\TE_all\\neutral\\F2_seed_11\\epochs\\epoch_007.pt",
+          "sha256": "d77aaae66c45967ee021948d5e7d3d4579bb7024f0ae9afa5b2a64c2641e0d49"
+        },
+        {
+          "available": true,
+          "epoch": 8,
+          "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\TE_all\\neutral\\F2_seed_11\\epochs\\epoch_008.pt",
+          "sha256": "391ab4e5b7d790c30d594ab8047282beb4f5f03d61ad7b2432a54da5caf627f1"
+        },
+        {
+          "available": true,
+          "epoch": 9,
+          "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\TE_all\\neutral\\F2_seed_11\\epochs\\epoch_009.pt",
+          "sha256": "7792e79324bd6c00fb8793654af285b49d09aedfb4a0a21c762989f66e96cf9b"
+        }
+      ]
+    },
+    "TE_all/F2/29": {
+      "available": true,
+      "fit_manifest_sha256": "96721f292f5468d0b34b6bc972a7597574d1bc14e1e69c0aa997263eeeb24fe2",
+      "selected": {
+        "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\TE_all\\neutral\\F2_seed_29\\selected.pt",
+        "sha256": "18151e4e3a38ad0c1dd088a92c3681a6f586f284bf0f0ce97c6d32ebfbf0bc80"
+      },
+      "selected_epoch": 10,
+      "trailing_states": [
+        {
+          "available": true,
+          "epoch": 8,
+          "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\TE_all\\neutral\\F2_seed_29\\epochs\\epoch_008.pt",
+          "sha256": "1ea587aa8745a88b203ad3fa080a43c1a139fca152a08fad009a1658a02f954f"
+        },
+        {
+          "available": true,
+          "epoch": 9,
+          "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\TE_all\\neutral\\F2_seed_29\\epochs\\epoch_009.pt",
+          "sha256": "d215c36e2a3e5bbb839fe72331aa2be93442edec9bf320214ce9821f2aa6266f"
+        },
+        {
+          "available": true,
+          "epoch": 10,
+          "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\TE_all\\neutral\\F2_seed_29\\epochs\\epoch_010.pt",
+          "sha256": "c34fa59db0aed90dee0c2bc05e7c1c05626de06e52575adf20ba980642c2f200"
+        }
+      ]
+    },
+    "TE_all/F2/47": {
+      "available": true,
+      "fit_manifest_sha256": "09911af07d36a8866b39d0e8c051a157a35d6c11e40cc61729b731a463b9be5e",
+      "selected": {
+        "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\TE_all\\neutral\\F2_seed_47\\selected.pt",
+        "sha256": "4f1c0ac5577cc6eae064619ad48875661a01b2d9ecd313effeaf25bbdd0f3f67"
+      },
+      "selected_epoch": 8,
+      "trailing_states": [
+        {
+          "available": true,
+          "epoch": 6,
+          "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\TE_all\\neutral\\F2_seed_47\\epochs\\epoch_006.pt",
+          "sha256": "3e800aea7002f8de6a172d56d6ff5a04ce19e88cf93b09e7f42026589ea6c4ea"
+        },
+        {
+          "available": true,
+          "epoch": 7,
+          "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\TE_all\\neutral\\F2_seed_47\\epochs\\epoch_007.pt",
+          "sha256": "5c5cedcd7b0ad9fdffa3a1a2f1d576b95ae9d291d3046cf04517b4b53d92ae04"
+        },
+        {
+          "available": true,
+          "epoch": 8,
+          "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\TE_all\\neutral\\F2_seed_47\\epochs\\epoch_008.pt",
+          "sha256": "cc29689461098d02fb237190f2f708ab5e2fcac0f54c63b0c6f8fad76c49432d"
+        }
+      ]
+    },
+    "TE_all/F3/11": {
+      "available": true,
+      "fit_manifest_sha256": "2a13992e57597069ac283a1c63cfeecf9a21cad2137d321498712dce45dd1b99",
+      "selected": {
+        "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\TE_all\\neutral\\F3_seed_11\\selected.pt",
+        "sha256": "9f18bf68eaf79c0d2e3c1b30b409dde5904d6919b317fbca5d3968e4183b4214"
+      },
+      "selected_epoch": 1,
+      "trailing_states": [
+        {
+          "available": true,
+          "epoch": 1,
+          "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\TE_all\\neutral\\F3_seed_11\\epochs\\epoch_001.pt",
+          "sha256": "e515f2a30bf482411513d6aec281ab09bf802c4b2dab7b3b51fb9d59f87958e5"
+        }
+      ]
+    },
+    "TE_all/F3/29": {
+      "available": true,
+      "fit_manifest_sha256": "8ba499213c8910ccb3a81f6cde4cfafb14152331145185175c9c92a199d06f7f",
+      "selected": {
+        "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\TE_all\\neutral\\F3_seed_29\\selected.pt",
+        "sha256": "e8abb5ed95b2c6f0a3da06ec3162ff93b7a551fc1e02f6951b2f49c100266486"
+      },
+      "selected_epoch": 1,
+      "trailing_states": [
+        {
+          "available": true,
+          "epoch": 1,
+          "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\TE_all\\neutral\\F3_seed_29\\epochs\\epoch_001.pt",
+          "sha256": "76409a98e9f1dda7534fbccdf7c7118b84f38f6bffa1588252e93e6c5c4fe50e"
+        }
+      ]
+    },
+    "TE_all/F3/47": {
+      "available": true,
+      "fit_manifest_sha256": "2cbe67c61c2d3404b9764978f9d6a825755be3d3253be97eaa5f7660af16bff0",
+      "selected": {
+        "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\TE_all\\neutral\\F3_seed_47\\selected.pt",
+        "sha256": "ab0e7b1499fcf306a426e0831559ba6ef171f436a087b11ea53febfbc89ee553"
+      },
+      "selected_epoch": 1,
+      "trailing_states": [
+        {
+          "available": true,
+          "epoch": 1,
+          "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\TE_all\\neutral\\F3_seed_47\\epochs\\epoch_001.pt",
+          "sha256": "5ae41ca535e7c391633c235e47c6b50f84e544803fa8d0abc1547f3a4ed09fa5"
+        }
+      ]
+    },
+    "TE_all/F4/11": {
+      "available": true,
+      "fit_manifest_sha256": "ef72bea355dbb4bfaab0f8c62c317ebc81fb4dc3cacbf0390e07cb06e4c4bf34",
+      "selected": {
+        "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\TE_all\\neutral\\F4_seed_11\\selected.pt",
+        "sha256": "03a1b4b91e2536becd3bc70f9fc7b1c79a5d8319c1bdc5f86159e0e9444db888"
+      },
+      "selected_epoch": 5,
+      "trailing_states": [
+        {
+          "available": true,
+          "epoch": 3,
+          "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\TE_all\\neutral\\F4_seed_11\\epochs\\epoch_003.pt",
+          "sha256": "67d1f3673f6fc40c8a80fff7732f2832307b34dc5b84bc41bd044a4c0a6fafa8"
+        },
+        {
+          "available": true,
+          "epoch": 4,
+          "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\TE_all\\neutral\\F4_seed_11\\epochs\\epoch_004.pt",
+          "sha256": "b0ec37fdcf617e350140131195462ab99bfefa0bb1624c44120616e27a587e82"
+        },
+        {
+          "available": true,
+          "epoch": 5,
+          "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\TE_all\\neutral\\F4_seed_11\\epochs\\epoch_005.pt",
+          "sha256": "8fff8a1470c7013c2d37ebbee19732f3fec4bd807993cb572a9fa549956a6b0f"
+        }
+      ]
+    },
+    "TE_all/F4/29": {
+      "available": true,
+      "fit_manifest_sha256": "e5fb6ab85679a6cabc1237bbf33b582502a0de37ed654cd973fd4e44163dfbf9",
+      "selected": {
+        "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\TE_all\\neutral\\F4_seed_29\\selected.pt",
+        "sha256": "fd28033f9d627cd1c467524616a9d85fe9ecb7f40b045da40ca595a3703298a2"
+      },
+      "selected_epoch": 5,
+      "trailing_states": [
+        {
+          "available": true,
+          "epoch": 3,
+          "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\TE_all\\neutral\\F4_seed_29\\epochs\\epoch_003.pt",
+          "sha256": "46fd7eae74864d3354d9ba94032e7ebb1c88bbfc71d9951bc9605645788ecf38"
+        },
+        {
+          "available": true,
+          "epoch": 4,
+          "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\TE_all\\neutral\\F4_seed_29\\epochs\\epoch_004.pt",
+          "sha256": "8c1653dbbb5f654e44cec4d374320d7ce3c7f1588d455d07d81c73140c2d32a7"
+        },
+        {
+          "available": true,
+          "epoch": 5,
+          "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\TE_all\\neutral\\F4_seed_29\\epochs\\epoch_005.pt",
+          "sha256": "bcce8fe0392dfb5ea2325a0a8435b88a552480d3c271380ae5642e82c0b4b668"
+        }
+      ]
+    },
+    "TE_all/F4/47": {
+      "available": true,
+      "fit_manifest_sha256": "876e14a96a55cb56aebdec5ff5af8b2310c318a5316bf2263186426738f10f24",
+      "selected": {
+        "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\TE_all\\neutral\\F4_seed_47\\selected.pt",
+        "sha256": "664a55e365268cdd090b069bba9c16a45f27d4ba6e24a477bee43572e91decfe"
+      },
+      "selected_epoch": 4,
+      "trailing_states": [
+        {
+          "available": true,
+          "epoch": 2,
+          "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\TE_all\\neutral\\F4_seed_47\\epochs\\epoch_002.pt",
+          "sha256": "c9e77fc3fdd100c1d3c752300ce0494603d3bc85dea2343e44a6d9ad74532256"
+        },
+        {
+          "available": true,
+          "epoch": 3,
+          "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\TE_all\\neutral\\F4_seed_47\\epochs\\epoch_003.pt",
+          "sha256": "49ea7cdd8ddacde1eba14d43d92adcf3981057ab6bfdda33ce2b3be290101073"
+        },
+        {
+          "available": true,
+          "epoch": 4,
+          "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\TE_all\\neutral\\F4_seed_47\\epochs\\epoch_004.pt",
+          "sha256": "e3e04963d51b75e2277c3cbd92e64e923f253ac6f43f85affc3e989d6bcdd3a2"
+        }
+      ]
+    },
+    "TE_all/F5/11": {
+      "available": true,
+      "fit_manifest_sha256": "46943d0ff758c5d22de3fbb95a9c59a3ea5a5a729fc5b0c8e4d6ee45759bf6ba",
+      "selected": {
+        "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\TE_all\\neutral\\F5_seed_11\\selected.pt",
+        "sha256": "16c848ba38603c43cd8af14ca138496bb431720964431c1c3c356aa84e0e8291"
+      },
+      "selected_epoch": 21,
+      "trailing_states": [
+        {
+          "available": true,
+          "epoch": 19,
+          "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\TE_all\\neutral\\F5_seed_11\\epochs\\epoch_019.pt",
+          "sha256": "7613e1fac28ed215275f9075ef161d520f41d218ce22c1c80b37e8a68256984e"
+        },
+        {
+          "available": true,
+          "epoch": 20,
+          "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\TE_all\\neutral\\F5_seed_11\\epochs\\epoch_020.pt",
+          "sha256": "5387e58e12f5b88c2166b4d5b5f38627fb186411ffd77442606c846e53cc6d52"
+        },
+        {
+          "available": true,
+          "epoch": 21,
+          "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\TE_all\\neutral\\F5_seed_11\\epochs\\epoch_021.pt",
+          "sha256": "e6a30fbe366de685c40325ca7250eabb3ebc4804a5edde11e1079eb108e6ca1c"
+        }
+      ]
+    },
+    "TE_all/F5/29": {
+      "available": true,
+      "fit_manifest_sha256": "ab4e7392c2e04e92a4ec55b6f0daeca5ea5d9a43640f5e0256c00cccdb7f4311",
+      "selected": {
+        "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\TE_all\\neutral\\F5_seed_29\\selected.pt",
+        "sha256": "8c27641461da5929b7402177cbc16f73aa7ecb7aff8f231c9b6c6b662f956e25"
+      },
+      "selected_epoch": 18,
+      "trailing_states": [
+        {
+          "available": true,
+          "epoch": 16,
+          "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\TE_all\\neutral\\F5_seed_29\\epochs\\epoch_016.pt",
+          "sha256": "031535a8941273c9bfc477a201b800a1f4e80b98439025fd2af1a504e33805d4"
+        },
+        {
+          "available": true,
+          "epoch": 17,
+          "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\TE_all\\neutral\\F5_seed_29\\epochs\\epoch_017.pt",
+          "sha256": "076229b3de492cd7ad14c5b122250cbfc7075356c94bb6da34ffe936a124cddc"
+        },
+        {
+          "available": true,
+          "epoch": 18,
+          "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\TE_all\\neutral\\F5_seed_29\\epochs\\epoch_018.pt",
+          "sha256": "25ca1a9122d4efa78b8e408355cb34859d2fa68a410fe83b3ada3620226e770c"
+        }
+      ]
+    },
+    "TE_all/F5/47": {
+      "available": true,
+      "fit_manifest_sha256": "c52a2e3339706259017b74a7e646fbd1eac6fdee0965261479d665e72d7097f7",
+      "selected": {
+        "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\TE_all\\neutral\\F5_seed_47\\selected.pt",
+        "sha256": "5e6dfda57de04f752b837f4620c98ff75ca9f69cce4f6384af5b078b2ab13cf2"
+      },
+      "selected_epoch": 11,
+      "trailing_states": [
+        {
+          "available": true,
+          "epoch": 9,
+          "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\TE_all\\neutral\\F5_seed_47\\epochs\\epoch_009.pt",
+          "sha256": "e713b27637e9c4a6ab566da0288aeebb7af56e4b8a2ae27219acbb624a4c24d6"
+        },
+        {
+          "available": true,
+          "epoch": 10,
+          "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\TE_all\\neutral\\F5_seed_47\\epochs\\epoch_010.pt",
+          "sha256": "5a7d1afff407f1573f698aa62a13b30de0e5c3fc2a3680963ea2946cf690fa2f"
+        },
+        {
+          "available": true,
+          "epoch": 11,
+          "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\TE_all\\neutral\\F5_seed_47\\epochs\\epoch_011.pt",
+          "sha256": "e48a7e0ba5ba454fb52c65dcac7bad0d4763ea198a3c23210cf2da71e48b24d5"
+        }
+      ]
+    },
+    "TE_all/F6/11": {
+      "available": true,
+      "fit_manifest_sha256": "b82842755b125208408b99a19f43a320dcd3f915db3e66f8dc0037de996489ea",
+      "selected": {
+        "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\TE_all\\neutral\\F6_seed_11\\selected.pt",
+        "sha256": "1b58fabc85c723111f7b229f75e60c7af8d3fe345a29d09caf9613f88491de85"
+      },
+      "selected_epoch": 1,
+      "trailing_states": [
+        {
+          "available": true,
+          "epoch": 1,
+          "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\TE_all\\neutral\\F6_seed_11\\epochs\\epoch_001.pt",
+          "sha256": "653839b354a2d14505cdc763c34f46118b397d0af5799a8cd9a34c83e3d834fe"
+        }
+      ]
+    },
+    "TE_all/F6/29": {
+      "available": true,
+      "fit_manifest_sha256": "b7ae37f014b7cebc2c3f9386ec5d115051b76b46c1a0a27efffc112b8a63f487",
+      "selected": {
+        "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\TE_all\\neutral\\F6_seed_29\\selected.pt",
+        "sha256": "d47da8eaf914738df321316c1a78a24ebb0168c22c003f53bc645f56aa3c6f76"
+      },
+      "selected_epoch": 1,
+      "trailing_states": [
+        {
+          "available": true,
+          "epoch": 1,
+          "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\TE_all\\neutral\\F6_seed_29\\epochs\\epoch_001.pt",
+          "sha256": "b7de321db626b6a14f4fdfaa0bb3090ad05880aee534c85bff25b1dd3c242085"
+        }
+      ]
+    },
+    "TE_all/F6/47": {
+      "available": true,
+      "fit_manifest_sha256": "abff2a4ac21b2240a440b1ca866c6e219424b7ce8c0c423a0f9b5591b60cfc63",
+      "selected": {
+        "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\TE_all\\neutral\\F6_seed_47\\selected.pt",
+        "sha256": "8898fbbc399405f512219e5dc0ec41a0cafa0d7897474f6553f620ef51402016"
+      },
+      "selected_epoch": 1,
+      "trailing_states": [
+        {
+          "available": true,
+          "epoch": 1,
+          "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\TE_all\\neutral\\F6_seed_47\\epochs\\epoch_001.pt",
+          "sha256": "18eb37e4f375fb5c79648d92cfb79d8349a47ba5cb0299caa108e6e09fd94508"
+        }
+      ]
+    },
+    "TE_all/F7/11": {
+      "available": true,
+      "fit_manifest_sha256": "8b661e7dc4ec8eb08bec7ca13d164b1c11def38631e4b6cad8b06331d14e3535",
+      "selected": {
+        "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\TE_all\\neutral\\F7_seed_11\\selected.pt",
+        "sha256": "c0bd130eb03063d88a39365d40dff1630cdcfefc87d43341ea972f7791cf00df"
+      },
+      "selected_epoch": 16,
+      "trailing_states": [
+        {
+          "available": true,
+          "epoch": 14,
+          "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\TE_all\\neutral\\F7_seed_11\\epochs\\epoch_014.pt",
+          "sha256": "f0459e5999271a8c5bd349838e40bd628ba71476c04f236663b8426461764814"
+        },
+        {
+          "available": true,
+          "epoch": 15,
+          "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\TE_all\\neutral\\F7_seed_11\\epochs\\epoch_015.pt",
+          "sha256": "f71058ed1903fd9458a98335160012b1a763cab75ff438fc092fb705d6ff2f93"
+        },
+        {
+          "available": true,
+          "epoch": 16,
+          "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\TE_all\\neutral\\F7_seed_11\\epochs\\epoch_016.pt",
+          "sha256": "49bd9f33e4f180c86b425e1f3abc8b0b0aab9ca53fc3554747cffc01ae7a7786"
+        }
+      ]
+    },
+    "TE_all/F7/29": {
+      "available": true,
+      "fit_manifest_sha256": "39eb502c9be803eba9f077cc0bfe0e3c6345a712fa695493534609ef40f4fec3",
+      "selected": {
+        "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\TE_all\\neutral\\F7_seed_29\\selected.pt",
+        "sha256": "7124d7be971eefc72eb98a7d383389505ba35329c80ba6be3dfa30581a8fa17d"
+      },
+      "selected_epoch": 11,
+      "trailing_states": [
+        {
+          "available": true,
+          "epoch": 9,
+          "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\TE_all\\neutral\\F7_seed_29\\epochs\\epoch_009.pt",
+          "sha256": "6f3aa4dec05771ac6ab844dd73218e03e6e36e476bddeff33390ecb7d793b6b2"
+        },
+        {
+          "available": true,
+          "epoch": 10,
+          "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\TE_all\\neutral\\F7_seed_29\\epochs\\epoch_010.pt",
+          "sha256": "9c032f3fac8695dafb3c46b10e61e50b47c90079b8aa6d3b7399bb77364ef7c2"
+        },
+        {
+          "available": true,
+          "epoch": 11,
+          "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\TE_all\\neutral\\F7_seed_29\\epochs\\epoch_011.pt",
+          "sha256": "63a613592fb6b6f165a4981f1817cc364f6f92dc3b23740c4fb8b7d3ba0bf35b"
+        }
+      ]
+    },
+    "TE_all/F7/47": {
+      "available": true,
+      "fit_manifest_sha256": "563272e0392ad77517d0771454588d973357499cc4d7022c6df145a30fc24dcf",
+      "selected": {
+        "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\TE_all\\neutral\\F7_seed_47\\selected.pt",
+        "sha256": "bab298a4c92021f9b603b1d2b3983228572f91e1780e0e59c640ba1b1cc9472b"
+      },
+      "selected_epoch": 9,
+      "trailing_states": [
+        {
+          "available": true,
+          "epoch": 7,
+          "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\TE_all\\neutral\\F7_seed_47\\epochs\\epoch_007.pt",
+          "sha256": "c977d4d9f95b4d0ff2bb718c4d438d535bce9265290ae2a3770ae8eb72079adf"
+        },
+        {
+          "available": true,
+          "epoch": 8,
+          "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\TE_all\\neutral\\F7_seed_47\\epochs\\epoch_008.pt",
+          "sha256": "112231f7d77631602968c5fe778e53f1d4882f6e2a0615679acb6cbee617dd62"
+        },
+        {
+          "available": true,
+          "epoch": 9,
+          "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\TE_all\\neutral\\F7_seed_47\\epochs\\epoch_009.pt",
+          "sha256": "e9c32d88640d6d79e993abfba0c2a5fb47e3deb5130651effaaf3883d2d10618"
+        }
+      ]
+    },
+    "TE_all/F8/11": {
+      "available": true,
+      "fit_manifest_sha256": "fac421f1f44aa5799746cc9b704106f224ff040b2364052656c66a4522493204",
+      "selected": {
+        "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\TE_all\\neutral\\F8_seed_11\\selected.pt",
+        "sha256": "a9b412a0eafed8cdea4662f190483747eab4ef39468aa5d3322e1a45765ba015"
+      },
+      "selected_epoch": 35,
+      "trailing_states": [
+        {
+          "available": true,
+          "epoch": 33,
+          "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\TE_all\\neutral\\F8_seed_11\\epochs\\epoch_033.pt",
+          "sha256": "82d5f6173135bdde9bc5ee4ae82bd8a0cd023f5d11b9c17befa15d6e799aec91"
+        },
+        {
+          "available": true,
+          "epoch": 34,
+          "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\TE_all\\neutral\\F8_seed_11\\epochs\\epoch_034.pt",
+          "sha256": "e16fe736b306e2d920637e15934051ea98ee3b2ee76804065132eb50be65c220"
+        },
+        {
+          "available": true,
+          "epoch": 35,
+          "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\TE_all\\neutral\\F8_seed_11\\epochs\\epoch_035.pt",
+          "sha256": "9dd24b8c67f4b550641dabc21405abd2315f63f73af086198905df262bddc7fa"
+        }
+      ]
+    },
+    "TE_all/F8/29": {
+      "available": true,
+      "fit_manifest_sha256": "d50e6ae6b8f9c0b8594115b4648fabc4d956aff1600246769a5c56ba6bec9dca",
+      "selected": {
+        "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\TE_all\\neutral\\F8_seed_29\\selected.pt",
+        "sha256": "49480871d88f682917da5734e8c7d0b54050e4ec4dbe6c6095847a50e853c53e"
+      },
+      "selected_epoch": 18,
+      "trailing_states": [
+        {
+          "available": true,
+          "epoch": 16,
+          "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\TE_all\\neutral\\F8_seed_29\\epochs\\epoch_016.pt",
+          "sha256": "fc6ecfe8934c20e999d7a52c8e29b1dbb5195cb22ce4e26f0312b5277283eace"
+        },
+        {
+          "available": true,
+          "epoch": 17,
+          "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\TE_all\\neutral\\F8_seed_29\\epochs\\epoch_017.pt",
+          "sha256": "7173cbc390c492568f46e09eb5cf39f2207a9b6b4dd6a414bb6eee5cc448baf7"
+        },
+        {
+          "available": true,
+          "epoch": 18,
+          "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\TE_all\\neutral\\F8_seed_29\\epochs\\epoch_018.pt",
+          "sha256": "fbede2d6e28e86c3f2d3161261852e9811e2cc3613c7fd14ed5a9590c303aa22"
+        }
+      ]
+    },
+    "TE_all/F8/47": {
+      "available": true,
+      "fit_manifest_sha256": "bf885580da2fa1c3e6d4cf4654badca5646663df376f728978d03bde35ad396b",
+      "selected": {
+        "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\TE_all\\neutral\\F8_seed_47\\selected.pt",
+        "sha256": "4b93d45f4d91f09a19b8c895668498e61ad5add47646c2e07ae7250e513a49ae"
+      },
+      "selected_epoch": 3,
+      "trailing_states": [
+        {
+          "available": true,
+          "epoch": 1,
+          "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\TE_all\\neutral\\F8_seed_47\\epochs\\epoch_001.pt",
+          "sha256": "6093fc5dff41854153c65c1cc4a5f20139817984663c007653b269b91e4eddfb"
+        },
+        {
+          "available": true,
+          "epoch": 2,
+          "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\TE_all\\neutral\\F8_seed_47\\epochs\\epoch_002.pt",
+          "sha256": "af958bc1c2a96754f760d5e2a63a39c0bb5e51abab50dd1f2a032a02d9e434c8"
+        },
+        {
+          "available": true,
+          "epoch": 3,
+          "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\TE_all\\neutral\\F8_seed_47\\epochs\\epoch_003.pt",
+          "sha256": "965a066e1482400422fb2fd4399d0c98fd97ac91b45380994a5adbde81b75dc5"
+        }
+      ]
+    },
+    "TE_all/F9/11": {
+      "available": true,
+      "fit_manifest_sha256": "d2c95f387977cd1281449a5b1aeb1274a51627e1da340cd37720b77e7a673315",
+      "selected": {
+        "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\TE_all\\neutral\\F9_seed_11\\selected.pt",
+        "sha256": "3e38ad0047de0f39fb352d916ac3b2aff6dc638c1694cbde32f9539c5523bd98"
+      },
+      "selected_epoch": 13,
+      "trailing_states": [
+        {
+          "available": true,
+          "epoch": 11,
+          "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\TE_all\\neutral\\F9_seed_11\\epochs\\epoch_011.pt",
+          "sha256": "b971c5aa8a1b18ab28eb774164f4f87e27cb12a70a8903a9b203df500d72563a"
+        },
+        {
+          "available": true,
+          "epoch": 12,
+          "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\TE_all\\neutral\\F9_seed_11\\epochs\\epoch_012.pt",
+          "sha256": "a0fb65e16a1b0718fe1d6702e4791324fe10c4d1fe51b06ecc06f07581a2c63b"
+        },
+        {
+          "available": true,
+          "epoch": 13,
+          "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\TE_all\\neutral\\F9_seed_11\\epochs\\epoch_013.pt",
+          "sha256": "9c9be13e2d92ac8c3390c84dde040c2e71646fdcac9b50a44580d30b084b1bb4"
+        }
+      ]
+    },
+    "TE_all/F9/29": {
+      "available": true,
+      "fit_manifest_sha256": "c059b308061fcab2ff072bdff6a6f43c7e5de1b45be3423688d19f60238798d6",
+      "selected": {
+        "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\TE_all\\neutral\\F9_seed_29\\selected.pt",
+        "sha256": "108238489684f3cac5d9a0645339332f52f6480d83a939c299def7d179e0f015"
+      },
+      "selected_epoch": 11,
+      "trailing_states": [
+        {
+          "available": true,
+          "epoch": 9,
+          "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\TE_all\\neutral\\F9_seed_29\\epochs\\epoch_009.pt",
+          "sha256": "cb97faca47ef1e3788f3440129774d8a728cfe24b51fed0ce350f245adc0bbc2"
+        },
+        {
+          "available": true,
+          "epoch": 10,
+          "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\TE_all\\neutral\\F9_seed_29\\epochs\\epoch_010.pt",
+          "sha256": "82d08785869f2c84f88623ca08cc4698f1995fd13e77efbcc9f19339a5807a3f"
+        },
+        {
+          "available": true,
+          "epoch": 11,
+          "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\TE_all\\neutral\\F9_seed_29\\epochs\\epoch_011.pt",
+          "sha256": "19489cb1157eb755e9427a42855a656894f91c08c888078a8025e5ca51b43a0b"
+        }
+      ]
+    },
+    "TE_all/F9/47": {
+      "available": true,
+      "fit_manifest_sha256": "886061cb3ed4bfa4b15b96ffa756cacf2914512f2bfc9f0d6c2ab20739f5e778",
+      "selected": {
+        "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\TE_all\\neutral\\F9_seed_47\\selected.pt",
+        "sha256": "4909006daff57794e7be296e88eeb6775e16b330b1a334e9f841ca032f2e22e4"
+      },
+      "selected_epoch": 17,
+      "trailing_states": [
+        {
+          "available": true,
+          "epoch": 15,
+          "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\TE_all\\neutral\\F9_seed_47\\epochs\\epoch_015.pt",
+          "sha256": "4365c02f7d20b66bcd89f65f8547e93b3cdf41ed08db6da8eae33ae6d61ce426"
+        },
+        {
+          "available": true,
+          "epoch": 16,
+          "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\TE_all\\neutral\\F9_seed_47\\epochs\\epoch_016.pt",
+          "sha256": "19bf17dd62aff53113abdd5f0b6d7b1dc0a3a145044ccc662a3a7dddae26cfd2"
+        },
+        {
+          "available": true,
+          "epoch": 17,
+          "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\fits\\TE_all\\neutral\\F9_seed_47\\epochs\\epoch_017.pt",
+          "sha256": "059e1b4bd95a5493fea7db58a22a6b3f2a3b7f099a60aeaca8729073a35801b5"
+        }
+      ]
+    }
+  }
+}
