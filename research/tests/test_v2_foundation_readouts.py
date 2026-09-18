@@ -106,3 +106,12 @@ def test_noninferiority_is_not_a_significance_failure_and_ema_needs_improvement(
         tmp_path, "similar", "control", folds, allow_noninferiority=False
     )["admitted"]
     assert not compare(tmp_path, "worse", "control", folds)["admitted"]
+    archived = {
+        (fold, member): tmp_path / "books/control/raw" / fold / member
+        for fold in folds
+        for member in ("11", "29", "47", "ensemble")
+    }
+    reused = compare(
+        tmp_path, "similar", "archived_control", folds, control_paths=archived
+    )
+    assert reused["metrics"] == similar["metrics"]

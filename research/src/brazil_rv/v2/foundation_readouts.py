@@ -334,6 +334,246 @@ def ensemble_diagnostics(root):
     return all_results
 
 
+def summarize_ensembles(root):
+    diagnostics = read(root / "ensemble_diagnostics.json")
+    results = {}
+    for arm, values in diagnostics.items():
+        arrays = {"net_excess_bps": [], "ic": []}
+        for index in range(len(DEVELOPMENT_FOLDS)):
+            paths = [
+                Path(values["members"][member][index]["book"]["path"])
+                for member in (*map(str, ALLOWED_SEEDS), "ensemble")
+            ]
+            books = [read(p) for p in paths]
+            forecasts = [
+                np.asarray(
+                    read(p.with_name("forecast_readout.json"))["neutral_ic"], float
+                )
+                for p in paths
+            ]
+            if any(b["dates"] != books[-1]["dates"] for b in books[:-1]):
+                raise ValueError("seed-size diagnostic dates differ")
+            valid = np.isfinite(forecasts[-1])
+            if any(not np.array_equal(np.isfinite(f), valid) for f in forecasts[:-1]):
+                raise ValueError("seed-size IC availability differs")
+            arrays["ic"].append(
+                forecasts[-1][valid]
+                - np.mean([f[valid] for f in forecasts[:-1]], axis=0)
+            )
+            arrays["net_excess_bps"].append(
+                np.asarray(books[-1]["daily"]["net_excess_bps"])
+                - np.mean([b["daily"]["net_excess_bps"] for b in books[:-1]], axis=0)
+            )
+        results[arm] = {
+            "mean_by_ensemble_size": values["mean_by_ensemble_size"],
+            "mean_pair_forecast_correlation": values["mean_pair_forecast_correlation"],
+            "three_minus_mean_individual": {
+                key: {str(b): paired_interval(parts, b) for b in (20, 40, 60)}
+                for key, parts in arrays.items()
+            },
+        }
+    write_json_atomic(
+        root / "ensemble_summary.json",
+        {
+            "source": bound(root / "ensemble_diagnostics.json"),
+            "results": results,
+            "scope": "Matched earlier neutral F trajectories; descriptive reused development results; fold accounts start in cash.",
+        },
+    )
+    return results
+
+
+def evaluate_averages(root):
+    """Compare fixed within-trajectory means with their exact original raw controls."""
+    torch.set_num_threads(1)
+    design = read(root / "frozen_design.json")
+    plan = read(root / "averaging_plan.json")
+    old = Path(design["prior_decision_root"])
+    store = Path(design["store"]["root"])
+    schema = read(store / "manifest.json")["metadata"]["feature_schema"]["sha256"]
+    data, binding = load_data(old, "C6")
+    benchmark_root = Path(read(PROJECT / "docs/v2_opportunity_run.json")["root"])
+    implementation = _git_identity()
+    results = {}
+    for arm in ("C6", "TE_all"):
+        references = {}
+        for fold in DEVELOPMENT_FOLDS:
+            rows = windows(old, data, fold)["evaluation"]
+            mapping = calibration(
+                read(old / "phase3/mappings" / f"{fold}.json")["arms"][arm]
+            )
+            panels, sources = {}, {}
+            valid = data.inputs.active[rows]
+            for seed in ALLOWED_SEEDS:
+                item = plan["checkpoints"][f"{arm}/{fold}/{seed}"]
+                checkpoint = Path(item["path"])
+                scores = checkpoint.parent / "scores"
+                manifest = read(scores / "score_manifest.json")
+                if (
+                    sha256_file(checkpoint) != item["sha256"]
+                    or manifest["checkpoint"]["sha256"] != item["sha256"]
+                    or manifest["store"]["manifest_sha256"]
+                    != design["store"]["manifest_sha256"]
+                ):
+                    raise ValueError("averaged scores differ from their bound source")
+                values, mask = _score_artifact(
+                    scores,
+                    require_clean_transfer=True,
+                    expected_dates=np.asarray(data.inputs.dates, dtype="datetime64[D]")[
+                        rows
+                    ],
+                    expected_isins=data.inputs.security_ids,
+                    expected_feature_schema_sha256=schema,
+                )
+                mask = mask[..., HEADS]
+                if not np.array_equal(mask.all(-1) & valid, valid):
+                    raise ValueError("averaged score loses eligible names")
+                panels[str(seed)] = normalized_ranks(
+                    rank_average_ensemble([values[..., HEADS]], mask), mask
+                )
+                sources[str(seed)] = {
+                    "checkpoint": bound(checkpoint),
+                    "scores": bound(scores / "score_manifest.json"),
+                    "averaging": bound(checkpoint.parent / "average.json"),
+                }
+            panels["ensemble"] = np.mean(list(panels.values()), axis=0)
+            for member, ranks in panels.items():
+                reference = old / "phase3/books" / fold / arm / "neutral" / member
+                verify_book(reference, read(reference / "book.json")["provenance"])
+                references[fold, member] = reference
+                book(
+                    root / "books" / arm / "average" / fold / member,
+                    data,
+                    rows,
+                    ranks,
+                    valid,
+                    mapping,
+                    {
+                        "implementation": implementation,
+                        "scenario": "base",
+                        "policy": "equal_rank",
+                        "economic_cache_binding": binding,
+                        "forecasts": sources,
+                        "member": member,
+                        "rule": "trailing up to three epochs ending at raw selection",
+                        "mapping": bound(old / "phase3/mappings" / f"{fold}.json"),
+                        "reference": bound(reference / "book.json"),
+                        "benchmark": bound(benchmark_root / "inputs/benchmarks.npz"),
+                        "initial_state": "cash at first evaluation date",
+                    },
+                    benchmark_root,
+                )
+            print({"averaging_readout": [arm, fold]}, flush=True)
+        results[arm] = {
+            "screen": compare(
+                root,
+                arm,
+                arm,
+                SCREEN_FOLDS,
+                "average",
+                allow_noninferiority=False,
+                control_paths=references,
+            ),
+            "all_development": compare(
+                root,
+                arm,
+                arm,
+                DEVELOPMENT_FOLDS,
+                "average",
+                allow_noninferiority=False,
+                control_paths=references,
+            ),
+        }
+        write_json_atomic(root / "averaging_summary.json", results)
+    return results
+
+
+def fixed_blend(root):
+    """Fixed half-C6/half-attention forecast diagnostic; no evaluation-chosen weight."""
+    torch.set_num_threads(1)
+    old = Path(read(root / "frozen_design.json")["prior_decision_root"])
+    data, binding = load_data(old, "C6")
+    benchmark_root = Path(read(PROJECT / "docs/v2_opportunity_run.json")["root"])
+    implementation = _git_identity()
+    records = []
+    differences = {arm: {"ic": [], "net_bps": []} for arm in ("C6", "TE_all")}
+    for fold in DEVELOPMENT_FOLDS:
+        rows = windows(old, data, fold)["evaluation"]
+        mappings = read(old / "phase3/mappings" / f"{fold}.json")
+        # This calibration was fitted before evaluation on the same fixed .5 blend.
+        trial = next(t for t in mappings["blend"]["trials"] if t["te_weight"] == 0.5)
+        mapping = calibration(trial["calibration"])
+        panels, sources = {}, {}
+        valid = data.inputs.active[rows]
+        for arm in differences:
+            panel, _, mask, sources[arm] = read_panel(
+                old, data, arm, "neutral", fold, rows
+            )
+            if not np.array_equal(mask, valid):
+                raise ValueError("cross-architecture blend populations differ")
+            panels[arm] = panel["ensemble"]
+        output = root / "fixed_blend" / fold
+        record, forecast = book(
+            output,
+            data,
+            rows,
+            np.mean(list(panels.values()), axis=0),
+            valid,
+            mapping,
+            {
+                "implementation": implementation,
+                "scenario": "base",
+                "policy": "equal_rank",
+                "economic_cache_binding": binding,
+                "forecasts": sources,
+                "attention_weight": 0.5,
+                "mapping": bound(old / "phase3/mappings" / f"{fold}.json"),
+                "benchmark": bound(benchmark_root / "inputs/benchmarks.npz"),
+                "initial_state": "cash at first evaluation date",
+            },
+            benchmark_root,
+        )
+        for arm, delta in differences.items():
+            path = old / "phase3/books" / fold / arm / "neutral/ensemble"
+            reference = verify_book(path, read(path / "book.json")["provenance"])
+            original = read(path / "forecast_readout.json")
+            if (
+                reference["dates"] != record["dates"]
+                or original["dates"] != forecast["dates"]
+            ):
+                raise ValueError("fixed blend comparison dates differ")
+            a, b = (np.asarray(v["neutral_ic"], float) for v in (forecast, original))
+            if not np.array_equal(np.isfinite(a), np.isfinite(b)):
+                raise ValueError("fixed blend IC populations differ")
+            delta["ic"].append((a - b)[np.isfinite(a)])
+            delta["net_bps"].append(
+                np.asarray(record["daily"]["net_excess_bps"])
+                - np.asarray(reference["daily"]["net_excess_bps"])
+            )
+        records.append(
+            {
+                "fold": fold,
+                "book": bound(output / "book.json"),
+                "mean_ic": forecast["neutral_ic_mean"],
+                "summary": record["summary"],
+            }
+        )
+        print({"fixed_blend_readout": fold}, flush=True)
+    result = {
+        "books": records,
+        "differences": {
+            arm: {
+                metric: {str(b): paired_interval(parts, b) for b in (20, 40, 60)}
+                for metric, parts in delta.items()
+            }
+            for arm, delta in differences.items()
+        },
+        "scope": "Fixed .5 forecast blend; reused development ensemble diagnostic, not promotion.",
+    }
+    write_json_atomic(root / "fixed_blend_summary.json", result)
+    return result
+
+
 def compare(
     root,
     candidate,
@@ -343,6 +583,7 @@ def compare(
     control_rule="raw",
     *,
     allow_noninferiority=True,
+    control_paths=None,
 ):
     metrics = {}
     for member in (*map(str, ALLOWED_SEEDS), "ensemble"):
@@ -352,6 +593,8 @@ def compare(
                 root / "books" / cell / rule / fold / member
                 for cell, rule in ((candidate, candidate_rule), (control, control_rule))
             ]
+            if control_paths is not None:
+                paths[1] = control_paths[fold, member]
             books = [read(p / "book.json") for p in paths]
             forecasts = [read(p / "forecast_readout.json") for p in paths]
             if (
@@ -438,12 +681,29 @@ def summarize(root, wave_name, folds):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("command", choices=("ensemble", "evaluate", "summarize"))
+    parser.add_argument(
+        "command",
+        choices=(
+            "ensemble",
+            "ensemble-summary",
+            "averages",
+            "blend",
+            "evaluate",
+            "summarize",
+        ),
+    )
     parser.add_argument("--root", required=True, type=Path)
     parser.add_argument("--wave", default="input")
     args = parser.parse_args()
     if args.command == "ensemble":
         ensemble_diagnostics(args.root)
+        summarize_ensembles(args.root)
+    elif args.command == "ensemble-summary":
+        summarize_ensembles(args.root)
+    elif args.command == "averages":
+        evaluate_averages(args.root)
+    elif args.command == "blend":
+        fixed_blend(args.root)
     elif args.command == "evaluate":
         evaluate_wave(args.root, args.wave, SCREEN_FOLDS)
     else:

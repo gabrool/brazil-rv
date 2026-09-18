@@ -15,20 +15,32 @@ quality and speed. Registration: `research/preregistrations/v2_foundation.md`.
 - Engineering: named exclusions, matched graph settings and true update EMA are
   implemented. 32 targeted input/training tests pass, including exact interrupted
   resume, unchanged raw trajectories with EMA tracking, fit-only subset scalers and
-  retained masks/ages. Two additional readout/gate tests pass. Removed the superseded
+  retained masks/ages. Three additional readout/gate/averaging tests pass. Removed the superseded
   pre-factorization cache test; its invariant is covered by the current exact-cache test.
 - Local worker: clean source `d21a93a`, detached worktree
   `C:/quant/brazil-rv-foundation-d21a93a`, launched 2026-09-18 21:49 UTC.
   Resolve `v2_foundation_run.json`; inspect worker.json and actual process command
-  lines before resuming. Full P/F2 GPU admission is in progress, then the same worker
-  runs the nine fresh matched P parents and 36 screen F fits. Raw and EMA are
+  lines before resuming. All six disposable full-population P/F2 GPU checks passed.
+  The worker is running nine fresh matched P parents and 36 screen F fits. Raw and EMA are
   selected on identical preceding selection dates; raw patience bounds each trajectory.
-- New financial fits: not started.
-- CPU readouts: seed-size analysis reuses sealed single-seed and three-seed books;
-  only pair books need replay. Current account must reproduce a sealed ensemble
-  before those new books. Do not run saved-average GPU scoring concurrently with
-  the fit worker. Use original compatible inference source for old checkpoints.
-- Remaining: original-checkpoint averaging and ensemble diagnostics; matched input wave; averaging/readout wave;
+- Completed CPU diagnostics: all 84 original checkpoint averages are prepared;
+  GPU inference remains pending. All 84 pair books are complete. Current accounts
+  exactly reproduce both sealed F2 controls. Three-seed attention gains .002318 IC
+  and .474 bps/day over its mean individual; C6 gains .000781 IC and -.019 bps/day.
+  These are fold-reset reused-development diagnostics, not promotion results.
+  See `v2_FOUNDATION.md` and `v2_foundation_ensemble.json`.
+- Fit-only correlation audit: no tested within-family pair exceeds absolute .97;
+  common fields use one observation per date. Insufficiently observed pairs remain
+  unassessed. This is not evidence that all fields are useful.
+- Source confidence: issuer documents establish Cielo cash-redemption terms,
+  Copel's two-share-class unit cancellation, and ALLOS/ISA ticker renames.
+  These need separately bound account integration and matched replay; they have
+  not changed the running fits or existing books. Broker financing remains unresolved.
+- Do not run saved-average GPU scoring concurrently with the fit worker.
+  Worktree `C:/quant/brazil-rv-portfolio-objective-33086be` has verified identical
+  inference dependencies to original neutral training source `b16732e`.
+- Remaining: matched input wave/readouts; original-average inference/readouts;
+  fixed cross-architecture blend; averaging/compact-readout wave;
   conditional component/capacity waves; residual information probe; confirmation,
   accounting uncertainty review, consolidated report and recovery archive.
 

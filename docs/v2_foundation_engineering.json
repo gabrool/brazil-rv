@@ -1,0 +1,43 @@
+{
+  "design_sha256": "00c5120cccb91bad5a2878f03949d167cce5cbc4acaf0cfd58b3ac89cb39268e",
+  "fits": {
+    "TE_full/F": {
+      "manifest_sha256": "dcb67d633461f0189ef6a2e5f8836ff0eb5acc36683615313e45e4497d1b4b1d",
+      "padded_names": 144,
+      "peak_cuda_bytes": 1159208448,
+      "seconds": 56.06818209999983
+    },
+    "TE_full/P": {
+      "manifest_sha256": "f930f106c9d9dc2a12ff6dc49efd89d0bcc5734982c0f75475bccc04903699cb",
+      "padded_names": 160,
+      "peak_cuda_bytes": 1635191808,
+      "seconds": 107.69621340000049
+    },
+    "TE_no_micro/F": {
+      "manifest_sha256": "e9dfa48c04ce8bb0f1b289d241c71c31429b9dd5f66bbfa0f7cef907fa639b3d",
+      "padded_names": 144,
+      "peak_cuda_bytes": 1156905472,
+      "seconds": 56.41312590000052
+    },
+    "TE_no_micro/P": {
+      "manifest_sha256": "1fe4f9e7715cf26032b70a485ea270ce65cbd727bc3bae020f26d625ff823b3d",
+      "padded_names": 160,
+      "peak_cuda_bytes": 1631406592,
+      "seconds": 75.86686740000005
+    },
+    "TE_no_weak/F": {
+      "manifest_sha256": "da70a8e304ec68a35e2c5cf71df64689883c590cfd1fbaacce3ab7fda130e85f",
+      "padded_names": 144,
+      "peak_cuda_bytes": 1153388032,
+      "seconds": 51.24305050000112
+    },
+    "TE_no_weak/P": {
+      "manifest_sha256": "4239c6f2046573165e2de978f8533a27897a91ea3e86873116c3cdb439cd29a0",
+      "padded_names": 160,
+      "peak_cuda_bytes": 1617805824,
+      "seconds": 66.48203860000103
+    }
+  },
+  "passed": true,
+  "scope": "one full P epoch and one full F2 epoch per input cell; disposable; no evaluation read"
+}

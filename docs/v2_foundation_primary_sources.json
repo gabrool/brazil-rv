@@ -1,0 +1,85 @@
+{
+  "allos_ticker_20231017": {
+    "bytes": 159171,
+    "mime": "application/pdf",
+    "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_foundation_d21a93a_20260918\\primary_sources\\allos_ticker_20231017.pdf",
+    "resolved_url": "https://api.mziq.com/mzfilemanager/v2/d/330c258b-6212-45ce-8c13-557ea46cc23a/09dd3df3-2b68-6ef3-8295-a359f82c76fc",
+    "retrieved_at": "2026-09-18T21:59:19.201616+00:00",
+    "sha256": "0554f8b08f6545d32b182724bf5920002e07d0b2f0814a934616a6b7f1e56ccb",
+    "url": "https://api.mziq.com/mzfilemanager/v2/d/330c258b-6212-45ce-8c13-557ea46cc23a/09dd3df3-2b68-6ef3-8295-a359f82c76fc"
+  },
+  "brmalls_board_20221219_published_20230210": {
+    "bytes": 445924,
+    "mime": "application/pdf",
+    "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_foundation_d21a93a_20260918\\primary_sources\\brmalls_board_20221219_published_20230210.pdf",
+    "resolved_url": "https://publicidadelegal.valor.com.br/valor/2023/02/10/BRMALLS1567671810022023.pdf",
+    "retrieved_at": "2026-09-18T22:19:55.826382+00:00",
+    "sha256": "42027e66bca51417ad13ef7cc2abe85a20079e966582a40382eafb7c5a7df19e",
+    "url": "https://publicidadelegal.valor.com.br/valor/2023/02/10/BRMALLS1567671810022023.pdf"
+  },
+  "brmalls_schedule_20221219": {
+    "bytes": 223248,
+    "mime": "application/pdf",
+    "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_foundation_d21a93a_20260918\\primary_sources\\brmalls_schedule_20221219.pdf",
+    "resolved_url": "https://api.mziq.com/mzfilemanager/v2/d/330c258b-6212-45ce-8c13-557ea46cc23a/1830f410-c0a5-44b9-58c9-7c3b4bddeff9?origin=1",
+    "retrieved_at": "2026-09-18T22:20:55.252147+00:00",
+    "sha256": "a77389803a591190881fafe5959a7cd6ab41c0a74345df0a1b35281cf86ce96f",
+    "url": "https://api.mziq.com/mzfilemanager/v2/d/330c258b-6212-45ce-8c13-557ea46cc23a/1830f410-c0a5-44b9-58c9-7c3b4bddeff9?origin=1"
+  },
+  "cielo_conversion_20240826": {
+    "bytes": 274096,
+    "mime": "text/html",
+    "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_foundation_d21a93a_20260918\\primary_sources\\cielo_conversion_20240826.pdf",
+    "resolved_url": "https://www.rad.cvm.gov.br/ENETWeb/frmDownloadDocumento.aspx?CodigoInstituicao=1&Tela=ext&descTipo=IPE&numProtocolo=1275808",
+    "retrieved_at": "2026-09-18T21:59:18.767718+00:00",
+    "sha256": "4135101e1ee2c9682b5257bb523a31569a7eb89cc02571e720ba9d8ec6ba8bf8",
+    "url": "https://www.rad.cvm.gov.br/ENETWeb/frmDownloadDocumento.aspx?CodigoInstituicao=1&Tela=ext&descTipo=IPE&numProtocolo=1275808",
+    "verified_document_date": "2024-08-26"
+  },
+  "cielo_redemption_20240923": {
+    "bytes": 252390,
+    "mime": "text/html",
+    "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_foundation_d21a93a_20260918\\primary_sources\\cielo_redemption_20240923.pdf",
+    "resolved_url": "https://www.rad.cvm.gov.br/ENETWeb/frmDownloadDocumento.aspx?Tela=ext&numProtocolo=1284473&descTipo=IPE&CodigoInstituicao=1",
+    "retrieved_at": "2026-09-18T22:01:33.021418+00:00",
+    "sha256": "f195bfd2c1d2ccfb445ebb0cf1b7fa988000b868e1eb2b6cc0c3d60161f5fc6d",
+    "url": "https://www.rad.cvm.gov.br/ENETWeb/frmDownloadDocumento.aspx?Tela=ext&numProtocolo=1284473&descTipo=IPE&CodigoInstituicao=1"
+  },
+  "copel_units_20231218": {
+    "bytes": 495035,
+    "mime": "application/pdf",
+    "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_foundation_d21a93a_20260918\\primary_sources\\copel_units_20231218.pdf",
+    "resolved_url": "https://api.mziq.com/mzfilemanager/v2/d/16a31b1b-5ecd-4214-a2e0-308a2393e330/a338bc96-aabd-f8e4-dc9d-3936484bff87",
+    "retrieved_at": "2026-09-18T21:59:19.452643+00:00",
+    "sha256": "4d172d4853ebd3ee6e375f4e8a26fac6b5e2e8d479c1d4c0d578ddc3e7fd2510",
+    "url": "https://api.mziq.com/mzfilemanager/v2/d/16a31b1b-5ecd-4214-a2e0-308a2393e330/a338bc96-aabd-f8e4-dc9d-3936484bff87"
+  },
+  "dommo_options_20221216": {
+    "bytes": 149453,
+    "mime": "text/html; charset=UTF-8",
+    "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_foundation_d21a93a_20260918\\primary_sources\\dommo_options_20221216.html",
+    "resolved_url": "https://mzgroup.com.br/fatosrelevantes/fato-relevante-periodo-de-opcao-procedimentos-e-data-de-fechamento/",
+    "retrieved_at": "2026-09-18T22:20:56.497008+00:00",
+    "sha256": "bfc6efc31bde073a0fe21b1dd06456fd352f3b6e2e390263c49b8a26224817e0",
+    "url": "https://mzgroup.com.br/fatosrelevantes/fato-relevante-periodo-de-opcao-procedimentos-e-data-de-fechamento/"
+  },
+  "dommo_payment_20230106": {
+    "bytes": 139958,
+    "mime": "application/pdf",
+    "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_foundation_d21a93a_20260918\\primary_sources\\dommo_payment_20230106.pdf",
+    "resolved_url": "https://api.mziq.com/mzfilemanager/v2/d/848ef34b-7dd8-49fe-b128-ac48ffa6bf38/a180c284-337c-1a35-bbd2-6a062ffbb28b",
+    "retrieved_at": "2026-09-18T22:19:55.232240+00:00",
+    "sha256": "7555ff6a80180276b827dea941434d99232fcc1c726ec54ea2aec3905acdbe6e",
+    "url": "https://api.mziq.com/mzfilemanager/v2/d/848ef34b-7dd8-49fe-b128-ac48ffa6bf38/a180c284-337c-1a35-bbd2-6a062ffbb28b",
+    "verified_document_date": "2023-01-06"
+  },
+  "isa_ticker_20241118": {
+    "bytes": 32219,
+    "mime": "text/html; charset=utf-8",
+    "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_foundation_d21a93a_20260918\\primary_sources\\isa_ticker_20241118.html",
+    "resolved_url": "https://www.isaenergiabrasil.com.br/centro-de-midia/noticias/trpl4-e-trpl3-agora-sao-isae4-e-isae3-na-b3/",
+    "retrieved_at": "2026-09-18T21:59:19.732739+00:00",
+    "sha256": "e47e6fdcd750e0f339f0561954ef61087fe0bcfa13eb7e20623794eb82bb0c4d",
+    "url": "https://www.isaenergiabrasil.com.br/centro-de-midia/noticias/trpl4-e-trpl3-agora-sao-isae4-e-isae3-na-b3/"
+  }
+}
