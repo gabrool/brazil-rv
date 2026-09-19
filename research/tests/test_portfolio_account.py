@@ -5,7 +5,6 @@ import torch
 from brazil_rv.execution.portfolio_account import PortfolioAccount, tensor
 from brazil_rv.execution.stateful_ledger import (
     PortfolioTarget,
-    daily_borrow_cost,
 )
 from brazil_rv.v2.corporate_actions import AlignedActionTerms
 from test_portfolio_ledger import replay
@@ -44,15 +43,14 @@ def compare(
     account = PortfolioAccount.empty(np.full(names + 1, 100.0), config=config)
     records = []
     for day in range(days):
-        borrow = daily_borrow_cost(
-            config.annual_borrow_rate, exact.dates[day], config=config
-        )
         record = account.step(
             tensor([*targets[day], 0.0]),
             day=day,
             close=np.r_[close[day], 100.0],
             cdi=float(cdi[day]),
-            daily_borrow=np.r_[np.full(names, borrow), 0.0],
+            session_date=exact.dates[day],
+            annual_borrow=np.r_[np.full(names, config.annual_borrow_rate), 0.0],
+            loan_reference=np.full(names + 1, 100.0),
             action_q=None
             if actions is None
             else np.r_[actions.shares_per_prior_share[day], 1.0],
@@ -219,14 +217,18 @@ def test_conversion_netting_preserves_gradients_and_does_not_trade_delivery():
             day=0,
             close=[100, 50, 100],
             cdi=0,
-            daily_borrow=[0, 0, 0],
+            session_date="2024-01-02",
+            annual_borrow=[0, 0, 0],
+            loan_reference=[100, 100, 100],
         )
         record = account.step(
             account.weights,
             day=1,
             close=[np.nan, 55, 100],
             cdi=0,
-            daily_borrow=[0, 0, 0],
+            session_date="2024-01-02",
+            annual_borrow=[0, 0, 0],
+            loan_reference=[100, 100, 100],
             action_q=[2, 1, 1],
             successor=[1, 1, 2],
         )
@@ -331,7 +333,9 @@ def test_sequential_gradient_includes_future_inventory_payoff_and_chunk_carry():
             day=0,
             close=[100, 100, 100],
             cdi=0.0004,
-            daily_borrow=[0, 0, 0],
+            session_date="2024-01-02",
+            annual_borrow=[0, 0, 0],
+            loan_reference=[100, 100, 100],
         )
         if detach:
             account.detach()
@@ -340,7 +344,9 @@ def test_sequential_gradient_includes_future_inventory_payoff_and_chunk_carry():
             day=1,
             close=[110, 95, 100],
             cdi=0.0004,
-            daily_borrow=[0, 0, 0],
+            session_date="2024-01-02",
+            annual_borrow=[0, 0, 0],
+            loan_reference=[100, 100, 100],
         )
         return account.nav
 
@@ -372,14 +378,15 @@ def test_joint_hedge_financing_missing_fill_and_reversal_parity():
         hedge_beta=np.ones_like(close),
     )
     account = PortfolioAccount.empty([100, 100, 100], config=config)
-    rate = np.expm1(np.log1p(0.02) / 252)
     for day in range(4):
         row = account.step(
             tensor(targets[day]),
             day=day,
             close=[100, 100, hedge_close[day]],
             cdi=0.0004,
-            daily_borrow=[rate] * 3,
+            session_date=exact.dates[day],
+            annual_borrow=[0.02] * 3,
+            loan_reference=[100] * 3,
             terminal=day == 3,
         )
         assert row["nav"].item() == pytest.approx(exact.nav[day], abs=1e-12)

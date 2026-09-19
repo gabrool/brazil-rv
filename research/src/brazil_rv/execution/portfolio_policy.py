@@ -133,12 +133,27 @@ class PolicyData:
     def step(self, account, target, day, *, terminal=False):
         inputs = self.inputs
         n = len(inputs.security_ids)
+        config = account.config
+        rates = (
+            np.full(n, config.annual_borrow_rate)
+            if config.borrow_source == "uniform"
+            else inputs.annual_borrow_rate_by_name[day]
+        )
+        hedge = config.hedge_annual_borrow_rate
+        if inputs.hedge_annual_borrow_rate is not None and np.isfinite(
+            inputs.hedge_annual_borrow_rate[day]
+        ):
+            hedge = inputs.hedge_annual_borrow_rate[day]
         return account.step(
             target,
             day=day,
             close=np.r_[inputs.raw_close[day], inputs.bova11_close[day]],
             cdi=float(inputs.cdi_returns[day]),
-            daily_borrow=self.borrow_rates(day, account.config),
+            session_date=inputs.dates[day],
+            annual_borrow=np.r_[rates, hedge],
+            loan_reference=np.full(n + 1, np.nan)
+            if inputs.loan_reference_prices is None
+            else inputs.loan_reference_prices[day],
             action_q=np.r_[inputs.action_shares_per_prior_share[day], 1.0],
             action_d=np.r_[inputs.action_cash_per_prior_share[day], 0.0],
             action_resolved=np.r_[inputs.action_session_resolved[day], True],
@@ -463,6 +478,7 @@ def ledger_arguments(data, start, stop):
         "hedge_beta_valid",
         "hedge_close",
         "hedge_annual_borrow_rate",
+        "loan_reference_prices",
     ):
         if arguments[key] is not None:
             arguments[key] = arguments[key][start:stop]

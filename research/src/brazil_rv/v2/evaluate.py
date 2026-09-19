@@ -48,7 +48,7 @@ MIN_CROSS_SECTION = 20
 BOOTSTRAP_SEED = 20260903
 ECONOMICS_COSTS_BPS = (2.0, 4.0, 7.0)
 ECONOMICS_HEADLINE = (4.0, 0.02)
-EVALUATION_SCHEMA = "BRAZIL_RV_V2_EVALUATION_V22"
+EVALUATION_SCHEMA = "BRAZIL_RV_V2_EVALUATION_V23"
 PRIOR_EVALUATION_SCHEMA = "BRAZIL_RV_V2_EVALUATION_V15"
 PAIRED_COMPARISON_SCHEMA = "BRAZIL_RV_V2_PAIRED_COMPARISON_V3"
 
@@ -136,6 +136,8 @@ class EvaluationInputs:
     bova11_data_sha256: str | None = None
     # Decision-available annual rates; NaN uses the configured hedge fallback.
     hedge_annual_borrow_rate: NDArray[np.floating] | None = None
+    # Prior published average on the equity axis, followed by BOVA11; [date, name+1].
+    loan_reference_prices: NDArray[np.floating] | None = None
     hedge_beta: NDArray[np.floating] | None = None
     hedge_beta_valid: NDArray[np.bool_] | None = None
     hedge_beta_history: tuple[NDArray[np.floating], NDArray[np.bool_]] | None = None
@@ -871,6 +873,7 @@ def _ledger_inputs(
         "initial_hedge_reference_price": inputs.initial_hedge_reference_price,
         "hedge_close": inputs.bova11_close,
         "hedge_annual_borrow_rate": inputs.hedge_annual_borrow_rate,
+        "loan_reference_prices": inputs.loan_reference_prices,
     }
 
 
@@ -940,6 +943,11 @@ def _ledger_rows(
             ),
             "turnover_cost_bps": _finite_or_none(result.cost_bps[index]),
             "borrow_cost_bps": _finite_or_none(result.borrow_bps[index]),
+            "loan_liability": _finite_or_none(result.loan_liability[index]),
+            "loan_payment": _finite_or_none(result.loan_payment[index]),
+            "loan_outstanding_principal": _finite_or_none(
+                result.loan_outstanding_principal[index]
+            ),
             "equity_borrow_observed_rate_bps": _finite_or_none(
                 result.equity_borrow_raw_bps[index]
             ),
@@ -947,14 +955,14 @@ def _ledger_rows(
                 result.equity_borrow_fee_bps[index]
             ),
             "cdi_benchmark_bps": _finite_or_none(result.cdi_benchmark_bps[index]),
-            "held_short_weighted_annual_borrow_rate": _finite_or_none(
-                result.held_short_weighted_annual_borrow_rate[index]
+            "borrowed_equity_weighted_annual_rate": _finite_or_none(
+                result.borrowed_equity_weighted_annual_rate[index]
             ),
-            "held_short_imputed_notional_at_open": _finite_or_none(
-                result.held_short_imputed_notional_at_open[index]
+            "borrowed_equity_imputed_principal_at_open": _finite_or_none(
+                result.borrowed_equity_imputed_principal_at_open[index]
             ),
-            "held_short_placeholder_notional_at_open": _finite_or_none(
-                result.held_short_placeholder_notional_at_open[index]
+            "borrowed_equity_placeholder_principal_at_open": _finite_or_none(
+                result.borrowed_equity_placeholder_principal_at_open[index]
             ),
             "excluded_short_entry_candidate_count": int(
                 result.excluded_short_entry_candidate_count[index]
@@ -1679,6 +1687,13 @@ def _input_hashes(inputs: EvaluationInputs) -> dict[str, str]:
                 else "configured_fallback"
             )
         ),
+        "loan_reference_prices": _array_sha256(
+            np.asarray(
+                inputs.loan_reference_prices
+                if inputs.loan_reference_prices is not None
+                else "unavailable_no_short_opening"
+            )
+        ),
         "hedge_beta_manifest": str(inputs.hedge_beta_manifest_sha256),
         "hedge_beta": _array_sha256(np.asarray(inputs.hedge_beta)),
         "hedge_beta_valid": _array_sha256(np.asarray(inputs.hedge_beta_valid)),
@@ -1802,16 +1817,25 @@ def _economics_contract(inputs: EvaluationInputs) -> dict[str, object]:
             "successor prices; no terminal fabricated delivery"
         ),
         "short_proceeds_remuneration": config.short_proceeds_remuneration,
+        "initial_capital_brl": config.initial_capital_brl,
         "costs_bps_per_side": list(ECONOMICS_COSTS_BPS),
         "cost_grid_borrow_cells": ["borrow_balance", "borrow_strict", "borrow_open"],
         "borrow_daily_accrual": (
-            "current marked-notional proxy; rent and dated exchange components "
-            "compound separately; fixed-contract principal/payment still pending"
+            "fixed opening principal and rate; registration exclusive/return inclusive; "
+            "accrued liability until return payment, with distinct dated B3 components"
         ),
         "borrow_fee_convention": LOAN_FEE_CONVENTION,
         "pre_platform_contract_minimum": (
-            "R$10 voluntary-contract minimum not yet integrated; "
-            "historical-account acceptance pending contract settlement"
+            "R$10 once per original voluntary contract, provisioned on first accrual; "
+            "residual payment on final return is an explicit research assumption"
+        ),
+        "loan_return_assumption": (
+            "prearranged return on covering spot settlement: T+3 before 2019-05-27, "
+            "T+2 thereafter; delivered custody offsets may return that session"
+        ),
+        "contractual_accounting_status": (
+            "loan mechanics implemented; historical references/events/rates, renewal "
+            "terms and full spot/proceeds settlement still require admission"
         ),
         "pending_entries_follow_retention": config.cancel_pending_outside_retention,
         "hedge_decision": "15:45; prior marks, prior BOVA11 close and prior NAV",
@@ -2939,6 +2963,11 @@ def headline_economics_excluded(report: Mapping[str, object]) -> bool:
 
 
 _PAIRED_INPUT_KEYS = (
+    "loan_reference_prices",
+    "annual_borrow_rate_by_name",
+    "hedge_annual_borrow_rate",
+    "borrow_rate_imputed",
+    "borrow_rate_placeholder",
     "dates",
     "canonical_calendar",
     "session_indices",

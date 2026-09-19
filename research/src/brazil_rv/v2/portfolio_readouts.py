@@ -135,6 +135,9 @@ def book_summary(data, result, previous, start, first):
         "hedge_gross_bps": result.hedge_gross_pnl_bps[selection],
         "trading_cost_bps": result.cost_bps[selection],
         "borrow_bps": result.borrow_bps[selection],
+        "loan_liability": result.loan_liability[selection],
+        "loan_payment": result.loan_payment[selection],
+        "loan_outstanding_principal": result.loan_outstanding_principal[selection],
         "loan_rent_bps": (result.equity_borrow_raw_bps + result.hedge_borrow_raw_bps)[
             selection
         ],
@@ -211,6 +214,9 @@ def save_book(output, data, result, targets, previous, start, first, provenance)
         "hedge_restricted_cash",
         "receivables",
         "payables",
+        "loan_liability",
+        "loan_payment",
+        "loan_outstanding_principal",
         "signed_shares",
         "mark_price",
         "hedge_signed_shares",
@@ -238,6 +244,7 @@ def save_book(output, data, result, targets, previous, start, first, provenance)
         for label, records in (
             ("fills", result.fills),
             ("orders", result.intended_orders),
+            ("loan_charges", result.loan_charges),
         ):
             if records:
                 pl.DataFrame(

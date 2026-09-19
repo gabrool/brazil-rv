@@ -57,6 +57,7 @@ def _run(
     entry_fill_allowed: np.ndarray | None = None,
     portfolio_policy=None,
     share_distributions=(),
+    loan_reference_prices=None,
 ) -> StatefulLedgerResult:
     days, names = close.shape
     dates = tuple(date(2024, 1, 2) + timedelta(days=index) for index in range(days))
@@ -72,6 +73,9 @@ def _run(
     )
     return simulate_stateful_ledger(
         dates=dates,
+        loan_reference_prices=np.full((days, names + 1), 100.0)
+        if loan_reference_prices is None
+        else loan_reference_prices,
         scores=scores,
         score_mask=mask if score_mask is None else score_mask,
         active=mask if active is None else active,
@@ -334,7 +338,7 @@ def test_lending_borrow_charges_observed_rate_plus_registered_capped_fee() -> No
         * 10_000
     )
     np.testing.assert_allclose(
-        lending.held_short_weighted_annual_borrow_rate[charged], 0.407
+        lending.borrowed_equity_weighted_annual_rate[charged], 0.407
     )
 
 
@@ -1132,7 +1136,7 @@ def test_missing_short_keeps_restricted_cash_and_continues_borrowing():
     daily_rent = np.expm1(np.log1p(0.02) / 252)
     for day in (10, 11):
         assert result.borrow_bps[day] * result.start_nav[day] / 1e4 == pytest.approx(
-            daily_rent
+            daily_rent * (1.02 ** ((day - 1) / 252))
         )
 
 

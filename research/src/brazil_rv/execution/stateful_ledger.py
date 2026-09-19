@@ -16,6 +16,7 @@ from .share_distributions import (
     basket_betas,
 )
 from .loan_fees import LoanModality, loan_fee_rates
+from .loan_contracts import LoanCharge, LoanContracts, LoanSession, cover_return_session
 
 
 OrderSide = Literal["buy", "sell"]
@@ -294,13 +295,17 @@ class StatefulLedgerResult:
     short_proceeds_interest_base: NDArray[np.float64]
     cost_bps: NDArray[np.float64]
     borrow_bps: NDArray[np.float64]
+    loan_liability: NDArray[np.float64]
+    loan_payment: NDArray[np.float64]
+    loan_outstanding_principal: NDArray[np.float64]
+    loan_charges: tuple[LoanCharge, ...]
     equity_borrow_raw_bps: NDArray[np.float64]
     equity_borrow_fee_bps: NDArray[np.float64]
     cdi_benchmark_bps: NDArray[np.float64]
-    held_short_weighted_annual_borrow_rate: NDArray[np.float64]
-    held_short_notional_at_open: NDArray[np.float64]
-    held_short_imputed_notional_at_open: NDArray[np.float64]
-    held_short_placeholder_notional_at_open: NDArray[np.float64]
+    borrowed_equity_weighted_annual_rate: NDArray[np.float64]
+    borrowed_equity_principal_at_open: NDArray[np.float64]
+    borrowed_equity_imputed_principal_at_open: NDArray[np.float64]
+    borrowed_equity_placeholder_principal_at_open: NDArray[np.float64]
     excluded_short_entry_candidate_count: NDArray[np.int64]
     gross_fraction_nav: NDArray[np.float64]
     turnover_fraction_nav: NDArray[np.float64]
@@ -583,35 +588,41 @@ class StatefulLedgerResult:
             "maximum_gross_fraction_nav": maximum_gross,
             "mean_turnover_fraction_nav": mean_turnover,
             "borrow_source": self.borrow_source,
-            "short_notional_weighted_borrow_rate": (
+            "borrow_weighting_basis": "outstanding fixed equity loan principal including pending returns",
+            "terminal_loan_liability": float(self.loan_liability[-1]),
+            "terminal_loan_outstanding_principal": float(
+                self.loan_outstanding_principal[-1]
+            ),
+            "total_loan_payment": float(self.loan_payment.sum()),
+            "principal_weighted_borrow_rate": (
                 float(
                     np.sum(
-                        self.held_short_weighted_annual_borrow_rate
-                        * self.held_short_notional_at_open
+                        self.borrowed_equity_weighted_annual_rate
+                        * self.borrowed_equity_principal_at_open
                     )
-                    / np.sum(self.held_short_notional_at_open)
+                    / np.sum(self.borrowed_equity_principal_at_open)
                 )
-                if np.sum(self.held_short_notional_at_open) > 0.0
+                if np.sum(self.borrowed_equity_principal_at_open) > 0.0
                 else 0.0
             ),
-            "imputed_rate_share_of_short_notional": (
+            "imputed_rate_share_of_borrowed_principal": (
                 float(
-                    np.sum(self.held_short_imputed_notional_at_open)
-                    / np.sum(self.held_short_notional_at_open)
+                    np.sum(self.borrowed_equity_imputed_principal_at_open)
+                    / np.sum(self.borrowed_equity_principal_at_open)
                 )
-                if np.sum(self.held_short_notional_at_open) > 0.0
+                if np.sum(self.borrowed_equity_principal_at_open) > 0.0
                 else 0.0
             ),
-            "placeholder_rate_share_of_short_notional": (
+            "placeholder_rate_share_of_borrowed_principal": (
                 float(
-                    np.sum(self.held_short_placeholder_notional_at_open)
-                    / np.sum(self.held_short_notional_at_open)
+                    np.sum(self.borrowed_equity_placeholder_principal_at_open)
+                    / np.sum(self.borrowed_equity_principal_at_open)
                 )
-                if np.sum(self.held_short_notional_at_open) > 0.0
+                if np.sum(self.borrowed_equity_principal_at_open) > 0.0
                 else 0.0
             ),
             "placeholder_priced_session_count": int(
-                (self.held_short_placeholder_notional_at_open > 0.0).sum()
+                (self.borrowed_equity_placeholder_principal_at_open > 0.0).sum()
             ),
             "excluded_short_entry_candidate_count": int(
                 self.excluded_short_entry_candidate_count.sum()
@@ -1173,11 +1184,15 @@ def _book_fill(
     restricted_by_name: NDArray[np.float64],
     free_cash: float,
     cost_rate: float,
+    loan_covers: NDArray[np.float64],
+    loan_openings: NDArray[np.float64],
+    loan_name: int,
 ) -> tuple[float, float]:
     old_shares = float(shares[name])
     remaining = quantity
     if side == "buy" and old_shares < 0.0:
         cover = min(remaining, -old_shares)
+        loan_covers[loan_name] += cover
         release = restricted_by_name[name] * cover / -old_shares
         restricted_by_name[name] -= release
         free_cash += release - cover * price
@@ -1193,6 +1208,7 @@ def _book_fill(
             free_cash -= remaining * price
             shares[name] += remaining
         else:
+            loan_openings[loan_name] += remaining
             restricted_by_name[name] += remaining * price
             shares[name] -= remaining
     notional = quantity * price
@@ -1231,6 +1247,7 @@ class PortfolioTarget:
 def simulate_stateful_ledger(
     *,
     dates: Sequence[date],
+    loan_reference_prices: NDArray[np.floating] | None = None,
     scores: NDArray[np.floating],
     score_mask: NDArray[np.bool_],
     active: NDArray[np.bool_],
@@ -1335,6 +1352,21 @@ def simulate_stateful_ledger(
     if initial_unresolved_action.shape != (name_count,):
         raise ValueError("initial action uncertainty must match the security axis")
     shares = np.zeros(name_count, dtype=np.float64)
+    loans = LoanContracts(
+        name_count + 1,
+        config.borrow_fee_modality,
+        config.borrow_fee_multiplier,
+        config.annual_sessions,
+    )
+    loan_references = (
+        np.full((day_count, name_count + 1), np.nan)
+        if loan_reference_prices is None
+        else np.asarray(loan_reference_prices, dtype=float)
+    )
+    if loan_references.shape != (day_count, name_count + 1):
+        raise ValueError(
+            "loan reference prices must align dates and equity-plus-hedge axes"
+        )
     marks = np.full(name_count, np.nan, dtype=np.float64)
     hedge_shares = 0.0
     if not np.isnan(initial_hedge_reference_price) and (
@@ -1402,6 +1434,10 @@ def simulate_stateful_ledger(
     short_proceeds_interest_base_rows: list[float] = []
     cost_rows: list[float] = []
     borrow_rows: list[float] = []
+    loan_liability_rows: list[float] = []
+    loan_payment_rows: list[float] = []
+    loan_principal_rows: list[float] = []
+    loan_charges: list[LoanCharge] = []
     equity_borrow_raw_rows: list[float] = []
     equity_borrow_fee_rows: list[float] = []
     cdi_benchmark_rows: list[float] = []
@@ -1607,6 +1643,19 @@ def simulate_stateful_ledger(
         transferred_basis = entry_cost_basis[name] * allocation
         prior_destination = float(shares[successor])
         combined = prior_destination + float(new_shares)
+        if shares[name] != 0:
+            loans.deliver(
+                name,
+                successor,
+                float(new_shares) / shares[name],
+                allocation,
+                final=final,
+            )
+        returns = np.zeros(name_count + 1)
+        returns[successor] = max(
+            float(loans.active_quantity[successor]) - max(-combined, 0), 0
+        )
+        loans.request_return(returns, day)
         # Delivery offsets opposite inventory without a market trade.
         # Only the extinguished short portion releases its proceeds.
         opposite = prior_destination * new_shares < 0.0
@@ -1795,6 +1844,7 @@ def simulate_stateful_ledger(
             if not np.isfinite(hedge_mark):
                 raise RuntimeError("open BOVA11 hedge has no finite mark")
             start_identity += hedge_restricted_cash + hedge_shares * hedge_mark
+        start_identity -= float(loans.liability)
         if not np.isclose(start_identity, start_nav, rtol=1e-12, atol=1e-12):
             raise RuntimeError("opening ledger identity does not reconcile")
         held_start_long_rows.append(int((shares > 0.0).sum()))
@@ -2938,6 +2988,31 @@ def simulate_stateful_ledger(
         action_uncertainty_seen |= bool(
             ((shares != 0.0) & explicit_unresolved_action).any()
         )
+        loan_rent, loan_fees = loans.accrue(
+            day, inputs.dates[day], charges=loan_charges
+        )
+        rates_today = (
+            np.full(name_count, config.annual_borrow_rate)
+            if config.borrow_source == "uniform"
+            else inputs.annual_borrow_rate_by_name[day]
+        )
+        hedge_rate_today = (
+            inputs.hedge_annual_borrow_rate[day]
+            if np.isfinite(inputs.hedge_annual_borrow_rate[day])
+            else config.hedge_annual_borrow_rate
+        )
+        loan_session = LoanSession(
+            day,
+            inputs.dates[day],
+            loan_references[day],
+            np.r_[rates_today, hedge_rate_today],
+            cover_return_session(day, inputs.dates[day]),
+            np.r_[inputs.borrow_rate_imputed[day], False],
+            np.r_[
+                inputs.borrow_rate_placeholder[day],
+                not np.isfinite(inputs.hedge_annual_borrow_rate[day]),
+            ],
+        )
         # Apply contractual terms to shares held before the session. Cash terms
         # become claims; only the later payment mask transfers them to cash.
         for name in np.flatnonzero(inputs.has_action[day]):
@@ -2961,6 +3036,14 @@ def simulate_stateful_ledger(
             q = float(inputs.action_q[day, name])
             d = float(inputs.action_d[day, name])
             old_shares = float(shares[name])
+            if q > 0 and successor == name:
+                loans.split(int(name), q)
+            elif q == 0 and inputs.action_payment_session[day, name] >= day:
+                returns = np.zeros(name_count + 1)
+                returns[name] = float(loans.active_quantity[name])
+                loans.request_return(
+                    returns, int(inputs.action_payment_session[day, name])
+                )
             new_shares, signed_claim = apply_contractual_action(
                 old_shares,
                 0.0,
@@ -3074,10 +3157,6 @@ def simulate_stateful_ledger(
                     payable_by_name[name] = 0.0
         pending_claims = unpaid_claims
 
-        short_at_open = shares < 0.0
-        short_value_at_open = float(
-            np.abs(shares[short_at_open] * marks[short_at_open]).sum()
-        )
         cash_rate = float(inputs.cdi[day])
         debit_rate = cash_rate + config.annual_debit_spread / config.annual_sessions
         free_cash_interest = (
@@ -3092,95 +3171,38 @@ def simulate_stateful_ledger(
             * config.short_proceeds_remuneration
         )
         interest = free_cash_interest + short_proceeds_interest
-        imputed_short_notional = 0.0
-        placeholder_short_notional = 0.0
-        if config.borrow_source != "uniform" and short_at_open.any():
-            short_values = np.abs(shares[short_at_open] * marks[short_at_open])
-            raw_rates = inputs.annual_borrow_rate_by_name[day, short_at_open]
-            if not np.isfinite(raw_rates).all():
-                raise RuntimeError("held archive-borrow short has no finite rate")
-            fee_rates = loan_fee_rates(
-                raw_rates, inputs.dates[day], modality=config.borrow_fee_modality
+        equity_borrow_raw = float(loan_rent[:-1].sum())
+        equity_borrow_fee = float(loan_fees[:-1].sum())
+        hedge_borrow_raw = float(loan_rent[-1])
+        hedge_borrow_fee = float(loan_fees[-1])
+        hedge_borrow = hedge_borrow_raw + hedge_borrow_fee
+        borrow = equity_borrow_raw + equity_borrow_fee + hedge_borrow
+        equity_loans = loans.name < name_count
+        principal = loans.principal.detach().numpy()[equity_loans]
+        contract_rates = loans.annual_rate[equity_loans]
+        contract_fees = (
+            loan_fee_rates(
+                contract_rates, inputs.dates[day], modality=config.borrow_fee_modality
+            ).sum(axis=-1)
+            * config.borrow_fee_multiplier
+        )
+        weighted_borrow_rate = (
+            float(
+                np.sum(principal * (contract_rates + contract_fees)) / principal.sum()
             )
-            effective_rates = (
-                raw_rates + fee_rates.sum(axis=-1) * config.borrow_fee_multiplier
-            )
-            equity_borrow_raw = float(
-                np.sum(
-                    short_values
-                    * np.expm1(np.log1p(raw_rates) / config.annual_sessions)
-                )
-            )
-            equity_borrow_fee = (
-                float(
-                    np.sum(
-                        short_values
-                        * np.expm1(np.log1p(fee_rates) / config.annual_sessions).sum(
-                            axis=-1
-                        )
-                    )
-                )
-                * config.borrow_fee_multiplier
-            )
-            borrow = equity_borrow_raw + equity_borrow_fee
-            weighted_borrow_rate = float(
-                np.sum(short_values * effective_rates) / short_value_at_open
-            )
-            imputed_short_notional = float(
-                np.sum(short_values[inputs.borrow_rate_imputed[day, short_at_open]])
-            )
-            placeholder_short_notional = float(
-                np.sum(short_values[inputs.borrow_rate_placeholder[day, short_at_open]])
-            )
-        else:
-            equity_borrow_raw = (
-                np.expm1(np.log1p(config.annual_borrow_rate) / config.annual_sessions)
-                * short_value_at_open
-            )
-            uniform_fee_rate = loan_fee_rates(
-                config.annual_borrow_rate,
-                inputs.dates[day],
-                modality=config.borrow_fee_modality,
-            )
-            equity_borrow_fee = (
-                np.expm1(np.log1p(uniform_fee_rate) / config.annual_sessions).sum()
-                * short_value_at_open
-                * config.borrow_fee_multiplier
-            )
-            borrow = equity_borrow_raw + equity_borrow_fee
-            weighted_borrow_rate = (
-                config.annual_borrow_rate
-                + uniform_fee_rate.sum() * config.borrow_fee_multiplier
-                if short_value_at_open > 0.0
-                else 0.0
-            )
-        hedge_borrow = 0.0
-        hedge_borrow_raw = 0.0
-        hedge_borrow_fee = 0.0
-        if config.beta_hedge and hedge_shares < 0.0:
-            hedge_rate = (
-                float(inputs.hedge_annual_borrow_rate[day])
-                if np.isfinite(inputs.hedge_annual_borrow_rate[day])
-                else config.hedge_annual_borrow_rate
-            )
-            hedge_borrow_raw = abs(hedge_shares * hedge_mark) * np.expm1(
-                np.log1p(hedge_rate) / config.annual_sessions
-            )
-            hedge_fees = loan_fee_rates(
-                hedge_rate, inputs.dates[day], modality=config.borrow_fee_modality
-            )
-            hedge_borrow_fee = (
-                abs(hedge_shares * hedge_mark)
-                * np.expm1(np.log1p(hedge_fees) / config.annual_sessions).sum()
-                * config.borrow_fee_multiplier
-            )
-            hedge_borrow = hedge_borrow_raw + hedge_borrow_fee
-            borrow += hedge_borrow
+            if principal.sum()
+            else 0.0
+        )
+        # Quality attribution is bound to each loan's opening observation below.
         held_short_borrow_rate_rows.append(weighted_borrow_rate)
-        held_short_notional_rows.append(short_value_at_open)
-        held_short_imputed_notional_rows.append(imputed_short_notional)
-        held_short_placeholder_notional_rows.append(placeholder_short_notional)
-        free_cash += interest - borrow
+        held_short_notional_rows.append(float(principal.sum()))
+        held_short_imputed_notional_rows.append(
+            float(principal[loans.imputed[equity_loans]].sum())
+        )
+        held_short_placeholder_notional_rows.append(
+            float(principal[loans.placeholder[equity_loans]].sum())
+        )
+        free_cash += interest
 
         # Only now may current-session prints affect the result. This makes the
         # immutable intended-order set invariant to those later observations.
@@ -3189,6 +3211,8 @@ def simulate_stateful_ledger(
             printed[list(retired_sources)] = False
         if day == day_count - 1:
             terminal_printed = printed.copy()
+        loan_covers = np.zeros(name_count + 1)
+        loan_openings = np.zeros(name_count + 1)
         traded_notional = 0.0
         costs = 0.0
         entry_fill_short_today = 0
@@ -3237,6 +3261,9 @@ def simulate_stateful_ledger(
                     restricted_by_name=restricted_by_name,
                     free_cash=free_cash,
                     cost_rate=cost_rate,
+                    loan_covers=loan_covers,
+                    loan_openings=loan_openings,
+                    loan_name=name,
                 )
                 after = float(shares[name])
                 if entries:
@@ -3392,6 +3419,9 @@ def simulate_stateful_ledger(
                     restricted_by_name=hedge_restricted_array,
                     free_cash=free_cash,
                     cost_rate=hedge_cost_rate,
+                    loan_covers=loan_covers,
+                    loan_openings=loan_openings,
+                    loan_name=name_count,
                 )
                 hedge_shares = float(hedge_share_array[0])
                 hedge_restricted_cash = float(hedge_restricted_array[0])
@@ -3422,6 +3452,17 @@ def simulate_stateful_ledger(
                     )
                 )
 
+        # Every name has at most one new-entry fill after reductions; contract
+        # terms are shared within this session. Apply those actual quantities in
+        # one vector operation, avoiding a whole-cohort scan for every fill.
+        loans.fill(loan_covers, loan_openings, loan_session)
+        rent_paid, fees_paid = loans.pay(day)
+        loan_paid = float(rent_paid.sum() + fees_paid.sum())
+        free_cash -= loan_paid
+        loan_liability = float(loans.liability)
+        loan_liability_rows.append(loan_liability)
+        loan_payment_rows.append(loan_paid)
+        loan_principal_rows.append(float(loans.principal.sum()))
         held_now = shares != 0.0
         marked_holdings = float(np.sum(shares[held_now] * marks[held_now]))
         current_nav = (
@@ -3435,6 +3476,7 @@ def simulate_stateful_ledger(
             )
             + hedge_restricted_cash
             + (hedge_shares * hedge_mark if hedge_shares != 0.0 else 0.0)
+            - loan_liability
         )
         identity = (
             free_cash
@@ -3444,6 +3486,7 @@ def simulate_stateful_ledger(
             + (hedge_shares * hedge_mark if hedge_shares != 0.0 else 0.0)
             + receivable_by_name.sum()
             - payable_by_name.sum()
+            - loan_liability
         )
         reconciliation = current_nav - identity
         all_cash *= 1.0 + inputs.cdi[day]
@@ -3879,19 +3922,23 @@ def simulate_stateful_ledger(
         ),
         cost_bps=np.asarray(cost_rows, dtype=np.float64),
         borrow_bps=np.asarray(borrow_rows, dtype=np.float64),
+        loan_liability=np.asarray(loan_liability_rows, dtype=np.float64),
+        loan_payment=np.asarray(loan_payment_rows, dtype=np.float64),
+        loan_outstanding_principal=np.asarray(loan_principal_rows, dtype=np.float64),
+        loan_charges=tuple(loan_charges),
         equity_borrow_raw_bps=np.asarray(equity_borrow_raw_rows, dtype=np.float64),
         equity_borrow_fee_bps=np.asarray(equity_borrow_fee_rows, dtype=np.float64),
         cdi_benchmark_bps=np.asarray(cdi_benchmark_rows, dtype=np.float64),
-        held_short_weighted_annual_borrow_rate=np.asarray(
+        borrowed_equity_weighted_annual_rate=np.asarray(
             held_short_borrow_rate_rows, dtype=np.float64
         ),
-        held_short_notional_at_open=np.asarray(
+        borrowed_equity_principal_at_open=np.asarray(
             held_short_notional_rows, dtype=np.float64
         ),
-        held_short_imputed_notional_at_open=np.asarray(
+        borrowed_equity_imputed_principal_at_open=np.asarray(
             held_short_imputed_notional_rows, dtype=np.float64
         ),
-        held_short_placeholder_notional_at_open=np.asarray(
+        borrowed_equity_placeholder_principal_at_open=np.asarray(
             held_short_placeholder_notional_rows, dtype=np.float64
         ),
         excluded_short_entry_candidate_count=np.asarray(

@@ -116,8 +116,6 @@ def test_attribution_reconciles_actions_partial_fills_and_shared_costs(liquid):
         entry_liquid=np.full(close.shape, liquid),
         entry_known=np.ones_like(close, dtype=bool),
         action_terms=_aligned_action_terms(inputs),
-        annual_borrow_rate_by_name=inputs.annual_borrow_rate_by_name,
-        config=config,
     )
     expected = result.net_excess_all_cash_bps if liquid else np.zeros(len(close))
     np.testing.assert_allclose(
@@ -187,8 +185,6 @@ def test_entry_liquidity_is_not_reclassified_on_later_partial_fills():
         result=result,
         entry_known=np.ones_like(tags),
         action_terms=_aligned_action_terms(inputs),
-        annual_borrow_rate_by_name=inputs.annual_borrow_rate_by_name,
-        config=config,
     )
     before = original_trade_attribution(**kwargs, entry_liquid=tags)
     after = original_trade_attribution(**kwargs, entry_liquid=np.ones_like(tags))

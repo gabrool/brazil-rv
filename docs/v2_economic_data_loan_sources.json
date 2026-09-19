@@ -54,5 +54,13 @@
     "retrieved_at_utc": "2026-09-19T16:46:06.078115+00:00",
     "sha256": "a00d62040adf07f0b781a1a46e22849333ef574407217951471487b3a855218e",
     "url": "https://bvmf.bmfbovespa.com.br/pt-br/servicos/custos-e-tributos/custos-operacionais/acoes.aspx?idioma=pt-br"
+  },
+  {
+    "bytes": 54357,
+    "id": "b3_spot_t2_2019",
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\primary_sources\\b3_spot_t2_2019.html",
+    "retrieved_at_utc": "2026-09-19T17:36:43.915446+00:00",
+    "sha256": "414bd144bad23d00cf65152d13c7baefca9a29e80b45b1acd3379e1dc3ff53b0",
+    "url": "https://www.b3.com.br/pt_br/noticias/liquidacao.htm"
   }
 ]

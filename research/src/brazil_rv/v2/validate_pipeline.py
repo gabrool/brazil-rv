@@ -1281,11 +1281,11 @@ def _development_acceptance(
                 "spilled_entries_short_by_quintile": headline.get(
                     "spilled_entries_short_by_quintile"
                 ),
-                "imputed_rate_share_of_short_notional": headline.get(
-                    "imputed_rate_share_of_short_notional"
+                "imputed_rate_share_of_borrowed_principal": headline.get(
+                    "imputed_rate_share_of_borrowed_principal"
                 ),
-                "placeholder_rate_share_of_short_notional": headline.get(
-                    "placeholder_rate_share_of_short_notional"
+                "placeholder_rate_share_of_borrowed_principal": headline.get(
+                    "placeholder_rate_share_of_borrowed_principal"
                 ),
                 "placeholder_priced_session_count": headline.get(
                     "placeholder_priced_session_count"

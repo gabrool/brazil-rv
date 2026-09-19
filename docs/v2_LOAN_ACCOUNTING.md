@@ -1,8 +1,8 @@
 # Loan accounting: verified terms and implementation boundary
 
 2026-09-19. Stage A of the economic/data/scaling program is still open.
-This document distinguishes the implemented tariff repair from the remaining
-contract ledger and source admission. It is not a new performance readout.
+This document distinguishes the implemented tariff and contract mechanics from
+remaining settlement terms and historical source admission. It is not a new performance readout.
 
 ## Implemented dated exchange-rate schedule
 
@@ -55,31 +55,86 @@ documents and their hashes on the resolved program root.
   available if necessary), contracted annual rent, business-session accrual and
   payment upon delivery/return or renewal.
 
-## Still required before accounting acceptance
+## Implemented contract mechanics
 
-1. Replace daily marked-notional/current-rate rent with contract cohorts that retain
-   their registration reference and rate. Increases need new terms; partial returns
-   preserve the remaining contract. Track accrual as a liability until actual
-   payment, rather than immediately removing all daily accrual from free cash.
-2. Model cash and security settlement, repayment delays and renewals coherently.
-   Separate beneficial short inventory from loans still outstanding during return.
-   Do not invent an automatic daily renewal or an unsupported broker notional toll.
-3. Integrate the pre-platform R$10 voluntary-contract minimum once, at its evidenced
-   contract/settlement boundary. The implemented annual-rate function does **not**
-   include this monetary minimum. Current account results are therefore not accepted
-   as full historical contractual economics. Check its incidence at R$1m/5m/10m.
-4. Use published COTAHIST average references, including BOVA11, without replacing
-   the source averages with turnover divided by quantity. Fixed-loan transformations
-   through cash distributions, splits and successor baskets require the applicable
-   B3 event terms. Generic shareholder-wealth conservation is not sufficient proof
-   of the transformed loan principal or payment terms.
-5. Admit the recovered donor/taker rates, modality and publication timing, preserving
-   unknown locates/intermediation as explicit assumptions. No new historical rates
-   or corporate events have yet been attached to the accepted data or old fits.
+Both accounts now keep sparse fixed-reference, fixed-rate loan cohorts. An increase
+registers only its new borrowed quantity using the supplied causal published-average
+reference and annual rate. Later market prices or lending observations do not
+reprice an existing contract. Same-security splits change deliverable quantity but
+preserve principal. Partial returns retain the original terms and divide accrued
+liabilities pro rata. Separate tariff intervals preserve earlier accrued fees.
 
-Evaluation V22 labels the remaining daily marked-notional proxy and missing
-contract minimum. Source auditing, repayment mechanics and financing terms remain
-Stage A work; no economic candidate is accepted from this intermediate revision.
+Accrual excludes registration and includes return. Rent and B3 charges are expenses
+and unpaid liabilities; cash pays them on the modeled return date. NAV subtracts
+that liability, preventing either premature cash deductions or a second loss on
+payment. Buying to cover removes market exposure but the loan persists until its
+return settles. A terminal cover does not extinguish an outstanding loan or its
+accrued liability. No future holding cost is silently charged on the final date.
+
+For pre-platform voluntary contracts, the R$10 minimum is provisioned once on first
+accrual, rather than once per partial return. Actual partial fees are paid on their
+return dates; any residual minimum is paid on final return. This last payment-timing
+choice is an explicit research assumption; the historical source establishes the
+contract minimum but not that partial-payment allocation. Returns are allocated pro
+rata across open loans in the same security, without selecting expensive contracts
+using hindsight. One daily borrowed increase per security is treated as one contract;
+a published aggregate rate does not establish the real broker's contract grouping.
+
+The primary return hypothesis is a prearranged return when the covering spot trade
+settles: T+3 before 2019-05-27 and T+2 thereafter. B3's dated [T+2 announcement](https://www.b3.com.br/pt_br/noticias/liquidacao.htm)
+is archived in the source manifest. Same-settlement return assumes the requisite
+request/custody cutoffs are met; it is not a universal broker service guarantee.
+The B3 contract supports payment at partial/full return or renewal. Delivered
+corporate offsets can return shares already in custody that session, subject to
+source-specific admission. Generic market settlement remains separate work below.
+
+Costs retain their original entry identifier through partial returns and successor
+transfers. Liquidity attribution now uses actual cohort charges instead of
+recalculating current-rate costs. Borrow-quality shares use outstanding fixed equity
+loan principal, including pending returns, and retain opening-observation provenance.
+Evaluation V23 hashes loan references and binds them and annual rates in paired
+comparisons. Readouts expose loan liabilities, payments, outstanding principal and
+sparse original-entry charges. They are monetary values in the declared capital units.
+
+The cash/share accounts remain separate implementations, but intentionally share
+one vectorized loan subledger. Agreement between accounts therefore does not supply
+an independent oracle for loan arithmetic: closed-form contract-formula tests do.
+SAM/TBPTT starts copy all loan tensors and metadata independently; mutable corporate
+claim containers are copied as well. Loan state survives truncation without retaining
+an earlier gradient graph. Replay batches actual same-session fills by name; it does
+not change the accepted fills, dates, eligible population or training budget.
+
+## Still required before full accounting acceptance
+
+1. Admit causal published-average reference panels, including BOVA11, and the
+   recovered donor/taker observations and source dates. No missing opening reference
+   is replaced with a convenient current price. Old accepted stores/caches do not
+   contain this new panel and must be explicitly enriched in a new bound replay
+   artifact; they are not silently rescored. Preserve published averages even where
+   turnover/quantity differs. Confirm source identity and exact units.
+2. Complete general spot cash/share settlement and remunerated **settled** proceeds,
+   rather than treating the implemented loan-return lag as completion of all cash
+   settlement. Freeze a renewal/maturity/recall convention and sensitivity using
+   source terms; the current subledger does not invent daily renewals, an unlimited
+   legal loan maturity, or a broker renewal toll. The B3 contract permits at most
+   two years, so unresolved long-lived inventory needs explicit treatment before
+   historical admission.
+3. Admit each corporate case's loan terms. Present basket transfers allocate loan
+   principal using the same marked constituent proportions as inventory and preserve
+   contracted rates. This is a declared intermediate assumption, not proof of B3's
+   treatment. Existing-listed successor mechanics are covered; nested actions,
+   unavailable successor marks, loan obligations during a delivery interval,
+   fractional entitlements and event-specific cash/loan settlements need evidence.
+   No historical corporate case has been admitted by this implementation.
+4. Check minimum billing at partial returns and old/new tariff transitions against
+   invoices/manual terms. Current calculations use continuous float64 currency for
+   differentiability, rather than invoice cent truncation. Measure/bound these small
+   rounding differences at the registered capital sizes before final acceptance.
+   Modality, locate capacity and broker intermediation remain explicit assumptions.
+5. Use R$10m for the registered primary replay and R$1m/R$5m sensitivities. The generic
+   engine's R$1 normalized test/default account cannot stand in for actual capital
+   when an absolute R$10 minimum applies. Capital is now recorded in the evaluation
+   contract. No ordinary-CNPJ fund discount or unsupported retail surcharge is added.
 
 ## Input compatibility and verification
 
@@ -90,9 +145,16 @@ trained-policy provenance. Do not regenerate that coordinate and feed it silentl
 to a policy trained on an old cache. Accounting-only replay must retain the frozen
 policy feature coordinates or explicitly refit and report a separate contrast.
 
-Targeted tests cover the dated component tables, stock/hedge agreement between
-NumPy replay and Torch accounting, uniform and sourced rate scenarios, conservation,
-future-rate mutation, gradients and downstream reporting. Synthetic unaffected
-long-only and fee-disabled long/short paths are bit-identical to `b1eed6c` on 13
-accounting arrays, fills and intentions. These checks establish implementation
-correctness for this change; they do not establish historical profitability.
+Validation of this milestone: 247 targeted tests passed, followed by 156 affected
+checks after batching loan fills (overlapping, not additive), and 65 final reporting/attribution/minimum checks passed. These cover source
+formulas, payment conservation, partial returns, terminal liabilities, fixed-rate
+future mutations, gradients, independent SAM restarts and downstream attribution.
+Two unaffected synthetic paths are bit-identical to `4e93bde` on 13 account arrays
+and fills/intentions. The acceptance receipt is `v2_loan_contract_acceptance.json`.
+
+A synthetic full-population CPU measurement (243 names, 252 sessions, 15,528 fills)
+took 1.44 seconds for contractual replay versus 0.22 seconds for the former proxy;
+64 sessions of differentiable account forward/backward took 0.26 seconds. This is
+an account benchmark, not a neural training forecast or a statistical speed claim.
+It preserves every supplied name. Historical data, fits and profitability were not
+used to select the implementation. Source admission and all remaining stages stay open.

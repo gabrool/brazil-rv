@@ -185,6 +185,7 @@ def _fixture() -> EvaluationInputs:
         transfer_chronology_clean=True,
         source_artifact_hashes={"store_manifest": "a" * 64},
         annual_borrow_rate_by_name=np.full(matrix_shape, 0.02),
+        loan_reference_prices=np.full((len(dates), names + 1), 100.0),
         borrow_rate_imputed=np.zeros(matrix_shape, dtype=np.bool_),
         borrow_rate_placeholder=np.zeros(matrix_shape, dtype=np.bool_),
         shortable_by_borrow_source={

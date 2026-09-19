@@ -15,6 +15,7 @@ from torch import Tensor
 
 from .stateful_ledger import LedgerConfig
 from .share_distributions import basket_prices
+from .loan_contracts import LoanContracts, LoanSession, cover_return_session
 
 
 def tensor(values) -> Tensor:
@@ -36,6 +37,7 @@ class PortfolioAccount:
     payments: list[tuple[int, Tensor]]
     distributions: dict
     retired_sources: set[int]
+    loans: LoanContracts
     config: LedgerConfig
 
     @classmethod
@@ -57,6 +59,12 @@ class PortfolioAccount:
             payments=[],
             distributions={},
             retired_sources=set(),
+            loans=LoanContracts(
+                n,
+                config.borrow_fee_modality,
+                config.borrow_fee_multiplier,
+                config.annual_sessions,
+            ),
             config=config,
         )
 
@@ -67,6 +75,7 @@ class PortfolioAccount:
             + self.restricted.sum()
             + self.claims.sum()
             + (self.shares * self.marks).sum()
+            - self.loans.liability
         )
 
     @property
@@ -110,6 +119,7 @@ class PortfolioAccount:
                     self.pending_exit,
                     torch.zeros_like(self.shares),
                     final=len(legs) == 1,
+                    day=day,
                 )
                 legs.remove(leg)
             if legs:
@@ -135,6 +145,7 @@ class PortfolioAccount:
         ):
             setattr(self, name, getattr(self, name).detach())
         self.payments = [(day, amount.detach()) for day, amount in self.payments]
+        self.loans.detach()
 
     def eligibility(self, active_score, prior_unresolved):
         held = self.shares.detach().numpy() != 0
@@ -151,7 +162,9 @@ class PortfolioAccount:
             required[list(self.distributions)] = False
         return allowed, required
 
-    def _fill(self, signed_quantity: Tensor, price: Tensor, cost_rate: Tensor):
+    def _fill(
+        self, signed_quantity: Tensor, price: Tensor, cost_rate: Tensor, loan_session
+    ):
         """Self-financing fill with segregated short proceeds, including reversals."""
         short_shares = (-self.shares).clamp_min(0)
         cover = torch.minimum(signed_quantity.clamp_min(0), short_shares)
@@ -159,6 +172,7 @@ class PortfolioAccount:
         release = self.restricted * cover / short_shares.clamp_min(1e-30)
         new_long = (signed_quantity - cover).clamp_min(0)
         new_short = (-signed_quantity - sell).clamp_min(0)
+        self.loans.fill(cover, new_short, loan_session)
         notional = signed_quantity.abs() * price
         costs = (cost_rate * notional).sum()
         self.cash = (
@@ -181,12 +195,22 @@ class PortfolioAccount:
         entry_notional,
         *,
         final,
+        day,
     ):
         shares, marks = self.shares.clone(), self.marks.clone()
         transferred_restricted = self.restricted[name] * allocation
         transferred_basis = self.cost_basis[name] * allocation
         existing = self.shares[destination]
         combined = incoming + existing
+        if self.shares[name].detach().item() != 0:
+            ratio = (incoming / self.shares[name]).detach().item()
+            self.loans.deliver(name, destination, ratio, allocation, final=final)
+        remaining_short = (-combined).clamp_min(0)
+        excess = torch.zeros_like(self.shares)
+        excess[destination] = (
+            self.loans.active_quantity[destination] - remaining_short
+        ).clamp_min(0)
+        self.loans.request_return(excess, day)
         offset = torch.where(
             incoming * existing < 0,
             torch.minimum(incoming.abs(), existing.abs()),
@@ -263,7 +287,9 @@ class PortfolioAccount:
         day: int,
         close,
         cdi: float,
-        daily_borrow,
+        session_date,
+        annual_borrow,
+        loan_reference,
         action_q=None,
         action_d=None,
         action_resolved=None,
@@ -273,6 +299,7 @@ class PortfolioAccount:
         fill_fraction=None,
         entry_fill_allowed=None,
         terminal=False,
+        loan_return_session=None,
     ):
         self.retired_sources.update(
             event.source_index
@@ -282,6 +309,15 @@ class PortfolioAccount:
         self.prepare_day(day)
         n = len(self.shares)
         start_nav = self.nav
+        loan_session = LoanSession(
+            day,
+            session_date,
+            np.asarray(loan_reference),
+            np.asarray(annual_borrow),
+            cover_return_session(day, session_date)
+            if loan_return_session is None
+            else loan_return_session,
+        )
         before = self.weights
         target = torch.zeros_like(before) if terminal else target
         reverse = before * target < 0
@@ -298,6 +334,8 @@ class PortfolioAccount:
         increase = torch.where(increase > 1e-10, increase, 0.0)
         entry_notional = target.sign() * increase * start_nav
         hedge_trade_notional = (target[-1] - before[-1]) * start_nav
+        loan_rent, loan_fee = self.loans.accrue(day, session_date)
+        borrow = loan_rent.sum() + loan_fee.sum()
 
         # Realizations begin here. Terms alter prior inventory and marks once;
         # a cash entitlement remains a claim until its explicit payment day.
@@ -332,6 +370,16 @@ class PortfolioAccount:
                 self.payments.append((pay, amount))
             shares, marks = self.shares.clone(), self.marks.clone()
             shares[name] = self.shares[name] * q[name]
+            if q[name] > 0 and mapping[name] == name:
+                self.loans.split(name, q[name])
+            elif (
+                q[name] == 0
+                and payment_session is not None
+                and int(payment_session[name]) >= day
+            ):
+                returns = torch.zeros_like(self.shares)
+                returns[name] = self.loans.active_quantity[name]
+                self.loans.request_return(returns, int(payment_session[name]))
             marks[name] = (self.marks[name] - d[name]) / q[name] if q[name] > 0 else 0
             if q[name] == 0:
                 self.cash = self.cash + self.restricted[name]
@@ -349,6 +397,7 @@ class PortfolioAccount:
                     exit_fraction,
                     entry_notional,
                     final=True,
+                    day=day,
                 )
                 continue
             self.shares, self.marks = shares, marks
@@ -400,8 +449,7 @@ class PortfolioAccount:
             / config.annual_sessions
             + self.restricted.sum() * cdi * config.short_proceeds_remuneration
         )
-        borrow = ((-self.shares).clamp_min(0) * self.marks * tensor(daily_borrow)).sum()
-        self.cash = self.cash + interest - borrow
+        self.cash = self.cash + interest
 
         close = np.asarray(close, dtype=float)
         printed = np.isfinite(close) & (close > 0)
@@ -417,7 +465,7 @@ class PortfolioAccount:
         cost_rate[-1] = config.hedge_cost_bps_per_side / 1e4
         shares_before_fill = self.shares
         used = exit_fraction * fractions
-        costs = self._fill(-self.shares * used, prices, cost_rate)
+        costs = self._fill(-self.shares * used, prices, cost_rate, loan_session)
         self.cost_basis = self.cost_basis * (1 - used)
         remaining_exit = (exit_fraction - used) / (1 - used).clamp_min(1e-30)
         remaining_exit = torch.where(self.shares.abs() > 1e-12, remaining_exit, 0.0)
@@ -431,7 +479,7 @@ class PortfolioAccount:
             * fractions
             * torch.as_tensor(opening_allowed)
         )
-        costs = costs + self._fill(quantity, prices, cost_rate)
+        costs = costs + self._fill(quantity, prices, cost_rate, loan_session)
         self.cost_basis = self.cost_basis + quantity.abs() * prices
 
         # Hedge reductions use fixed decision notional; final liquidation uses
@@ -441,7 +489,9 @@ class PortfolioAccount:
             hedge_quantity[-1] = (
                 -self.shares[-1] if terminal else hedge_trade_notional / prices[-1]
             )
-        costs = costs + self._fill(hedge_quantity, prices, cost_rate)
+        costs = costs + self._fill(hedge_quantity, prices, cost_rate, loan_session)
+        rent_paid, fees_paid = self.loans.pay(day)
+        self.cash = self.cash - rent_paid.sum() - fees_paid.sum()
         self.marks = torch.where(torch.as_tensor(printed), prices, self.marks)
         valued = printed.copy()
         for name, legs in self.distributions.items():
@@ -484,6 +534,8 @@ class PortfolioAccount:
             "net_excess": nav / start_nav - 1 - cdi,
             "interest": interest,
             "borrow": borrow,
+            "borrow_paid": rent_paid.sum() + fees_paid.sum(),
+            "borrow_liability": self.loans.liability,
             "cost": costs,
             "unpriced_inventory_notional": unpriced_notional,
             "undelivered_share_notional": sum(

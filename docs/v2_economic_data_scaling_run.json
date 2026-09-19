@@ -2,5 +2,9 @@
   "registration": "research/preregistrations/v2_economic_data_scaling.md",
   "root": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919",
   "source_bindings_sha256": "4e86c957fb1b1052285a3410765204b8fb13b0903c83d5bdc5e3a3c879048092",
-  "status": "accounting_and_deep_data_audit"
+  "status": "accounting_and_deep_data_audit",
+  "loan_contract_acceptance": {
+    "path": "docs\\v2_loan_contract_acceptance.json",
+    "sha256": "58db32e966dfe4108a1c6f5101eefe2158a5ba37cd9402ee5f74c4b29fc8a2cf"
+  }
 }

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from copy import copy
+from copy import copy, deepcopy
 from dataclasses import fields
 
 import numpy as np
@@ -28,6 +28,10 @@ def clone_account(account):
             value = value.copy()
         elif field.name == "payments":
             value = [(day, amount.detach().clone()) for day, amount in value]
+        elif field.name == "loans":
+            value = value.detached_copy()
+        elif isinstance(value, (dict, set)):
+            value = deepcopy(value)
         values[field.name] = value
     return PortfolioAccount(**values)
 

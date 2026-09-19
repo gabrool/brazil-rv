@@ -16,7 +16,6 @@ from brazil_rv.execution.stateful_ledger import (
     LedgerConfig,
     StatefulLedgerResult,
 )
-from brazil_rv.execution.loan_fees import loan_fee_rates
 from brazil_rv.modeling.metrics import average_ranks
 from brazil_rv.v2.corporate_actions import AlignedActionTerms
 from brazil_rv.v2.artifacts import inventory, sha256_file
@@ -196,8 +195,6 @@ def original_trade_attribution(
     entry_liquid: NDArray[np.bool_],
     entry_known: NDArray[np.bool_],
     action_terms: AlignedActionTerms,
-    annual_borrow_rate_by_name: NDArray[np.floating] | None,
-    config: LedgerConfig,
 ) -> dict[str, object]:
     """Partition the existing fills; contribution bps use the full book's NAV.
 
@@ -215,6 +212,21 @@ def original_trade_attribution(
     for fill in result.fills:
         if fill.purpose != "hedge":
             fills[fill.fill_session].append(fill)
+    # Loan costs retain their opening-entry qualification through partial returns,
+    # successor conversion and settlement, including days with no short inventory.
+    loan_entries = defaultdict(lambda: np.zeros(2))
+    for day_fills in fills.values():
+        for fill in day_fills:
+            if fill.purpose == "entry" and fill.side == "sell":
+                order = orders[fill.order_id]
+                qualified = entry_liquid[order.decision_session, order.security_index]
+                loan_entries[(fill.fill_session, fill.security_index)] += (
+                    fill.quantity * np.asarray([1.0, float(qualified)])
+                )
+    charges = defaultdict(list)
+    for charge in result.loan_charges:
+        if charge.security_index < names:
+            charges[charge.session].append(charge)
     fields = (
         "equity_gross_pnl_bps",
         "equity_trading_cost_bps",
@@ -251,27 +263,15 @@ def original_trade_attribution(
             marks[name] = np.nan
             shares[:, successor] = old * q
             marks[successor] = converted
-        shorts = shares < 0
-        short_value = np.where(shorts, np.abs(shares * marks), 0.0)
-        rates = (
-            np.full(names, config.annual_borrow_rate)
-            if config.borrow_source == "uniform"
-            else np.asarray(annual_borrow_rate_by_name[day], dtype=np.float64)
-        )
-        fees = loan_fee_rates(
-            rates, result.dates[day], modality=config.borrow_fee_modality
-        )
-        borrowed = np.nansum(
-            short_value * np.expm1(np.log1p(rates) / config.annual_sessions), axis=1
-        )
-        borrow_fee = (
-            np.nansum(
-                short_value
-                * np.expm1(np.log1p(fees) / config.annual_sessions).sum(axis=-1),
-                axis=1,
-            )
-            * config.borrow_fee_multiplier
-        )
+        borrowed = np.zeros(2)
+        borrow_fee = np.zeros(2)
+        for charge in charges[day]:
+            total, qualified = loan_entries[
+                (charge.opening_session, charge.security_index)
+            ]
+            allocation = np.asarray([1.0, qualified / total])
+            borrowed += charge.rent * allocation
+            borrow_fee += charge.fee * allocation
         cash = np.zeros(2)
         costs = np.zeros(2)
         entries = np.zeros(2)

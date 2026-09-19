@@ -88,10 +88,15 @@ def test_both_accounts_use_dated_equity_and_hedge_fees(modality, uniform):
     )
     equity_rate = 0.3 if uniform else 0.4
     annual_fees = loan_fee_rates(equity_rate, calendar[:stop], modality=modality)
-    opening_short = np.r_[0, -exact.signed_shares[:-1, 1] * 100]
+    opening_short = exact.borrowed_equity_principal_at_open
+    # The November 14 cap amendment starts a separately accrued tariff period.
+    ages = np.asarray([0, 0, 1, 2, 3, 0, 1, 2, 3])[:, None]
     expected_fees = (
         opening_short
-        * np.expm1(np.log1p(annual_fees) / 252).sum(axis=-1)
+        * (
+            np.exp(np.log1p(annual_fees) / 252 * ages)
+            * np.expm1(np.log1p(annual_fees) / 252)
+        ).sum(axis=-1)
         / exact.start_nav
         * 1e4
     )

@@ -133,7 +133,11 @@ def test_inferred_close_mutation_cannot_change_event_day_orders(tmp_path):
             terms.append(inputs.action_cash_per_prior_share[2, 0])
             evaluations.append(
                 evaluate_scores(
-                    replace(inputs, source_artifact_hashes={"fixture": "c" * 64}),
+                    replace(
+                        inputs,
+                        source_artifact_hashes={"fixture": "c" * 64},
+                        loan_reference_prices=np.full((7, 41), 100.0),
+                    ),
                     window_name="causality_fixture",
                 )
             )

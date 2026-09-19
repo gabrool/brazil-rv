@@ -214,22 +214,23 @@ def test_controller_reserves_delayed_claim_capacity_and_matches_actual_delivery(
 
 @pytest.mark.parametrize("hedge_weight", [-0.02, 0.02])
 @pytest.mark.parametrize("charge_fee", [True, False])
+@pytest.mark.parametrize("entry_rate", [0.0, 0.005, 0.03, np.nan])
 def test_hedge_borrow_rates_and_fee_scenarios_match_both_accounts(
-    hedge_weight, charge_fee
+    hedge_weight, charge_fee, entry_rate
 ):
     data = policy_fixture()
-    rates = np.full(len(data.inputs.dates), np.nan)
-    rates[4:8] = [0.0, 0.005, 0.03, np.nan]
-    data.inputs = replace(data.inputs, hedge_annual_borrow_rate=rates)
-    changes = (
-        {}
-        if charge_fee
-        else dict(
-            borrow_fee_multiplier=0.0,
-        )
+    rates = np.full(len(data.inputs.dates), entry_rate)
+    rates[4:] = 0.9  # Existing contracts must keep the earlier agreed rate.
+    data.inputs = replace(
+        data.inputs,
+        hedge_annual_borrow_rate=rates,
+        bova11_close=np.full(len(rates), 100.0),
+        cdi_returns=np.zeros(len(rates)),
     )
     config = policy_ledger_config(
-        cost_bps_per_side=0.0, hedge_cost_bps_per_side=0.0, **changes
+        cost_bps_per_side=0,
+        hedge_cost_bps_per_side=0,
+        borrow_fee_multiplier=float(charge_fee),
     )
     start, stop = 3, 9
     targets = np.zeros((stop - start, len(data.inputs.security_ids) + 1))
@@ -241,38 +242,24 @@ def test_hedge_borrow_rates_and_fee_scenarios_match_both_accounts(
     ]
     exact, _, _ = exact_replay(data, None, start, stop, config=config, targets=targets)
     assert [r["nav"].item() for r in records] == pytest.approx(exact.nav, abs=1e-12)
-    # Observed zero/below/above fallback rates, then missing. The first close
-    # opens the hedge, so rent starts only on the following session.
-    rent = np.array([0.0, 0.0, 0.005, 0.03, 0.02, 0.02])
-    fees = np.array(
-        [
-            [0, 0],
-            [0.000025, 0.000225],
-            [0.0001, 0.0009],
-            [0.0006, 0.0054],
-            [0.0004, 0.0036],
-            [0.0004, 0.0036],
-        ]
-    )
-    expected = np.expm1(np.log1p(rent) / 252)
-    if charge_fee:
-        expected += np.expm1(np.log1p(fees) / 252).sum(axis=-1)
-    if hedge_weight > 0:
-        expected[:] = 0.0
-    opening_nav = np.r_[config.initial_capital_brl, exact.nav[:-1]]
-    opening_hedge = np.r_[
-        0.0, exact.hedge_signed_shares[:-1] * exact.hedge_mark_price[:-1]
-    ]
-    assert exact.hedge_borrow_bps == pytest.approx(
-        np.abs(opening_hedge) / opening_nav * expected * 1e4, abs=1e-10
+    rate = 0.02 if np.isnan(entry_rate) else entry_rate
+    expected = 0 if hedge_weight > 0 else 0.02 * np.expm1(np.log1p(rate) / 252)
+    assert exact.hedge_borrow_raw_bps[1] * exact.start_nav[1] / 1e4 == pytest.approx(
+        expected
     )
     assert np.max(np.abs(exact.reconciliation_error)) < 1e-12
-    # A later published rate cannot change an earlier accounting result.
-    rates[7:] = 0.50
+    # A fixed-price, zero-cash-interest book only reduces the original hedge.
+    # Mutation of all later rates therefore cannot alter any contract or NAV.
+    data.inputs = replace(
+        data.inputs, hedge_annual_borrow_rate=np.r_[rates[:4], np.zeros(len(rates) - 4)]
+    )
     changed, _, _ = exact_replay(
         data, None, start, stop, config=config, targets=targets
     )
-    np.testing.assert_array_equal(changed.nav[:4], exact.nav[:4])
+    np.testing.assert_array_equal(changed.nav, exact.nav)
+    assert exact.loan_liability[-1] >= 0
+    if hedge_weight < 0:
+        assert exact.loan_outstanding_principal[-1] > 0  # Terminal cover is unsettled.
 
 
 def test_preference_gradient_survives_sequential_account_and_detach_preserves_value():
@@ -381,3 +368,44 @@ def test_policy_training_selects_only_on_exact_ledger_and_reuses_completed_trial
         training.fit_policy(data, tmp_path, "S0", "F1", 11, "fixture", max_epochs=2)
         == result
     )
+
+
+def test_historical_minimum_is_paid_once_after_cover_without_second_nav_loss():
+    from datetime import date, timedelta
+
+    data = policy_fixture()
+    days = len(data.inputs.dates)
+    calendar = tuple(
+        date(2019, 1, 2) + timedelta(days=i)
+        for i in range(2 * days)
+        if (date(2019, 1, 2) + timedelta(days=i)).weekday() < 5
+    )[:days]
+    data.inputs = replace(
+        data.inputs,
+        dates=calendar,
+        raw_close=np.full_like(data.inputs.raw_close, 100.0),
+        bova11_close=np.full(days, 100.0),
+        cdi_returns=np.zeros(days),
+        annual_borrow_rate_by_name=np.zeros_like(data.inputs.raw_close),
+        hedge_annual_borrow_rate=np.zeros(days),
+    )
+    config = policy_ledger_config(
+        initial_capital_brl=10_000_000, cost_bps_per_side=0, hedge_cost_bps_per_side=0
+    )
+    targets = np.zeros((8, len(data.inputs.security_ids) + 1))
+    targets[:2, 0], targets[:2, 1] = 0.01, -0.01
+    account = data.initial_account(0, config)
+    values = [
+        data.step(account, tensor(t), day, terminal=day == 7)
+        for day, t in enumerate(targets)
+    ]
+    exact, _, _ = exact_replay(data, None, 0, 8, config=config, targets=targets)
+    np.testing.assert_allclose(
+        [v["nav"].item() for v in values], exact.nav, atol=1e-8, rtol=0
+    )
+    assert exact.loan_liability[1:5] == pytest.approx([10.0] * 4)
+    assert exact.signed_shares[2].sum() == 0
+    assert exact.loan_outstanding_principal[2] == pytest.approx(100_000)
+    assert exact.loan_payment.tolist() == pytest.approx([0, 0, 0, 0, 0, 10, 0, 0])
+    assert exact.nav[-1] == pytest.approx(10_000_000 - 10, abs=1e-8)
+    assert exact.loan_liability[-1] == exact.loan_outstanding_principal[-1] == 0

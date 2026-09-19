@@ -192,8 +192,6 @@ def _panel(inputs, original_report, policy, median_volume):
                 entry_liquid=median_volume >= 20e6,
                 entry_known=np.isfinite(median_volume),
                 action_terms=_aligned_action_terms(inputs),
-                annual_borrow_rate_by_name=inputs.annual_borrow_rate_by_name,
-                config=config,
             )
         if failed:
             break

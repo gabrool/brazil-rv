@@ -1,0 +1,116 @@
+{
+  "reference_commit": "4e93bde08381fdbb8d411ec04d9cf7a570336358",
+  "scope": "Synthetic mechanics/CPU timing only; no historical source admission or profitability",
+  "unaffected_bit_identical": {
+    "long_only": {
+      "nav": true,
+      "free_cash": true,
+      "restricted_cash": true,
+      "signed_shares": true,
+      "mark_price": true,
+      "cost_bps": true,
+      "borrow_bps": true,
+      "turnover_fraction_nav": true,
+      "gross_fraction_nav": true,
+      "receivables": true,
+      "payables": true,
+      "all_cash_nav": true,
+      "reconciliation_error": true,
+      "fills": true,
+      "intentions": true
+    },
+    "zero_rate_fee_disabled_long_short": {
+      "nav": true,
+      "free_cash": true,
+      "restricted_cash": true,
+      "signed_shares": true,
+      "mark_price": true,
+      "cost_bps": true,
+      "borrow_bps": true,
+      "turnover_fraction_nav": true,
+      "gross_fraction_nav": true,
+      "receivables": true,
+      "payables": true,
+      "all_cash_nav": true,
+      "reconciliation_error": true,
+      "fills": true,
+      "intentions": true
+    }
+  },
+  "benchmark": {
+    "days": 252,
+    "names": 243,
+    "capital_brl": 10000000,
+    "seconds": {
+      "old_proxy": 0.2230783999984851,
+      "fixed_contract": 1.437029499997152,
+      "64_session_243_name_forward_backward": 0.2580270000034943
+    },
+    "fills": 15528,
+    "charges": 220799,
+    "max_liability": 878775.4010995396,
+    "conservation_error_brl": -2.3283064365386963e-10
+  },
+  "heldout_accessed": false,
+  "test_runs": [
+    {
+      "passed": 247,
+      "scope": "loan source formulas, both accounts, policy/evaluation/attribution/readout, SAM objectives, causality and consumer tests"
+    },
+    {
+      "passed": 156,
+      "scope": "affected loan/account/policy/SAM checks after batching actual fills; overlaps prior run"
+    },
+    {
+      "passed": 65,
+      "scope": "final minimum/payment integration, V23 reporting, attribution and readouts; overlaps prior runs"
+    }
+  ],
+  "source_manifest_sha256": "fbdb127b528279f01449dbfee79924a78cb73c0ccc563453da4737c07efe4a93",
+  "source_sha256_lf": {
+    "research/src/brazil_rv/execution/loan_contracts.py": "5f6baf4967d3017f48687665a55686bf09bc59e135540f5d72860c7bcb2054eb",
+    "research/src/brazil_rv/execution/portfolio_account.py": "39e28b6b65f81abf989b73d059f1da24ba30add09d7ca799ab0c1799a1d28fa8",
+    "research/src/brazil_rv/execution/portfolio_policy.py": "72a2b6810171bfef2e0ab228bbafea061f71206fe7b01380882e7788ada92b69",
+    "research/src/brazil_rv/execution/stateful_ledger.py": "da43172a055e0208ed3dda3f89767a6a790c7419774a27e42b89a08eb204bd81",
+    "research/src/brazil_rv/v2/controller_synthetic.py": "559f985ab6e0aabde08aa5337d96d4a07432783052be465aac80fcefe131c931",
+    "research/src/brazil_rv/v2/evaluate.py": "17184cca0a96c39236d4768c99d9e6d5472816e6f0e368b11f53d1d36132c27c",
+    "research/src/brazil_rv/v2/execution_policy.py": "33858e6c04852293305f9921b95f30ce406852145cb17773c91d4150ecd44115",
+    "research/src/brazil_rv/v2/execution_sweep.py": "8b074d06bc1d0907f0dba184de64278f5765ac500aa34868324617a9206a555f",
+    "research/src/brazil_rv/v2/portfolio_objective.py": "a44325f46683ec77623f1b3266ee2f638fda672086fc177e4947d5861ff62748",
+    "research/src/brazil_rv/v2/portfolio_readouts.py": "e705bc4b2d2516d1d0074c1f3b2c21024a38d0747cee1bb9b62f4b8685c362b3",
+    "research/src/brazil_rv/v2/research_checkpoint.py": "df65f09e7f4846674af902804b4f63f2b544e4ca4fbbf75f6546d9ab2160ecca",
+    "research/src/brazil_rv/v2/validate_pipeline.py": "dc8616232e503a8b07422e34655a598d975c739eee09af79e477350bdfd9739b",
+    "research/tests/test_loan_contracts.py": "9f0e975f97eafcd65da5dae25f13372b040e0cdfb916c6b897c0f2184c674c38",
+    "research/tests/test_loan_fees.py": "7e1310555d1363f7ec8c5c762d143a1f2448302d055990dc1b31801f3b7e8e52",
+    "research/tests/test_portfolio_account.py": "fad3cecb7d6c2576e26ec50ab68ef5927c6be4517becf98120ba44bcd8ba6193",
+    "research/tests/test_portfolio_policy.py": "97f8d9411644d96928c9abd56c82a06d65232acaa4deb051df958714dffb76cb",
+    "research/tests/test_share_distributions.py": "45d32b0cdcf5ddee9ee091f4ab9260bcbafb00331dd1c846d9d0fac763ca2003",
+    "research/tests/test_v2_action_ledger_causality.py": "f80fc84aad68615c80f5a4b9ed5535e1a539a5ad4c442c8f8472d62130be0fd7",
+    "research/tests/test_v2_evaluate.py": "18de2d6fe8958b4d4345b51c828a0720d55618c751e72fc9e35965343bca6084",
+    "research/tests/test_v2_execution_policy.py": "03f241729bd16a6fa2c1ba5110070f3655830d4af1ec161c0a0df64fad7f7977",
+    "research/tests/test_v2_stateful_ledger.py": "8dd782c5b08904760ed97f7a11cdb02ce54f89e83de99f7fb992c6f981ac3996"
+  },
+  "shared_loan_subledger": true,
+  "formula_oracle": "Closed-form fixed-principal 252-session compounding, partial-return, minimum and payment conservation tests; NumPy/Torch comparison is not independent loan arithmetic.",
+  "reproducer": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\verify_loan_contract_acceptance.py",
+    "sha256": "7cd507bab2c3a9f72316904c1b2d119f0e9c276d4a86c4192a344743bd377252"
+  },
+  "pending": [
+    "historical published-average references and recovered rate admission",
+    "corporate source-specific loan terms and unresolved claim transformations",
+    "general spot/proceeds settlement",
+    "renewal/maturity/recall convention",
+    "partial-return minimum timing and invoice rounding bounds",
+    "remaining Stage B source-to-tensor audit",
+    "Stages C and D matched corrected replays and capacity waves"
+  ],
+  "assumptions": [
+    "one loan contract per security daily borrowed increase; pro-rata partial returns",
+    "prearranged return on covering spot settlement; no additional unsourced broker toll",
+    "original pre-platform minimum residual paid on final return",
+    "continuous float64 charges; no cent truncation",
+    "successor principal allocation by current constituent proportions is pending source admission",
+    "actual primary replay must explicitly use R$10m, with R$1m/R$5m checks"
+  ]
+}

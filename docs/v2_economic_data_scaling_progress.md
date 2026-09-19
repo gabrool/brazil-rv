@@ -8,7 +8,7 @@ stage. Foundation outcomes remain sealed at the canonical foundation pointer.
 **Current status:** A/B remain in progress; C/D have not started. Corporate-account
 research and the source censuses below are complete. BOVA11 borrowing-path
 consistency, removal of fabricated missing-quote liquidations, inventory netting and
-multi-leg/delayed-delivery mechanics are implemented and tested (see the latest
+multi-leg/delayed-delivery and fixed-contract loan mechanics are implemented and tested (see the latest
 entries); recovered historical sources are not yet
 admitted. No training or source-census worker is active.
 
@@ -415,3 +415,50 @@ published-average references, then actual source admission and remaining Stage B
 audits. Preserve the completed corporate-claim mechanics and resolve event-specific
 loan transformations from source terms. Stages C/D remain unstarted; no GPU worker
 or historical performance comparison launched in this step.
+
+## 2026-09-19: fixed-contract loan mechanics and account integration
+
+Both accounts now carry original published-average reference principal and agreed
+rate, separate accrued rent/B3 liabilities from cash payment, retain loans through
+cover settlement, split partial returns without repricing, and provision the
+historical R$10 minimum once per original contract. Same-security splits retain
+principal; successor transfers preserve original-entry attribution. Source-specific
+loan transformations and delayed claims still need admission. The old daily marked
+notional/current-rate accrual is removed from the active accounts and original-trade
+cost attribution. Explicit daily marginal cost estimates for allocation remain
+estimates of a prospective new loan, not the accounting charge on existing contracts.
+
+Evaluation V23 binds reference panels and paired opening-rate inputs, records capital
+and reports pending loan liabilities/payments/principal. Borrow-quality readouts use
+original-observation provenance and fixed outstanding principal. Training SAM/TBPTT
+restarts independently copy loan state and mutable corporate claim containers.
+Ledger replay batches actual same-session loan openings/returns without modifying
+fills; the gradient account retains its vectorized operations. Both accounts share
+the loan subledger; independent closed-form tests, not their mutual agreement alone,
+verify contract arithmetic.
+
+Validation: 247 targeted tests passed; after the batching optimization, 156 affected
+checks also passed, followed by 65 reporting/attribution/minimum checks (overlapping counts). A 243-name/252-session synthetic replay with
+15,528 fills takes 1.44 seconds versus .22 for the former proxy; a 64-session account
+forward/backward takes .26 seconds. These are single-run local CPU observations,
+not neural-fit estimates. Expense equals payment plus terminal liability to less
+than R$1e-7 at R$10m. Two unaffected synthetic paths are bit-identical to `4e93bde`
+on 13 accounting arrays and fills/intentions. The receipt and reproducer are archived
+on the resolved D root; `docs/v2_loan_contract_acceptance.json` binds the evidence.
+
+No historical opening references, recovered rates or corporate cases are admitted
+yet, and no old policy features were regenerated. Missing opening references cause
+an explicit stop at actual new borrowing, never a fabricated source price. The
+minimum's partial-payment allocation, same-settlement return cutoff, continuous
+currency arithmetic and corporate principal allocation remain documented research
+assumptions in `docs/v2_LOAN_ACCOUNTING.md`. General spot cash/proceeds settlement,
+renewals/maturities/recalls and issuer-specific loan terms still need completion.
+The ordinary engine's normalized test capital is not the registered R$10m replay.
+
+The registration was revisited. Continue Stage A with these source/settlement gaps
+and actual source admission, then finish the Stage B source-to-tensor audit. Preserve
+both completed censuses; inspect only their unresolved cases. Stage C corrected
+comparisons and Stage D capacity waves remain unstarted, with no GPU worker active.
+This milestone does not constitute historical accounting or program acceptance.
+
+Loan-contract acceptance receipt SHA-256: `58db32e966dfe4108a1c6f5101eefe2158a5ba37cd9402ee5f74c4b29fc8a2cf`. The D-root recovery copy is byte-identical.

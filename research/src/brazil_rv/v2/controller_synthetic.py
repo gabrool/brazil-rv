@@ -102,6 +102,10 @@ def synthetic_data(seed=201, days=640, names=32):
         shortable_by_borrow_source={"borrow_balance": active},
         borrow_source_label="synthetic_known_borrow",
         bova11_close=np.full(days, 100.0),
+        # This synthetic market's published loan references equal the prior close.
+        loan_reference_prices=np.column_stack(
+            (np.vstack((close[0], close[:-1])), np.full(days, 100.0))
+        ),
         bova11_manifest_sha256="synthetic",
         bova11_data_sha256="synthetic",
         hedge_beta=np.ones_like(signal),

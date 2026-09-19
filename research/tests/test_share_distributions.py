@@ -127,7 +127,9 @@ def test_basket_gradient_survives_marking_partial_delivery_and_detach():
             day=0,
             close=[100, 30, 30, 100],
             cdi=0,
-            daily_borrow=[0] * 4,
+            session_date="2024-01-02",
+            annual_borrow=[0] * 4,
+            loan_reference=[100] * 4,
         )
         for day, prices in [(1, [np.nan, 31, 32, 100]), (2, [np.nan, 32, 34, 100])]:
             account.prepare_day(day)
@@ -136,7 +138,9 @@ def test_basket_gradient_survives_marking_partial_delivery_and_detach():
                 day=day,
                 close=prices,
                 cdi=0,
-                daily_borrow=[0] * 4,
+                session_date="2024-01-02",
+                annual_borrow=[0] * 4,
+                loan_reference=[100] * 4,
                 share_distributions=(distribution(),),
             )
             if detach and day == 1:

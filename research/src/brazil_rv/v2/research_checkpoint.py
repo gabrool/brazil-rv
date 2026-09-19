@@ -176,8 +176,8 @@ def _finish_cell(root: Path, evaluation, *, name: str, fold: str) -> None:
     by_date = {row["date"]: row for row in headline}
     observed = np.asarray(
         [
-            by_date[day]["held_short_imputed_notional_at_open"] == 0
-            and by_date[day]["held_short_placeholder_notional_at_open"] == 0
+            by_date[day]["borrowed_equity_imputed_principal_at_open"] == 0
+            and by_date[day]["borrowed_equity_placeholder_principal_at_open"] == 0
             and by_date[day]["short_proceeds_interest_base_brl"] > 0
             for day in dates
         ]
