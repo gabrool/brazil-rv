@@ -233,3 +233,15 @@ forecasts start at 1618 (2016-07-18): even the maximum ten-session label horizon
 matures before the first forecast. Evidence: `v2_foundation_residual_prelude.json`.
 Residual model implementation and execution remain pending; this is source
 validation, not a residual experiment result.
+
+### Residual learner implementation (2026-09-19 06:28 UTC)
+
+Added `foundation_residual.py` fixed ridge and seven-leaf LightGBM learners,
+equal-date fit weights, per-date Spearman selection and shared three-head strength
+selection. Two targeted tests pass: duplicating a date's full observations does not
+change ridge fitting, and the intercept is unpenalized/selection ties retain zero
+correction. Ruff passes. These are learner primitives, not completed experiments.
+Next implementation: source-bound per-seed OOS panel assembly, fit-only feature
+encoding with original masks/ages, chronological fold driver and economic readouts.
+Tree callback currently computes equal-date IC explicitly; preserve its semantics
+if optimizing callback speed during the first representative CPU run.
