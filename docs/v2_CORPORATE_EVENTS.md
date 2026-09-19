@@ -78,8 +78,40 @@ shares are available at the beginning of January 11. The cash leg settles Januar
 20, including borrower-to-lender compensation through the B3 window. The document
 explicitly retains fractional entitlements in loan quantities. Shareholder fraction
 auction/payment rules require their own treatment rather than being inferred from
-the loan convention. These source terms are recovered; the historical case remains
-pending integration with the already implemented successor netting and cash claims.
+the loan convention. These terms are now admitted on BRBRMLACNOR9 (axis 169) and
+BRALSOACNOR5 (axis 34). January 10 closing loan conversion is represented at January
+11 opening, before decisions and that day's accrual. Principal/rate do not change
+across that zero-session boundary. The issuer's final cash already includes its
+projected CDI correction through January 13; January 20 is its operational payment
+date. Do not add an invented correction to the announced final amount.
+
+The newly archived January 25 issuer auction result establishes R$17.694416 per
+fractional share, net of auction fees, available by February 2. Long shareholders
+receive whole shares January 11; the remainder stays a priced, non-tradable successor
+claim. January 26 recognizes the announcement conservatively at the next session;
+February 2 pays at the announced deadline. Earlier receipt between January 26 and
+February 2 is a bounded cash-timing sensitivity, not an invented exact sweep.
+Until recognition, only available successor marks value the claim. Loan quantities
+retain all fractions. Ordinary research fills still use continuous quantities;
+auction rounding applies to the resulting beneficial entitlement. Integer order
+sizing and unusual gross-versus-net custody registers remain distinct assumptions.
+
+A recently purchased ALSO long can offset a converted short economically while
+its loan and proceeds remain outstanding until purchase value date. The actual
+January 10 purchase/January 11 conversion oracle pays one original-principal loan
+portion January 12 and the remaining cover portion January 13. Both accounts and
+closed-form rent agree exactly. Admission adds 494 BRML coverage cells (six eligible),
+leaving the accepted store, neural arrays and serialized static policy coordinates
+untouched. Long/short R$1m/R$5m/R$10m historical oracles also agree exactly. These
+predetermined positions are not forecast-profitability results.
+
+The admitted disposal rule waits for January 11 custody. The issuer also states
+that the newly issued shares start trading January 9. That does not alone establish
+this account's ability to dispose of its undelivered entitlement. Before final A/C
+acceptance, resolve or bound a prearranged January 9-10 sale settling after credit;
+do not present custody-first disposal as the only legally feasible route. This
+affects execution opportunity, unlike the requirement for available shares when
+physically returning borrowed stock.
 
 ## Remaining source admission
 

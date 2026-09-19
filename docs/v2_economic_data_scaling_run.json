@@ -10,13 +10,18 @@
     "status": "source_rules_recovered_historical_axis_admission_pending"
   },
   "corporate_replay": {
-    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\corporate_replay\\manifest.json",
-    "sha256": "dd201256a751186b368d629d0fce33bf4f52e6c0fb397d662d1d4f14c7c1a5ab",
-    "status": "cielo_admitted_accounting_only_other_cases_pending"
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\corporate_replay\\brmalls_manifest.json",
+    "sha256": "f9e42a83a091b06ef54aa6ca99f2dc55d5583e466c0efd793a26bd7c29fdf2a6",
+    "status": "cielo_and_brmalls_admitted_accounting_only_other_cases_pending"
   },
   "corporate_replay_acceptance": {
     "path": "docs\\v2_corporate_replay_acceptance.json",
-    "sha256": "feee8988ac27cf408c7c844b0d02ce06d69834d5ba94504f816b3eb223228c24"
+    "sha256": "93b5c1f0d2e8764e33c8337d8a04c3dd294254529b39cc939785e99d492edf9a"
+  },
+  "custody_runtime_acceptance": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\custody_acceptance\\result.json",
+    "reproducer_sha256": "93b1616d1eac81ed5507f2432b7984430a2d71c703af5ec5b23056d34045ded8",
+    "sha256": "788fce91bce7c1f0b7035e9b8ee1bd1b1e93047b4f68332f4f0c1fb19792de3d"
   },
   "identity_source_admission": {
     "path": "docs\\v2_identity_source_admission.json",
@@ -63,6 +68,10 @@
   },
   "registration": "research/preregistrations/v2_economic_data_scaling.md",
   "root": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919",
+  "share_custody_acceptance": {
+    "path": "docs\\v2_share_custody_acceptance.json",
+    "sha256": "e8ef32f90f97ed6f55d716c7bc706bed922d330106801d03c284c0315de498ff"
+  },
   "source_admission_recovery": {
     "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\source_admission_recovery.json",
     "sha256": "32a07e988924d3ad47287c84f971aeefbc8ae240076e4f45982fe2f12a596e2a"

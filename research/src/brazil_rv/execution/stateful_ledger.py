@@ -16,6 +16,7 @@ from .share_distributions import (
     basket_betas,
 )
 from .loan_fees import LoanModality, loan_fee_rates
+from .share_custody import ShareCustody
 from .loan_contracts import (
     LoanCharge,
     LoanCashSettlement,
@@ -1211,6 +1212,8 @@ def _book_fill(
     loan_covers: NDArray[np.float64],
     loan_openings: NDArray[np.float64],
     loan_name: int,
+    long_purchases: NDArray[np.float64],
+    long_sales: NDArray[np.float64],
 ) -> tuple[float, float]:
     old_shares = float(shares[name])
     remaining = quantity
@@ -1224,11 +1227,13 @@ def _book_fill(
         remaining -= cover
     if side == "sell" and old_shares > 0.0:
         sale = min(remaining, old_shares)
+        long_sales[loan_name] += sale
         free_cash += sale * price
         shares[name] -= sale
         remaining -= sale
     if remaining > 0.0:
         if side == "buy":
+            long_purchases[loan_name] += remaining
             free_cash -= remaining * price
             shares[name] += remaining
         else:
@@ -1448,6 +1453,7 @@ def simulate_stateful_ledger(
     # Trade-date cash includes dated settlement claims. Funding and public cash
     # balances below subtract those claims until their value date.
     settlements: list[tuple[int | None, float, NDArray[np.float64]]] = []
+    custody = ShareCustody(name_count + 1)
     previous_nav = config.initial_capital_brl
     all_cash = config.initial_capital_brl
     pending_entries: dict[int, _PendingOrder] = {}
@@ -1688,6 +1694,7 @@ def simulate_stateful_ledger(
         converted_reference,
         *,
         final,
+        ratio,
     ):
         nonlocal free_cash, cancelled_today
         transferred_restricted = restricted_by_name[name] * allocation
@@ -1698,19 +1705,14 @@ def simulate_stateful_ledger(
         transferred_basis = entry_cost_basis[name] * allocation
         prior_destination = float(shares[successor])
         combined = prior_destination + float(new_shares)
-        if shares[name] != 0:
-            loans.deliver(
-                name,
-                successor,
-                float(new_shares) / shares[name],
-                allocation,
-                final=final,
-            )
+        loans.deliver(name, successor, ratio, allocation, final=final)
+        custody_dates = custody.deliver(
+            name, successor, ratio, new_shares, prior_destination, day, final=final
+        )
         returns = np.zeros(name_count + 1)
         returns[successor] = max(
             float(loans.active_quantity[successor]) - max(-combined, 0), 0
         )
-        loans.request_return(returns, day)
         # Delivery offsets opposite inventory without a market trade.
         # Only the extinguished short portion releases its proceeds.
         opposite = prior_destination * new_shares < 0.0
@@ -1732,7 +1734,17 @@ def simulate_stateful_ledger(
             transferred_restricted * source_fraction
             + restricted_by_name[successor] * destination_fraction
         )
-        free_cash += transferred_restricted + restricted_by_name[successor] - restricted
+        release = transferred_restricted + restricted_by_name[successor] - restricted
+        offset = min(abs(prior_destination), abs(new_shares)) if opposite else 0.0
+        for due, quantity in custody_dates:
+            fraction = float(quantity[successor]) / max(offset, 1e-30)
+            loans.request_return(returns * fraction, due)
+            if due > day:
+                deferred = release * fraction
+                restricted_flow = np.zeros(name_count + 1)
+                restricted_flow[successor] = -deferred
+                settlements.append((due, deferred, restricted_flow))
+        free_cash += release
         restricted_by_name[name] -= transferred_restricted
         restricted_by_name[successor] = restricted
         entry_cost_basis[successor] = (
@@ -1833,11 +1845,32 @@ def simulate_stateful_ledger(
             entry_cost_basis[name] = 0.0
             submission_nav[name] = 0.0
 
-    def deliver_due(day):
+    def deliver_due(day, *, realize_auctions=False):
         # Each delivery uses the same netting transition as a one-leg conversion.
         # Value weights allocate existing proceeds/basis; they create no cash.
         for name, legs in tuple(pending_distributions.items()):
             for leg in tuple(legs):
+                auction = leg.fractional_auction
+                if (
+                    realize_auctions
+                    and leg.delivery_session is None
+                    and auction is not None
+                    and auction.available_session == day
+                ):
+                    claim = (
+                        shares[name]
+                        * leg.shares_per_prior_share
+                        * auction.cash_per_share
+                    )
+                    receivable_by_name[name] += claim
+                    pending_claims.append(
+                        _PendingClaim(name, claim, auction.payment_session)
+                    )
+                    shares[name], marks[name] = 0.0, np.nan
+                    entry_cost_basis[name], entry_session[name] = 0.0, -1
+                    pending_exits.pop(name, None)
+                    legs.remove(leg)
+                    continue
                 if leg.delivery_session != day:
                     continue
                 prices = basket_prices(legs, last_observed)
@@ -1847,17 +1880,38 @@ def simulate_stateful_ledger(
                 ]
                 allocation = values[legs.index(leg)] / sum(values)
                 destination = leg.successor_index
+                source_entry = entry_session[name]
+                incoming = float(shares[name]) * leg.shares_per_prior_share
+                fraction = fraction_basis = 0.0
+                if auction is not None and incoming > 0:
+                    if any(float(q[name]) > 1e-12 for _, q in custody.receipts):
+                        raise ValueError(
+                            "fraction auction requires settled source purchases"
+                        )
+                    fraction = incoming - np.floor(incoming)
+                    fraction_basis = entry_cost_basis[name] * fraction / incoming
+                    entry_cost_basis[name] -= fraction_basis
+                    incoming = float(np.floor(incoming))
                 deliver_shares(
                     day,
                     name,
                     destination,
-                    float(shares[name]) * leg.shares_per_prior_share,
+                    incoming,
                     allocation,
                     float(last_observed[destination]),
                     float(last_observed[destination]),
                     final=len(legs) == 1,
+                    ratio=leg.shares_per_prior_share,
                 )
-                legs.remove(leg)
+                if fraction > 0:
+                    shares[name] = fraction / leg.shares_per_prior_share
+                    entry_cost_basis[name], entry_session[name] = (
+                        fraction_basis,
+                        source_entry,
+                    )
+                    legs[legs.index(leg)] = replace(leg, delivery_session=None)
+                else:
+                    legs.remove(leg)
             if legs:
                 prices = basket_prices(legs, last_observed)
                 marks[name] = sum(
@@ -1873,6 +1927,7 @@ def simulate_stateful_ledger(
         )
         settlements = [item for item in settlements if item[0] is None or item[0] > day]
         cancelled_today = 0
+        custody.settle(day)
         deliver_due(day)
         locked = np.zeros(name_count, dtype=bool)
         if pending_distributions:
@@ -3054,6 +3109,15 @@ def simulate_stateful_ledger(
             if event.effective_session != day:
                 continue
             name = event.security_index
+            for due in np.unique(loans.return_day[loans.name == name]):
+                if due > day:
+                    restored = np.zeros(name_count + 1)
+                    restored[name] = float(
+                        loans.quantity[
+                            (loans.name == name) & (loans.return_day == due)
+                        ].sum()
+                    )
+                    custody.add(int(due), restored)
             quantity = float(loans.cash_settle(name, day))
             paid = quantity * event.cash_per_share
             free_cash += restricted_by_name[name] - paid
@@ -3123,12 +3187,15 @@ def simulate_stateful_ledger(
             old_shares = float(shares[name])
             if q > 0 and successor == name:
                 loans.split(int(name), q)
+                custody.split(int(name), q)
             elif q == 0 and inputs.action_payment_session[day, name] >= day:
                 returns = np.zeros(name_count + 1)
                 returns[name] = float(loans.active_quantity[name])
                 loans.request_return(
                     returns, int(inputs.action_payment_session[day, name])
                 )
+            if q == 0:
+                custody.split(int(name), 0.0)
             new_shares, signed_claim = apply_contractual_action(
                 old_shares,
                 0.0,
@@ -3181,6 +3248,7 @@ def simulate_stateful_ledger(
                     converted_mark,
                     converted_reference,
                     final=True,
+                    ratio=q,
                 )
             if (
                 successor == name
@@ -3223,7 +3291,7 @@ def simulate_stateful_ledger(
                 payable_by_name[name] -= claim
             if claim:
                 pending_claims.append(_PendingClaim(name, claim, event.payment_session))
-            if shares[name] != 0:
+            if shares[name] != 0 or (loans.name == name).any():
                 prices = basket_prices(event.legs, last_observed)
                 pending_distributions[name] = list(event.legs)
                 marks[name] = sum(
@@ -3234,7 +3302,7 @@ def simulate_stateful_ledger(
                 explicit_unresolved_action[name] = False
             last_observed[name] = np.nan
 
-        deliver_due(day)
+        deliver_due(day, realize_auctions=True)
 
         unpaid_claims: list[_PendingClaim] = []
         for claim in pending_claims:
@@ -3309,6 +3377,9 @@ def simulate_stateful_ledger(
             terminal_printed = printed.copy()
         loan_covers = np.zeros(name_count + 1)
         loan_openings = np.zeros(name_count + 1)
+        long_purchases = np.zeros(name_count + 1)
+        long_sales = np.zeros(name_count + 1)
+        long_before_fill = np.maximum(np.r_[shares, hedge_shares], 0)
         traded_notional = 0.0
         costs = 0.0
         entry_fill_short_today = 0
@@ -3360,6 +3431,8 @@ def simulate_stateful_ledger(
                     loan_covers=loan_covers,
                     loan_openings=loan_openings,
                     loan_name=name,
+                    long_purchases=long_purchases,
+                    long_sales=long_sales,
                 )
                 after = float(shares[name])
                 if entries:
@@ -3518,6 +3591,8 @@ def simulate_stateful_ledger(
                     loan_covers=loan_covers,
                     loan_openings=loan_openings,
                     loan_name=name_count,
+                    long_purchases=long_purchases,
+                    long_sales=long_sales,
                 )
                 hedge_shares = float(hedge_share_array[0])
                 hedge_restricted_cash = float(hedge_restricted_array[0])
@@ -3560,6 +3635,13 @@ def simulate_stateful_ledger(
                     - fill_restricted_before,
                 )
             )
+        custody.fill(
+            long_before_fill,
+            long_purchases,
+            long_sales,
+            day,
+            spot_settlement_session(day, inputs.dates[day]),
+        )
         loans.fill(loan_covers, loan_openings, loan_session)
         rent_paid, fees_paid = loans.pay(day)
         loan_paid = float(rent_paid.sum() + fees_paid.sum())

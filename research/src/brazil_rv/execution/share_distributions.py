@@ -12,10 +12,24 @@ import numpy as np
 
 
 @dataclass(frozen=True)
+class FractionAuction:
+    available_session: int
+    cash_per_share: float
+    payment_session: int
+
+    def __post_init__(self):
+        if self.payment_session < self.available_session:
+            raise ValueError("fraction payment cannot precede known auction terms")
+        if not math.isfinite(self.cash_per_share) or self.cash_per_share <= 0:
+            raise ValueError("fraction auction requires a positive sourced price")
+
+
+@dataclass(frozen=True)
 class ShareDelivery:
     successor_index: int
     shares_per_prior_share: float
     delivery_session: int | None
+    fractional_auction: FractionAuction | None = None
 
 
 @dataclass(frozen=True)
@@ -54,6 +68,14 @@ class ShareDistribution:
         ):
             raise ValueError("cash payment cannot precede economic succession")
         for leg in self.legs:
+            if leg.fractional_auction is not None and (
+                len(self.legs) != 1
+                or leg.delivery_session is None
+                or leg.fractional_auction.available_session < leg.delivery_session
+            ):
+                raise ValueError(
+                    "fraction auction requires a prior single-leg delivery"
+                )
             if (
                 leg.successor_index == self.source_index
                 or not math.isfinite(leg.shares_per_prior_share)
@@ -89,6 +111,14 @@ def slice_distributions(distributions, start, stop):
                     delivery_session=None
                     if leg.delivery_session is None
                     else leg.delivery_session - start,
+                    fractional_auction=None
+                    if leg.fractional_auction is None
+                    else replace(
+                        leg.fractional_auction,
+                        available_session=leg.fractional_auction.available_session
+                        - start,
+                        payment_session=leg.fractional_auction.payment_session - start,
+                    ),
                 )
                 for leg in event.legs
             ),

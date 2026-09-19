@@ -255,14 +255,18 @@ class LoanContracts:
                 torch.zeros_like(self.root_fees).index_add(0, root_index, fees.sum(-1))
                 + minimum_change
             )
-            for index in range(len(self.root_name)):
+            # Paid contract roots remain for attribution, but emitting zero rows
+            # for every old root each day makes long replays needlessly quadratic.
+            rent_values = root_rent.detach().numpy()
+            fee_values = root_fee.detach().numpy()
+            for index in np.flatnonzero((rent_values != 0) | (fee_values != 0)):
                 charges.append(
                     LoanCharge(
                         day,
                         int(self.root_opened[index]),
                         int(self.root_name[index]),
-                        float(root_rent[index]),
-                        float(root_fee[index]),
+                        float(rent_values[index]),
+                        float(fee_values[index]),
                     )
                 )
         return self._by_name(rent), self._by_name(fees.sum(-1)) + self._by_name(

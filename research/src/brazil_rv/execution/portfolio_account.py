@@ -7,7 +7,7 @@ notional and exit fractions have been computed from the previous state.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 import numpy as np
 import torch
@@ -16,6 +16,7 @@ from torch import Tensor
 from .stateful_ledger import LedgerConfig
 from .share_distributions import basket_prices
 from .loan_contracts import LoanContracts, LoanSession, spot_settlement_session
+from .share_custody import ShareCustody
 
 
 def tensor(values) -> Tensor:
@@ -38,6 +39,7 @@ class PortfolioAccount:
     distributions: dict
     retired_sources: set[int]
     loans: LoanContracts
+    custody: ShareCustody
     config: LedgerConfig
     settlements: list[tuple[int | None, Tensor, Tensor]]
     funding_day: int
@@ -69,6 +71,7 @@ class PortfolioAccount:
                 config.borrow_fee_multiplier,
                 config.annual_sessions,
             ),
+            custody=ShareCustody(n),
             config=config,
             settlements=[],
             funding_day=-1,
@@ -129,12 +132,13 @@ class PortfolioAccount:
                 )
         return values / self.nav
 
-    def prepare_day(self, day):
+    def prepare_day(self, day, *, realize_auctions=False):
         """Known settlement/delivery dates inform decisions, never current prices."""
         if day != self.funding_day:
             self.funding_cash, restricted = self.settled_balances()
             self.funding_restricted = restricted.sum()
             self.funding_day = day
+            self.custody.settle(day)
             # Value-date obligations settle within this session. Close-to-close
             # interest below belongs to balances carried from the previous close.
             self.settlements = [
@@ -142,6 +146,28 @@ class PortfolioAccount:
             ]
         for name, legs in tuple(self.distributions.items()):
             for leg in tuple(legs):
+                auction = leg.fractional_auction
+                if (
+                    realize_auctions
+                    and leg.delivery_session is None
+                    and auction is not None
+                    and auction.available_session == day
+                ):
+                    amount = torch.zeros_like(self.claims)
+                    amount[name] = (
+                        self.shares[name]
+                        * leg.shares_per_prior_share
+                        * auction.cash_per_share
+                    )
+                    self.claims = self.claims + amount
+                    self.payments.append((auction.payment_session, amount))
+                    for field in ("shares", "marks", "cost_basis", "pending_exit"):
+                        values = getattr(self, field).clone()
+                        values[name] = 0
+                        setattr(self, field, values)
+                    self.entry_day[name] = -1
+                    legs.remove(leg)
+                    continue
                 if leg.delivery_session != day:
                     continue
                 prices = basket_prices(legs, self.marks.detach().numpy())
@@ -150,18 +176,47 @@ class PortfolioAccount:
                     for item, price in zip(legs, prices)
                 ]
                 allocation = values[legs.index(leg)] / sum(values)
+                source_entry_day = self.entry_day[name]
+                incoming = self.shares[name] * leg.shares_per_prior_share
+                fraction = tensor(0.0)
+                fraction_basis = tensor(0.0)
+                if auction is not None and incoming.detach().item() > 0:
+                    # Shareholder fractions remain a non-tradable claim. Loan
+                    # quantities retain all fractions under the separate B3 rule.
+                    if any(
+                        float(q[name].detach()) > 1e-12
+                        for _, q in self.custody.receipts
+                    ):
+                        raise ValueError(
+                            "fraction auction requires settled source purchases"
+                        )
+                    fraction = incoming - incoming.floor()
+                    fraction_basis = self.cost_basis[name] * fraction / incoming
+                    basis = self.cost_basis.clone()
+                    basis[name] = basis[name] - fraction_basis
+                    self.cost_basis = basis
+                    incoming = incoming.floor()
                 self.pending_exit, _ = self._deliver_shares(
                     name,
                     leg.successor_index,
-                    self.shares[name] * leg.shares_per_prior_share,
+                    incoming,
                     allocation,
                     self.marks[leg.successor_index],
                     self.pending_exit,
                     torch.zeros_like(self.shares),
                     final=len(legs) == 1,
                     day=day,
+                    ratio=leg.shares_per_prior_share,
                 )
-                legs.remove(leg)
+                if fraction.detach().item() > 0:
+                    shares, basis = self.shares.clone(), self.cost_basis.clone()
+                    shares[name] = fraction / leg.shares_per_prior_share
+                    basis[name] = fraction_basis
+                    self.shares, self.cost_basis = shares, basis
+                    self.entry_day[name] = source_entry_day
+                    legs[legs.index(leg)] = replace(leg, delivery_session=None)
+                else:
+                    legs.remove(leg)
             if legs:
                 marks = self.marks.clone()
                 marks[name] = sum(
@@ -188,6 +243,7 @@ class PortfolioAccount:
             setattr(self, name, getattr(self, name).detach())
         self.payments = [(day, amount.detach()) for day, amount in self.payments]
         self.loans.detach()
+        self.custody.detach()
         self.settlements = [(d, f.detach(), r.detach()) for d, f, r in self.settlements]
 
     def eligibility(self, active_score, prior_unresolved):
@@ -215,6 +271,13 @@ class PortfolioAccount:
         release = self.trade_restricted * cover / short_shares.clamp_min(1e-30)
         new_long = (signed_quantity - cover).clamp_min(0)
         new_short = (-signed_quantity - sell).clamp_min(0)
+        self.custody.fill(
+            self.shares.clamp_min(0),
+            new_long,
+            sell,
+            loan_session.day,
+            spot_settlement_session(loan_session.day, loan_session.date),
+        )
         self.loans.fill(cover, new_short, loan_session)
         notional = signed_quantity.abs() * price
         costs = (cost_rate * notional).sum()
@@ -246,6 +309,7 @@ class PortfolioAccount:
         *,
         final,
         day,
+        ratio,
     ):
         shares, marks = self.shares.clone(), self.marks.clone()
         transferred_restricted = self.trade_restricted[name] * allocation
@@ -260,15 +324,15 @@ class PortfolioAccount:
         transferred_basis = self.cost_basis[name] * allocation
         existing = self.shares[destination]
         combined = incoming + existing
-        if self.shares[name].detach().item() != 0:
-            ratio = (incoming / self.shares[name]).detach().item()
-            self.loans.deliver(name, destination, ratio, allocation, final=final)
+        self.loans.deliver(name, destination, ratio, allocation, final=final)
+        custody_dates = self.custody.deliver(
+            name, destination, ratio, incoming, existing, day, final=final
+        )
         remaining_short = (-combined).clamp_min(0)
         excess = torch.zeros_like(self.shares)
         excess[destination] = (
             self.loans.active_quantity[destination] - remaining_short
         ).clamp_min(0)
-        self.loans.request_return(excess, day)
         offset = torch.where(
             incoming * existing < 0,
             torch.minimum(incoming.abs(), existing.abs()),
@@ -281,11 +345,20 @@ class PortfolioAccount:
             transferred_restricted * incoming_fraction
             + self.trade_restricted[destination] * existing_fraction
         )
-        self.trade_cash = self.trade_cash + (
+        release = (
             transferred_restricted
             + self.trade_restricted[destination]
             - restricted[destination]
         )
+        for due, quantity in custody_dates:
+            fraction = quantity[destination] / offset.clamp_min(1e-30)
+            self.loans.request_return(excess * fraction, due)
+            if due > day:
+                deferred = release * fraction
+                restricted_flow = torch.zeros_like(self.trade_restricted)
+                restricted_flow[destination] = -deferred
+                self.settlements.append((due, deferred, restricted_flow))
+        self.trade_cash = self.trade_cash + release
         restricted[name] = restricted[name] - transferred_restricted
         self.trade_restricted = restricted
         basis = self.cost_basis.clone()
@@ -404,6 +477,13 @@ class PortfolioAccount:
                 entry_notional[name] = entry_notional[name].clone().clamp_min(0)
             if event.effective_session != day:
                 continue
+            for due in np.unique(self.loans.return_day[self.loans.name == name]):
+                if due > day:
+                    restored = torch.zeros_like(self.shares)
+                    restored[name] = self.loans.quantity[
+                        (self.loans.name == name) & (self.loans.return_day == due)
+                    ].sum()
+                    self.custody.add(int(due), restored)
             quantity = self.loans.cash_settle(name, day)
             paid = quantity * event.cash_per_share
             cash_loan_payment = cash_loan_payment + paid
@@ -464,6 +544,7 @@ class PortfolioAccount:
             shares[name] = self.shares[name] * q[name]
             if q[name] > 0 and mapping[name] == name:
                 self.loans.split(name, q[name])
+                self.custody.split(name, q[name])
             elif (
                 q[name] == 0
                 and payment_session is not None
@@ -474,6 +555,7 @@ class PortfolioAccount:
                 self.loans.request_return(returns, int(payment_session[name]))
             marks[name] = (self.marks[name] - d[name]) / q[name] if q[name] > 0 else 0
             if q[name] == 0:
+                self.custody.split(name, 0.0)
                 release = self.trade_restricted[name]
                 release_vector = torch.zeros_like(self.trade_restricted)
                 release_vector[name] = -release
@@ -498,6 +580,7 @@ class PortfolioAccount:
                     entry_notional,
                     final=True,
                     day=day,
+                    ratio=q[name],
                 )
                 continue
             self.shares, self.marks = shares, marks
@@ -515,7 +598,10 @@ class PortfolioAccount:
             self.claims = self.claims + amount
             if event.cash_per_prior_share:
                 self.payments.append((event.payment_session, amount))
-            if self.shares[name].detach().item() != 0:
+            if (
+                self.shares[name].detach().item() != 0
+                or (self.loans.name == name).any()
+            ):
                 basket_prices(event.legs, self.marks.detach().numpy())
                 self.distributions[name] = list(event.legs)
                 marks = self.marks.clone()
@@ -527,7 +613,7 @@ class PortfolioAccount:
         # Same-session delivery of a newly recognized claim is a realization;
         # later deliveries were handled before this day's decision above.
         self.pending_exit = exit_fraction
-        self.prepare_day(day)
+        self.prepare_day(day, realize_auctions=True)
         exit_fraction = self.pending_exit
         if self.retired_sources:
             entry_notional = entry_notional.clone()

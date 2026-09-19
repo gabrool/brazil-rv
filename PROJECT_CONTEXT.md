@@ -26,7 +26,7 @@ against existing inventory in both accounts, preserving signed cash claims and
 releasing only the extinguished short portion's restricted proceeds. Sparse sourced
 multi-leg distributions can now retain signed, non-tradable baskets until separately
 dated custody delivery, with separate cash claims/payment. Allocation reserves their
-capacity and risk/readouts use the underlying exposures. Evaluation V25 binds these
+capacity and risk/readouts use the underlying exposures. Evaluation V26 binds these
 terms and reports undelivered and unpriced inventory separately on the full calendar.
 Both cost paths now use dated B3 loan components, with stock/hedge rent separated
 from exchange fees. Both accounts now retain fixed-principal/rate loan cohorts,
@@ -34,8 +34,9 @@ accrued liabilities through return, and the old contract minimum; loan reference
 are a new explicitly bound input and cannot be invented from current marks. Spot cash
 now settles on dated T+3/T+2 value dates; NAV retains unsettled obligations and income
 uses prior-close settled cash/proceeds. Readouts separate free-cash income, proceeds
-income and debit financing. Custody/calendar boundaries, renewal/event-specific
-terms and historical source admission remain open. SAM restarts independently copy
+income and debit financing. Regular-way purchase custody now delays corporate loan
+offsets and proceeds release until deliverable. Clearing-calendar exceptions,
+renewal/event-specific terms and remaining source admission remain open. SAM restarts independently copy
 the whole account state, including pending settlements. See
 `docs/v2_LOAN_ACCOUNTING.md`. This is an
 implemented accounting repair, not completion of the contractual-event/source audit
@@ -49,8 +50,12 @@ Static policy coordinates remain frozen and effective borrowing prohibitions als
 apply to later flat-start windows. See `docs/v2_CORPORATE_EVENTS.md` for Cielo's
 distinct dates and SELIC correction, and BR Malls' recovered custody/loan terms.
 
-The economic/data run pointer now binds Cielo's separate source-based accounting
-amendment and its verified historical event arithmetic. Apply it explicitly after
+The economic/data run pointer now binds Cielo and BR Malls source-based accounting
+amendments and verified historical event arithmetic. BR Malls preserves original
+loan principal/rates across conversion, separate Jan9 effect/Jan11 custody/Jan20
+cash, and non-tradable shareholder fractions until known auction terms/payment.
+The reference uses custody-first disposal; feasibility of Jan9-Jan10 presettlement
+disposal remains a separate execution assumption. Apply amendments explicitly after
 loading frozen policy inputs; accepted stores and static feature coordinates stay
 unchanged. The source-backed ISIN allowlist now also contains the ALLOS and ISA
 renames, with a repaired admission loader that validates dated original identities

@@ -16,8 +16,9 @@ def main():
     pointer_path = PROJECT / "docs/v2_economic_data_scaling_run.json"
     pointer = json.loads(pointer_path.read_text())
     output = Path(pointer["root"]) / "corporate_replay"
-    if output.exists():
-        raise FileExistsError(output)
+    path = output / "brmalls_manifest.json"
+    if path.exists():
+        raise FileExistsError(path)
     binding = json.loads((PROJECT / "docs/v2_data_inputs.json").read_text())["store"]
     store = Path(binding["root"])
     if sha256_file(store / "manifest.json") != binding["manifest_sha256"]:
@@ -42,6 +43,21 @@ def main():
         "selic_sgs11_20240816_20240926",
     ]
     receipts = [sources[key] for key in needed]
+    foundation = json.loads(
+        (PROJECT / "docs/v2_foundation_primary_sources.json").read_text()
+    )
+    fraction = json.loads(
+        (
+            Path(pointer["root"])
+            / "primary_sources/brmalls_fractions_20230125.receipt.json"
+        ).read_text()
+    )
+    receipts += [
+        sources["brmalls_loan_b3_20230103"],
+        fraction,
+        foundation["brmalls_schedule_20221219"],
+        foundation["brmalls_delivery_20221219_mirror"],
+    ]
     for record in receipts:
         if sha256_file(Path(record["path"])) != record["sha256"]:
             raise ValueError("corporate source receipt differs")
@@ -65,12 +81,48 @@ def main():
     quoted = np.isfinite(close) & (close > 0)
     if str(calendar[np.flatnonzero(quoted)[-1]]) != "2024-08-26":
         raise ValueError("Cielo terminal quote differs from the issuer closing date")
+    brml = isins.index("BRBRMLACNOR9")
+    also = isins.index("BRALSOACNOR5")
+    prices = np.load(store / "raw_close.npy", mmap_mode="r")
+    quoted = np.isfinite(prices[:, brml]) & (prices[:, brml] > 0)
+    if str(calendar[np.flatnonzero(quoted)[-1]]) != "2023-01-06":
+        raise ValueError("BR Malls terminal source quote differs")
+    preceding = np.searchsorted(calendar, np.datetime64("2023-01-09")) - 1
+    if not np.isfinite(prices[preceding, also]):
+        raise ValueError("BR Malls successor lacks a causal existing-listing mark")
     # Source announcement after the market close on Sep23: recognize at the next
     # session, never retroactively at the August conversion or Sept23 decision.
     terms = {
-        "schema": "BRAZIL_RV_CORPORATE_REPLAY_V1",
+        "schema": "BRAZIL_RV_CORPORATE_REPLAY_V2",
         "store": binding,
-        "status": "cielo_admitted_accounting_only_other_cases_pending",
+        "status": "cielo_and_brmalls_admitted_accounting_only_other_cases_pending",
+        "supersedes": pointer["corporate_replay"],
+        "share_distributions": [
+            {
+                "isin": "BRBRMLACNOR9",
+                "successor_isin": "BRALSOACNOR5",
+                "available_date": "2023-01-04",
+                "effective_date": "2023-01-09",
+                "last_trade_date": "2023-01-06",
+                "loan_conversion_close_date": "2023-01-10",
+                "delivery_date": "2023-01-11",
+                "payment_date": "2023-01-20",
+                "shares_per_prior_share": 0.398551577675763,
+                "cash_per_prior_share": 1.62899410177968,
+                "loan_principal_allocation": 1.0,
+                "loan_conversion_convention": "Jan10 close represented at Jan11 opening before new decisions; unchanged principal/rate across that zero-session boundary; no daily repricing",
+                "cash_basis": "announced final amount already includes projected CDI to Jan13; no additional invented Jan13-Jan20 correction",
+                "fractional_auction": {
+                    "auction_date": "2023-01-24",
+                    "announcement_date": "2023-01-25",
+                    "available_date": "2023-01-26",
+                    "payment_date": "2023-02-02",
+                    "cash_per_share": 17.694416,
+                    "payment_convention": "issuer's by-Feb2 deadline; no invented earlier sweep; bound earliest known Jan26 receipt separately",
+                    "basis": "whole shareholder shares delivered; residual remains marked non-tradable successor claim until next-session recognition of auction result; fractional loan quantities retained",
+                },
+            }
+        ],
         "calendar": {
             "path": str(store / "date_index.npy"),
             "sha256": sha256_file(store / "date_index.npy"),
@@ -104,15 +156,13 @@ def main():
         ],
         "unchanged": "model features, scores, targets, eligibility, raw quotes and accepted store",
         "pending_cases": [
-            "BRML",
             "DMMO",
             "CPLE",
             "ALLOS/ISA identity audit",
             "other exposed events",
         ],
     }
-    output.mkdir()
-    path = output / "manifest.json"
+    output.mkdir(exist_ok=True)
     digest = write_json_atomic(path, terms)
     pointer["corporate_replay"] = {
         "path": str(path),

@@ -104,8 +104,12 @@ def main():
         assert getattr(full, key) is getattr(after, key)
     name = full.security_ids.index("BRCIELACNOR3")
     resolved_gain = after.action_session_resolved & ~full.action_session_resolved
+    admitted_names = [name] + [
+        full.security_ids.index(x["isin"]) for x in terms["share_distributions"]
+    ]
     assert not (
-        resolved_gain & np.broadcast_to(names != name, resolved_gain.shape)
+        resolved_gain
+        & np.broadcast_to(~np.isin(names, admitted_names), resolved_gain.shape)
     ).any()
     eligible_gain = int((resolved_gain & full.active).sum())
     rows = np.flatnonzero(
@@ -186,9 +190,149 @@ def main():
                 "loan_invoice_cent_bound_brl": quantity * 0.01 if side < 0 else 0,
             }
         )
+    event = terms["share_distributions"][0]
+    source = full.security_ids.index(event["isin"])
+    destination = full.security_ids.index(event["successor_isin"])
+    rows = np.flatnonzero(
+        (calendar >= np.datetime64("2023-01-06"))
+        & (calendar <= np.datetime64("2023-02-03"))
+    )
+    raw = inputs_on_axes(store, calendar, names, rows)
+    with np.load(loan_path) as panels:
+        raw = replace(raw, loan_reference_prices=panels["loan_reference_prices"][rows])
+    raw = replace(raw, initial_reference_price=raw.loan_reference_prices[0, :-1])
+    shape = raw.active.shape
+    original = PolicyData(
+        raw,
+        np.ones(shape),
+        np.full(shape, 0.0004),
+        np.full(len(rows), 0.0001),
+        np.zeros(len(rows)),
+        raw.loan_reference_prices[:, :-1],
+    )
+    brml = copy(original)
+    brml.inputs = apply_corporate_replay(raw, terms, calendar, record["sha256"])
+    assert brml.static is original.static
+    dates = calendar[rows].astype(str).tolist()
+    delivery = dates.index(event["delivery_date"])
+    entry = float(raw.raw_close[0, source])
+    sale = float(raw.raw_close[delivery, destination])
+    ratio = event["shares_per_prior_share"]
+    cash = event["cash_per_prior_share"]
+    brml_outcomes = []
+    for capital in [1_000_000, 5_000_000, 10_000_000]:
+        for side in [1, -1]:
+            quantity = 0.04 * capital / entry
+            entitled = quantity * ratio
+            fraction = entitled % 1 if side > 0 else 0
+            delivered = np.floor(entitled) if side > 0 else entitled
+            targets = np.zeros((len(rows), len(names) + 1))
+            targets[0, source] = side * 0.04
+            cfg = replace(config, initial_capital_brl=capital)
+            account = brml.initial_account(0, cfg)
+            nav = [
+                brml.step(account, tensor(t), d, terminal=d == len(rows) - 1)[
+                    "nav"
+                ].item()
+                for d, t in enumerate(targets)
+            ]
+            result, _, _ = exact_replay(
+                brml, None, 0, len(rows), config=cfg, targets=targets
+            )
+            np.testing.assert_allclose(nav, result.nav, atol=3e-8, rtol=0)
+            expected = capital + side * (
+                delivered * sale + quantity * cash - quantity * entry
+            )
+            expected += fraction * event["fractional_auction"]["cash_per_share"]
+            np.testing.assert_allclose(result.nav[-1], expected, atol=3e-8, rtol=0)
+            delivered_fills = [
+                f for f in result.fills if f.security_index == destination
+            ]
+            assert (
+                len(delivered_fills) == 1
+                and delivered_fills[0].fill_session == delivery
+            )
+            np.testing.assert_allclose(
+                delivered_fills[0].quantity, delivered, atol=1e-8
+            )
+            assert result.unsettled_cash[-1] == 0
+            brml_outcomes.append(
+                dict(
+                    capital_brl=capital,
+                    side=side,
+                    source_quantity=quantity,
+                    delivered_quantity=delivered,
+                    retained_fraction=fraction,
+                    expected_nav_brl=expected,
+                    actual_nav_brl=float(result.nav[-1]),
+                    max_account_difference_brl=float(np.max(np.abs(result.nav - nav))),
+                )
+            )
+    # Actual Jan10 ALSO purchase offsets a BRML short on Jan11, but cannot return
+    # its part of the converted loan until Jan12. The remaining Jan11 cover returns Jan13.
+    cfg = replace(config, annual_borrow_rate=0.04)
+    annual = np.full(shape, 0.04)
+    brml = copy(brml)
+    brml.inputs = replace(brml.inputs, annual_borrow_rate_by_name=annual)
+    account = brml.initial_account(0, cfg)
+    targets = np.zeros((len(rows), len(names) + 1))
+    targets[0, source] = -0.04
+    nav = []
+    for d in range(len(rows)):
+        account.prepare_day(d)
+        if dates[d] == "2023-01-10":
+            targets[d, destination] = 200_000 / float(account.nav)
+        nav.append(
+            float(
+                brml.step(account, tensor(targets[d]), d, terminal=d == len(rows) - 1)[
+                    "nav"
+                ]
+            )
+        )
+    result, _, _ = exact_replay(brml, None, 0, len(rows), config=cfg, targets=targets)
+    np.testing.assert_allclose(nav, result.nav, atol=3e-8, rtol=0)
+    quantity = 400_000 / entry
+    purchased = 200_000 / float(raw.raw_close[dates.index("2023-01-10"), destination])
+    portion = purchased / (quantity * ratio)
+    reference = float(raw.loan_reference_prices[0, source])
+    first_return = dates.index("2023-01-12")
+    last_return = dates.index("2023-01-13")
+    principal = quantity * reference
+    rent1 = principal * portion * (1.04 ** (first_return / 252) - 1)
+    rent2 = principal * (1 - portion) * (1.04 ** (last_return / 252) - 1)
+    expected = (
+        cfg.initial_capital_brl
+        + quantity * (entry - ratio * sale - cash)
+        + purchased * sale
+        - 200_000
+        - rent1
+        - rent2
+    )
+    np.testing.assert_allclose(result.nav[-1], expected, atol=3e-8, rtol=0)
+    np.testing.assert_allclose(
+        result.loan_payment[first_return], rent1, atol=3e-8, rtol=0
+    )
+    np.testing.assert_allclose(
+        result.loan_payment[last_return], rent2, atol=3e-8, rtol=0
+    )
+    brml_outcomes.append(
+        dict(
+            case="Jan10 owned purchase offsets loan at Jan11 custody",
+            capital_brl=cfg.initial_capital_brl,
+            source_quantity=quantity,
+            owned_purchase_quantity=purchased,
+            original_reference_brl=reference,
+            original_principal_brl=principal,
+            Jan12_rent_brl=rent1,
+            Jan13_rent_brl=rent2,
+            expected_nav_brl=expected,
+            actual_nav_brl=float(result.nav[-1]),
+            max_account_difference_brl=float(np.max(np.abs(result.nav - nav))),
+        )
+    )
     assert before_hashes == {k: sha256_file(store / f"{k}.npy") for k in ACCOUNT_FIELDS}
     receipt = {
-        "status": "cielo_source_admission_verified_not_model_profitability",
+        "status": "cielo_brmalls_source_admission_verified_not_model_profitability",
         "manifest": record,
         "store": terms["store"],
         "source_array_hashes": before_hashes,
@@ -200,7 +344,8 @@ def main():
         "model_arrays_mutated": False,
         "accepted_store_mutated": False,
         "historical_mechanics_oracles": outcomes,
-        "scope": "zero-cost predetermined 4% position; actual Cielo quotes and sourced claims; other names flat",
+        "brmalls_historical_oracles": brml_outcomes,
+        "scope": "predetermined 4% Cielo/BRML positions plus sourced Jan10 ALSO custody offset; zero execution fees; other names flat; BRML R$1m/R$5m/R$10m and original-principal 4% loan oracle",
         "elapsed_seconds": time.perf_counter() - started,
     }
     path = PROJECT / "docs/v2_corporate_replay_acceptance.json"

@@ -711,3 +711,65 @@ archive SHA-256 is
 `1256e3f8210994131984a805c0ef072f2f2783fff9a01fea0a76c370fc0145ed`.
 The implementation is pushed to GitHub. This closes the Cielo admission and
 rename-loader milestone only; the broader A-D program remains active.
+
+## 2026-09-19: custody timing, BR Malls admission and faster loan attribution
+
+Both accounts now track scheduled owned purchases separately from beneficial
+holdings and cash value dates. An offset against an undelivered long no longer
+returns stock or releases proceeds early. Settled shares are used first, then the
+earliest receipt. Original principal/rate accrue through the actual return date;
+external cash obligations keep their original value dates. SAM/TBPTT clone or retain
+the independent custody queue. Outstanding return cohorts also follow contractual
+identity even when the beneficial source holding is flat.
+
+The explicit corporate manifest now admits BRML on source axis 169/BRBRMLACNOR9 and
+successor axis 34/BRALSOACNOR5. It recognizes Jan9 economic succession, Jan10-close
+loan conversion represented at Jan11 opening, Jan11 available custody and Jan20
+cash of R$1.62899410177968 per prior share. The share ratio is .398551577675763.
+All original loan principal/rate stays with the single stock successor. The issuer
+already specified final cash including its projected CDI adjustment; no extra
+correction is fabricated. Source-array effects are 494 additional BRML coverage
+cells, six eligible; combined with Cielo this is 580 coverage cells and 12 eligible.
+Old quotes, membership, predictions, targets and static policy features are unchanged.
+
+The January25 issuer fraction-auction result was retrieved, archived, hash-bound
+and visually verified. Long shareholders receive whole successor shares, retaining
+their fraction as a non-tradable marked entitlement. The announced R$17.694416 per
+fractional share is recognized Jan26 and paid at the issuer's Feb2 deadline.
+Fractional loan quantities remain intact, per B3. Future auction amounts do not
+enter earlier NAV or intentions. The fraction participates in constituent risk
+until it becomes a known cash receivable. This uses the existing claim machinery.
+
+Actual-calendar long/short 4% position oracles at R$1m/R$5m/R$10m agree exactly
+between accounts and independent cash-flow formulas. A separate R$10m case buys
+R$200k of ALSO Jan10 against the BRML short: the netted loan part returns Jan12,
+the remaining Jan11 cover returns Jan13, and original-reference rent is respectively
+R$140.6798916651383 and R$123.84628958666255. This is a prescribed mechanics oracle,
+not a new model return. `v2_corporate_replay_acceptance.json` binds the source axes,
+unchanged array hashes and all results. Its SHA is
+`93b5c1f0d2e8764e33c8337d8a04c3dd294254529b39cc939785e99d492edf9a`.
+The new corporate manifest SHA is
+`f9e42a83a091b06ef54aa6ca99f2dc55d5583e466c0efd793a26bd7c29fdf2a6`.
+
+Validation: 241 affected tests passed, followed by 25 overlapping loan/custody/
+readout tests after the reporting optimization. Ruff and diff checks passed. The
+runtime reproducer preserves exact ordinary long-only and long/short NAV, holdings,
+cash, loans, costs, fills, intentions and every nonzero original-entry charge against
+56adc09. Extracting attribution arrays once instead of indexing Torch scalars for
+each row reduced a 243-name/252-session stress replay from 16.90 to 6.95 seconds.
+All 2,640,861 nonzero charge rows and 61,230 fills remain in that stress case;
+identically zero rows alone may be omitted. The 64-session account forward/backward
+took .23 seconds versus .30 in a single observation and preserved NAV/gradient
+exactly. These are CPU account measurements, not neural-fit estimates.
+`v2_share_custody_acceptance.json` binds tests, code hashes and runtime receipts.
+
+The registration was revisited. A/B remain incomplete and C/D have not started.
+BRML's reference waits for custody before disposal. Its issuer also allows trading
+of the new issue from Jan9; resolve or bound a prearranged Jan9-Jan10 sale settling
+after credit before final accounting/candidate acceptance. Earlier fraction cash
+receipt Jan26-Feb2, integer order sizing and unusual gross custody registers remain
+explicit bounded execution assumptions. Next continue DMMO/CPLE and other exposed
+events, finite maturity/renewal/recall and clearing-calendar terms, then complete
+the deep source-through-tensor audit and propagate accepted identity fixes. Do not
+repeat completed censuses or this passed mechanics work. No GPU fit or model
+profitability result has been produced in this milestone.

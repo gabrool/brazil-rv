@@ -49,7 +49,7 @@ MIN_CROSS_SECTION = 20
 BOOTSTRAP_SEED = 20260903
 ECONOMICS_COSTS_BPS = (2.0, 4.0, 7.0)
 ECONOMICS_HEADLINE = (4.0, 0.02)
-EVALUATION_SCHEMA = "BRAZIL_RV_V2_EVALUATION_V25"
+EVALUATION_SCHEMA = "BRAZIL_RV_V2_EVALUATION_V26"
 PRIOR_EVALUATION_SCHEMA = "BRAZIL_RV_V2_EVALUATION_V15"
 PAIRED_COMPARISON_SCHEMA = "BRAZIL_RV_V2_PAIRED_COMPARISON_V3"
 
@@ -1832,7 +1832,9 @@ def _economics_contract(inputs: EvaluationInputs) -> dict[str, object]:
             "proceeds; each declared payment session settles its cash claim"
             "; sourced multi-leg entitlements remain non-tradable baskets until "
             "known custody delivery before the decision, marked only with causal "
-            "successor prices; no terminal fabricated delivery"
+            "successor prices; no terminal fabricated delivery; sourced single-leg "
+            "shareholder fractions remain non-tradable until known auction cash "
+            "terms and their separate payment, while loan quantities retain fractions"
         ),
         "short_proceeds_remuneration": config.short_proceeds_remuneration,
         "initial_capital_brl": config.initial_capital_brl,
@@ -1858,7 +1860,8 @@ def _economics_contract(inputs: EvaluationInputs) -> dict[str, object]:
         ),
         "loan_return_assumption": (
             "prearranged return on covering spot settlement: T+3 before 2019-05-27, "
-            "T+2 thereafter; delivered custody offsets may return that session"
+            "T+2 thereafter; corporate offsets wait for actual purchase custody, "
+            "with settled-first then earliest-receipt allocation and retained proceeds"
         ),
         "loan_cash_settlement": (
             "source-bound compulsory loan cash payments are separate from shareholder "

@@ -260,3 +260,30 @@ bit-identical paths against commit 601b75a. General physical custody, failed-del
 and restored holding-basis metadata are not established by the superseded-return
 cash/NAV fixture. Historical event-axis admission remains separate from these
 mechanics, and model-data changes require their own contract and matched refits.
+
+## Purchase custody and shareholder fractions (Evaluation V26)
+
+Scheduled owned purchases carry actual spot value dates through succession.
+Netting beneficial holdings does not itself return a loan. Corporate offsets use
+settled owned shares first, then earliest undelivered receipts; each portion retains
+loan accrual and restricted proceeds until custody is available. External trade cash
+dates remain unchanged. Cover purchases are already committed to their scheduled
+loan return and cannot be reused. Return cohorts convert even when beneficial source
+inventory is flat. SAM copies and TBPTT retain independent custody receipts.
+
+This addresses regular-way custody without a failed-delivery simulator. Special
+return overrides may postpone covering-asset availability; broker cutoffs and failed
+deliveries still need explicit conventions. The single-leg BRML fraction auction
+requires source purchases to settle before corporate credit, as its Jan6 last trade
+and Jan11 credit permit. Multi-leg/nested fractional auctions remain unadmitted until
+their specific allocation and registration terms exist. Long fractions remain in
+the existing share-claim machinery, including constituent risk and causal marking,
+and become cash receivables only when the later auction result is available.
+Loan fractions remain contractual quantities.
+
+The source/calendar oracles are bound in `v2_corporate_replay_acceptance.json`.
+Runtime verification preserves bit-identical ordinary book cash, NAV, loans, fills
+and intentions versus the previous source commit. Loan attribution now omits only
+identically zero rent/fee rows for old paid roots; every nonzero original-entry
+charge and all money arithmetic remain unchanged. This avoids unnecessary output
+work in long replays with frequent trading.

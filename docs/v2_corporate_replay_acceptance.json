@@ -1,16 +1,91 @@
 {
   "accepted_store_mutated": false,
+  "brmalls_historical_oracles": [
+    {
+      "actual_nav_brl": 1003188.8555168937,
+      "capital_brl": 1000000,
+      "delivered_quantity": 1930.0,
+      "expected_nav_brl": 1003188.8555168937,
+      "max_account_difference_brl": 0.0,
+      "retained_fraction": 0.03179967085930002,
+      "side": 1,
+      "source_quantity": 4842.6148779193
+    },
+    {
+      "actual_nav_brl": 996811.125543702,
+      "capital_brl": 1000000,
+      "delivered_quantity": 1930.0317996708593,
+      "expected_nav_brl": 996811.125543702,
+      "max_account_difference_brl": 0.0,
+      "retained_fraction": 0,
+      "side": -1,
+      "source_quantity": 4842.6148779193
+    },
+    {
+      "actual_nav_brl": 5015944.277584468,
+      "capital_brl": 5000000,
+      "delivered_quantity": 9650.0,
+      "expected_nav_brl": 5015944.277584468,
+      "max_account_difference_brl": 0.0,
+      "retained_fraction": 0.15899835429627274,
+      "side": 1,
+      "source_quantity": 24213.0743895965
+    },
+    {
+      "actual_nav_brl": 4984055.62771851,
+      "capital_brl": 5000000,
+      "delivered_quantity": 9650.158998354296,
+      "expected_nav_brl": 4984055.62771851,
+      "max_account_difference_brl": 0.0,
+      "retained_fraction": 0,
+      "side": -1,
+      "source_quantity": 24213.0743895965
+    },
+    {
+      "actual_nav_brl": 10031888.555168936,
+      "capital_brl": 10000000,
+      "delivered_quantity": 19300.0,
+      "expected_nav_brl": 10031888.555168936,
+      "max_account_difference_brl": 0.0,
+      "retained_fraction": 0.3179967085925455,
+      "side": 1,
+      "source_quantity": 48426.148779193
+    },
+    {
+      "actual_nav_brl": 9968111.25543702,
+      "capital_brl": 10000000,
+      "delivered_quantity": 19300.317996708593,
+      "expected_nav_brl": 9968111.25543702,
+      "max_account_difference_brl": 0.0,
+      "retained_fraction": 0,
+      "side": -1,
+      "source_quantity": 48426.148779193
+    },
+    {
+      "Jan12_rent_brl": 140.6798916651383,
+      "Jan13_rent_brl": 123.84628958666255,
+      "actual_nav_brl": 9974981.509250771,
+      "capital_brl": 10000000,
+      "case": "Jan10 owned purchase offsets loan at Jan11 custody",
+      "expected_nav_brl": 9974981.509250771,
+      "max_account_difference_brl": 0.0,
+      "original_principal_brl": 384987.8827945843,
+      "original_reference_brl": 7.95,
+      "owned_purchase_quantity": 11325.028410422548,
+      "source_quantity": 48426.148779193
+    }
+  ],
   "changed_cells": {
     "action_cash_per_prior_share": 1,
     "action_has_action": 1,
     "action_payment_session": 1,
-    "action_session_resolved": 86,
+    "action_session_resolved": 580,
     "action_shares_per_prior_share": 1,
     "action_successor_index": 0,
     "active": 0,
     "raw_close": 0
   },
-  "elapsed_seconds": 0.5249877000023844,
+  "elapsed_seconds": 1.1669326999981422,
   "historical_mechanics_oracles": [
     {
       "actual_nav_brl": 10004116.64336735,
@@ -35,14 +110,14 @@
   ],
   "loan_panel_sha256": "0b3ea912bd5e798f7e7a4dbf1b4007fc97698f98bb6805411fdc899d6f2a7e94",
   "manifest": {
-    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\corporate_replay\\manifest.json",
-    "sha256": "dd201256a751186b368d629d0fce33bf4f52e6c0fb397d662d1d4f14c7c1a5ab",
-    "status": "cielo_admitted_accounting_only_other_cases_pending"
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\corporate_replay\\brmalls_manifest.json",
+    "sha256": "f9e42a83a091b06ef54aa6ca99f2dc55d5583e466c0efd793a26bd7c29fdf2a6",
+    "status": "cielo_and_brmalls_admitted_accounting_only_other_cases_pending"
   },
   "model_arrays_mutated": false,
   "model_predictions_and_labels_read": false,
-  "resolved_eligible_stock_days": 6,
-  "scope": "zero-cost predetermined 4% position; actual Cielo quotes and sourced claims; other names flat",
+  "resolved_eligible_stock_days": 12,
+  "scope": "predetermined 4% Cielo/BRML positions plus sourced Jan10 ALSO custody offset; zero execution fees; other names flat; BRML R$1m/R$5m/R$10m and original-principal 4% loan oracle",
   "shape": [
     3717,
     933
@@ -57,7 +132,7 @@
     "active": "1e7f0e3c10592bcb99942b37359534e37485bdfdb6eab26f117ebf846d21629e",
     "raw_close": "d822a557e79452270d897c9c0df470efd56519754e56b44840243b5024fd0e16"
   },
-  "status": "cielo_source_admission_verified_not_model_profitability",
+  "status": "cielo_brmalls_source_admission_verified_not_model_profitability",
   "store": {
     "manifest_sha256": "61149d43a23fc55fcd92b43aaa4e74d747fbdf62f852bedbbbdb2cf18281f3cc",
     "root": "C:\\quant-data\\b3\\processed\\v2_data_store_2d59b9d_20260913T211700Z"

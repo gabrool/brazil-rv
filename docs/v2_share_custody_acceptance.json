@@ -1,0 +1,62 @@
+{
+  "accepted_store_mutated": false,
+  "completed": [
+    "regular-way owned purchase custody controls corporate loan-return timing and proceeds release",
+    "pending returns follow identity even when beneficial inventory is flat",
+    "BRML source-axis admission with original loan principal, cash and custody clocks",
+    "whole shareholder shares and retained fractional auction claims, distinct from fractional loans",
+    "nonzero original-entry loan charges preserved under vectorized scalar extraction"
+  ],
+  "corporate_manifest": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\corporate_replay\\brmalls_manifest.json",
+    "sha256": "f9e42a83a091b06ef54aa6ca99f2dc55d5583e466c0efd793a26bd7c29fdf2a6",
+    "status": "cielo_and_brmalls_admitted_accounting_only_other_cases_pending"
+  },
+  "evaluation_schema": "BRAZIL_RV_V2_EVALUATION_V26",
+  "gpu_fit_launched": false,
+  "heldout_accessed": false,
+  "implementation_sha256_lf": {
+    "ops/admit_corporate_replay.py": "d214c344f10413e74a16c2469827ac3aa88ebd2961bb8b6a368a1dd5d2288eda",
+    "ops/verify_corporate_replay.py": "ef4c6e553be935245b4425c81d4ba8e67ce9672fbfd87a30f67e6ce82e67a9f7",
+    "ops/verify_share_custody.py": "fc777e8f31943a21962d9cc9b20977e2c74cd82338e120c2399fcb5ba7d72442",
+    "research/src/brazil_rv/execution/loan_contracts.py": "08413202d6850868ed6858c075768e6a813ce194909fed1d80fd046f0416744a",
+    "research/src/brazil_rv/execution/portfolio_account.py": "10088bde02f395ff09ec1ea29bf16328c01adf974a7b2792a3253daea1392dcc",
+    "research/src/brazil_rv/execution/share_custody.py": "936d5f83e1c159a43239221e34a0022952627100203e30e94647bfbf229d8c81",
+    "research/src/brazil_rv/execution/share_distributions.py": "bbbbe130cb9757b07646f6b8e8136f950fe952543acb3db6a5a40146e630b688",
+    "research/src/brazil_rv/execution/stateful_ledger.py": "9927f8f60f513990e8beca7168bfde19d57d1e6aff0eeac175d47b685f67b989",
+    "research/src/brazil_rv/v2/corporate_replay.py": "dd27d8a471121664114df04c667b324b52549cc37981bebd08733c3755ecfdb3",
+    "research/src/brazil_rv/v2/evaluate.py": "ac099db1d88f7a29351490c5f2a63aaac05bc66b010943537af7be6d86762d41",
+    "research/src/brazil_rv/v2/portfolio_objective.py": "84f889946eea6eb833c3c5061a02be9121119ab529dd3a5a62936b89000df3f1",
+    "research/tests/test_corporate_replay.py": "b49be7a634be316e3332adfbd5f8964a3c53f39702dc37a513fdde1a2aadd12e",
+    "research/tests/test_share_custody.py": "2c0845749453abe89c021de224fe550c3ead121e85a9fef6f882917b115e2ba5"
+  },
+  "reference_commit": "56adc098a746c27ad4d62e7ecfd1e13ea9cd1108",
+  "remaining": [
+    "resolve or bound prearranged Jan9-Jan10 disposal before Jan11 BRML custody; current reference waits for custody",
+    "fraction cash receipt uses issuer Feb2 deadline; earlier announced Jan26-Feb2 arrival is a bounded funding sensitivity",
+    "ordinary fill quantities remain continuous; integer sizing and unusual gross custody registers are execution assumptions",
+    "DMMO/CPLE and remaining exposed corporate cases, loan lifecycle and clearing-calendar assumptions",
+    "deep source-to-tensor audit and eventual new derived-store/refit contract",
+    "corrected candidate economics and conditional capacity experiments remain unstarted"
+  ],
+  "runtime_acceptance": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\custody_acceptance\\result.json",
+    "reproducer_sha256": "93b1616d1eac81ed5507f2432b7984430a2d71c703af5ec5b23056d34045ded8",
+    "sha256": "788fce91bce7c1f0b7035e9b8ee1bd1b1e93047b4f68332f4f0c1fb19792de3d"
+  },
+  "source_axis_acceptance": {
+    "path": "docs\\v2_corporate_replay_acceptance.json",
+    "sha256": "93b5c1f0d2e8764e33c8337d8a04c3dd294254529b39cc939785e99d492edf9a"
+  },
+  "status": "custody_and_brmalls_verified_not_full_stage_A_or_profitability",
+  "validation": [
+    {
+      "passed": 241,
+      "scope": "affected independent/training accounts, distributions, custody, source loader, SAM, policy, evaluation and readouts"
+    },
+    {
+      "passed": 25,
+      "scope": "after charge-reporting optimization: loan arithmetic, custody, and readouts; overlapping"
+    }
+  ]
+}

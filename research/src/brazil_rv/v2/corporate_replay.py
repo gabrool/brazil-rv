@@ -7,6 +7,11 @@ from pathlib import Path
 import numpy as np
 
 from brazil_rv.execution.loan_contracts import LoanCashSettlement
+from brazil_rv.execution.share_distributions import (
+    FractionAuction,
+    ShareDelivery,
+    ShareDistribution,
+)
 from .artifacts import sha256_file
 
 
@@ -68,6 +73,46 @@ def apply_corporate_replay(inputs, terms, calendar, manifest_sha256):
             raise ValueError(f"corporate date {value} absent from bound calendar")
         return position - int(indices[0])
 
+    distributions = list(inputs.share_distributions)
+    for event in terms.get("share_distributions", ()):
+        if event["isin"] not in names:
+            continue
+        if event["successor_isin"] not in names:
+            raise ValueError("corporate replay is missing its contractual successor")
+        name = names[event["isin"]]
+        effective = session(event["effective_date"])
+        if effective < len(indices):
+            if inputs.action_has_action[max(0, effective) :, name].any():
+                raise ValueError(
+                    "distribution conflicts with an existing source action"
+                )
+            changed["action_session_resolved"][max(0, effective) :, name] = True
+            if effective < 0:
+                initial[name] = False
+            auction = event["fractional_auction"]
+            distributions.append(
+                ShareDistribution(
+                    source_index=name,
+                    effective_session=effective,
+                    available_session=session(event["available_date"]),
+                    legs=(
+                        ShareDelivery(
+                            names[event["successor_isin"]],
+                            event["shares_per_prior_share"],
+                            session(event["delivery_date"]),
+                            FractionAuction(
+                                session(auction["available_date"]),
+                                auction["cash_per_share"],
+                                session(auction["payment_date"]),
+                            ),
+                        ),
+                    ),
+                    cash_per_prior_share=event["cash_per_prior_share"],
+                    payment_session=session(event["payment_date"]),
+                    source=source,
+                )
+            )
+
     for event in terms["cash_cancellations"]:
         if event["isin"] not in names:
             continue
@@ -115,6 +160,7 @@ def apply_corporate_replay(inputs, terms, calendar, manifest_sha256):
         **changed,
         initial_unresolved_action=initial,
         loan_cash_settlements=tuple(loans),
+        share_distributions=tuple(distributions),
         source_artifact_hashes=provenance,
         action_terms_source=f"{inputs.action_terms_source};{source}",
     )

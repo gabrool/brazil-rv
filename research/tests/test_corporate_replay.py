@@ -177,3 +177,46 @@ def test_sliced_axis_keeps_payment_dates_and_prior_loan_prohibition():
     assert revised.action_payment_session[1, 0] == 3
     assert not revised.initial_unresolved_action[0]
     assert revised.scores is sliced.scores
+
+
+def test_distribution_admission_keeps_source_and_later_fraction_clocks_separate():
+    from brazil_rv.execution.share_distributions import slice_distributions
+
+    data, terms, calendar = fixture()
+    terms["cash_cancellations"] = []
+    terms["loan_cash_settlements"] = []
+    terms["share_distributions"] = [
+        {
+            "isin": data.inputs.security_ids[0],
+            "successor_isin": data.inputs.security_ids[1],
+            "effective_date": str(calendar[2]),
+            "available_date": str(calendar[1]),
+            "delivery_date": str(calendar[4]),
+            "shares_per_prior_share": 0.5,
+            "cash_per_prior_share": 3.0,
+            "payment_date": str(calendar[7]),
+            "fractional_auction": {
+                "available_date": str(calendar[6]),
+                "payment_date": str(calendar[8]),
+                "cash_per_share": 20,
+            },
+        }
+    ]
+    revised = apply_corporate_replay(data.inputs, terms, calendar, "a" * 64)
+    assert revised.action_session_resolved[:, 0].all()
+    assert revised.scores is data.inputs.scores
+    assert revised.active is data.inputs.active
+    assert not revised.action_has_action[:, 0].any()
+    event = revised.share_distributions[0]
+    assert (
+        event.effective_session,
+        event.legs[0].delivery_session,
+        event.payment_session,
+    ) == (2, 4, 7)
+    rebased = slice_distributions((event,), 3, 8)[0]
+    assert rebased.effective_session == -1
+    assert rebased.legs[0].fractional_auction.available_session == 3
+    assert rebased.legs[0].fractional_auction.payment_session == 5
+    terms["share_distributions"][0]["available_date"] = str(calendar[3])
+    with pytest.raises(ValueError, match="backdated"):
+        apply_corporate_replay(data.inputs, terms, calendar, "a" * 64)
