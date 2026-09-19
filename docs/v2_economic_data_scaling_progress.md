@@ -702,3 +702,12 @@ not started. Next resolve corporate custody/loan lifecycle and BRML/DMMO/CPLE,
 then propagate these identity links and finish the deep source-to-tensor audit.
 The BDI's predecessor loan aliases can outlast a spot rename; do not silently map
 those onto new neural features or infer a loan renewal date from the quote change.
+
+Implementation commit: `3d9eff4`. The verified D recovery archive has 25 members;
+all members, restored accounting/identity manifests and the allowlist bytes were
+checked, along with eleven original source receipts. No immutable dataset was
+duplicated. `source_admission_recovery.json` is bound through the run pointer;
+archive SHA-256 is
+`1256e3f8210994131984a805c0ef072f2f2783fff9a01fea0a76c370fc0145ed`.
+The implementation is pushed to GitHub. This closes the Cielo admission and
+rename-loader milestone only; the broader A-D program remains active.

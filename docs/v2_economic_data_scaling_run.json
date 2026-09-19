@@ -63,6 +63,10 @@
   },
   "registration": "research/preregistrations/v2_economic_data_scaling.md",
   "root": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919",
+  "source_admission_recovery": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\source_admission_recovery.json",
+    "sha256": "32a07e988924d3ad47287c84f971aeefbc8ae240076e4f45982fe2f12a596e2a"
+  },
   "source_bindings_sha256": "4e86c957fb1b1052285a3410765204b8fb13b0903c83d5bdc5e3a3c879048092",
   "spot_settlement_acceptance": {
     "path": "docs\\v2_spot_settlement_acceptance.json",
