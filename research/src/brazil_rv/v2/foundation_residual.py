@@ -17,6 +17,207 @@ from .train import rank_average_ensemble
 STRENGTHS = (0.0, 0.1, 0.25, 0.5, 1.0)
 
 
+def rank_targets(store, rows, before):
+    """Read only labels ending strictly before the next decision window."""
+    from .contract import REGISTERED_PRIMARY_TARGET, REGISTERED_PRIMARY_TARGET_MASK
+
+    mask = store.read(REGISTERED_PRIMARY_TARGET_MASK, rows).copy()
+    for h, horizon in enumerate((1, 2, 3, 5, 10)):
+        mask[..., h] &= (np.asarray(rows) + horizon < before)[:, None]
+    values = store.read_target(REGISTERED_PRIMARY_TARGET, rows, valid_mask=mask)
+    values, mask = values[..., HEADS], mask[..., HEADS]
+    mask &= store.read("active", rows)[..., None]
+    ranked = np.zeros(values.shape, np.float32)
+    for d in range(len(rows)):
+        for h in range(3):
+            valid = mask[d, :, h]
+            count = valid.sum()
+            if count:
+                ranked[d, valid, h] = (
+                    2 * (rankdata(values[d, valid, h]) - 0.5) / count - 1
+                )
+    return ranked, mask
+
+
+def run_residual(root, folds):
+    """Four registered cells; prior-only selection, no evaluation-label tuning."""
+    from pathlib import Path
+    from time import perf_counter
+
+    from .research_rounds import _git_identity
+    from .train import _cli_stage_indices
+
+    implementation = _git_identity()
+    design = read(root / "frozen_design.json")
+    source = Path(design["store"]["root"])
+    anchor_manifest = read(root / "residual/anchors.json")
+    if sha256_file(root / "residual/anchors.npz") != anchor_manifest["sha256"]:
+        raise ValueError("residual anchor cache changed")
+    with np.load(root / "residual/anchors.npz") as cache:
+        anchor_ranks, anchor_indices = cache["ranks"], cache["indices"]
+    roster = read(root / "waves/input.json")["cells"]["TE_full"]
+    for fold in folds:
+        fit, selection, evaluation, _ = _cli_stage_indices(source, "F", fold)
+        rows = np.unique(np.r_[fit, selection, evaluation])
+        target_window = np.arange(fit[0], evaluation[0])
+        store, _ = open_store_for_samples(
+            source,
+            rows,
+            purpose="evaluation",
+            history_lookbacks=60,
+            history_end_offsets=0,
+            target_window_indices=target_window,
+        )
+        try:
+            scaler = fit_feature_scalers(store, fit, roster)
+            sets = {}
+            for label, ix, before in (
+                ("fit", fit, selection[0]),
+                ("selection", selection, evaluation[0]),
+                ("evaluation", evaluation, None),
+            ):
+                x, common, dates, names = encode_features(store, ix, scaler)
+                a = np.searchsorted(anchor_indices, dates)
+                if np.any(a >= len(anchor_indices)) or not np.array_equal(
+                    anchor_indices[a], dates
+                ):
+                    raise ValueError("missing genuine OOS training anchor")
+                sets[label] = {
+                    "x": x,
+                    "common": common,
+                    "dates": dates,
+                    "names": names,
+                    "anchors": anchor_ranks[:, a, names],
+                }
+                if before is not None:
+                    target, valid = rank_targets(store, ix, before)
+                    d = np.searchsorted(ix, dates)
+                    sets[label].update(target=target[d, names], valid=valid[d, names])
+        finally:
+            store.close()
+        write_json_atomic(root / "residual" / f"{fold}_scalers.json", scaler.payload())
+        for seed_index, seed in enumerate(ALLOWED_SEEDS):
+            for learner in ("ridge", "tree"):
+                for rich in (False, True):
+                    cell = f"{learner}_{'rich' if rich else 'score'}"
+                    output = root / "residual" / cell / f"{fold}_seed_{seed}"
+                    binding = {
+                        "implementation": implementation,
+                        "anchor_sha256": anchor_manifest["sha256"],
+                        "scaler_sha256": sha256_file(
+                            root / "residual" / f"{fold}_scalers.json"
+                        ),
+                        "cell": cell,
+                        "fold": fold,
+                        "seed": seed,
+                    }
+                    if (output / "result.json").exists():
+                        previous = read(output / "result.json")
+                        if previous["binding"] != binding:
+                            raise ValueError("residual resume source differs")
+                        if (
+                            sha256_file(output / "scores.npz")
+                            != previous["score_sha256"]
+                        ):
+                            raise ValueError("residual score artifact changed")
+                        continue
+                    started = perf_counter()
+                    output.mkdir(parents=True, exist_ok=True)
+                    matrices, corrections = {}, {}
+                    for label, data in sets.items():
+                        anchor = data["anchors"][seed_index]
+                        matrices[label] = (
+                            np.column_stack(
+                                (
+                                    anchor,
+                                    data["x"],
+                                    (
+                                        data["common"][:, :, None] * anchor[:, None, :]
+                                    ).reshape(len(anchor), -1),
+                                )
+                            )
+                            if rich
+                            else anchor
+                        )
+                        corrections[label] = np.zeros_like(anchor)
+                    train, select = sets["fit"], sets["selection"]
+                    iterations = []
+                    for h in range(3):
+                        valid, selection_valid = (
+                            train["valid"][:, h],
+                            select["valid"][:, h],
+                        )
+                        residual = (
+                            train["target"][valid, h]
+                            - train["anchors"][seed_index, valid, h]
+                        )
+                        if learner == "ridge":
+                            beta, intercept = fit_ridge(
+                                matrices["fit"][valid], residual, train["dates"][valid]
+                            )
+                            np.savez(
+                                output / f"head_{h}.npz", beta=beta, intercept=intercept
+                            )
+                            for label in sets:
+                                corrections[label][:, h] = (
+                                    matrices[label] @ beta + intercept
+                                )
+                        else:
+                            model = fit_tree(
+                                matrices["fit"][valid],
+                                residual,
+                                train["dates"][valid],
+                                matrices["selection"][selection_valid],
+                                select["target"][selection_valid, h],
+                                select["anchors"][seed_index, selection_valid, h],
+                                select["dates"][selection_valid],
+                            )
+                            model.save_model(str(output / f"head_{h}.txt"))
+                            iterations.append(model.best_iteration)
+                            for label in sets:
+                                corrections[label][:, h] = model.predict(
+                                    matrices[label], num_iteration=model.best_iteration
+                                )
+                    strength, selection_scores = choose_strength(
+                        select["anchors"][seed_index],
+                        corrections["selection"],
+                        select["target"],
+                        select["valid"],
+                        select["dates"],
+                    )
+                    evaluation_set = sets["evaluation"]
+                    anchor = evaluation_set["anchors"][seed_index]
+                    prediction = (
+                        anchor
+                        if strength == 0
+                        else anchor + strength * corrections["evaluation"]
+                    )
+                    np.savez(
+                        output / "scores.npz",
+                        scores=prediction,
+                        dates=evaluation_set["dates"],
+                        names=evaluation_set["names"],
+                    )
+                    write_json_atomic(
+                        output / "result.json",
+                        {
+                            "binding": binding,
+                            "strength": strength,
+                            "selection_scores": selection_scores,
+                            "iterations": iterations,
+                            "seconds": perf_counter() - started,
+                            "score_sha256": sha256_file(output / "scores.npz"),
+                        },
+                    )
+                    print(
+                        {
+                            "completed_residual": [cell, fold, seed],
+                            "strength": strength,
+                        },
+                        flush=True,
+                    )
+
+
 def fit_feature_scalers(store, fit_rows, cell):
     """Reuse accepted scalar semantics, including one common sample per date."""
     from types import SimpleNamespace
