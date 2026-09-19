@@ -245,3 +245,16 @@ Next implementation: source-bound per-seed OOS panel assembly, fit-only feature
 encoding with original masks/ages, chronological fold driver and economic readouts.
 Tree callback currently computes equal-date IC explicitly; preserve its semantics
 if optimizing callback speed during the first representative CPU run.
+
+### Per-seed residual anchor assembly (2026-09-19 06:46 UTC)
+
+Implemented and executed `foundation_residual.build_anchors`. It joins verified
+C6 P preludes and all original neutral F evaluation blocks for each seed, checks
+checkpoint/store/schema/date/ISIN bindings and contiguous nonoverlapping dates,
+and requires every eligible name with all three forecast heads. Output:
+ROOT/residual/anchors.npz with source hashes in anchors.json. No fitted-score
+fallback or evaluation labels were used. All three seed populations match.
+Two residual invariant tests and Ruff pass. Next: fit-only feature encoding and
+chronological ridge/tree driver; do not mistake the completed anchor cache for
+completed residual experiments. Existing score helpers provide original masks and
+rank units, and registered common snapshots must be scaled once per date.
