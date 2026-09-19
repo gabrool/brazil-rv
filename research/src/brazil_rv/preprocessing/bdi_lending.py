@@ -233,6 +233,18 @@ def _parse_legacy(lines: list[str], report_date: date) -> Bulletin | None:
     ).date()
     if position_date > report_date:
         raise ValueError("BDI position date cannot follow its report date")
+    lines = list(lines)
+    for index in range(start + 1, len(lines)):
+        # The legacy table's printed market code is not part of the ticker.
+        lines[index] = re.sub(r"^02(?=[A-Z])", "02 ", lines[index])
+        if (
+            index + 1 < len(lines)
+            and LEGACY_ROW.fullmatch(lines[index]) is None
+            and re.fullmatch(r"[0-9][0-9.,]*[.,][0-9]{2,7}", lines[index + 1])
+        ):
+            joined = lines[index] + " " + lines[index + 1]
+            if LEGACY_ROW.fullmatch(joined) is not None:
+                lines[index], lines[index + 1] = joined, ""
     end = len(lines)
     for index, line in enumerate(lines[start + 1 :], start + 1):
         lowered = line.lower()
@@ -245,11 +257,20 @@ def _parse_legacy(lines: list[str], report_date: date) -> Bulletin | None:
             or ("posi" in lowered and "garantias" in lowered)
             or ("op" in lowered and "flex" in lowered)
             or lowered in {"custódia", "custodia", "ações custodiadas"}
+            or lowered.startswith("saldo total em")
+            or lowered.startswith("conta margem")
         ):
             end = index
             break
     by_ticker: dict[str, Position] = {}
     for line in lines[start + 1 : end]:
+        # Printed thousands groups establish the boundary when a large share
+        # balance touches its BRL column (e.g. ITSA4 in November 2019).
+        line = re.sub(
+            r"([0-9]{1,3}(?:\.[0-9]{3})+)([0-9]{1,3}(?:\.[0-9]{3})+,[0-9]{2})$",
+            r"\1 \2",
+            line,
+        )
         match = LEGACY_ROW.fullmatch(line)
         if match is None:
             continue
@@ -273,12 +294,10 @@ def _parse_legacy(lines: list[str], report_date: date) -> Bulletin | None:
             quantity=int(quantity),
             balance_brl=_money(match.group("balance")),
         )
-    if not by_ticker:
-        return None
     # Reconcile named source rows before admitting the table. A wrapped or
     # malformed numerical row must not silently disappear from loan features.
     named_rows = sum(
-        re.match(r"^(?:0?2\s+)?[A-Z0-9](?:\s?[A-Z0-9]){3}\s?\d{1,2}\s", line)
+        re.match(r"^(?:0?2\s+)?[A-Z0-9](?:\s?[A-Z0-9]){3}\s?\d{1,2}[BF]?\s", line)
         is not None
         for line in lines[start + 1 : end]
     )
@@ -286,6 +305,18 @@ def _parse_legacy(lines: list[str], report_date: date) -> Bulletin | None:
         raise ValueError(
             f"Incomplete legacy balance extraction: {len(by_ticker)}/{named_rows} named rows"
         )
+    if not by_ticker:
+        return None
+    if end < len(lines):
+        total = re.fullmatch(r"Saldo total em R\$\s+([0-9.,]+)", lines[end], re.I)
+        if total is not None:
+            printed = _money(total.group(1))
+            parsed = sum(row.balance_brl for row in by_ticker.values())
+            # Some daily sources round individual BRL rows to cents.
+            if abs(parsed - printed) > 0.011 * (len(by_ticker) + 1):
+                raise ValueError(
+                    f"Legacy balance total differs: {parsed:.2f}/{printed:.2f} BRL"
+                )
     return Bulletin(
         report_date=report_date,
         position_date=position_date,

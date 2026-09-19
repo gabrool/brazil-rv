@@ -164,6 +164,44 @@ def test_legacy_balance_stops_before_custody_tables() -> None:
     assert [row.ticker for row in bulletin.positions] == ["PETR4"]
 
 
+def test_legacy_balance_recovers_touching_columns_and_reconciles_total() -> None:
+    import pytest
+
+    text = (
+        "Banco de Títulos\nemprestadas em 31/10/2019\n"
+        "ITSA4 ITAUSA PN 64.178.822832.890.269,87\n"
+        "ENMA3B CIA ON 6 291,96\n"
+        "Saldo total em R$ 832.890.561,83\n"
+        "CONTA MARGEM – OPERAÇÕES DE COMPRA\n"
+        "VALE3 VALE ON 999 9999,00\n"
+    )
+    bulletin = parse_bdi_pages([text], date(2019, 11, 1))
+    assert bulletin is not None
+    assert [row.ticker for row in bulletin.positions] == ["ITSA4", "ENMA3B"]
+    assert bulletin.positions[0].quantity == 64_178_822
+    with pytest.raises(ValueError, match="balance total differs"):
+        parse_bdi_pages(
+            [text.replace("832.890.561,83", "932.890.561,83")], date(2019, 11, 1)
+        )
+
+
+def test_legacy_market_prefix_and_wrapped_value_preserve_identity_and_units() -> None:
+    bulletin = parse_bdi_pages(
+        [
+            "Banco de Títulos\nemprestadas em 17/03/2022\n"
+            "02ITSA3 ITAUSA ON 1555125 17165910,89\n"
+            "ESGB11 BTG PACTUAL ESG FUNDO DE INDICE CI 1\n"
+            "104,09\nSaldo total em R$ 17166014,98\n"
+        ],
+        date(2022, 3, 18),
+    )
+    assert bulletin is not None
+    assert [(row.ticker, row.quantity) for row in bulletin.positions] == [
+        ("ITSA3", 1555125),
+        ("ESGB11", 1),
+    ]
+
+
 def test_rows_use_next_session_exact_lags_and_future_mutation_isolated() -> None:
     first = date(2023, 1, 2)
     sessions = [first + timedelta(days=index) for index in range(43)]
