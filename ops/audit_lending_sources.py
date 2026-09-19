@@ -13,6 +13,7 @@ from pathlib import Path
 os.environ.setdefault("POLARS_MAX_THREADS", "1")
 
 import polars as pl
+import numpy as np
 
 from brazil_rv.preprocessing import bdi_lending_strong as parser
 from brazil_rv.v2.artifacts import sha256_file, write_json_atomic
@@ -49,6 +50,68 @@ def parse_one(record, output, parser_sha):
         result.update(status="extraction_failure", error=str(error))
     write_json_atomic(receipt, result)
     return result
+
+
+def eligible_attribution(output):
+    """Measure recovery on actual model axes at causal D+1 availability."""
+    pointer = read(PROJECT / "docs/v2_data_inputs.json")["store"]
+    store = Path(pointer["root"])
+    if sha256_file(store / "manifest.json") != pointer["manifest_sha256"]:
+        raise ValueError("accepted store differs")
+    dates = np.load(store / "date_index.npy")
+    isins = np.load(store / "isin_index.npy")
+    active = np.load(store / "active.npy", mmap_mode="r")
+    if dates[-1] > np.datetime64("2024-12-30"):
+        raise PermissionError("development-only source audit")
+    lookup = {value: index for index, value in enumerate(isins)}
+    source = output / "accepted_rate_comparison.parquet"
+    frame = pl.read_parquet(source)
+    name = np.array(
+        [lookup.get(s.removeprefix("ISIN:"), -1) for s in frame["security_id"]]
+    )
+    available = np.searchsorted(
+        dates, frame["source_trade_date"].to_numpy(), side="right"
+    )
+    valid = (name >= 0) & (available < len(dates))
+    eligible = np.zeros(frame.height, bool)
+    eligible[valid] = active[available[valid], name[valid]]
+    frame = frame.with_columns(
+        pl.Series("on_model_axes", name >= 0),
+        pl.Series("eligible_when_available", eligible),
+        pl.Series("available_within_development", available < len(dates)),
+    )
+    frame.write_parquet(output / "eligible_rate_comparison.parquet")
+    result = {
+        "store": pointer,
+        "inputs_sha256": sha256_file(source),
+        "availability": "First B3 session strictly after source trade/report date; final bulletin has no development consumer",
+    }
+    for key, mask in [("model_axes", name >= 0), ("eligible_when_available", eligible)]:
+        subset = frame.filter(pl.Series(mask))
+        overlap = subset.filter(pl.col("rate_delta").is_not_null())
+        result[key] = {
+            "rows": subset.height,
+            "overlap": overlap.height,
+            "new": subset.filter(pl.col("annual_taker_rate").is_null()).height,
+            "changed": overlap.filter(pl.col("rate_delta").abs() > 1e-8).height,
+            "rate_delta_mean_annual": overlap["rate_delta"].mean(),
+            "rate_delta_abs_mean_annual": overlap["rate_delta"].abs().mean(),
+            "higher": overlap.filter(pl.col("rate_delta") > 1e-8).height,
+            "lower": overlap.filter(pl.col("rate_delta") < -1e-8).height,
+            "max_rate_recovered": subset["annual_taker_rate_recovered"].max(),
+        }
+    hedge = pl.read_parquet(output / "recovered_registered_loans.parquet").filter(
+        pl.col("isin") == "BRBOVACTF003"
+    )
+    result["bova11"] = {
+        "positive_flow_days": hedge.height,
+        "first": str(hedge["source_trade_date"].min()),
+        "last": str(hedge["source_trade_date"].max()),
+        "rate_min": hedge["annual_taker_rate"].min(),
+        "rate_median": hedge["annual_taker_rate"].median(),
+        "rate_max": hedge["annual_taker_rate"].max(),
+    }
+    write_json_atomic(output / "eligible_attribution.json", result)
 
 
 def main():
@@ -192,6 +255,7 @@ def main():
         "heldout_accessed": False,
     }
     write_json_atomic(output / "result.json", result)
+    eligible_attribution(output)
     print({k: v for k, v in result.items() if k != "failed_extractions"}, flush=True)
 
 

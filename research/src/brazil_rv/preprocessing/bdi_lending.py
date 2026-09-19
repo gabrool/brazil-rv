@@ -244,6 +244,7 @@ def _parse_legacy(lines: list[str], report_date: date) -> Bulletin | None:
             )
             or ("posi" in lowered and "garantias" in lowered)
             or ("op" in lowered and "flex" in lowered)
+            or lowered in {"custódia", "custodia", "ações custodiadas"}
         ):
             end = index
             break
@@ -274,6 +275,17 @@ def _parse_legacy(lines: list[str], report_date: date) -> Bulletin | None:
         )
     if not by_ticker:
         return None
+    # Reconcile named source rows before admitting the table. A wrapped or
+    # malformed numerical row must not silently disappear from loan features.
+    named_rows = sum(
+        re.match(r"^(?:0?2\s+)?[A-Z0-9](?:\s?[A-Z0-9]){3}\s?\d{1,2}\s", line)
+        is not None
+        for line in lines[start + 1 : end]
+    )
+    if len(by_ticker) != named_rows:
+        raise ValueError(
+            f"Incomplete legacy balance extraction: {len(by_ticker)}/{named_rows} named rows"
+        )
     return Bulletin(
         report_date=report_date,
         position_date=position_date,

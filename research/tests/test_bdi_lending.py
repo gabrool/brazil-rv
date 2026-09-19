@@ -136,6 +136,34 @@ def test_legacy_seven_decimal_currency_is_not_a_thousands_group() -> None:
     assert bulletin.positions[1].balance_brl == 446.91
 
 
+def test_legacy_balance_does_not_admit_a_partial_named_table() -> None:
+    import pytest
+
+    with pytest.raises(ValueError, match="1/2 named rows"):
+        parse_bdi_pages(
+            [
+                "Banco de Títulos\nemprestadas em 29/05/2020\n"
+                "PETR4 PETROBRAS PN 100 2000,00\n"
+                "VALE3 VALE ON missing amount\n"
+            ],
+            date(2020, 6, 1),
+        )
+
+
+def test_legacy_balance_stops_before_custody_tables() -> None:
+    bulletin = parse_bdi_pages(
+        [
+            "Banco de Títulos\nemprestadas em 29/05/2020\n"
+            "PETR4 PETROBRAS PN 100 2000,00\n"
+            "Custódia\n"
+            "VALE3 VALE ON 999 9999,00\n"
+        ],
+        date(2020, 6, 1),
+    )
+    assert bulletin is not None
+    assert [row.ticker for row in bulletin.positions] == ["PETR4"]
+
+
 def test_rows_use_next_session_exact_lags_and_future_mutation_isolated() -> None:
     first = date(2023, 1, 2)
     sessions = [first + timedelta(days=index) for index in range(43)]
