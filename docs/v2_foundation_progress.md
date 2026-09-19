@@ -290,3 +290,17 @@ from later main. Three targeted helper tests pass; full per-fold runs additional
 enforce anchor matching and store target capabilities. After completion audit
 selected strengths/iterations and saved forecasts, build matched C6 economic
 readouts and registered comparisons. Accounting and final archival work remain.
+
+### Residual fits complete; economic readout active (2026-09-19 07:39 UTC)
+
+All 48 residual cell/fold/seed fits completed (three heads each), including ridge
+and tree matched score-only controls, with no runtime errors. Economic readout is
+running from clean immutable 77c3556 at
+C:/quant/brazil-rv-foundation-residual-readouts-77c3556. Receipt and logs:
+ROOT/readout_residual_worker.json and readout_residual.{stdout,stderr}.log.
+It checks exact original eligible-name/date populations and hashes, reranks each
+seed's corrections cross-sectionally, then applies original C6 prior calibration
+and neutral accounts. Paired rich-vs-anchor and rich-vs-score comparisons follow.
+Use this same source to resume accounts; source bindings are part of book identity.
+No residual promotion decision yet. Remaining: review results, any admitted
+confirmation, accounting sensitivity/limitations and consolidated recovery/report.
