@@ -8,6 +8,10 @@
     "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\brmalls_custody_recovery.json",
     "sha256": "dbbf7c4db7906d3a273b9c63a4cf6720c02e1b501efa96c241079df4dcf2e3c0"
   },
+  "copel_allocation_recovery": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\copel_allocation_recovery.json",
+    "sha256": "0eb836ce0417748faf7d3227d49bda0c1b670a226767ba2b1b33669c4ca8dce7"
+  },
   "copel_replay_acceptance": {
     "path": "docs\\v2_copel_replay_acceptance.json",
     "sha256": "f3c79690011a0ca7af3bf252f6ed36f15b4e292c75ef17db3f5cc7b95eec6056"

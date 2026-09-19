@@ -833,3 +833,10 @@ family parquets carry a decision date and field ages but not original timestamps
 trace their bound upstream sources rather than treating these final parquet dates
 as proof of public availability. This schema inspection is not completion of B.
 Do not repeat the completed quote/lending censuses or passed mechanics checks.
+
+Implementation `293edbd` is preserved in a 30-member verified D recovery ZIP.
+All members were restored and checked, including the corporate manifest and source
+code hashes; 17 original source receipts were verified without duplicating
+immutable inputs. `copel_allocation_recovery.json` is bound by the run pointer.
+ZIP SHA-256: `d3d0a8d1a61ccb3c1ca32523b408e00232603ef636452e674a99acce49b9639d`.
+Loan-allocation acceptance SHA-256: `3245e35dafc8ed0e3d24b7f3367690ef47cc129d7c5d1e9b2de7b0755b72491d`.
