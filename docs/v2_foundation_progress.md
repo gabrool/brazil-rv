@@ -344,3 +344,15 @@ and not triggered. Whole program still incomplete: bounded settlement/financing
 sensitivity and identity implications, consolidated performance/report, and hashed
 recoverable D archive plus canonical-pointer/GitHub verification remain. No candidate
 qualified for new confirmation fits. GPU remains idle; do not launch duplicate work.
+
+### Matched financing scenarios dispatched (2026-09-19 08:15 UTC)
+
+Run sixteen additional accounts: C6 and retained TE_full ensembles, four screen
+folds, independently zero short-proceeds remuneration and +3% annual debit spread.
+These are labelled scenarios, not asserted broker terms. The exact allocator and
+inventory ledger replay each case with original causal mappings and unchanged
+forecasts; source 9cda3ae frozen at C:/quant/brazil-rv-foundation-financing. Logs and
+receipt: ROOT/financing.{stdout,stderr}.log and financing_worker.json. Summary will
+be financing_summary.json with paired 20/40/60-session uncertainty against the
+matched base accounts. No new candidate was promoted. Settlement event integration,
+consolidated report and verified archive remain; do not mark program complete.
