@@ -144,11 +144,14 @@ def test_lending_wrapped_isin_uses_its_own_printed_check_digit() -> None:
             f"{'27/11/202':24}BRBEWWBDR00         ISHARES Neg. Elet",
             f"{'4          BEWW39':24}7                   ETF rônica "
             "2 30 2,216.40 8.57% 8.57% 8.57% 8.57% 8.57% 8.57%",
+            f"{'27/11/2024 POMO3':24}BRPOMOACNOR MARCOPOLO Registro "
+            "8 25,930 107,350.20 8.42% 8.42% 8.42% 8.42% 8.42% 8.42%",
+            f"{'':25}0",
         ],
         date(2024, 11, 27),
     )
-    assert [r.isin for r in rows] == ["BRBEWWBDR007", "BRBEWWBDR007"]
-    assert [r.quantity for r in rows] == [0, 30]
+    assert [r.isin for r in rows] == ["BRBEWWBDR007", "BRBEWWBDR007", "BRPOMOACNOR0"]
+    assert [r.quantity for r in rows] == [0, 30, 25930]
 
 
 def test_lending_wrapped_ticker_and_sparse_table_are_retained() -> None:
@@ -162,6 +165,24 @@ def test_lending_wrapped_ticker_and_sparse_table_are_retained() -> None:
     )
     assert len(rows) == 1
     assert rows[0].ticker == "DEBBETF11"
+
+
+def test_lending_identity_can_start_above_the_dated_numerical_row() -> None:
+    rows = parse_registered_lines(
+        [
+            f"{'':22}BRBMOBACNOR Neg. Elet",
+            f"{'11/11/2024BMOB3':21}7 BEMOBI rônica "
+            "1 2.700 39.096,00 0,45% 0,45% 0,45% 0,45% 0,45% 0,45%",
+            f"{'':10}LFTBETF1         INVESTO ETF",
+            "11/11/20241           BRLFTBCTF002 TREASURY Renda "
+            "10 51.047 5.181.270,50 0,10% 0,10% 0,10% 0,10% 0,10% 0,10%",
+        ],
+        date(2024, 11, 11),
+    )
+    assert [(r.ticker, r.isin) for r in rows] == [
+        ("BMOB3", "BRBMOBACNOR7"),
+        ("LFTBETF11", "BRLFTBCTF002"),
+    ]
 
 
 def test_lending_incomplete_printed_rows_cannot_silently_bias_the_average() -> None:

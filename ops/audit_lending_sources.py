@@ -192,7 +192,7 @@ def main():
         "heldout_accessed": False,
     }
     write_json_atomic(output / "result.json", result)
-    print(result, flush=True)
+    print({k: v for k, v in result.items() if k != "failed_extractions"}, flush=True)
 
 
 if __name__ == "__main__":

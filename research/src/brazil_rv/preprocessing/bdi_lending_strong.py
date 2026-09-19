@@ -115,14 +115,39 @@ def _decimal(value: str) -> float:
 def parse_registered_lines(
     lines: Sequence[str], report_date: date
 ) -> list[RegisteredLoan]:
+    lines = list(lines)
+    for index in range(len(lines) - 1):
+        # The ISIN can start above the numerical row, independently of its
+        # date. Join only a check digit printed in the same identifier column.
+        partial = re.search(r"\b[A-Z]{2}[A-Z0-9]{9}\b", lines[index][:50])
+        if partial is None:
+            continue
+        offset = partial.start()
+        lower = lines[index + 1]
+        digit = re.search(r"(?<!\S)(\d)(?!\S)", lower[max(0, offset - 2) : offset + 4])
+        if digit is not None:
+            a, b = (max(0, offset - 2) + n for n in digit.span(1))
+            isin = partial.group() + digit.group(1)
+            lines[index] = lines[index][:offset] + isin + lines[index][partial.end() :]
+            lines[index + 1] = lower[:a] + isin + lower[b:]
     rows = []
     for index, line in enumerate(lines):
+        next_line = lines[index + 1] if index + 1 < len(lines) else ""
+        ticker_end = re.match(
+            r"^\s*\d{2}/\d{2}/20\d{2}\s*(\d{1,2})\s+"
+            r"[A-Z]{2}[A-Z0-9]{9}[0-9]\s+",
+            line,
+        )
+        if ticker_end is not None and index > 0:
+            a, b = ticker_end.span(1)
+            ticker_start = re.match(r"[A-Z0-9]{4,11}(?=\s)", lines[index - 1][a:])
+            if ticker_start is not None:
+                line = line[:a] + ticker_start.group() + ticker_end.group(1) + line[b:]
         # A printed date can wrap independently of the other columns. Recover
         # its printed final digit; the ticker and numerical row may be on
         # either physical line (notably electronic trades in late 2024).
         wrapped_date = re.match(r"^(\s*\d{2}/\d{2}/20\d)(\s+.*)$", line)
         if wrapped_date is not None and index + 1 < len(lines):
-            next_line = lines[index + 1]
             ticker_start = re.match(r"\s*([A-Z0-9]{4,11})\s+", wrapped_date.group(2))
             ticker_end = re.match(
                 r"^\s*\d\s+(\d{1,2})\s+[A-Z]{2}[A-Z0-9]{9}[0-9]\s+",
@@ -136,17 +161,6 @@ def parse_registered_lines(
                     + ticker_end.group(1)
                     + next_line[b:]
                 )
-            # Occasionally the ISIN check digit wraps in its own column too.
-            # Join only a digit printed directly underneath that identifier.
-            partial_isin = re.search(r"\b[A-Z]{2}[A-Z0-9]{9}\b", line[:50])
-            if partial_isin is not None:
-                offset = partial_isin.start()
-                digit = re.match(r"(\d)(?:\s|$)", next_line[offset:])
-                if digit is not None:
-                    isin = partial_isin.group() + digit.group(1)
-                    line = line[:offset] + isin + line[partial_isin.end() :]
-                    next_line = next_line[:offset] + isin + next_line[offset + 1 :]
-                    wrapped_date = re.match(r"^(\s*\d{2}/\d{2}/20\d)(\s+.*)$", line)
             continuation = re.match(r"^\s*(\d)(\s.*|$)", next_line)
             if continuation is not None:
                 prefix = wrapped_date.group(1) + continuation.group(1)

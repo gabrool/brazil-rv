@@ -1,0 +1,26 @@
+[
+  {
+    "id": "b3_loan_contract",
+    "url": "https://www.b3.com.br/data/files/8F/C4/F7/7D/C8B37610515A8076AC094EA8/Contrato-Emprestimo-de-Ativos.pdf",
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\primary_sources\\b3_loan_contract.pdf",
+    "sha256": "a437f3a8643a6369a9e6882300e144575c2adcc72b2b4f8ed02b56ed1c8c8520",
+    "bytes": 444430,
+    "retrieved_at_utc": "2026-09-19T12:46:46.331832+00:00"
+  },
+  {
+    "id": "b3_125_2020",
+    "url": "https://www.b3.com.br/data/files/ED/F6/31/E2/7B6E47102C784E47AC094EA8/OC%20125%202020%20PRE%20Negocia%C3%A7%C3%A3o%20Eletr%C3%B4nica%20de%20Empr%C3%A9stimo%20de%20Ativos_vers%C3%A3o_final%20a.pdf",
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\primary_sources\\b3_125_2020.pdf",
+    "sha256": "4f745bd5f07bce76f34bd6be76416fd876b4f89f0459216f0d791408024330fc",
+    "bytes": 173747,
+    "retrieved_at_utc": "2026-09-19T12:46:46.285823+00:00"
+  },
+  {
+    "id": "b3_081_2022",
+    "url": "https://www.b3.com.br/data/files/0D/61/E7/6D/B5AD1810C493CD08AC094EA8/OC%20081-2022%20PRE%20Pol%C3%ADtica%20de%20Tarifa%C3%A7%C3%A3o%20de%20Empr%C3%A9stimos%20de%20Ativos%20%28PT%29.pdf",
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\primary_sources\\b3_081_2022.pdf",
+    "sha256": "475c0d231daa15aed6dbfd5a9489fc274874c3a6df2b892ec688fea2294834b7",
+    "bytes": 183088,
+    "retrieved_at_utc": "2026-09-19T12:46:46.285823+00:00"
+  }
+]
