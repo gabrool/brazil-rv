@@ -46,7 +46,7 @@ MIN_CROSS_SECTION = 20
 BOOTSTRAP_SEED = 20260903
 ECONOMICS_COSTS_BPS = (2.0, 4.0, 7.0)
 ECONOMICS_HEADLINE = (4.0, 0.02)
-EVALUATION_SCHEMA = "BRAZIL_RV_V2_EVALUATION_V17"
+EVALUATION_SCHEMA = "BRAZIL_RV_V2_EVALUATION_V18"
 PRIOR_EVALUATION_SCHEMA = "BRAZIL_RV_V2_EVALUATION_V15"
 PAIRED_COMPARISON_SCHEMA = "BRAZIL_RV_V2_PAIRED_COMPARISON_V3"
 
@@ -132,6 +132,8 @@ class EvaluationInputs:
     bova11_close: NDArray[np.floating] | None = None
     bova11_manifest_sha256: str | None = None
     bova11_data_sha256: str | None = None
+    # Decision-available annual rates; NaN uses the configured hedge fallback.
+    hedge_annual_borrow_rate: NDArray[np.floating] | None = None
     hedge_beta: NDArray[np.floating] | None = None
     hedge_beta_valid: NDArray[np.bool_] | None = None
     hedge_beta_history: tuple[NDArray[np.floating], NDArray[np.bool_]] | None = None
@@ -864,6 +866,7 @@ def _ledger_inputs(
         "hedge_beta_history": inputs.hedge_beta_history,
         "initial_hedge_reference_price": inputs.initial_hedge_reference_price,
         "hedge_close": inputs.bova11_close,
+        "hedge_annual_borrow_rate": inputs.hedge_annual_borrow_rate,
     }
 
 
@@ -1652,6 +1655,13 @@ def _input_hashes(inputs: EvaluationInputs) -> dict[str, str]:
         "bova11_close": _array_sha256(np.asarray(inputs.bova11_close)),
         "bova11_manifest": str(inputs.bova11_manifest_sha256),
         "bova11_data": str(inputs.bova11_data_sha256),
+        "hedge_annual_borrow_rate": _array_sha256(
+            np.asarray(
+                inputs.hedge_annual_borrow_rate
+                if inputs.hedge_annual_borrow_rate is not None
+                else "configured_fallback"
+            )
+        ),
         "hedge_beta_manifest": str(inputs.hedge_beta_manifest_sha256),
         "hedge_beta": _array_sha256(np.asarray(inputs.hedge_beta)),
         "hedge_beta_valid": _array_sha256(np.asarray(inputs.hedge_beta_valid)),

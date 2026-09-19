@@ -5,6 +5,11 @@ additional historical B3 retrieval and economic-primary attention/GRU capacity
 follow-ups. Read `research/preregistrations/v2_economic_data_scaling.md` after each
 stage. Foundation outcomes remain sealed at the canonical foundation pointer.
 
+**Current status:** A/B remain in progress; C/D have not started. Corporate-account
+research and the source censuses below are complete. The BOVA11 borrowing-path
+repair is implemented and tested (see the latest entry); recovered historical
+sources are not yet admitted. No training or source-census worker is active.
+
 Initial inspection: the account supports only one scalar successor and rejects a
 successor already held; multi-leg Copel delivery and mixed contractual consideration
 need explicit support. Borrow charges currently use each day's marked exposure and
@@ -167,3 +172,36 @@ No quote was obtained or outreach sent. Source/data consumers, sealed books and
 training defaults have not changed in this amendment. Complete the actual Stage A
 accounting and Stage B audit before interpreting corrected economics or starting
 the registered follow-up fits.
+
+### BOVA11 borrowing-path consistency repair, 2026-09-19
+
+The independent ledger no longer floors a supplied hedge loan rate at its 2%
+fallback: finite observed rates, including zero, are used as supplied; only missing
+observations use the configured fallback. EvaluationInputs now carries the causal
+hedge-rate series into the ledger, sliced replay windows and input hashes. Evaluation
+schema V18 distinguishes this economic contract from previously sealed reports.
+
+The policy allocator and differentiable account consume that same series. Borrowing
+costs are calculated from input rates and the actual account configuration rather
+than a cached array constructed with default charges. Stress replays retain the
+primary decision estimate while changing realized costs. The configured B3 loan fee
+is now applied to hedge borrowing in both accounts, as it already was to individual
+equities; long hedge positions pay no borrowing charge. This removes an omitted
+cost as well as the overly high observed-rate floor, so it is not an unconditional
+performance improvement. Historical accounting results remain sealed.
+
+Validation: 149 targeted independent-ledger, differentiable-account, policy and
+evaluation tests pass. New cases cover rates below/above fallback, observed zero,
+missing observations, long versus short hedges, alternative fee scenarios, a replay
+starting partway through the source series, future-rate mutation and provenance.
+Both accounts agree on daily NAV to 1e-12 in the targeted hedge cases. Ruff passes.
+
+This is a bounded path repair, not final loan-source or contractual-accounting
+acceptance. No recovered historical lending series has been admitted or backcast,
+no old policy cache has been rewritten, and no financial comparison has been rerun.
+The daily marked-notional/latest-rate accrual and static fee schedule still require
+replacement by the registered fixed-contract reference/rate and dated fee rules.
+Multi-leg corporate actions, delivery/payment claims, existing-destination netting
+and removal of synthetic missing-quote liquidation remain the next accounting work,
+alongside causal source admission and the remaining source-to-model audit. No GPU
+follow-up is launched before those contracts are ready.

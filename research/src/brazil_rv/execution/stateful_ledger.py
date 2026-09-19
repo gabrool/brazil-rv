@@ -176,6 +176,14 @@ def equity_borrow_registration_fee(
     return float(fee) if fee.ndim == 0 else fee
 
 
+def daily_borrow_cost(annual_rate, *, config: LedgerConfig):
+    """Daily rent plus B3 fee under the configured annual-rate convention."""
+    fee = equity_borrow_registration_fee(annual_rate, config=config)
+    return np.expm1(np.log1p(annual_rate) / config.annual_sessions) + np.expm1(
+        np.log1p(fee) / config.annual_sessions
+    )
+
+
 @dataclass(frozen=True)
 class IntendedOrder:
     order_id: str
@@ -2951,14 +2959,13 @@ def simulate_stateful_ledger(
             )
         hedge_borrow = 0.0
         if config.beta_hedge and hedge_shares < 0.0:
-            hedge_rate = max(
+            hedge_rate = (
                 float(inputs.hedge_annual_borrow_rate[day])
                 if np.isfinite(inputs.hedge_annual_borrow_rate[day])
-                else 0.0,
-                config.hedge_annual_borrow_rate,
+                else config.hedge_annual_borrow_rate
             )
-            hedge_borrow = abs(hedge_shares * hedge_mark) * np.expm1(
-                np.log1p(hedge_rate) / config.annual_sessions
+            hedge_borrow = abs(hedge_shares * hedge_mark) * daily_borrow_cost(
+                hedge_rate, config=config
             )
             borrow += hedge_borrow
         held_short_borrow_rate_rows.append(weighted_borrow_rate)

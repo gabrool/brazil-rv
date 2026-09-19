@@ -157,6 +157,62 @@ def test_shared_controller_and_independent_exact_ledger_agree():
     assert previous.shape == (12, len(data.inputs.security_ids) + 1)
 
 
+@pytest.mark.parametrize("hedge_weight", [-0.02, 0.02])
+@pytest.mark.parametrize("charge_fee", [True, False])
+def test_hedge_borrow_rates_and_fee_scenarios_match_both_accounts(
+    hedge_weight, charge_fee
+):
+    data = policy_fixture()
+    rates = np.full(len(data.inputs.dates), np.nan)
+    rates[4:8] = [0.0, 0.005, 0.03, np.nan]
+    data.inputs = replace(data.inputs, hedge_annual_borrow_rate=rates)
+    changes = (
+        {}
+        if charge_fee
+        else dict(
+            borrow_registration_fee_fraction=0.0,
+            borrow_registration_fee_floor=0.0,
+            borrow_registration_fee_cap=0.0,
+        )
+    )
+    config = policy_ledger_config(
+        cost_bps_per_side=0.0, hedge_cost_bps_per_side=0.0, **changes
+    )
+    start, stop = 3, 9
+    targets = np.zeros((stop - start, len(data.inputs.security_ids) + 1))
+    targets[:-1, -1] = hedge_weight
+    account = data.initial_account(start, config)
+    records = [
+        data.step(account, tensor(target), day, terminal=day == stop - 1)
+        for day, target in zip(range(start, stop), targets)
+    ]
+    exact, _, _ = exact_replay(data, None, start, stop, config=config, targets=targets)
+    assert [r["nav"].item() for r in records] == pytest.approx(exact.nav, abs=1e-12)
+    # Observed zero/below/above fallback rates, then missing. The first close
+    # opens the hedge, so rent starts only on the following session.
+    rent = np.array([0.0, 0.0, 0.005, 0.03, 0.02, 0.02])
+    fee = np.array([0.0, 0.00025, 0.001, 0.006, 0.004, 0.004])
+    expected = np.expm1(np.log1p(rent) / 252)
+    if charge_fee:
+        expected += np.expm1(np.log1p(fee) / 252)
+    if hedge_weight > 0:
+        expected[:] = 0.0
+    opening_nav = np.r_[config.initial_capital_brl, exact.nav[:-1]]
+    opening_hedge = np.r_[
+        0.0, exact.hedge_signed_shares[:-1] * exact.hedge_mark_price[:-1]
+    ]
+    assert exact.hedge_borrow_bps == pytest.approx(
+        np.abs(opening_hedge) / opening_nav * expected * 1e4, abs=1e-10
+    )
+    assert np.max(np.abs(exact.reconciliation_error)) < 1e-12
+    # A later published rate cannot change an earlier accounting result.
+    rates[7:] = 0.50
+    changed, _, _ = exact_replay(
+        data, None, start, stop, config=config, targets=targets
+    )
+    np.testing.assert_array_equal(changed.nav[:4], exact.nav[:4])
+
+
 def test_preference_gradient_survives_sequential_account_and_detach_preserves_value():
     torch.set_num_threads(1)
     torch.manual_seed(29)

@@ -14,7 +14,7 @@ from .portfolio_account import PortfolioAccount, tensor
 from .stateful_ledger import (
     LedgerConfig,
     PortfolioTarget,
-    equity_borrow_registration_fee,
+    daily_borrow_cost,
     simulate_stateful_ledger,
 )
 from brazil_rv.v2.evaluate import _ledger_inputs
@@ -30,15 +30,19 @@ def policy_ledger_config(**changes):
     return replace(LedgerConfig(), **(defaults | changes))
 
 
-def daily_borrow(rates, config):
-    fee = equity_borrow_registration_fee(rates, config=config)
-    equity = np.expm1(np.log1p(rates) / config.annual_sessions)
-    equity += np.expm1(np.log1p(fee) / config.annual_sessions)
-    hedge = np.full(
-        (*equity.shape[:-1], 1),
-        np.expm1(np.log1p(config.hedge_annual_borrow_rate) / config.annual_sessions),
+def daily_borrow(rates, config, *, hedge_rates=None):
+    equity = daily_borrow_cost(rates, config=config)
+    hedge_rates = (
+        config.hedge_annual_borrow_rate
+        if hedge_rates is None
+        else np.where(
+            np.isnan(hedge_rates), config.hedge_annual_borrow_rate, hedge_rates
+        )
     )
-    return np.concatenate((equity, hedge), axis=-1)
+    hedge = np.broadcast_to(
+        daily_borrow_cost(hedge_rates, config=config), equity.shape[:-1]
+    )
+    return np.concatenate((equity, hedge[..., None]), axis=-1)
 
 
 @dataclass
@@ -56,8 +60,10 @@ class PolicyData:
             inputs.scores[..., HEADS], inputs.score_mask[..., HEADS]
         )
         self.valid = inputs.active & inputs.score_mask[..., HEADS].all(-1)
-        self.borrow = daily_borrow(
-            inputs.annual_borrow_rate_by_name, policy_ledger_config()
+        borrow = daily_borrow(
+            inputs.annual_borrow_rate_by_name,
+            policy_ledger_config(),
+            hedge_rates=inputs.hedge_annual_borrow_rate,
         )
         self.volatility = np.sqrt(self.diagonal + self.beta**2 * self.factor[:, None])
         self.shortable = inputs.shortable_by_borrow_source["borrow_balance"]
@@ -75,7 +81,7 @@ class PolicyData:
                 prior_valid[..., None],
                 np.log(self.volatility)[..., None],
                 self.beta[..., None],
-                np.arcsinh(self.borrow[..., :-1] / 0.0001)[..., None],
+                np.arcsinh(borrow[..., :-1] / 0.0001)[..., None],
                 np.broadcast_to(
                     prior_cdi[:, None, None] / 0.0001, (*self.valid.shape, 1)
                 ),
@@ -85,6 +91,16 @@ class PolicyData:
         ).astype(np.float32)
         if not np.isfinite(self.static[self.valid]).all():
             raise ValueError("policy observed features contain a non-finite value")
+
+    def borrow_rates(self, day, config):
+        # Realized financing uses the account's cost scenario; the decision path
+        # below keeps its primary estimate fixed across cost stress replays.
+        rates = self.inputs.hedge_annual_borrow_rate
+        return daily_borrow(
+            self.inputs.annual_borrow_rate_by_name[day],
+            config,
+            hedge_rates=None if rates is None else rates[day],
+        )
 
     def initial_account(self, start, config):
         hedge = (
@@ -111,7 +127,7 @@ class PolicyData:
             day=day,
             close=np.r_[inputs.raw_close[day], inputs.bova11_close[day]],
             cdi=float(inputs.cdi_returns[day]),
-            daily_borrow=self.borrow[day],
+            daily_borrow=self.borrow_rates(day, account.config),
             action_q=np.r_[inputs.action_shares_per_prior_share[day], 1.0],
             action_d=np.r_[inputs.action_cash_per_prior_share[day], 0.0],
             action_resolved=np.r_[inputs.action_session_resolved[day], True],
@@ -300,7 +316,7 @@ def decide(
         beta=np.r_[data.beta[day, names], 1.0],
         idiosyncratic_variance=np.r_[data.diagonal[day, names], 1e-8],
         market_variance=float(data.factor[day]),
-        daily_borrow=data.borrow[day, ids],
+        daily_borrow=data.borrow_rates(day, policy_ledger_config())[ids],
         lower=lower,
         upper=upper,
         config=allocation,
@@ -372,6 +388,7 @@ def ledger_arguments(data, start, stop):
         "hedge_beta",
         "hedge_beta_valid",
         "hedge_close",
+        "hedge_annual_borrow_rate",
     ):
         if arguments[key] is not None:
             arguments[key] = arguments[key][start:stop]

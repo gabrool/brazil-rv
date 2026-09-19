@@ -103,6 +103,22 @@ def test_registered_book_stop_includes_nonheadline_defects():
         evaluate_module.enforce_registered_book_bounds(report)
 
 
+def test_hedge_lending_series_is_bound_in_economic_provenance_and_ledger():
+    inputs = _fixture()
+    rates = np.full(len(inputs.dates), 0.005)
+    changed = replace(inputs, hedge_annual_borrow_rate=rates)
+    before = evaluate_module._input_hashes(inputs)
+    after = evaluate_module._input_hashes(changed)
+    assert before["hedge_annual_borrow_rate"] != after["hedge_annual_borrow_rate"]
+    assert {key for key in before if before[key] != after[key]} == {
+        "hedge_annual_borrow_rate"
+    }
+    arguments = evaluate_module._ledger_inputs(
+        changed, changed.scores, changed.score_mask
+    )
+    np.testing.assert_array_equal(arguments["hedge_annual_borrow_rate"], rates)
+
+
 def _fixture() -> EvaluationInputs:
     dates = _weekdays(date(2024, 1, 2), 25)
     names = 60
