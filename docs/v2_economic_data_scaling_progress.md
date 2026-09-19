@@ -894,3 +894,5 @@ loan/spot clearing-calendar clocks, presettlement disposal bounds, and every-fam
 source-to-tensor audit plus full identity propagation. Then apply accounting, new
 cash calendar and source availability separately in corrected model replays. Keep
 old static coordinates; refit only under an explicit changed data contract.
+
+Implementation `4640921` is archived in `loan_election_cash_calendar_4640921.zip` (39 restored/hash-verified members; 20 original source checks), with no immutable dataset duplication. Restored source acceptance hashes and cash-panel arrays match. Archive SHA-256: `1f26d000daf75526d684d1b652d2ede10f0849768d7a08350ba0bf0254cb14f6`. Recovery is bound by `loan_election_cash_calendar_recovery`; prior archives remain valid for their source commits.

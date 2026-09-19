@@ -90,6 +90,10 @@
     "path": "docs\\v2_loan_election_acceptance.json",
     "sha256": "eb7065996382ed3a9892ec8a94c914e08480f04b9061125eadbe646d8ca7f387"
   },
+  "loan_election_cash_calendar_recovery": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\loan_election_cash_calendar_recovery.json",
+    "sha256": "1952d95f69133b718c7a7a76308f5ce0a569b15260813cbd2be2a4e1f6f01aac"
+  },
   "loan_election_unchanged": {
     "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\loan_election_unchanged\\result.json",
     "sha256": "8c64fbad4c0526d08203b79512717af7889da3a7880988c66793c4a668209639"
