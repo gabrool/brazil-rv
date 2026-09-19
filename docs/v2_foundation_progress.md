@@ -324,3 +324,23 @@ no book.json and moved it within the run to residual_incomplete_readout_F2_11,
 preserving evidence. Retried unchanged 81ba9c9 source; current receipt/logs are
 readout_residual_retry_worker.json and readout_residual_retry.*.log. First book.json
 now exists; no error in retry log at check. Do not rerun the earlier failing logs.
+
+### Residual screen decision (2026-09-19 07:57 UTC)
+
+All 48 cell/fold/seed fits and 64 economic books completed. Rich ridge versus C6:
+IC -0.000044, net +0.783563 bps/day; only two folds improve net (F14 +2.911 is the
+main contribution), so no admission. Versus score-only ridge: IC +0.002598,
+net +0.756046, also fails fold consistency. Rich tree versus C6: IC +0.000239,
+net -0.096322, no admission. Versus score-only tree: IC +0.001781/net +1.333112,
+and that comparator passes the IC improvement gate, but improvement over a weaker
+correction does not meet the required unchanged-C6 gate. Neither learner confirms.
+Full results: `v2_foundation_residual_results.json`. Retain unchanged C6 anchor;
+no new feature, penalty, strength or tree sweep follows. This closes the bounded
+current-state residual question, not every temporal representation of rich data.
+
+Reread residual registration and its two-comparator requirement before this decision.
+All five research screens are now addressed, with conditional C6 capacity reviewed
+and not triggered. Whole program still incomplete: bounded settlement/financing
+sensitivity and identity implications, consolidated performance/report, and hashed
+recoverable D archive plus canonical-pointer/GitHub verification remain. No candidate
+qualified for new confirmation fits. GPU remains idle; do not launch duplicate work.
