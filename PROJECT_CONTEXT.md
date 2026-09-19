@@ -26,7 +26,7 @@ against existing inventory in both accounts, preserving signed cash claims and
 releasing only the extinguished short portion's restricted proceeds. Sparse sourced
 multi-leg distributions can now retain signed, non-tradable baskets until separately
 dated custody delivery, with separate cash claims/payment. Allocation reserves their
-capacity and risk/readouts use the underlying exposures. Evaluation V30 binds these
+capacity and risk/readouts use the underlying exposures. Evaluation V31 binds these
 terms and reports undelivered and unpriced inventory separately on the full calendar.
 Both cost paths now use dated B3 loan components, with stock/hedge rent separated
 from exchange fees. Both accounts now retain fixed-principal/rate loan cohorts,
@@ -40,8 +40,12 @@ offsets and proceeds release until deliverable. Finite loans now use a registere
 reference/rate replace the old contract and its accrued charges pay once. Pending
 returns retain old terms, and original investment entries remain available for cost
 attribution. The registered 30/126-session bounds are assumptions to evaluate, not
-broker quotes. Dated D0/D1 accrual endpoints, denied renewal/ordinary recall and
-remaining clearing/event boundaries are still open. SAM restarts independently copy
+broker quotes. Loan cohorts now distinguish registered/D0 rent and B3 fee endpoints
+from electronic D1; expense is recognized after actual fills and renewals, with
+source-specific corporate stopped-accrual dates retained. Pre-platform D0 and
+post-platform electronic D1 are explicit modality hypotheses, not observed invoices.
+Denied renewal/ordinary recall and remaining clearing/event boundaries are still
+open. SAM restarts independently copy
 the whole account state, including pending settlements. See
 `docs/v2_LOAN_ACCOUNTING.md`. This is an
 implemented accounting repair, not completion of the contractual-event/source audit
@@ -99,6 +103,11 @@ CPU inputs on 45 full-population 60-session samples. No scaler, field-routing,
 permanent-identity, mask, age or dtype mismatch was found. This closes that boundary;
 it does not certify upstream publication vintages, financial denominators, wealth/
 labels or the pending full-store identity repairs. See `docs/v2_FIT_CONDITIONING_AUDIT.md`.
+The separate US-source audit reconciles original bounded bars, exact return
+endpoints and historical close times; EWZ shocks also reconcile through the actual
+decision clock into stored values/masks/ages. Preserved vendor revisions remain
+unknown, and untimed pre-NYSE Suzano history remains unusable for timed features.
+See `docs/v2_US_SOURCE_AUDIT.md`; this does not finish the other upstream families.
 
 The economic/data/scaling run pointer now binds a separately admitted archive of
 reconciled BDI lending observations and causal stock/BOVA11 loan-source panels.

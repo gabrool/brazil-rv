@@ -64,8 +64,9 @@ reprice an existing contract. Same-security splits change deliverable quantity b
 preserve principal. Partial returns retain the original terms and divide accrued
 liabilities pro rata. Separate tariff intervals preserve earlier accrued fees.
 
-Accrual excludes registration and includes return. Rent and B3 charges are expenses
-and unpaid liabilities; cash pays them on the modeled return date. NAV subtracts
+Accrual follows the registered/D0 versus electronic/D1 endpoints below. Rent and
+B3 charges are expenses and unpaid liabilities; cash pays them on the modeled
+return date. NAV subtracts
 that liability, preventing either premature cash deductions or a second loss on
 payment. Buying to cover removes market exposure but the loan persists until its
 return settles. A terminal cover does not extinguish an outstanding loan or its
@@ -112,8 +113,8 @@ not change the accepted fills, dates, eligible population or training budget.
    contain this new panel and must be explicitly enriched in a new bound replay
    artifact; they are not silently rescored. Preserve published averages even where
    turnover/quantity differs. Confirm source identity and exact units.
-2. Complete actual clearing-calendar and dated D0/D1 accrual boundaries alongside
-   the implemented dated spot cash/proceeds settlement. Finite approved renewals
+2. Complete unresolved clearing-calendar boundaries alongside the implemented
+   dated spot cash/proceeds settlement and D0/D1 loan accrual. Finite approved renewals
    are implemented below; denied renewals and ordinary lender recalls remain
    execution assumptions to resolve or bound. Do not infer additional equity
    settlement days merely because the monetary calendar has more dates.
@@ -158,11 +159,35 @@ observed maturities. All full-store 126-session windows span at most 194 calenda
 days. Ordinary unscheduled lender recalls are absent in the primary; source-bound
 corporate elections remain. Denied approval/recall sensitivity is still open.
 
-Current rent accrual excludes registration and includes return. The 2021 manual
-p112 distinguishes registered/electronic D0 rent through the session before return
-from electronic D1 rent through return; registered B3 fees use another endpoint.
-This dated modality distinction is not yet implemented. Completed-contract rent
-counts alone cannot prove intermediate liabilities or fee timing correct.
+Evaluation V31 implements the 2021 manual p112 distinction. Registered/electronic
+D0 rent includes registration and stops before ordinary physical return, while B3
+fees include both dates. Electronic D1 rent and fees start on the next-session value
+date and include return. The special same-registration-day request settling D1 pays
+one day of rates. Source-bound corporate stopped-accrual dates override physical
+return endpoints; rent payment can remain later. Each cohort retains its value lag
+through partial returns and corporate transfers. Renewals pay the old contract and
+start the new one under the applicable date/modality.
+
+The primary before 2020-10-26 is registered D0, a stated historical modality
+hypothesis. After platform launch use normal electronic D1, with electronic D0
+as an explicit sensitivity. OTC uses D0; compulsory D0 is outside the ordinary
+account primary. The blended published rate file does not identify our actual
+loan type. These assumptions do not change its observed rent or add a broker toll.
+
+Both accounts now recognize loan expense once at session end, after actual fills,
+source events and renewals but before paying accrued liabilities. Earlier intentions
+still use their original decision information. This permits correct registration-day
+D0 expense without a separate reporting-only adjustment. Historical minimum fixtures
+now include registration-day accrual; renewing a D0 contract starts its new minimum
+that day. NAV and cash payments never charge the same liability twice.
+
+Eight new endpoint/partial-return/renewal/tariff/gradient/account tests passed, as
+did 119 affected checks and 22 further custody/distribution checks. Two ordinary D1
+books preserve exact NAV, cash, positions, fills and intentions versus 197d774. Loan
+metadata/payment arithmetic differs by at most R$1.14e-13 and account expense/liability
+by R$2.28e-13 because accrual now follows cohort splitting; this is not bit-identical
+loan bookkeeping. Original-entry charge differences are at most R$1.78e-15. The
+acceptance receipt binds the measured bounds. These checks are not model returns.
 
 Ten archived B3 calendar receipts explain 20 of the 23 money-only dates in the cash
 audit as equity clearing/custody closures. The remaining 2016-12-30, 2017-01-25 and

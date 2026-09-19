@@ -1002,3 +1002,44 @@ Recovery: implementation `92c338a`; `loan_renewal_conditioning_92c338a.zip` SHA-
 including complete current research source, acceptance code hashes and audit
 artifacts. 19 original-source receipts verified. Immutable inputs and old fits
 were not duplicated. The run pointer binds the recovery receipt.
+
+## Dated loan accrual and upstream US source timing — 2026-09-19
+
+V31 implements the archived 2021 B3 manual's p112 distinction in both accounts.
+Registered/D0 rent includes registration and excludes physical return; B3 fees
+include both. Electronic D1 starts after registration and includes return. A
+same-registration-day request settling next session incurs one day of rates.
+Explicit corporate stop dates retain their separate contractual treatment. Charges
+now accrue after actual fills/events/renewals and before payment; earlier intentions
+remain unchanged. Partial cohorts, renewal minima, liabilities and original-entry
+attribution follow the same interval rules. The pre-2020-10-26 registered-D0 primary
+and subsequent electronic-D1 primary are explicit modality hypotheses; blended BDI
+rates cannot identify actual contract type. Electronic D0 remains a sensitivity.
+
+Eight new closed-form/day-count/partial/renewal/tariff/corporate-stop/gradient cases
+pass, included in a 119-check affected batch (50.76s). Two subsequent evaluation
+checks, 22 distribution/custody checks and three corrected historical-fixture checks
+also pass; counts overlap. Ruff and diff checks pass. The two ordinary D1 books
+preserve exact NAV, cash, positions, fills and intentions versus 197d774. Moving
+accrual after cohort splitting produces only measured floating-point loan rounding:
+at most R$2.28e-13 in account loan amounts and R$1.78e-15 per original-entry charge.
+Do not claim every loan metadata array is bit-identical. See the bound
+v2_loan_accrual_acceptance.json and loan_accrual_unchanged evidence. No stress
+benchmark or previously passed census was repeated.
+
+The independent US-source audit verifies 19 bounded original files, 71,135 bars
+and 69,029 returns with zero mismatches (1.43s). A separate first-available-decision
+reconstruction checks 1,136,631 active EWZ input cells (5.85s), with exact values,
+masks and ages. Fourteen early-close dates correctly enter the same B3 decision;
+ordinary US closes enter later. Untimed pre-NYSE SUZ history remains preserved,
+without invented availability. Only historical 2010-2024 payloads are decoded;
+present-day quote metadata is not consumed. Single-vintage historical revisions
+remain unknown. See v2_US_SOURCE_AUDIT.md and the two bound audit receipts.
+
+Registration reread; A/B remain incomplete and C/D unstarted. No GPU fit or model
+profitability result was produced. Remaining priorities are denied-renewal/recall
+and pre-custody-disposal bounds, three older clearing ambiguities, upstream clocks/
+units/financial denominators across the remaining families, and full identity,
+universe, warmup, wealth and label propagation. Completed conditioning and auxiliary
+tensor checks need not be repeated. Accounting-only replay must preserve frozen
+static policy coordinates; data repairs require a separately bound store/refit.

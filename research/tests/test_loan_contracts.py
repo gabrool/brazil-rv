@@ -54,8 +54,9 @@ def test_new_borrow_is_a_new_cohort_and_does_not_reprice_old_principal():
 def test_historical_minimum_is_one_contract_obligation_not_a_partial_return_toll():
     book = LoanContracts(1)
     book.open([100], [10], [0], 0, "2019-01-02")
-    _, expense = book.accrue(1, "2019-01-03")
+    _, expense = book.accrue(0, "2019-01-02")
     assert expense.item() == pytest.approx(10)
+    book.accrue(1, "2019-01-03")
     book.request_return([25], 2)
     book.accrue(2, "2019-01-04")
     liability = book.liability.item()
@@ -75,12 +76,12 @@ def test_large_historical_contract_pays_actual_fee_when_above_minimum():
     book = LoanContracts(1)
     book.open([100000], [10], [0], 0, "2019-01-02")
     expense = 0
-    for day in range(1, 4):
+    for day in range(4):
         _, fee = book.accrue(day, "2019-01-03")
         expense += fee.item()
     book.request_return([100000], 3)
     _, paid = book.pay(3)
-    expected = 1e6 * (1.0025 ** (3 / 252) - 1)
+    expected = 1e6 * (1.0025 ** (4 / 252) - 1)
     assert paid.item() == pytest.approx(expected, abs=1e-9)
     assert expense == pytest.approx(expected, abs=1e-9)
 

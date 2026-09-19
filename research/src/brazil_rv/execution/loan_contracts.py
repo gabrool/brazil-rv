@@ -164,8 +164,13 @@ class LoanContracts:
     modality: str = "normal"
     fee_multiplier: float = 1.0
     annual_sessions: int = 252
+    electronic_settlement_days: int = 1
     name: np.ndarray = field(default_factory=lambda: np.empty(0, dtype=np.int64))
     opened: np.ndarray = field(default_factory=lambda: np.empty(0, dtype=np.int64))
+    value_lag: np.ndarray = field(default_factory=lambda: np.empty(0, dtype=np.int64))
+    return_requested: np.ndarray = field(
+        default_factory=lambda: np.empty(0, dtype=np.int64)
+    )
     return_day: np.ndarray = field(default_factory=lambda: np.empty(0, dtype=np.int64))
     accrual_end: np.ndarray = field(default_factory=lambda: np.empty(0, dtype=np.int64))
     root: np.ndarray = field(default_factory=lambda: np.empty(0, dtype=np.int64))
@@ -248,6 +253,14 @@ class LoanContracts:
         roots = np.arange(len(self.root_name), len(self.root_name) + len(ids))
         self.name = np.r_[self.name, ids]
         self.opened = np.r_[self.opened, np.full(len(ids), day)]
+        registered = np.datetime64(session_date) < np.datetime64(
+            "2020-10-26"
+        ) or self.modality in ("otc", "compulsory")
+        self.value_lag = np.r_[
+            self.value_lag,
+            np.full(len(ids), 0 if registered else self.electronic_settlement_days),
+        ]
+        self.return_requested = np.r_[self.return_requested, np.full(len(ids), -1)]
         self.return_day = np.r_[self.return_day, np.full(len(ids), -1)]
         self.accrual_end = np.r_[self.accrual_end, np.full(len(ids), -1)]
         self.root = np.r_[self.root, roots]
@@ -294,16 +307,26 @@ class LoanContracts:
         )
 
     def accrue(self, day, session_date, *, charges=None):
-        """Registration exclusive, return inclusive; recognize expense, not payment."""
+        """End-of-session recognition after actual fills, returns and renewals.
+
+        Registered/D0 rent includes registration and excludes physical return;
+        its B3 fees include both dates. Electronic D1 includes value date through
+        return. Explicit corporate accrual-end dates override physical return.
+        A D0 same-registration-day request settling D1 pays one day of rates.
+        """
         if not len(self.name):
             zero = torch.zeros(self.names, dtype=torch.float64)
             return zero, zero.clone()
         age = day - self.opened
-        if np.any(age <= 0):
-            raise ValueError("loans accrue once per subsequent business session")
+        if np.any(age < 0):
+            raise ValueError("a loan cannot accrue before registration")
+        accrues = (self.accrual_end < 0) | (day <= self.accrual_end)
+        started = age >= self.value_lag
+        physical_end = (self.return_day == day) & (self.accrual_end < 0)
+        rent_active = accrues & started & ~((self.value_lag == 0) & physical_end)
         rent_log = np.log1p(self.annual_rate) / self.annual_sessions
         rent = self.principal * _tensor(
-            np.exp(rent_log * (age - 1)) * np.expm1(rent_log) * (self.accrual_end < 0)
+            np.exp(rent_log * (age - self.value_lag)) * np.expm1(rent_log) * rent_active
         )
         # Tariff periods are charged separately; a new schedule must not
         # retrospectively reprice an earlier period's accrued fee.
@@ -316,15 +339,14 @@ class LoanContracts:
                 self.annual_rate[changed], session_date, modality=self.modality
             )
         daily_fee = np.expm1(np.log1p(self.fee_rate) / self.annual_sessions)
+        same_day_request = (self.return_requested == self.opened) & (age == 0)
+        fee_active = accrues & started & ~same_day_request
         fees = self.principal[:, None] * _tensor(
-            self.fee_growth
-            * daily_fee
-            * self.fee_multiplier
-            * (self.accrual_end < 0)[:, None]
+            self.fee_growth * daily_fee * self.fee_multiplier * fee_active[:, None]
         )
-        self.fee_growth *= 1 + daily_fee
+        self.fee_growth *= 1 + daily_fee * fee_active[:, None]
         before = self.minimum_provision
-        self.started[:] = True
+        self.started[np.unique(self.root[fee_active])] = True
         self.root_fees = self.root_fees.index_add(
             0, torch.as_tensor(self.root), fees.sum(-1)
         )
@@ -356,7 +378,7 @@ class LoanContracts:
             minimum_change, self.root_name
         )
 
-    def request_return(self, quantity, settlement_day):
+    def request_return(self, quantity, settlement_day, *, request_day=None):
         """Allocate partial returns pro rata across unreturned contracts of a name."""
         quantity = _tensor(quantity)
         if not np.any(quantity.detach().numpy() > 0):
@@ -379,6 +401,7 @@ class LoanContracts:
         for key in (
             "name",
             "opened",
+            "value_lag",
             "accrual_end",
             "root",
             "annual_rate",
@@ -391,13 +414,17 @@ class LoanContracts:
             value = getattr(self, key)
             setattr(self, key, np.concatenate((value, value[ids])))
         self.return_day = np.r_[self.return_day, np.full(len(ids), settlement_day)]
+        self.return_requested = np.r_[
+            self.return_requested,
+            np.full(len(ids), -1 if request_day is None else request_day),
+        ]
         self._keep(
             (self.quantity.detach().numpy() > 0)
             | (self.principal.detach().numpy() != 0)
         )
 
     def fill(self, cover, new_short, session):
-        self.request_return(cover, session.return_day)
+        self.request_return(cover, session.return_day, request_day=session.day)
         self.open(
             new_short,
             session.reference,
@@ -515,7 +542,7 @@ class LoanContracts:
     def cash_settle(self, event, day):
         """Extinguish all outstanding shares, including later requested returns.
 
-        Rent/fees accrue through today before this call and pay via the ordinary
+        Explicit terms stop accrual at today; end-of-session charges pay via the ordinary
         liability path. Principal cash is a separate issuer-specific payment.
         A covering asset is retained if its planned physical return is superseded.
         """
@@ -570,6 +597,8 @@ class LoanContracts:
         for key in (
             "name",
             "opened",
+            "value_lag",
+            "return_requested",
             "return_day",
             "accrual_end",
             "root",
@@ -651,6 +680,8 @@ class LoanContracts:
         self.name = np.r_[self.name, np.full(len(ids), destination)]
         for key in (
             "opened",
+            "value_lag",
+            "return_requested",
             "return_day",
             "accrual_end",
             "root",

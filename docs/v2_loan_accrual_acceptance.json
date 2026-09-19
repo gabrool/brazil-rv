@@ -1,0 +1,150 @@
+{
+  "contract": {
+    "D0_B3_fees": "Registration and physical return inclusive.",
+    "D0_rent": "Registration inclusive; physical return exclusive.",
+    "D1_rent_and_fees": "Value date after registration through physical return inclusive.",
+    "before_2020_10_26": "Registered D0 is an explicit historical modality hypothesis, not observed BDI modality.",
+    "corporate_stops": "Explicit source-bound stopped-rent dates override ordinary physical-return endpoint.",
+    "electronic_primary": "D1 after platform launch; D0 configured one-factor sensitivity.",
+    "recognition": "After actual fills, corporate events and renewals; before loan-charge payment. Previously formed intentions stay causal.",
+    "same_registration_day_return_request": "When settling next session, one day of rates; no second B3 daily charge.",
+    "unit_and_axis": "252 annual sessions; existing B3 equity session axis retained pending remaining historical clearing bounds."
+  },
+  "evaluation_schema": "BRAZIL_RV_V2_EVALUATION_V31",
+  "evidence": {
+    "ewz_decision_audit": {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\ewz_decision_audit.json",
+      "sha256": "92ebff9b4fb27d939d803ebcf43b14ac3946709482c997c65424589bf15d188d"
+    },
+    "loan_accrual_unchanged": {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\loan_accrual_unchanged\\result.json",
+      "sha256": "d4015907bab5c4ba398d6648c5a44000c44d7ca87df7c201cf966f2319ba9a0a"
+    },
+    "us_source_audit": {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\us_source_audit.json",
+      "sha256": "c5fbdb461303001eadedff388d098ea28c0d8c08038ee97856a0420b5c3424e2"
+    }
+  },
+  "ewz_audit": {
+    "active_valid_cells": 1136631,
+    "fields": [
+      {
+        "active_valid_cells": 568567,
+        "field": "shock_ewz_1",
+        "known_sessions": 3715,
+        "same_date_sessions": [
+          "2012-07-03",
+          "2013-07-03",
+          "2014-07-03",
+          "2017-07-03",
+          "2018-07-03",
+          "2019-07-03",
+          "2019-11-29",
+          "2020-11-27",
+          "2021-11-26",
+          "2022-11-25",
+          "2023-07-03",
+          "2023-11-24",
+          "2024-07-03",
+          "2024-11-29"
+        ]
+      },
+      {
+        "active_valid_cells": 568064,
+        "field": "shock_ewz_5",
+        "known_sessions": 3711,
+        "same_date_sessions": [
+          "2012-07-03",
+          "2013-07-03",
+          "2014-07-03",
+          "2017-07-03",
+          "2018-07-03",
+          "2019-07-03",
+          "2019-11-29",
+          "2020-11-27",
+          "2021-11-26",
+          "2022-11-25",
+          "2023-07-03",
+          "2023-11-24",
+          "2024-07-03",
+          "2024-11-29"
+        ]
+      }
+    ],
+    "seconds": 5.848476800005301
+  },
+  "immutable_inputs_or_old_fits_modified": false,
+  "limits": [
+    "BDI averages are blended proxies and do not identify historical modality, executable rates or loan approval.",
+    "Denied renewal/recall and pre-custody disposal still need execution bounds on actual model books.",
+    "Three older money-only dates remain equity-clearing ambiguous; custody closure alone does not establish every rent calendar.",
+    "US single vendor snapshot has unknown revision share; multiplicative adjustment cancellation is not a vintage-fidelity proof.",
+    "Untimed pre-NYSE SUZ rows are preserved, not assigned a guessed close; sources begin in 2010 and do not add 2009 warmup.",
+    "Other upstream sources, financial denominators, full identity/universe/warmup/wealth/labels and derived-store propagation remain in B.",
+    "No model-profitability effect or scaling result is inferred from accounting fixtures or source reconciliation."
+  ],
+  "lint": "Ruff and git diff --check pass.",
+  "previous_source_commit": "197d7743390596fdabc8040049a466ac23788160",
+  "source_lf_sha256": {
+    "ops/audit_ewz_decisions.py": "0227de7d5b95f4015cb432ac2951d9108a8c89246143211d9580c3cf27b3df8f",
+    "ops/audit_us_sources.py": "a7578410cefe7528447ebd5313950a80660dbd9c46400bef4ec3ceb73b0ef03a",
+    "research/src/brazil_rv/execution/loan_contracts.py": "47e2de3394b990534b6f658d6afa8f032d4b0084556f29ebe77402d7f4767831",
+    "research/src/brazil_rv/execution/portfolio_account.py": "027916f7d7f8771b54bc3922f9471bbc18cdc892b7c017001ede1b3d9e1e3cd0",
+    "research/src/brazil_rv/execution/stateful_ledger.py": "46ec02f64509d0e8e4081e45bc4519afc8cf68cf134b14c960103e42502d709e",
+    "research/src/brazil_rv/v2/evaluate.py": "eb7700093c3c09aaf93d68177d77cbe4dd26c9934ed50ffd3219a1cdb29423ca",
+    "research/tests/test_loan_accrual.py": "a28b97311c3201b0d188fe090deb93e707d4ec9144393812e8123304317f9dd0",
+    "research/tests/test_loan_contracts.py": "bfd398fc4a585e6ed99c6a0debe116ad16daef70fa9679c919a0ae8ad6402b9c",
+    "research/tests/test_loan_renewal.py": "cf9359d47c7022c636dc2d5c48fd4d301d628878b9edcfeae5f2f39a3bdca27e"
+  },
+  "source_rule": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\primary_sources\\b3_clearing_manual_20210126.pdf",
+    "printed_page": 112,
+    "sha256": "43545a5e0e628d4b165bb65361bd28996ca483f32efc3a6ce44bb19260695623"
+  },
+  "status": "dated_modality_accrual_and_US_source_clock_verified_A_B_incomplete_C_D_unstarted",
+  "tests": [
+    {
+      "passed": 8,
+      "scope": "New D0/D1 partial-return liabilities, same-day exception, renewal, tariff, corporate stop, analytic gradient and cross-account cases.",
+      "seconds": 2.1
+    },
+    {
+      "passed": 119,
+      "scope": "Affected loan/account/ledger/corporate cash and fraction/evaluation batch; includes preceding eight.",
+      "seconds": 50.76
+    },
+    {
+      "passed": 2,
+      "scope": "Evaluation contract and persisted state after V31 metadata addition; overlap with affected batch.",
+      "seconds": 4.18
+    },
+    {
+      "passed": 22,
+      "scope": "Share distribution and custody paths.",
+      "seconds": 2.67
+    },
+    {
+      "passed": 3,
+      "scope": "Historical fixtures now include D0 registration accrual and renew before accrual; overlap with affected batch.",
+      "seconds": 1.93
+    }
+  ],
+  "unaffected_D1_books": {
+    "exact": "Both synthetic books have exact NAV, cash, positions, fills and intentions versus previous source; all ordinary long arrays exact.",
+    "max_account_loan_roundoff_brl": 2.2737367544323206e-13,
+    "max_original_entry_charge_roundoff_brl": 1.7763568394002505e-15,
+    "mixed_nonzero_charge_rows": 262,
+    "note": "End-of-session accrual follows partial splits, changing floating-point addition order. No claim of bit-identical loan metadata."
+  },
+  "us_audit": {
+    "mismatches": 0,
+    "original_rows": 71135,
+    "returns": 69029,
+    "same_date_first_decision_rows": 261,
+    "seconds": 1.4300791999994544,
+    "source_files": 19,
+    "untimed_returns": 656,
+    "unverified_suz_rows": 2249
+  },
+  "verified_utc": "2026-09-19T23:23:18.314489+00:00"
+}

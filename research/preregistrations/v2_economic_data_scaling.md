@@ -80,8 +80,21 @@ B3 sessions as one-factor sensitivities. These are negotiated-account hypotheses
 not observed contract maturities or a guarantee of approval at public average rates.
 Primary loans are borrower-reversible; ordinary unscheduled lender recalls are
 assumed absent, while the already sourced corporate lender elections still apply.
-Denied renewal/ordinary recall and the dated D0/D1 accrual endpoints remain explicit
-execution/source boundaries to resolve or bound before final accounting acceptance.
+Denied renewal/ordinary recall remain execution assumptions to resolve or bound
+before final accounting acceptance.
+
+Value-date amendment, 2026-09-19, before corrected model outcomes: use registered
+D0 before the electronic-platform launch on 2020-10-26, explicitly a historical
+modality hypothesis, and normal electronic D1 afterward. The electronic D0 endpoint
+is a separate one-factor sensitivity; published blended rate files do not identify
+our actual modality. Registered/D0 rent includes registration and excludes ordinary
+physical return; B3 fees include both dates. Electronic D1 rent/fees include the
+next-session value date through return. A same-registration-day early-return request
+settling D1 has one day of rates. Sourced corporate stopped-rent dates retain their
+separate meaning. Recognize these expenses after actual fills/returns/renewals,
+without changing the information available to the earlier intention. The contract's
+252-day denominator and B3 session axis remain primary; unresolved older calendar
+closures are separate evidence gaps, not permission to add all monetary dates.
 
 ## B. Deep source-to-model data audit
 

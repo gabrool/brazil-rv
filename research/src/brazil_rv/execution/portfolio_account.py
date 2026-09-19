@@ -71,6 +71,7 @@ class PortfolioAccount:
                 config.borrow_fee_modality,
                 config.borrow_fee_multiplier,
                 config.annual_sessions,
+                config.electronic_loan_settlement_days,
             ),
             custody=ShareCustody(n),
             config=config,
@@ -407,7 +408,7 @@ class PortfolioAccount:
         )
         for due, quantity in custody_dates:
             fraction = quantity[destination] / offset.clamp_min(1e-30)
-            self.loans.request_return(excess * fraction, due)
+            self.loans.request_return(excess * fraction, due, request_day=day)
             if due > day:
                 deferred = release * fraction
                 restricted_flow = torch.zeros_like(self.trade_restricted)
@@ -566,9 +567,6 @@ class PortfolioAccount:
         increase = torch.where(increase > 1e-10, increase, 0.0)
         entry_notional = target.sign() * increase * start_nav
         hedge_trade_notional = (target[-1] - before[-1]) * start_nav
-        loan_rent, loan_fee = self.loans.accrue(day, session_date)
-        borrow = loan_rent.sum() + loan_fee.sum()
-
         for event in loan_cash_settlements:
             if event.prohibit_new_borrow and event.effective_session <= day:
                 entry_notional = entry_notional.clone()
@@ -620,7 +618,9 @@ class PortfolioAccount:
             ):
                 returns = torch.zeros_like(self.shares)
                 returns[name] = self.loans.active_quantity[name]
-                self.loans.request_return(returns, int(payment_session[name]))
+                self.loans.request_return(
+                    returns, int(payment_session[name]), request_day=day
+                )
             marks[name] = (self.marks[name] - d[name]) / q[name] if q[name] > 0 else 0
             if q[name] == 0:
                 self.custody.split(name, 0.0)
@@ -744,6 +744,8 @@ class PortfolioAccount:
         self.trade_cash = self.trade_cash - cash_loan_payment
         cash_loan_payment = cash_loan_payment + self.prepared_loan_cash_payment
         self.loans.renew(loan_session, self.config.loan_term_sessions)
+        loan_rent, loan_fee = self.loans.accrue(day, session_date)
+        borrow = loan_rent.sum() + loan_fee.sum()
         rent_paid, fees_paid = self.loans.pay(day)
         self.trade_cash = self.trade_cash - rent_paid.sum() - fees_paid.sum()
         self.marks = torch.where(torch.as_tensor(printed), prices, self.marks)

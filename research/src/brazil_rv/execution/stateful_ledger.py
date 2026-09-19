@@ -97,6 +97,7 @@ class LedgerConfig:
     borrow_fee_modality: LoanModality = "normal"
     borrow_fee_multiplier: float = 1.0
     loan_term_sessions: int = 63
+    electronic_loan_settlement_days: int = 1
     volatility_balanced_entries: bool = True
     volatility_group_count: int = 5
     small_stratum_scaling_threshold_multiple: int = 2
@@ -117,6 +118,8 @@ class LedgerConfig:
     annual_sessions: int = 252
 
     def __post_init__(self) -> None:
+        if self.electronic_loan_settlement_days not in (0, 1):
+            raise ValueError("electronic loan settlement must be D0 or D1")
         if not 5 <= self.loan_term_sessions <= 126:
             raise ValueError("research loan term must be 5 to 126 B3 sessions")
         if self.k_per_side <= 0 or self.buffer_per_side < 0:
@@ -1413,6 +1416,7 @@ def simulate_stateful_ledger(
         config.borrow_fee_modality,
         config.borrow_fee_multiplier,
         config.annual_sessions,
+        config.electronic_loan_settlement_days,
     )
     loan_references = (
         np.full((day_count, name_count + 1), np.nan)
@@ -1747,7 +1751,7 @@ def simulate_stateful_ledger(
         offset = min(abs(prior_destination), abs(new_shares)) if opposite else 0.0
         for due, quantity in custody_dates:
             fraction = float(quantity[successor]) / max(offset, 1e-30)
-            loans.request_return(returns * fraction, due)
+            loans.request_return(returns * fraction, due, request_day=day)
             if due > day:
                 deferred = release * fraction
                 restricted_flow = np.zeros(name_count + 1)
@@ -3174,9 +3178,6 @@ def simulate_stateful_ledger(
         action_uncertainty_seen |= bool(
             ((shares != 0.0) & explicit_unresolved_action).any()
         )
-        loan_rent, loan_fees = loans.accrue(
-            day, inputs.dates[day], charges=loan_charges
-        )
 
         def convert_loan_cash(event):
             nonlocal free_cash
@@ -3276,7 +3277,9 @@ def simulate_stateful_ledger(
                 returns = np.zeros(name_count + 1)
                 returns[name] = float(loans.active_quantity[name])
                 loans.request_return(
-                    returns, int(inputs.action_payment_session[day, name])
+                    returns,
+                    int(inputs.action_payment_session[day, name]),
+                    request_day=day,
                 )
             if q == 0:
                 custody.split(int(name), 0.0)
@@ -3402,12 +3405,6 @@ def simulate_stateful_ledger(
             * config.short_proceeds_remuneration
         )
         interest = free_cash_interest + short_proceeds_interest
-        equity_borrow_raw = float(loan_rent[:-1].sum())
-        equity_borrow_fee = float(loan_fees[:-1].sum())
-        hedge_borrow_raw = float(loan_rent[-1])
-        hedge_borrow_fee = float(loan_fees[-1])
-        hedge_borrow = hedge_borrow_raw + hedge_borrow_fee
-        borrow = equity_borrow_raw + equity_borrow_fee + hedge_borrow
         equity_loans = loans.name < name_count
         principal = loans.principal.detach().numpy()[equity_loans]
         contract_rates = loans.annual_rate[equity_loans]
@@ -3719,6 +3716,15 @@ def simulate_stateful_ledger(
             loans.settle_cash_claims(day, payments=loan_cash_payments).sum()
         )
         loans.renew(loan_session, config.loan_term_sessions)
+        loan_rent, loan_fees = loans.accrue(
+            day, inputs.dates[day], charges=loan_charges
+        )
+        equity_borrow_raw = float(loan_rent[:-1].sum())
+        equity_borrow_fee = float(loan_fees[:-1].sum())
+        hedge_borrow_raw = float(loan_rent[-1])
+        hedge_borrow_fee = float(loan_fees[-1])
+        hedge_borrow = hedge_borrow_raw + hedge_borrow_fee
+        borrow = equity_borrow_raw + equity_borrow_fee + hedge_borrow
         rent_paid, fees_paid = loans.pay(day)
         loan_paid = float(rent_paid.sum() + fees_paid.sum())
         free_cash -= loan_paid

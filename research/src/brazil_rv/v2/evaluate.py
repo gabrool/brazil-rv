@@ -49,7 +49,7 @@ MIN_CROSS_SECTION = 20
 BOOTSTRAP_SEED = 20260903
 ECONOMICS_COSTS_BPS = (2.0, 4.0, 7.0)
 ECONOMICS_HEADLINE = (4.0, 0.02)
-EVALUATION_SCHEMA = "BRAZIL_RV_V2_EVALUATION_V30"
+EVALUATION_SCHEMA = "BRAZIL_RV_V2_EVALUATION_V31"
 PRIOR_EVALUATION_SCHEMA = "BRAZIL_RV_V2_EVALUATION_V15"
 PAIRED_COMPARISON_SCHEMA = "BRAZIL_RV_V2_PAIRED_COMPARISON_V3"
 
@@ -1853,9 +1853,18 @@ def _economics_contract(inputs: EvaluationInputs) -> dict[str, object]:
         "costs_bps_per_side": list(ECONOMICS_COSTS_BPS),
         "cost_grid_borrow_cells": ["borrow_balance", "borrow_strict", "borrow_open"],
         "borrow_daily_accrual": (
-            "fixed opening principal and rate; registration exclusive/return inclusive; "
-            "accrued liability until return payment, with distinct dated B3 components"
+            "fixed principal/rate; registered/D0 rent includes registration and excludes "
+            "physical return, B3 fees include both; electronic D1 includes value date "
+            "through return. Same-registration-day return request settling D1 has one "
+            "day of rates. Explicit corporate stopped-accrual dates override physical "
+            "return. End-of-session expense and liability settle without double NAV loss"
         ),
+        "loan_value_date_convention": {
+            "pre_platform": "registered D0 assumption before 2020-10-26",
+            "electronic_settlement_days": config.electronic_loan_settlement_days,
+            "otc_compulsory": "D0; compulsory is not the ordinary account primary",
+            "source": "B3 clearing manual 2021-01-26 p112; dated modality not identified in blended source rates",
+        },
         "borrow_fee_convention": LOAN_FEE_CONVENTION,
         "loan_lifecycle": {
             "term_b3_sessions": config.loan_term_sessions,

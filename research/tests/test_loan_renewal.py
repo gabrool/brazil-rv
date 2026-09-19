@@ -46,12 +46,12 @@ def test_renewal_minimum_is_new_contract_with_no_double_nav_expense():
     book.open([10], [10], [0], 0, "2019-01-02")
     expense = 0
     paid = 0
-    for day in range(1, 7):
-        rent, fee = book.accrue(day, "2019-01-03")
-        expense += (rent + fee).item()
+    for day in range(7):
         book.renew(session(day, 10, 0, "2019-01-03"), 8)
         if day == 6:
             book.request_return([10], 6)
+        rent, fee = book.accrue(day, "2019-01-03")
+        expense += (rent + fee).item()
         rent, fee = book.pay(day)
         paid += (rent + fee).item()
         assert expense == pytest.approx(paid + book.liability.item(), abs=1e-12)
