@@ -21,6 +21,18 @@
     "path": "docs\\v2_cash_calendar_audit.json",
     "sha256": "687cd4d999bdb39867b5cd59c9972293a1b5748b811f264b66ae4e78905c862c"
   },
+  "clearing_calendar_audit": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\clearing_calendar_audit.json",
+    "sha256": "4bfd969c94551764038f233bbf1364efb65313d3d384b238b09b3e09c21b52cb"
+  },
+  "clearing_calendar_sources": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\clearing_calendar_sources.json",
+    "sha256": "5b0057bdb106e26ec2e9ca1fd709786428953a9252e5e978cf57e3fcb25b7bfe"
+  },
+  "conditioned_tensor_audit": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\fit_conditioning_audit\\tensors.json",
+    "sha256": "d01f0711c0f11d08067e6aa67ce062079f213425f0cba05016e399fd8381aca2"
+  },
   "copel_allocation_recovery": {
     "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\copel_allocation_recovery.json",
     "sha256": "0eb836ce0417748faf7d3227d49bda0c1b670a226767ba2b1b33669c4ca8dce7"
@@ -68,6 +80,10 @@
   "dommo_source_terms": {
     "path": "docs\\v2_dommo_source_terms.json",
     "sha256": "feb7483d455f9c77093814c1fdfc52725acabfbaa6c8f9d6e6c183777932ae50"
+  },
+  "fit_conditioning_audit": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\fit_conditioning_audit\\report.json",
+    "sha256": "814a0a846feea64b0694859fc90924e9dd42bafbc84f1ea64807415c237e181d"
   },
   "identity_source_admission": {
     "path": "docs\\v2_identity_source_admission.json",
@@ -117,6 +133,14 @@
   "loan_fraction_unchanged": {
     "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\loan_fraction_unchanged\\result.json",
     "sha256": "1013c343994bcbb7ebdb47cb9483a882ef738701cc4b7c9dda08a30712b7428e"
+  },
+  "loan_renewal_acceptance": {
+    "path": "docs\\v2_loan_renewal_acceptance.json",
+    "sha256": "c5e8263e84b932565ba9f1d9331806d49d826aa185daa79aa4f0d5be2bc29a65"
+  },
+  "loan_renewal_unchanged": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\loan_renewal_unchanged\\result.json",
+    "sha256": "cb4f60b3ea8ad9dd22d55e907960753ed7644161e31d42cce1d7e9ce8097521d"
   },
   "loan_source_panels": {
     "bytes": 3553,

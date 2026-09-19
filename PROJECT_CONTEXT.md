@@ -26,7 +26,7 @@ against existing inventory in both accounts, preserving signed cash claims and
 releasing only the extinguished short portion's restricted proceeds. Sparse sourced
 multi-leg distributions can now retain signed, non-tradable baskets until separately
 dated custody delivery, with separate cash claims/payment. Allocation reserves their
-capacity and risk/readouts use the underlying exposures. Evaluation V29 binds these
+capacity and risk/readouts use the underlying exposures. Evaluation V30 binds these
 terms and reports undelivered and unpriced inventory separately on the full calendar.
 Both cost paths now use dated B3 loan components, with stock/hedge rent separated
 from exchange fees. Both accounts now retain fixed-principal/rate loan cohorts,
@@ -35,8 +35,13 @@ are a new explicitly bound input and cannot be invented from current marks. Spot
 now settles on dated T+3/T+2 value dates; NAV retains unsettled obligations and income
 uses prior-close settled cash/proceeds. Readouts separate free-cash income, proceeds
 income and debit financing. Regular-way purchase custody now delays corporate loan
-offsets and proceeds release until deliverable. Clearing-calendar exceptions,
-renewal/event-specific terms and remaining source admission remain open. SAM restarts independently copy
+offsets and proceeds release until deliverable. Finite loans now use a registered
+63-session term with assumed approved renewal four sessions early; then-causal
+reference/rate replace the old contract and its accrued charges pay once. Pending
+returns retain old terms, and original investment entries remain available for cost
+attribution. The registered 30/126-session bounds are assumptions to evaluate, not
+broker quotes. Dated D0/D1 accrual endpoints, denied renewal/ordinary recall and
+remaining clearing/event boundaries are still open. SAM restarts independently copy
 the whole account state, including pending settlements. See
 `docs/v2_LOAN_ACCOUNTING.md`. This is an
 implemented accounting repair, not completion of the contractual-event/source audit
@@ -86,6 +91,14 @@ consistently to the benchmark, cash income and debit financing; never silently
 replace old features/results. Full event admission, loan clearing-calendar treatment
 and the wider source-to-tensor audit remain open. No corrected model performance
 is established by prescribed accounting oracles.
+
+The conditioning audit binds all 120 foundation fit manifests and saved checkpoint
+preprocessing payloads. It independently reconstructs 15 distinct coordinate systems
+from fit-only observations, including P-to-F inheritance, and verifies actual packed
+CPU inputs on 45 full-population 60-session samples. No scaler, field-routing,
+permanent-identity, mask, age or dtype mismatch was found. This closes that boundary;
+it does not certify upstream publication vintages, financial denominators, wealth/
+labels or the pending full-store identity repairs. See `docs/v2_FIT_CONDITIONING_AUDIT.md`.
 
 The economic/data/scaling run pointer now binds a separately admitted archive of
 reconciled BDI lending observations and causal stock/BOVA11 loan-source panels.

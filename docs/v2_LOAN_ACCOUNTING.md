@@ -112,12 +112,11 @@ not change the accepted fills, dates, eligible population or training budget.
    contain this new panel and must be explicitly enriched in a new bound replay
    artifact; they are not silently rescored. Preserve published averages even where
    turnover/quantity differs. Confirm source identity and exact units.
-2. Admit actual custody and clearing-calendar boundaries alongside the implemented
-   dated spot cash/proceeds settlement below. Freeze a renewal/maturity/recall convention and sensitivity using
-   source terms; the current subledger does not invent daily renewals, an unlimited
-   legal loan maturity, or a broker renewal toll. The B3 contract permits at most
-   two years, so unresolved long-lived inventory needs explicit treatment before
-   historical admission.
+2. Complete actual clearing-calendar and dated D0/D1 accrual boundaries alongside
+   the implemented dated spot cash/proceeds settlement. Finite approved renewals
+   are implemented below; denied renewals and ordinary lender recalls remain
+   execution assumptions to resolve or bound. Do not infer additional equity
+   settlement days merely because the monetary calendar has more dates.
 3. Admit each corporate case's loan terms. Basket transfers now require explicit
    loan principal fractions that sum to one, independently of market-value allocation
    of inventory cost basis and proceeds. Original principal/rate survive staged
@@ -137,6 +136,49 @@ not change the accepted fills, dates, eligible population or training budget.
    engine's R$1 normalized test/default account cannot stand in for actual capital
    when an absolute R$10 minimum applies. Capital is now recorded in the evaluation
    contract. No ordinary-CNPJ fund discount or unsupported retail surcharge is added.
+
+## Finite approved renewals (Evaluation V30)
+
+The registered primary is a negotiated 63-B3-session term, with a prearranged
+request four sessions before maturity and assumed same-day approvals after the
+decision. The remaining unreturned quantity renews at the supplied causal rate
+and published-average reference. Old accrued rent/fees pay once, while the new
+contract starts its own principal, accrual and historical minimum. Pending physical
+returns keep their old terms. No stock trade, short-proceeds release or brokerage
+renewal surcharge is invented. Original investment entry identifiers survive for
+cost attribution. A corporate basket renews separately by continuing security.
+SAM/TBPTT state copies include renewal history independently.
+
+The B3 contract's sections 8, 9 and 12 establish finite freely agreed terms up to
+two years, payment on renewal and advance renewal requests. The dated 2021 manual
+pp109-111 distinguishes registered approvals and electronic automatic renewal;
+these are not proof that our hypothetical account obtained either arrangement.
+Primary 63 sessions and 30/126-session sensitivities are research choices, not
+observed maturities. All full-store 126-session windows span at most 194 calendar
+days. Ordinary unscheduled lender recalls are absent in the primary; source-bound
+corporate elections remain. Denied approval/recall sensitivity is still open.
+
+Current rent accrual excludes registration and includes return. The 2021 manual
+p112 distinguishes registered/electronic D0 rent through the session before return
+from electronic D1 rent through return; registered B3 fees use another endpoint.
+This dated modality distinction is not yet implemented. Completed-contract rent
+counts alone cannot prove intermediate liabilities or fee timing correct.
+
+Ten archived B3 calendar receipts explain 20 of the 23 money-only dates in the cash
+audit as equity clearing/custody closures. The remaining 2016-12-30, 2017-01-25 and
+2017-11-20 lack evidence specific enough to resolve the older equity clearing house.
+The 2017 circular names a clearing house without establishing the separate equity
+house's treatment; the 2019 circular directly establishes equity custody closure.
+No calendar indices changed on that basis. Nine dated holiday/amendment controls
+match the accepted session axis. Delivery closures do not by themselves establish
+every loan day-count convention. See the `clearing_calendar_audit` and
+`clearing_calendar_sources` pointers.
+
+Six new renewal tests cover fixed-principal formulas, partial returns, historical
+minima, successor identity, gradients, independent state copies, missing references
+and account reconciliation. The affected batch passed 111 tests; two ordinary
+30-session books remain bit-identical against 464b8c4. This establishes the bounded
+renewal mechanics, not full-account acceptance or a historical model return.
 
 ## Input compatibility and verification
 

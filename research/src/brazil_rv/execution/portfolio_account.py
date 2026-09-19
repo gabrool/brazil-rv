@@ -743,6 +743,7 @@ class PortfolioAccount:
         cash_loan_payment = self.loans.settle_cash_claims(day).sum()
         self.trade_cash = self.trade_cash - cash_loan_payment
         cash_loan_payment = cash_loan_payment + self.prepared_loan_cash_payment
+        self.loans.renew(loan_session, self.config.loan_term_sessions)
         rent_paid, fees_paid = self.loans.pay(day)
         self.trade_cash = self.trade_cash - rent_paid.sum() - fees_paid.sum()
         self.marks = torch.where(torch.as_tensor(printed), prices, self.marks)

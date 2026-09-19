@@ -1,0 +1,80 @@
+{
+  "assumptions": {
+    "approval": "prearranged request before cutoff; approval after decision; assumed not observed",
+    "minimum": "renewed security contract has its own minimum; old partial-return minimum convention retained",
+    "rate_and_reference": "then-causal supplied source average/fallback and published-average reference",
+    "recall": "borrower reversible, ordinary unscheduled lender recall absent in primary; sourced corporate elections retained",
+    "renewal_lead_b3_sessions": 4,
+    "sensitivity_terms_b3_sessions": [
+      30,
+      126
+    ],
+    "term_b3_sessions": 63
+  },
+  "evaluation_schema": "BRAZIL_RV_V2_EVALUATION_V30",
+  "evidence": {
+    "clearing_calendar_audit": {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\clearing_calendar_audit.json",
+      "sha256": "4bfd969c94551764038f233bbf1364efb65313d3d384b238b09b3e09c21b52cb"
+    },
+    "clearing_calendar_sources": {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\clearing_calendar_sources.json",
+      "sha256": "5b0057bdb106e26ec2e9ca1fd709786428953a9252e5e978cf57e3fcb25b7bfe"
+    },
+    "conditioned_tensor_audit": {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\fit_conditioning_audit\\tensors.json",
+      "sha256": "d01f0711c0f11d08067e6aa67ce062079f213425f0cba05016e399fd8381aca2"
+    },
+    "fit_conditioning_audit": {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\fit_conditioning_audit\\report.json",
+      "sha256": "814a0a846feea64b0694859fc90924e9dd42bafbc84f1ea64807415c237e181d"
+    },
+    "loan_renewal_unchanged": {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\loan_renewal_unchanged\\result.json",
+      "sha256": "cb4f60b3ea8ad9dd22d55e907960753ed7644161e31d42cce1d7e9ce8097521d"
+    }
+  },
+  "fit_audit": {
+    "checkpoint_payloads": 120,
+    "coordinate_systems": 15,
+    "full_population_60_session_samples": 45,
+    "independent_scalar_fit_observations": 34852386,
+    "manifests": 120,
+    "mismatches": 0,
+    "packed_cells": 1856628
+  },
+  "immutable_inputs_or_old_fits_modified": false,
+  "limitations": [
+    "Dated D0/D1 rent and B3 fee endpoints remain unimplemented; current interval is registration-exclusive/return-inclusive",
+    "Denied renewal and unscheduled recall need source resolution or model-book sensitivity",
+    "Three older money-only dates lack equity-specific clearing receipts; delivery closures alone do not prove loan day count",
+    "Passing saved scalar/tensor boundaries does not establish upstream publication/revision or denominator correctness, full identity propagation or wealth/labels",
+    "No historical model returns, GPU fits or C/D experiment results; A/B incomplete"
+  ],
+  "lint": "Ruff passed",
+  "previous_source_commit": "464b8c4605f7664c814c61ce1767e241dd86b6e4",
+  "source_lf_sha256": {
+    "ops/audit_clearing_calendar.py": "e818f482d7f79a1f78607988b1f14a7e839a18176dead68dd91e1316fa47934c",
+    "ops/audit_fit_conditioning.py": "c3995b2b867aa50e9c9fed59f04dd4f2961fc7f9fa184e010ea3c0ce2de44cc8",
+    "ops/verify_conditioned_tensors.py": "c51132e9ab131e6188336fae39435d196b59a76662973d19316178413c3d9b5d",
+    "research/src/brazil_rv/execution/loan_contracts.py": "586fb568ec91f45f9a2b339f53f5ca13b12c7f97391bce962a74fdd48a9119c5",
+    "research/src/brazil_rv/execution/portfolio_account.py": "49acb05f640f92e326971693ae3d22ef1b968a60bd7e7c3c605e0c5b41878b51",
+    "research/src/brazil_rv/execution/stateful_ledger.py": "c1bcf054e921f2f7abf3ab417483cc92eeddbc5d03312e055bd8b8adf035e1d2",
+    "research/src/brazil_rv/v2/evaluate.py": "1e9b0dd5ed62206e083ee000e4731f6a52c61eaf5a7134cfbbe5ddaa01ca4122",
+    "research/tests/test_loan_renewal.py": "c8a109a3bc30f35a4af03c33efd1ba06fbc740d79c857acf25bf4335858f3e99"
+  },
+  "status": "finite_approved_renewal_and_saved_conditioning_verified_not_full_accounting_or_profitability",
+  "tests": [
+    {
+      "passed": 6,
+      "scope": "new renewal closed forms, partial returns, minima, identity, gradients, state isolation, causal references and account reconciliation",
+      "seconds": 2.28
+    },
+    {
+      "passed": 111,
+      "scope": "affected loan/account/ledger/corporate cash and fraction/evaluation batch; includes preceding six",
+      "seconds": 53.96
+    }
+  ],
+  "verified_utc": "2026-09-19T22:54:33.786809+00:00"
+}

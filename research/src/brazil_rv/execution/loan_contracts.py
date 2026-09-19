@@ -46,6 +46,19 @@ class LoanCharge:
 
 
 @dataclass(frozen=True)
+class LoanRenewal:
+    session: int
+    opening_session: int
+    security_index: int
+    previous_registration_session: int
+    quantity: float
+    previous_principal: float
+    new_principal: float
+    previous_annual_rate: float
+    new_annual_rate: float
+
+
+@dataclass(frozen=True)
 class LoanCashValue:
     available_session: int
     cash_per_share: float
@@ -176,6 +189,7 @@ class LoanContracts:
     cash_claims: list[tuple[LoanCashSettlement, torch.Tensor, float]] = field(
         default_factory=list
     )
+    renewals: list[LoanRenewal] = field(default_factory=list)
 
     def _by_name(self, values, names=None):
         return torch.zeros(self.names, dtype=torch.float64).index_add(
@@ -394,6 +408,82 @@ class LoanContracts:
             session.placeholder,
         )
 
+    def renew(self, session, term_sessions):
+        """Approved renewal of the still-unreturned portion, four sessions early.
+
+        Approval is an explicit research assumption, not inferred from a balance
+        file. Old charges settle today; the new contract uses today's causal
+        reference/rate and starts its own accrual/minimum. Neither beneficial
+        shares nor restricted sale proceeds move. Pending physical returns and
+        extinguished quantities keep their original obligations.
+        """
+        eligible = (
+            (self.return_day < 0)
+            & (self.accrual_end < 0)
+            & (self.quantity.detach().numpy() > 0)
+            & (session.day - self.opened >= term_sessions - 4)
+        )
+        ids = np.flatnonzero(eligible)
+        if not len(ids):
+            return
+        if self.modality == "compulsory":
+            raise ValueError("compulsory loans cannot be renewed")
+        if np.any(session.day - self.opened[ids] > term_sessions - 4):
+            raise ValueError("a finite loan missed its registered renewal date")
+        # Validate before touching a contract or paying a liability.
+        names = self.name[ids]
+        reference = np.asarray(session.reference)[names]
+        rates = np.asarray(session.annual_rate)[names]
+        if not np.all(np.isfinite(reference) & (reference > 0)) or not np.all(
+            np.isfinite(rates) & (rates >= 0)
+        ):
+            raise ValueError("renewal requires causal published references and rates")
+        # A corporate basket can leave several legs under one original root.
+        # Each continuing security becomes a separate renewed contract, retaining
+        # its original investment entry for expense attribution.
+        entries = []
+        for root, name in np.unique(np.c_[self.root[ids], names], axis=0):
+            selected = ids[(self.root[ids] == root) & (names == name)]
+            entries.append(
+                (
+                    int(name),
+                    self.quantity[selected].sum(),
+                    float(self.principal[selected].detach().sum()),
+                    int(self.opened[selected[0]]),
+                    float(self.annual_rate[selected[0]]),
+                    int(self.root_opened[root]),
+                    int(self.root_name[root]),
+                )
+            )
+        self.return_day[ids] = session.day
+        for name, quantity, principal, opened, rate, entry_day, entry_name in entries:
+            quantities = torch.zeros(self.names, dtype=torch.float64)
+            quantities[name] = quantity
+            self.open(
+                quantities,
+                session.reference,
+                session.annual_rate,
+                session.day,
+                session.date,
+                session.imputed,
+                session.placeholder,
+            )
+            self.root_opened[-1] = entry_day
+            self.root_name[-1] = entry_name
+            self.renewals.append(
+                LoanRenewal(
+                    session.day,
+                    entry_day,
+                    name,
+                    opened,
+                    float(quantity.detach()),
+                    principal,
+                    float(self.principal[-1].detach()),
+                    rate,
+                    float(session.annual_rate[name]),
+                )
+            )
+
     def pay(self, day):
         """Pay matured returns, retaining unreturned and future-return liabilities.
 
@@ -599,5 +689,7 @@ class LoanContracts:
                     (event, quantity.detach().clone(), mark)
                     for event, quantity, mark in value
                 ]
+            elif item.name == "renewals":
+                value = value.copy()
             values[item.name] = value
         return LoanContracts(**values)

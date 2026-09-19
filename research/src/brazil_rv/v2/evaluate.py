@@ -49,7 +49,7 @@ MIN_CROSS_SECTION = 20
 BOOTSTRAP_SEED = 20260903
 ECONOMICS_COSTS_BPS = (2.0, 4.0, 7.0)
 ECONOMICS_HEADLINE = (4.0, 0.02)
-EVALUATION_SCHEMA = "BRAZIL_RV_V2_EVALUATION_V29"
+EVALUATION_SCHEMA = "BRAZIL_RV_V2_EVALUATION_V30"
 PRIOR_EVALUATION_SCHEMA = "BRAZIL_RV_V2_EVALUATION_V15"
 PAIRED_COMPARISON_SCHEMA = "BRAZIL_RV_V2_PAIRED_COMPARISON_V3"
 
@@ -1857,6 +1857,13 @@ def _economics_contract(inputs: EvaluationInputs) -> dict[str, object]:
             "accrued liability until return payment, with distinct dated B3 components"
         ),
         "borrow_fee_convention": LOAN_FEE_CONVENTION,
+        "loan_lifecycle": {
+            "term_b3_sessions": config.loan_term_sessions,
+            "renewal_lead_b3_sessions": 4,
+            "approval": "prearranged request before cutoff, approval after decision; assumed, not observed",
+            "repricing": "causal published average and causal annual rate at renewal; accrued old charges paid once",
+            "early_return": "borrower reversible; no ordinary unscheduled lender recall in primary; sourced corporate elections remain",
+        },
         "pre_platform_contract_minimum": (
             "R$10 once per original voluntary contract, provisioned on first accrual; "
             "residual payment on final return is an explicit research assumption"
@@ -2290,6 +2297,11 @@ def _evaluate_economics(
                 "borrow_fee_modality": config.borrow_fee_modality,
                 "borrow_fee_multiplier": config.borrow_fee_multiplier,
                 "borrow_fee_convention": LOAN_FEE_CONVENTION,
+                "loan_term_sessions": config.loan_term_sessions,
+                "loan_renewal_count": len(result.loan_renewals),
+                "loan_renewed_principal_brl": sum(
+                    r.new_principal for r in result.loan_renewals
+                ),
                 "missing_quote_convention": MISSING_QUOTE_CONVENTION,
                 "settlement_grace_sessions": config.settlement_grace_sessions,
                 "unpriced_haircut": config.unpriced_haircut,
@@ -2352,6 +2364,7 @@ def _evaluate_economics(
         "headline_audit": {
             "daily_state": headline_daily,
             "intended_orders": _serialise_records(headline.intended_orders),
+            "loan_renewals": _serialise_records(headline.loan_renewals),
             "fills": _serialise_records(headline.fills),
             "cancellations": _serialise_records(headline.cancellations),
             "holding_age_distribution": holding_audit,

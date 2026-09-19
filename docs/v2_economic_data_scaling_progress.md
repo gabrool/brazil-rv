@@ -951,3 +951,48 @@ Recovery: implementation `6576955`; `dommo_fraction_auxiliary_6576955.zip` SHA-2
 including the complete current research source package and acceptance code hashes;
 18 primary-source references verified. Immutable stores, family parquets,
 raw datasets and old fits were not copied. The run pointer binds the recovery receipt.
+
+
+### Finite loans and saved conditioning (2026-09-19)
+
+The registered 63-session term now renews four B3 sessions before maturity under
+explicit assumed approval. Only remaining unreturned quantity renews. Pay old
+accrued charges once, reset reference/rate from the current causal source panel,
+retain original investment entry attribution and keep pending returns on old terms.
+No market fill or proceeds release is invented. Renewed contracts receive their
+own historical minimum. The 30/126-session sensitivities, no ordinary unscheduled
+recall and prearranged approvals are negotiated-account hypotheses, not observed
+contract history. V30 reports renewal records and hashes the lifecycle convention.
+Dated D0/D1 rent/fee endpoints and denied-renewal/recall execution remain open.
+
+Ten new archived B3 calendar receipts explain 20 of 23 money-only dates as equity
+clearing/custody closures; nine dated holiday controls match the store. Three dates
+(2016-12-30, 2017-01-25, 2017-11-20) still need older equity-specific evidence. Do
+not use the older circular's different clearing-house name as proof of the equity
+house's treatment. No settlement or model arrays were changed. Full-store 126-session
+terms span at most 194 calendar days, below the two-year contract maximum. This
+calendar evidence does not establish every rent-accrual day-count rule.
+
+All 120 foundation manifests and selected-checkpoint preprocessing payloads match.
+Independent reconstruction of 15 coordinate systems from 34,852,386 unique scalar
+fit observations finds zero median/scale/support/inheritance mismatches. The stricter
+actual CPU input check verifies 1,856,628 packed cells over 45 full-population,
+60-session samples, including field routing, masks, ages and permanent name indices.
+No neural forward or forecast scoring occurred. Source reconstruction took 25.38s;
+checkpoint/tensor verification 24.85s. See v2_FIT_CONDITIONING_AUDIT.md. This closes
+conditioning and the tested input-routing boundary; upstream original publication,
+revisions, financial denominators, complete identity propagation and wealth/labels
+remain. No completed source census was repeated.
+
+Validation: six new renewal checks, followed by 111 affected checks (overlapping),
+all pass; Ruff passes. Two 30-session ordinary long/mixed books remain bit-identical
+to 464b8c4 in original arrays, account records, fills, intentions and charges. Final
+NAVs are R$10,116,715.718244806 and R$10,131,576.35573736 at R$10m start, respectively;
+these are synthetic unaffected-path oracles, not model alpha. No stress benchmark
+was repeated. Acceptance is bound by v2_loan_renewal_acceptance.json.
+
+Registration reread. A/B remain incomplete, C/D unstarted and no GPU job launched.
+Next: dated modality accrual/clearing and presettlement-disposal/recall bounds,
+remaining exposed cases, upstream units/vintages and full identity/wealth/label
+propagation. Corrected replay must keep frozen static coordinates and separate
+accounting, source rates/availability and changed-store/refit effects.

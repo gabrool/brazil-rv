@@ -19,6 +19,7 @@ from .loan_fees import LoanModality, loan_fee_rates
 from .share_custody import ShareCustody
 from .loan_contracts import (
     LoanCharge,
+    LoanRenewal,
     LoanCashSettlement,
     LoanCashPayment,
     LoanContracts,
@@ -95,6 +96,7 @@ class LedgerConfig:
     borrow_source: BorrowSource = "borrow_balance"
     borrow_fee_modality: LoanModality = "normal"
     borrow_fee_multiplier: float = 1.0
+    loan_term_sessions: int = 63
     volatility_balanced_entries: bool = True
     volatility_group_count: int = 5
     small_stratum_scaling_threshold_multiple: int = 2
@@ -115,6 +117,8 @@ class LedgerConfig:
     annual_sessions: int = 252
 
     def __post_init__(self) -> None:
+        if not 5 <= self.loan_term_sessions <= 126:
+            raise ValueError("research loan term must be 5 to 126 B3 sessions")
         if self.k_per_side <= 0 or self.buffer_per_side < 0:
             raise ValueError("ledger K must be positive and its buffer non-negative")
         if self.gross_target <= 0 or self.cost_bps_per_side < 0:
@@ -311,6 +315,7 @@ class StatefulLedgerResult:
     loan_payment: NDArray[np.float64]
     loan_outstanding_principal: NDArray[np.float64]
     loan_charges: tuple[LoanCharge, ...]
+    loan_renewals: tuple[LoanRenewal, ...]
     loan_cash_payments: tuple[LoanCashPayment, ...]
     equity_borrow_raw_bps: NDArray[np.float64]
     equity_borrow_fee_bps: NDArray[np.float64]
@@ -3713,6 +3718,7 @@ def simulate_stateful_ledger(
         free_cash -= float(
             loans.settle_cash_claims(day, payments=loan_cash_payments).sum()
         )
+        loans.renew(loan_session, config.loan_term_sessions)
         rent_paid, fees_paid = loans.pay(day)
         loan_paid = float(rent_paid.sum() + fees_paid.sum())
         free_cash -= loan_paid
@@ -4195,6 +4201,7 @@ def simulate_stateful_ledger(
         loan_payment=np.asarray(loan_payment_rows, dtype=np.float64),
         loan_outstanding_principal=np.asarray(loan_principal_rows, dtype=np.float64),
         loan_charges=tuple(loan_charges),
+        loan_renewals=tuple(loans.renewals),
         loan_cash_payments=tuple(loan_cash_payments),
         equity_borrow_raw_bps=np.asarray(equity_borrow_raw_rows, dtype=np.float64),
         equity_borrow_fee_bps=np.asarray(equity_borrow_fee_rows, dtype=np.float64),

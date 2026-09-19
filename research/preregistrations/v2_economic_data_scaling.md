@@ -66,6 +66,23 @@ and shares, multiple successors, merging/netting holdings, delayed payments/deli
 date boundaries and unaffected-path agreement. Update independent and training
 accounts coherently where applicable; leave no silently incompatible active path.
 
+Finite-loan amendment, frozen before corrected model outcomes, 2026-09-19:
+use a negotiated 63-B3-session term (roughly three months), with a prearranged
+renewal request four sessions before maturity and assumed approvals completed
+after the current decision. Only the remaining unreturned quantity renews; pending
+returns and extinguished corporate quantities keep their original obligations.
+Pay old accrued rent/fees, reset principal to quantity times the then-causal
+published average, and reset the rate to the then-causal sourced rate/fallback.
+Keep the investment's original entry for cost attribution. No market fill or
+release of short-sale proceeds accompanies renewal. A renewed contract has its
+own historical minimum under the stated minimum convention. Compare 30 and 126
+B3 sessions as one-factor sensitivities. These are negotiated-account hypotheses,
+not observed contract maturities or a guarantee of approval at public average rates.
+Primary loans are borrower-reversible; ordinary unscheduled lender recalls are
+assumed absent, while the already sourced corporate lender elections still apply.
+Denied renewal/ordinary recall and the dated D0/D1 accrual endpoints remain explicit
+execution/source boundaries to resolve or bound before final accounting acceptance.
+
 ## B. Deep source-to-model data audit
 
 Revisit the actual sources and builders, not just finite-value/coverage summaries.
