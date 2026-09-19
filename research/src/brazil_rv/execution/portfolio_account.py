@@ -181,25 +181,77 @@ class PortfolioAccount:
                 self.restricted = restricted
             destination = int(mapping[name])
             if destination != name:
-                if self.shares[destination].detach().item() != 0:
-                    raise ValueError("conversion successor already has inventory")
-                shares[destination], marks[destination] = (
-                    shares[name].clone(),
-                    marks[name].clone(),
+                incoming = shares[name].clone()
+                existing = self.shares[destination]
+                combined = incoming + existing
+                offset = torch.where(
+                    incoming * existing < 0,
+                    torch.minimum(incoming.abs(), existing.abs()),
+                    0.0,
+                )
+                incoming_fraction = (
+                    incoming.abs() - offset
+                ) / incoming.abs().clamp_min(1e-30)
+                existing_fraction = (
+                    existing.abs() - offset
+                ) / existing.abs().clamp_min(1e-30)
+                restricted = self.restricted.clone()
+                restricted[destination] = (
+                    self.restricted[name] * incoming_fraction
+                    + self.restricted[destination] * existing_fraction
+                )
+                self.cash = self.cash + (
+                    self.restricted[name]
+                    + self.restricted[destination]
+                    - restricted[destination]
+                )
+                restricted[name] = 0
+                self.restricted = restricted
+                basis = self.cost_basis.clone()
+                basis[destination] = (
+                    self.cost_basis[name] * incoming_fraction
+                    + self.cost_basis[destination] * existing_fraction
+                )
+                basis[name] = 0
+                self.cost_basis = basis
+                shares[destination] = combined
+                marks[destination] = torch.where(
+                    existing != 0, self.marks[destination], marks[name]
                 )
                 shares[name], marks[name] = 0, 0
-                for field in ("restricted", "cost_basis"):
-                    values = getattr(self, field).clone()
-                    values[destination] = values[destination] + values[name]
-                    values[name] = 0
-                    setattr(self, field, values)
+                exit_quantity = (
+                    incoming * exit_fraction[name]
+                    + existing * exit_fraction[destination]
+                )
                 exit_fraction = exit_fraction.clone()
-                exit_fraction[destination] = exit_fraction[name]
+                denominator = torch.where(combined != 0, combined, 1.0)
+                exit_fraction[destination] = torch.where(
+                    combined != 0, (exit_quantity / denominator).clamp(0, 1), 0.0
+                )
                 exit_fraction[name] = 0
-                for field in ("entry_day", "missing_sessions", "ineligible_sessions"):
-                    values = getattr(self, field)
-                    values[destination] = values[name]
-                    values[name] = -1 if field == "entry_day" else 0
+                # An entry into a cancelled predecessor is not an instruction
+                # to open its successor. Realize only the existing entitlement.
+                entry_notional = entry_notional.clone()
+                entry_notional[name] = 0
+                origins = [
+                    index
+                    for index, fraction in (
+                        (name, incoming_fraction),
+                        (destination, existing_fraction),
+                    )
+                    if fraction.detach().item() > 0
+                ]
+                self.entry_day[destination] = min(
+                    (self.entry_day[index] for index in origins), default=-1
+                )
+                self.ineligible_sessions[destination] = max(
+                    (self.ineligible_sessions[index] for index in origins), default=0
+                )
+                if existing.detach().item() == 0 and incoming.detach().item() != 0:
+                    self.missing_sessions[destination] = self.missing_sessions[name]
+                self.entry_day[name] = -1
+                self.ineligible_sessions[name] = 0
+                self.missing_sessions[name] = 0
             self.shares, self.marks = shares, marks
         unpaid = []
         for pay, amount in self.payments:

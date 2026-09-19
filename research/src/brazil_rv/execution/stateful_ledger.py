@@ -31,6 +31,7 @@ CancellationReason = Literal[
     "risk_net_cap",
     "risk_name_cap",
     "policy_replaced",
+    "corporate_action_netting",
 ]
 _CANCELLATION_REASONS: tuple[CancellationReason, ...] = (
     "band_exit",
@@ -42,6 +43,7 @@ _CANCELLATION_REASONS: tuple[CancellationReason, ...] = (
     "risk_net_cap",
     "risk_name_cap",
     "policy_replaced",
+    "corporate_action_netting",
 )
 
 MISSING_QUOTE_CONVENTION = "retain_inventory_until_quote_or_contractual_event"
@@ -2748,28 +2750,125 @@ def simulate_stateful_ledger(
                     entry_cost_basis[name] = 0.0
                     submission_nav[name] = 0.0
             else:
-                if shares[successor] != 0.0:
-                    raise ValueError(
-                        "conversion successor already has ledger inventory"
+                prior_destination = float(shares[successor])
+                combined = prior_destination + float(new_shares)
+                # Delivery offsets opposite inventory without a market trade.
+                # Only the extinguished short portion releases its proceeds.
+                opposite = prior_destination * new_shares < 0.0
+                source_left = (
+                    max(abs(new_shares) - abs(prior_destination), 0.0)
+                    if opposite
+                    else abs(new_shares)
+                )
+                destination_left = (
+                    max(abs(prior_destination) - abs(new_shares), 0.0)
+                    if opposite
+                    else abs(prior_destination)
+                )
+                source_fraction = source_left / abs(new_shares) if new_shares else 0.0
+                destination_fraction = (
+                    destination_left / abs(prior_destination)
+                    if prior_destination
+                    else 0.0
+                )
+                restricted = (
+                    restricted_by_name[name] * source_fraction
+                    + restricted_by_name[successor] * destination_fraction
+                )
+                free_cash += (
+                    restricted_by_name[name]
+                    + restricted_by_name[successor]
+                    - restricted
+                )
+                restricted_by_name[name] = 0.0
+                restricted_by_name[successor] = restricted
+                entry_cost_basis[successor] = (
+                    entry_cost_basis[name] * source_fraction
+                    + entry_cost_basis[successor] * destination_fraction
+                )
+                submission_nav[successor] = (
+                    submission_nav[successor]
+                    if destination_left
+                    else submission_nav[name]
+                    if source_left
+                    else 0.0
+                )
+                surviving_origins = [
+                    index
+                    for index, quantity in (
+                        (int(name), source_left),
+                        (successor, destination_left),
                     )
+                    if quantity > 0.0
+                ]
+                entry_session[successor] = min(
+                    (entry_session[index] for index in surviving_origins), default=-1
+                )
+                ineligible_streak[successor] = max(
+                    (ineligible_streak[index] for index in surviving_origins), default=0
+                )
+                # Keep the successor's own causal mark when available. A source
+                # with no holding must not erase an existing recipient position.
+                destination_mark = (
+                    marks[successor] if prior_destination else converted_mark
+                )
+                if not np.isfinite(destination_mark) or destination_mark <= 0.0:
+                    destination_mark = converted_reference
+                source_exit = pending_exits.pop(int(name), None)
+                destination_exit = pending_exits.pop(successor, None)
+                exit_quantity = (
+                    new_shares * source_exit.remaining_size if source_exit else 0.0
+                ) + (
+                    prior_destination * destination_exit.remaining_size
+                    if destination_exit
+                    else 0.0
+                )
+                exit_fraction = (
+                    float(np.clip(exit_quantity / combined, 0.0, 1.0))
+                    if combined
+                    else 0.0
+                )
+                pending = None
+                if exit_fraction > 0.0:
+                    side = "sell" if combined > 0.0 else "buy"
+                    pending = next(
+                        item
+                        for item in (destination_exit, source_exit)
+                        if item is not None and item.order.side == side
+                    )
+                    # The public intention remains unchanged. Its outstanding
+                    # claim follows contractual succession and the net quantity.
+                    pending.order = replace(
+                        pending.order,
+                        security=inputs.securities[successor],
+                        security_index=successor,
+                        side=side,
+                    )
+                    pending.remaining_size = exit_fraction
+                    pending_exits[successor] = pending
+                for item in (source_exit, destination_exit):
+                    if item is not None and item is not pending:
+                        cancellations.append(
+                            item.cancellation(
+                                day, inputs.dates[day], "corporate_action_netting"
+                            )
+                        )
+                cancelled_today += int(
+                    cancel_entry(int(name), day, "corporate_action_netting")
+                )
                 shares[name] = 0.0
                 marks[name] = np.nan
                 last_observed[name] = np.nan
-                pending = pending_exits.pop(int(name), None)
-                if pending is not None:
-                    pending_exits[successor] = pending
-                missing_sessions[successor] = missing_sessions[name]
+                if not prior_destination and new_shares:
+                    missing_sessions[successor] = missing_sessions[name]
                 missing_sessions[name] = 0
-                shares[successor] = float(new_shares)
-                marks[successor] = converted_mark
-                # Reference marks belong to the tradable claim even when no
-                # inventory existed at the conversion.  Do not overwrite the
-                # causal predecessor-derived reference with the inventory-only
-                # converted mark (NaN in that case).
-                last_observed[successor] = converted_reference
-                restricted_by_name[successor] += restricted_by_name[name]
-                restricted_by_name[name] = 0.0
-                if np.isfinite(converted_mark) and converted_mark <= 0.0:
+                shares[successor] = combined
+                marks[successor] = destination_mark if combined else np.nan
+                if not prior_destination and np.isfinite(converted_reference):
+                    last_observed[successor] = converted_reference
+                if combined and (
+                    not np.isfinite(destination_mark) or destination_mark <= 0
+                ):
                     unresolved_action[successor] = True
                     explicit_unresolved_action[successor] = True
                 explicit_unresolved_action[successor] |= explicit_unresolved_action[
@@ -2777,12 +2876,8 @@ def simulate_stateful_ledger(
                 ]
                 unresolved_action[name] = False
                 explicit_unresolved_action[name] = False
-                entry_session[successor] = entry_session[name]
                 entry_session[name] = -1
-                ineligible_streak[successor] = ineligible_streak[name]
                 ineligible_streak[name] = 0
-                entry_cost_basis[successor] = entry_cost_basis[name]
-                submission_nav[successor] = submission_nav[name]
                 entry_cost_basis[name] = 0.0
                 submission_nav[name] = 0.0
             if (

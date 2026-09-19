@@ -149,6 +149,157 @@ def test_identity_conversion_transfers_inventory_and_exit_instruction():
     )
 
 
+@pytest.mark.parametrize(
+    "source,destination,source_exit,destination_exit",
+    [
+        (0.4, 0.2, 0, 0),
+        (-0.4, -0.2, 0, 0),
+        (0.4, -0.2, 0, 0),
+        (-0.4, 0.2, 0, 0),
+        (0.2, -0.4, 0, 0),
+        (-0.2, 0.4, 0, 0),
+        (0.4, -0.4, 0, 0),
+        (-0.4, 0.4, 0, 0),
+        (0.4, 0.2, 0.5, 0.25),
+        (-0.4, -0.2, 0.5, 0.25),
+        (0.4, -0.2, 1, 0),
+        (-0.4, 0.2, 1, 0),
+        (0.2, -0.4, 1, 0),
+        (-0.2, 0.4, 1, 0),
+        (0, 0.4, 0, 0.5),
+        (0, -0.4, 0, 0.5),
+    ],
+)
+def test_conversion_nets_existing_inventory_and_signed_exit_instructions(
+    source, destination, source_exit, destination_exit
+):
+    close = np.array([[100, 50], [np.nan, 50], [np.nan, 50]])
+    q = np.ones_like(close)
+    q[1, 0] = 2
+    successor = np.broadcast_to([0, 1], close.shape).copy()
+    successor[1, 0] = 1
+    actions = AlignedActionTerms(
+        q, np.zeros_like(q), np.ones_like(q, bool), q != 1, successor
+    )
+    targets = [
+        [source, destination],
+        [source * (1 - source_exit), destination * (1 - destination_exit)],
+        [0, 0],
+    ]
+    # Zero trading costs isolate a wealth-conserving delivery, including shorts.
+    records = compare(close, targets, actions=actions, config=_config())
+    assert [r["nav"].item() for r in records] == pytest.approx([1, 1, 1])
+    exact = replay(
+        close,
+        lambda state: PortfolioTarget(np.array(targets[state.day])),
+        actions=actions,
+    )
+    net = source + destination
+    requested_exit = source * source_exit + destination * destination_exit
+    remaining = net - net * np.clip(requested_exit / net, 0, 1) if net else 0
+    assert exact.signed_shares[1] == pytest.approx([0, remaining / 50])
+    assert exact.restricted_cash[1] == pytest.approx(max(-remaining, 0))
+    assert exact.cost_bps == pytest.approx([0, 0, 0])
+    assert exact.reconciliation_error == pytest.approx([0, 0, 0], abs=1e-12)
+    assert all(
+        fill.security_index == 1 for fill in exact.fills if fill.fill_session == 1
+    )
+
+
+def test_conversion_netting_preserves_gradients_and_does_not_trade_delivery():
+    def run(weight):
+        account = PortfolioAccount.empty([100, 50, 100], config=_config())
+        account.step(
+            torch.stack((weight, weight * 0 - 0.2, weight * 0)),
+            day=0,
+            close=[100, 50, 100],
+            cdi=0,
+            daily_borrow=[0, 0, 0],
+        )
+        record = account.step(
+            account.weights,
+            day=1,
+            close=[np.nan, 55, 100],
+            cdi=0,
+            daily_borrow=[0, 0, 0],
+            action_q=[2, 1, 1],
+            successor=[1, 1, 2],
+        )
+        assert record["cost"].item() == 0
+        return account.nav
+
+    value = tensor(0.4).requires_grad_()
+    nav = run(value)
+    nav.backward()
+    assert nav.item() == pytest.approx(1.02)
+    assert value.grad.item() == pytest.approx(0.1)
+    finite_difference = (run(tensor(0.400001)) - run(tensor(0.399999))) / 0.000002
+    assert value.grad.item() == pytest.approx(finite_difference.item(), abs=1e-9)
+
+
+@pytest.mark.parametrize("sign", [-1, 1])
+def test_netted_conversion_retains_signed_cash_until_payment(sign):
+    close = np.array([[100, 45], [np.nan, np.nan], [np.nan, 45], [np.nan, 45]])
+    q, d = np.ones_like(close), np.zeros_like(close)
+    q[1, 0], d[1, 0] = 2, 10
+    mapping = np.broadcast_to([0, 1], close.shape).copy()
+    mapping[1, 0] = 1
+    actions = AlignedActionTerms(q, d, np.ones_like(q, bool), q != 1, mapping)
+    payments = np.full(close.shape, -1)
+    payments[1, 0] = 3
+    targets = np.array([[0.4, -0.2], [0, 0], [0, 0], [0, 0]]) * sign
+    fractions = np.ones_like(close)
+    fractions[2, 1] = 0.5
+    records = compare(
+        close,
+        targets,
+        actions=actions,
+        payments=payments,
+        fractions=fractions,
+        config=_config(),
+    )
+    assert [row["nav"].item() for row in records] == pytest.approx([1, 1, 1, 1])
+    exact = replay(
+        close,
+        lambda state: PortfolioTarget(targets[state.day]),
+        actions=actions,
+        payment_session=payments,
+        fill_fraction=fractions,
+    )
+    signed_claim = exact.receivables - exact.payables
+    assert signed_claim == pytest.approx(np.array([0, 0.04, 0.04, 0]) * sign)
+    assert exact.signed_shares[1, 1] == pytest.approx(sign * (0.008 - 0.2 / 45))
+    assert exact.signed_shares[2, 1] == pytest.approx(exact.signed_shares[1, 1] / 2)
+    assert exact.free_cash[-1] == pytest.approx(1)
+    assert not [fill for fill in exact.fills if fill.fill_session == 1]
+
+
+def test_conversion_terms_cannot_rewrite_original_decision_intentions():
+    close = np.array([[100, 100], [np.nan, 100], [np.nan, 100]])
+    targets = [[0.4, -0.2], [0, 0], [0, 0]]
+    results = []
+    for ratio in [1, 2]:
+        q = np.ones_like(close)
+        q[1, 0] = ratio
+        mapping = np.broadcast_to([0, 1], close.shape).copy()
+        mapping[1, 0] = 1
+        has_action = np.zeros_like(close, bool)
+        has_action[1, 0] = True
+        results.append(
+            replay(
+                close,
+                lambda state: PortfolioTarget(np.array(targets[state.day])),
+                actions=AlignedActionTerms(
+                    q, np.zeros_like(q), np.ones_like(q, bool), has_action, mapping
+                ),
+            )
+        )
+    assert results[0].nav[1] != results[1].nav[1]
+    assert [
+        order for order in results[0].intended_orders if order.decision_session <= 1
+    ] == [order for order in results[1].intended_orders if order.decision_session <= 1]
+
+
 @pytest.mark.parametrize("missing_name", [0, 1])
 def test_long_quote_outage_and_terminal_inventory_parity(missing_name):
     close = np.full((13, 2), 100.0)

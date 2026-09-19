@@ -1,0 +1,64 @@
+{
+  "scope": "Synthetic 20-session fixtures; not a historical performance replay or source admission",
+  "reference_commit": "bd3a88db65b06696dea6e36655e8f1ad61b0b7d0",
+  "unaffected_bit_identical": {
+    "no_actions_and_missing_quotes": {
+      "nav": true,
+      "free_cash": true,
+      "restricted_cash": true,
+      "signed_shares": true,
+      "mark_price": true,
+      "cost_bps": true,
+      "borrow_bps": true,
+      "turnover_fraction_nav": true,
+      "gross_fraction_nav": true,
+      "receivables": true,
+      "payables": true,
+      "all_cash_nav": true,
+      "reconciliation_error": true,
+      "actual_fills_identical": true,
+      "decision_intentions_identical": true
+    },
+    "splits_and_cash_claims": {
+      "nav": true,
+      "free_cash": true,
+      "restricted_cash": true,
+      "signed_shares": true,
+      "mark_price": true,
+      "cost_bps": true,
+      "borrow_bps": true,
+      "turnover_fraction_nav": true,
+      "gross_fraction_nav": true,
+      "receivables": true,
+      "payables": true,
+      "all_cash_nav": true,
+      "reconciliation_error": true,
+      "actual_fills_identical": true,
+      "decision_intentions_identical": true
+    },
+    "empty_successor": {
+      "nav": true,
+      "free_cash": true,
+      "restricted_cash": true,
+      "signed_shares": true,
+      "mark_price": true,
+      "cost_bps": true,
+      "borrow_bps": true,
+      "turnover_fraction_nav": true,
+      "gross_fraction_nav": true,
+      "receivables": true,
+      "payables": true,
+      "all_cash_nav": true,
+      "reconciliation_error": true,
+      "actual_fills_identical": true,
+      "decision_intentions_identical": true
+    }
+  },
+  "source_sha256": {
+    "research/src/brazil_rv/execution/stateful_ledger.py": "678b050917968cda5b4870c4f9fba24fc6fff1f19f3a52dee75064db8273e7fe",
+    "research/src/brazil_rv/execution/portfolio_account.py": "6437c2fd3537712cc973fe27c2f87ff17315422c0b1a78f2d7ece890fbf517e8",
+    "research/src/brazil_rv/v2/evaluate.py": "5caba67272391682d4db51a58a2b002d9260073601246b9e8a02ee725af803e0",
+    "research/tests/test_portfolio_account.py": "5cace271d1f3dacf5a8695b3b0a5ec5ed6bf2f20bf0602b9c41a63c2bd0bc00f"
+  },
+  "heldout_accessed": false
+}

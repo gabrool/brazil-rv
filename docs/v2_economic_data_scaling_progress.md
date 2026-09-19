@@ -7,8 +7,8 @@ stage. Foundation outcomes remain sealed at the canonical foundation pointer.
 
 **Current status:** A/B remain in progress; C/D have not started. Corporate-account
 research and the source censuses below are complete. BOVA11 borrowing-path
-consistency and removal of fabricated missing-quote liquidations are implemented
-and tested (see the latest entries); recovered historical sources are not yet
+consistency, removal of fabricated missing-quote liquidations and single-successor
+inventory netting are implemented and tested (see the latest entries); recovered historical sources are not yet
 admitted. No training or source-census worker is active.
 
 Initial inspection: the account supports only one scalar successor and rejects a
@@ -257,3 +257,47 @@ admit recovered causal lending sources. Stage B's remaining family/identity/labe
 tensor audit also remains open. Stage C corrected historical replay and Stage D
 scaling have not started. The registration was revisited: these are repairs within
 A, not a reason to skip A/B or to claim either candidate improved economically.
+
+### Existing-successor netting, 2026-09-19
+
+Both the independent ledger and differentiable account now support delivery of a
+single successor into an already held security. Previously they raised an error;
+an unheld predecessor could also overwrite the successor's state. Same-direction
+positions combine; opposite positions offset without a market fill, fee or turnover.
+Only the extinguished short portion releases restricted proceeds. The remaining
+position retains its proportional cost basis and oldest surviving entry age.
+An existing recipient keeps its own causal mark; no current or future quote is
+used to construct the decision. An unheld source does not erase recipient inventory.
+
+Pending exits combine in signed share units after applying the conversion ratio,
+then become a fraction of the remaining position. They can reduce that position
+but cannot turn into an unintended opening on the other side. The original public
+decision intentions remain immutable; outstanding instructions follow succession.
+Consumed instructions and entries into the cancelled predecessor carry an explicit
+corporate-action cancellation reason. Signed cash entitlements remain separate
+receivables/payables through their payment date, including after full share netting.
+Evaluation V20 declares this accounting convention; old sealed reports are unchanged.
+
+Targeted account, ledger, policy, action-causality, evaluation and readout checks
+pass. The new cases cover both signs, partial/full offsets, both possible surviving
+positions, partial exits/fills, missing successor prints, an unheld predecessor,
+delayed signed cash payment and event-day decision invariance. The differentiable
+netting path's gradient matches an independent finite-difference check away from
+the net-zero kink. Ruff and diff checks pass.
+
+`docs/v2_successor_netting_acceptance.json` and the identical receipt in the resolved
+run root bind the changed code to reference commit `bd3a88d`. Three synthetic
+20-session fixtures (no action with a long quote outage; splits/cash claims; an
+empty successor) have bit-identical cash, NAV, positions/marks, costs, borrowing,
+turnover, gross exposure, claims, benchmark and reconciliation, plus identical
+actual fills and original intentions. Receipt SHA-256:
+`5e4bef4efa6e9fcf927569e09fa979656b444386fabbf44ef8ae32f03f6327a3`.
+This is an unaffected-path engineering check, not a historical financial result.
+
+The registration was revisited. This completes the existing-destination part of A,
+not the whole contractual-event stage. Multi-leg claims and the interval between
+economic succession and custody delivery still require integration; do not admit
+CPLE/BRML/DMMO events by treating delivery as immediate. Fixed-contract lending,
+dated fees, causal recovered-source admission, the rest of the deep audit and all
+corrected historical comparisons/scaling remain outstanding. No new input store,
+historical replay, GPU fit or promotion is implied by this repair.

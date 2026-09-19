@@ -46,7 +46,7 @@ MIN_CROSS_SECTION = 20
 BOOTSTRAP_SEED = 20260903
 ECONOMICS_COSTS_BPS = (2.0, 4.0, 7.0)
 ECONOMICS_HEADLINE = (4.0, 0.02)
-EVALUATION_SCHEMA = "BRAZIL_RV_V2_EVALUATION_V19"
+EVALUATION_SCHEMA = "BRAZIL_RV_V2_EVALUATION_V20"
 PRIOR_EVALUATION_SCHEMA = "BRAZIL_RV_V2_EVALUATION_V15"
 PAIRED_COMPARISON_SCHEMA = "BRAZIL_RV_V2_PAIRED_COMPARISON_V3"
 
@@ -1776,7 +1776,9 @@ def _economics_contract(inputs: EvaluationInputs) -> dict[str, object]:
         "schedule_source": inputs.schedule_source,
         "corporate_action_basis": (
             "the explicitly labelled action tier supplies q/d terms, successor "
-            "shares, and cash claims; each declared payment session settles its claim"
+            "shares, and cash claims; delivered successor shares net against existing "
+            "inventory without a market fill and release only extinguished short "
+            "proceeds; each declared payment session settles its cash claim"
         ),
         "short_proceeds_remuneration": config.short_proceeds_remuneration,
         "costs_bps_per_side": list(ECONOMICS_COSTS_BPS),
