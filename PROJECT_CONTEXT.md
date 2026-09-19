@@ -23,9 +23,12 @@ claims and financing obligations until an observed execution or contractual even
 Missing quotes and evaluation boundaries never manufacture last-mark fills or
 permanently exclude a security. Delivered single-successor conversions now net
 against existing inventory in both accounts, preserving signed cash claims and
-releasing only the extinguished short portion's restricted proceeds. Evaluation V20
-reports remaining inventory and a
-separate non-cash valuation sensitivity on the full comparison calendar. This is an
+releasing only the extinguished short portion's restricted proceeds. Sparse sourced
+multi-leg distributions can now retain signed, non-tradable baskets until separately
+dated custody delivery, with separate cash claims/payment. Allocation reserves their
+capacity and risk/readouts use the underlying exposures. Evaluation V21 binds these
+terms and reports undelivered and unpriced inventory separately on the full calendar.
+Historical event/source admission and fixed-contract lending remain open. This is an
 implemented accounting repair, not completion of the contractual-event/source audit
 or acceptance of new historical results. Reproduce sealed books with their recorded
 source commits; use new roots for corrected replays.

@@ -9,6 +9,12 @@ from numpy.typing import NDArray
 
 from brazil_rv.v2.corporate_actions import AlignedActionTerms, apply_contractual_action
 from brazil_rv.v2.hedge_beta import resolve_hedge_beta
+from .share_distributions import (
+    ShareDistribution,
+    ShareClaimPosition,
+    basket_prices,
+    basket_betas,
+)
 
 
 OrderSide = Literal["buy", "sell"]
@@ -325,6 +331,8 @@ class StatefulLedgerResult:
     mark_price: NDArray[np.float64]
     free_cash: NDArray[np.float64]
     restricted_cash: NDArray[np.float64]
+    undelivered_share_notional: NDArray[np.float64]
+    share_claim_positions: tuple[ShareClaimPosition, ...]
     hedge_restricted_cash: NDArray[np.float64]
     receivables: NDArray[np.float64]
     payables: NDArray[np.float64]
@@ -462,6 +470,17 @@ class StatefulLedgerResult:
     gross_fraction_nav_including_hedge: NDArray[np.float64]
     net_notional_including_hedge: NDArray[np.float64]
     net_fraction_nav_including_hedge: NDArray[np.float64]
+
+    @property
+    def equity_market_weights(self):
+        """Economic risk exposures, including shares not yet credited to custody."""
+        result = self.signed_shares * np.nan_to_num(self.mark_price) / self.nav[:, None]
+        for claim in self.share_claim_positions:
+            result[claim.session, claim.source_index] = 0.0
+            result[claim.session, claim.successor_index] += (
+                claim.signed_quantity * claim.mark / self.nav[claim.session]
+            )
+        return result
 
     def summary(self) -> dict[str, object]:
         excess = self.net_excess_all_cash_bps
@@ -655,6 +674,12 @@ class StatefulLedgerResult:
             "settlement_grace_sessions": self.settlement_grace_sessions,
             "unpriced_haircut": self.unpriced_haircut,
             "unpriced_inventory_count": int(self.unpriced_inventory_count[-1]),
+            "terminal_undelivered_share_notional": float(
+                self.undelivered_share_notional[-1]
+            ),
+            "maximum_undelivered_share_notional": float(
+                self.undelivered_share_notional.max()
+            ),
             "unpriced_inventory_notional": float(self.unpriced_inventory_notional[-1]),
             "unpriced_inventory_fraction_nav": float(
                 self.unpriced_inventory_fraction_nav[-1]
@@ -1205,6 +1230,9 @@ class PortfolioDecisionState:
     entry_allowed: NDArray[np.bool_]
     shortable: NDArray[np.bool_]
     required_exit: NDArray[np.bool_]
+    locked: NDArray[np.bool_]
+    effective_beta: NDArray[np.float64]
+    claim_exposure: NDArray[np.float64]
 
 
 @dataclass(frozen=True)
@@ -1223,6 +1251,7 @@ def simulate_stateful_ledger(
     action_terms: AlignedActionTerms,
     action_payment_session: NDArray[np.integer],
     cdi_returns: NDArray[np.floating],
+    share_distributions: Sequence[ShareDistribution] = (),
     config: LedgerConfig = LedgerConfig(),
     fill_fraction: NDArray[np.floating] | None = None,
     security_ids: Sequence[str] | None = None,
@@ -1286,6 +1315,20 @@ def simulate_stateful_ledger(
     if portfolio_policy is not None and config.volatility_balanced_entries:
         raise ValueError("portfolio allocation does not use fixed volatility slots")
     day_count, name_count = inputs.score.shape
+    distributions_by_day: dict[int, list[ShareDistribution]] = {}
+    for event in share_distributions:
+        if not (
+            event.effective_session < day_count and 0 <= event.source_index < name_count
+        ):
+            raise ValueError("distribution must align with replay sessions and names")
+        if any(not 0 <= leg.successor_index < name_count for leg in event.legs):
+            raise ValueError("distribution successor is outside the security axis")
+        if (
+            event.effective_session >= 0
+            and inputs.has_action[event.effective_session, event.source_index]
+        ):
+            raise ValueError("a distribution cannot duplicate a scalar source action")
+        distributions_by_day.setdefault(event.effective_session, []).append(event)
     if entry_fill_allowed is not None:
         entry_fill_allowed = np.asarray(entry_fill_allowed, dtype=np.bool_)
         if entry_fill_allowed.shape != inputs.score.shape:
@@ -1344,6 +1387,16 @@ def simulate_stateful_ledger(
     pending_entries: dict[int, _PendingOrder] = {}
     pending_exits: dict[int, _PendingOrder] = {}
     pending_claims: list[_PendingClaim] = []
+    pending_distributions = {}
+    share_claim_positions = []
+    retired_sources = {
+        event.source_index
+        for event in share_distributions
+        if event.effective_session < 0
+    }
+    if retired_sources:
+        last_observed[list(retired_sources)] = np.nan
+    undelivered_rows = []
     orders: list[IntendedOrder] = []
     fills: list[Fill] = []
     cancellations: list[OrderCancellation] = []
@@ -1549,8 +1602,187 @@ def simulate_stateful_ledger(
             submission_nav[name] = 0.0
         return True
 
+    def deliver_shares(
+        day,
+        name,
+        successor,
+        new_shares,
+        allocation,
+        converted_mark,
+        converted_reference,
+        *,
+        final,
+    ):
+        nonlocal free_cash, cancelled_today
+        transferred_restricted = restricted_by_name[name] * allocation
+        transferred_basis = entry_cost_basis[name] * allocation
+        prior_destination = float(shares[successor])
+        combined = prior_destination + float(new_shares)
+        # Delivery offsets opposite inventory without a market trade.
+        # Only the extinguished short portion releases its proceeds.
+        opposite = prior_destination * new_shares < 0.0
+        source_left = (
+            max(abs(new_shares) - abs(prior_destination), 0.0)
+            if opposite
+            else abs(new_shares)
+        )
+        destination_left = (
+            max(abs(prior_destination) - abs(new_shares), 0.0)
+            if opposite
+            else abs(prior_destination)
+        )
+        source_fraction = source_left / abs(new_shares) if new_shares else 0.0
+        destination_fraction = (
+            destination_left / abs(prior_destination) if prior_destination else 0.0
+        )
+        restricted = (
+            transferred_restricted * source_fraction
+            + restricted_by_name[successor] * destination_fraction
+        )
+        free_cash += transferred_restricted + restricted_by_name[successor] - restricted
+        restricted_by_name[name] -= transferred_restricted
+        restricted_by_name[successor] = restricted
+        entry_cost_basis[successor] = (
+            transferred_basis * source_fraction
+            + entry_cost_basis[successor] * destination_fraction
+        )
+        submission_nav[successor] = (
+            submission_nav[successor]
+            if destination_left
+            else submission_nav[name]
+            if source_left
+            else 0.0
+        )
+        surviving_origins = [
+            index
+            for index, quantity in (
+                (int(name), source_left),
+                (successor, destination_left),
+            )
+            if quantity > 0.0
+        ]
+        entry_session[successor] = min(
+            (entry_session[index] for index in surviving_origins), default=-1
+        )
+        ineligible_streak[successor] = max(
+            (ineligible_streak[index] for index in surviving_origins), default=0
+        )
+        # Keep the successor's own causal mark when available. A source
+        # with no holding must not erase an existing recipient position.
+        destination_mark = marks[successor] if prior_destination else converted_mark
+        if not np.isfinite(destination_mark) or destination_mark <= 0.0:
+            destination_mark = converted_reference
+        source_exit = pending_exits.get(int(name))
+        if final:
+            pending_exits.pop(int(name), None)
+        destination_exit = pending_exits.pop(successor, None)
+        exit_quantity = (
+            new_shares * source_exit.remaining_size if source_exit else 0.0
+        ) + (
+            prior_destination * destination_exit.remaining_size
+            if destination_exit
+            else 0.0
+        )
+        exit_fraction = (
+            float(np.clip(exit_quantity / combined, 0.0, 1.0)) if combined else 0.0
+        )
+        pending = None
+        if exit_fraction > 0.0:
+            side = "sell" if combined > 0.0 else "buy"
+            pending = next(
+                item
+                for item in (destination_exit, source_exit)
+                if item is not None and item.order.side == side
+            )
+            # The public intention remains unchanged. Its outstanding
+            # claim follows contractual succession and the net quantity.
+            adjusted_order = replace(
+                pending.order,
+                security=inputs.securities[successor],
+                security_index=successor,
+                side=side,
+            )
+            pending_exits[successor] = _PendingOrder(adjusted_order, exit_fraction)
+        for item in (source_exit, destination_exit):
+            if (
+                item is not None
+                and item is not pending
+                and (item is not source_exit or final)
+            ):
+                cancellations.append(
+                    item.cancellation(
+                        day, inputs.dates[day], "corporate_action_netting"
+                    )
+                )
+        cancelled_today += int(cancel_entry(int(name), day, "corporate_action_netting"))
+        if final:
+            shares[name] = 0.0
+            marks[name] = np.nan
+            last_observed[name] = np.nan
+        if not prior_destination and new_shares:
+            missing_sessions[successor] = missing_sessions[name]
+        if final:
+            missing_sessions[name] = 0
+        shares[successor] = combined
+        marks[successor] = destination_mark if combined else np.nan
+        if not prior_destination and np.isfinite(converted_reference):
+            last_observed[successor] = converted_reference
+        if combined and (not np.isfinite(destination_mark) or destination_mark <= 0):
+            unresolved_action[successor] = True
+            explicit_unresolved_action[successor] = True
+        explicit_unresolved_action[successor] |= explicit_unresolved_action[name]
+        entry_cost_basis[name] -= transferred_basis
+        if final:
+            unresolved_action[name] = False
+            explicit_unresolved_action[name] = False
+            entry_session[name] = -1
+            ineligible_streak[name] = 0
+            entry_cost_basis[name] = 0.0
+            submission_nav[name] = 0.0
+
+    def deliver_due(day):
+        # Each delivery uses the same netting transition as a one-leg conversion.
+        # Value weights allocate existing proceeds/basis; they create no cash.
+        for name, legs in tuple(pending_distributions.items()):
+            for leg in tuple(legs):
+                if leg.delivery_session != day:
+                    continue
+                prices = basket_prices(legs, last_observed)
+                values = [
+                    item.shares_per_prior_share * price
+                    for item, price in zip(legs, prices)
+                ]
+                allocation = values[legs.index(leg)] / sum(values)
+                destination = leg.successor_index
+                deliver_shares(
+                    day,
+                    name,
+                    destination,
+                    float(shares[name]) * leg.shares_per_prior_share,
+                    allocation,
+                    float(last_observed[destination]),
+                    float(last_observed[destination]),
+                    final=len(legs) == 1,
+                )
+                legs.remove(leg)
+            if legs:
+                prices = basket_prices(legs, last_observed)
+                marks[name] = sum(
+                    leg.shares_per_prior_share * price
+                    for leg, price in zip(legs, prices)
+                )
+            else:
+                del pending_distributions[name]
+
     for day in range(day_count):
         cancelled_today = 0
+        deliver_due(day)
+        locked = np.zeros(name_count, dtype=bool)
+        if pending_distributions:
+            locked[list(pending_distributions)] = True
+        decision_beta = basket_betas(
+            pending_distributions, last_observed, inputs.hedge_beta[day]
+        )
         if day == day_count - 1:
             prior_pending_names = [
                 name
@@ -1602,6 +1834,15 @@ def simulate_stateful_ledger(
             held = shares != 0.0
             signed_values = np.where(held, shares * np.nan_to_num(marks), 0.0)
             weights = signed_values / start_nav
+            claim_exposure = np.zeros(name_count)
+            for name, legs in pending_distributions.items():
+                for leg in legs:
+                    claim_exposure[leg.successor_index] += (
+                        shares[name]
+                        * leg.shares_per_prior_share
+                        * last_observed[leg.successor_index]
+                        / start_nav
+                    )
             ineligible_streak[~held | eligible] = 0
             ineligible_streak[held & ~eligible] += 1
             entry_eligible = (
@@ -1610,9 +1851,12 @@ def simulate_stateful_ledger(
                 & np.isfinite(last_observed)
                 & (last_observed > 0.0)
             )
+            if pending_distributions:
+                entry_eligible[list(pending_distributions)] = False
             required_exit = (ineligible_streak > config.ineligible_hold_sessions) | (
                 missing_sessions >= config.settlement_grace_sessions
             )
+            required_exit[locked] = False
             pending_entry_weights = np.zeros(name_count, dtype=np.float64)
             pending_exit_fractions = np.zeros(name_count, dtype=np.float64)
             for name, pending in pending_entries.items():
@@ -1644,6 +1888,9 @@ def simulate_stateful_ledger(
                 entry_allowed=entry_eligible.copy(),
                 shortable=inputs.shortable[day].copy(),
                 required_exit=required_exit,
+                locked=locked.copy(),
+                effective_beta=decision_beta,
+                claim_exposure=claim_exposure,
             )
             target = (
                 portfolio_policy(decision_state)
@@ -1673,12 +1920,13 @@ def simulate_stateful_ledger(
                 > config.planned_gross_cap + tol
                 or abs(desired.sum() + target.hedge_weight)
                 > config.planned_absolute_net_cap + tol
-                or np.abs(desired).max() > config.planned_name_weight_cap + tol
+                or np.abs(desired[~locked]).max(initial=0.0)
+                > config.planned_name_weight_cap + tol
                 or abs(target.hedge_weight) > config.hedge_notional_cap_nav + tol
                 or (not config.beta_hedge and abs(target.hedge_weight) > tol)
                 or (
                     config.beta_hedge
-                    and abs(desired @ inputs.hedge_beta[day] + target.hedge_weight)
+                    and abs(desired @ decision_beta + target.hedge_weight)
                     > config.planned_absolute_beta_cap + tol
                 )
             ):
@@ -2011,7 +2259,8 @@ def simulate_stateful_ledger(
             def projected_signed_values() -> NDArray[np.float64]:
                 projected = signed_values.copy()
                 for name, pending in pending_exits.items():
-                    projected[name] -= pending.remaining_size * signed_values[name]
+                    if not locked[name]:
+                        projected[name] -= pending.remaining_size * signed_values[name]
                 for name, pending in pending_entries.items():
                     direction = 1.0 if pending.order.side == "buy" else -1.0
                     projected[name] += direction * pending.remaining_size
@@ -2218,6 +2467,7 @@ def simulate_stateful_ledger(
                     for name, pending in pending_exits.items()
                     if pending.order.decision_session == day
                     and pending.remaining_size >= 1.0 - 1e-12
+                    and not locked[name]
                 }
                 unavailable = set(np.flatnonzero(shares != 0.0).tolist()) | set(
                     pending_entries
@@ -2618,7 +2868,10 @@ def simulate_stateful_ledger(
             direction = 1.0 if pending.order.side == "buy" else -1.0
             planned_equity[name] += direction * pending.remaining_size
         for name, pending in pending_exits.items():
-            planned_equity[name] -= pending.remaining_size * shares[name] * marks[name]
+            if not locked[name]:
+                planned_equity[name] -= (
+                    pending.remaining_size * shares[name] * marks[name]
+                )
         beta_required = held_for_hedge.copy()
         for name in pending_entries:
             beta_required[name] = True
@@ -2630,7 +2883,7 @@ def simulate_stateful_ledger(
         )
         exposure = planned_equity != 0.0
         equity_beta_notional = (
-            float(np.sum(planned_equity[exposure] * inputs.hedge_beta[day, exposure]))
+            float(np.sum(planned_equity[exposure] * decision_beta[exposure]))
             if config.beta_hedge
             else 0.0
         )
@@ -2682,6 +2935,10 @@ def simulate_stateful_ledger(
             action_exposed[name] = True
         same_day_action_rows.append(
             bool(np.any(action_exposed & inputs.has_action[day]))
+            or any(
+                action_exposed[event.source_index]
+                for event in distributions_by_day.get(day, ())
+            )
         )
 
         # Action-term uncertainty is a property of this session's claim, not
@@ -2695,6 +2952,14 @@ def simulate_stateful_ledger(
         # Apply contractual terms to shares held before the session. Cash terms
         # become claims; only the later payment mask transfers them to cash.
         for name in np.flatnonzero(inputs.has_action[day]):
+            if name in pending_distributions or any(
+                int(name) == leg.successor_index
+                for legs in pending_distributions.values()
+                for leg in legs
+            ):
+                raise ValueError(
+                    "an action on an outstanding basket needs explicit claim terms"
+                )
             successor = int(inputs.action_successor[day, name])
             if not inputs.action_resolved[day, name]:
                 if (
@@ -2750,136 +3015,16 @@ def simulate_stateful_ledger(
                     entry_cost_basis[name] = 0.0
                     submission_nav[name] = 0.0
             else:
-                prior_destination = float(shares[successor])
-                combined = prior_destination + float(new_shares)
-                # Delivery offsets opposite inventory without a market trade.
-                # Only the extinguished short portion releases its proceeds.
-                opposite = prior_destination * new_shares < 0.0
-                source_left = (
-                    max(abs(new_shares) - abs(prior_destination), 0.0)
-                    if opposite
-                    else abs(new_shares)
+                deliver_shares(
+                    day,
+                    int(name),
+                    successor,
+                    float(new_shares),
+                    1.0,
+                    converted_mark,
+                    converted_reference,
+                    final=True,
                 )
-                destination_left = (
-                    max(abs(prior_destination) - abs(new_shares), 0.0)
-                    if opposite
-                    else abs(prior_destination)
-                )
-                source_fraction = source_left / abs(new_shares) if new_shares else 0.0
-                destination_fraction = (
-                    destination_left / abs(prior_destination)
-                    if prior_destination
-                    else 0.0
-                )
-                restricted = (
-                    restricted_by_name[name] * source_fraction
-                    + restricted_by_name[successor] * destination_fraction
-                )
-                free_cash += (
-                    restricted_by_name[name]
-                    + restricted_by_name[successor]
-                    - restricted
-                )
-                restricted_by_name[name] = 0.0
-                restricted_by_name[successor] = restricted
-                entry_cost_basis[successor] = (
-                    entry_cost_basis[name] * source_fraction
-                    + entry_cost_basis[successor] * destination_fraction
-                )
-                submission_nav[successor] = (
-                    submission_nav[successor]
-                    if destination_left
-                    else submission_nav[name]
-                    if source_left
-                    else 0.0
-                )
-                surviving_origins = [
-                    index
-                    for index, quantity in (
-                        (int(name), source_left),
-                        (successor, destination_left),
-                    )
-                    if quantity > 0.0
-                ]
-                entry_session[successor] = min(
-                    (entry_session[index] for index in surviving_origins), default=-1
-                )
-                ineligible_streak[successor] = max(
-                    (ineligible_streak[index] for index in surviving_origins), default=0
-                )
-                # Keep the successor's own causal mark when available. A source
-                # with no holding must not erase an existing recipient position.
-                destination_mark = (
-                    marks[successor] if prior_destination else converted_mark
-                )
-                if not np.isfinite(destination_mark) or destination_mark <= 0.0:
-                    destination_mark = converted_reference
-                source_exit = pending_exits.pop(int(name), None)
-                destination_exit = pending_exits.pop(successor, None)
-                exit_quantity = (
-                    new_shares * source_exit.remaining_size if source_exit else 0.0
-                ) + (
-                    prior_destination * destination_exit.remaining_size
-                    if destination_exit
-                    else 0.0
-                )
-                exit_fraction = (
-                    float(np.clip(exit_quantity / combined, 0.0, 1.0))
-                    if combined
-                    else 0.0
-                )
-                pending = None
-                if exit_fraction > 0.0:
-                    side = "sell" if combined > 0.0 else "buy"
-                    pending = next(
-                        item
-                        for item in (destination_exit, source_exit)
-                        if item is not None and item.order.side == side
-                    )
-                    # The public intention remains unchanged. Its outstanding
-                    # claim follows contractual succession and the net quantity.
-                    pending.order = replace(
-                        pending.order,
-                        security=inputs.securities[successor],
-                        security_index=successor,
-                        side=side,
-                    )
-                    pending.remaining_size = exit_fraction
-                    pending_exits[successor] = pending
-                for item in (source_exit, destination_exit):
-                    if item is not None and item is not pending:
-                        cancellations.append(
-                            item.cancellation(
-                                day, inputs.dates[day], "corporate_action_netting"
-                            )
-                        )
-                cancelled_today += int(
-                    cancel_entry(int(name), day, "corporate_action_netting")
-                )
-                shares[name] = 0.0
-                marks[name] = np.nan
-                last_observed[name] = np.nan
-                if not prior_destination and new_shares:
-                    missing_sessions[successor] = missing_sessions[name]
-                missing_sessions[name] = 0
-                shares[successor] = combined
-                marks[successor] = destination_mark if combined else np.nan
-                if not prior_destination and np.isfinite(converted_reference):
-                    last_observed[successor] = converted_reference
-                if combined and (
-                    not np.isfinite(destination_mark) or destination_mark <= 0
-                ):
-                    unresolved_action[successor] = True
-                    explicit_unresolved_action[successor] = True
-                explicit_unresolved_action[successor] |= explicit_unresolved_action[
-                    name
-                ]
-                unresolved_action[name] = False
-                explicit_unresolved_action[name] = False
-                entry_session[name] = -1
-                ineligible_streak[name] = 0
-                entry_cost_basis[name] = 0.0
-                submission_nav[name] = 0.0
             if (
                 successor == name
                 and np.isfinite(converted_mark)
@@ -2894,6 +3039,34 @@ def simulate_stateful_ledger(
                 entry_session[name] = -1
                 entry_cost_basis[name] = 0.0
                 submission_nav[name] = 0.0
+
+        # Recognize a non-tradable basket at its economic effective date. The
+        # current source quote can no longer sell the cancelled predecessor.
+        for event in distributions_by_day.get(day, ()):
+            name = event.source_index
+            retired_sources.add(name)
+            if name in pending_distributions:
+                raise ValueError("overlapping distributions on one predecessor")
+            cancelled_today += int(cancel_entry(name, day, "corporate_action_netting"))
+            claim = float(shares[name]) * event.cash_per_prior_share
+            if claim >= 0:
+                receivable_by_name[name] += claim
+            else:
+                payable_by_name[name] -= claim
+            if claim:
+                pending_claims.append(_PendingClaim(name, claim, event.payment_session))
+            if shares[name] != 0:
+                prices = basket_prices(event.legs, last_observed)
+                pending_distributions[name] = list(event.legs)
+                marks[name] = sum(
+                    leg.shares_per_prior_share * price
+                    for leg, price in zip(event.legs, prices)
+                )
+                unresolved_action[name] = False
+                explicit_unresolved_action[name] = False
+            last_observed[name] = np.nan
+
+        deliver_due(day)
 
         unpaid_claims: list[_PendingClaim] = []
         for claim in pending_claims:
@@ -3005,6 +3178,8 @@ def simulate_stateful_ledger(
         # Only now may current-session prints affect the result. This makes the
         # immutable intended-order set invariant to those later observations.
         printed = np.isfinite(inputs.raw_close[day]) & (inputs.raw_close[day] > 0.0)
+        if retired_sources:
+            printed[list(retired_sources)] = False
         if day == day_count - 1:
             terminal_printed = printed.copy()
         traded_notional = 0.0
@@ -3151,7 +3326,31 @@ def simulate_stateful_ledger(
             elif shares[name] != 0.0:
                 missing_sessions[name] += 1
 
-        stale = int(np.sum((shares != 0.0) & ~printed))
+        valued = printed.copy()
+        for name, legs in pending_distributions.items():
+            prices = basket_prices(legs, last_observed)
+            marks[name] = sum(
+                leg.shares_per_prior_share * price for leg, price in zip(legs, prices)
+            )
+            valued[name] = all(printed[leg.successor_index] for leg in legs)
+            if valued[name]:
+                missing_sessions[name] = 0
+            last_observed[name] = np.nan
+            share_claim_positions.extend(
+                ShareClaimPosition(
+                    day,
+                    name,
+                    leg.successor_index,
+                    float(shares[name]) * leg.shares_per_prior_share,
+                    float(last_observed[leg.successor_index]),
+                    leg.delivery_session,
+                )
+                for leg in legs
+            )
+        undelivered_rows.append(
+            sum(abs(shares[name] * marks[name]) for name in pending_distributions)
+        )
+        stale = int(np.sum((shares != 0.0) & ~valued))
 
         hedge_traded_notional = 0.0
         hedge_cost = 0.0
@@ -3251,7 +3450,7 @@ def simulate_stateful_ledger(
         scenario_seen |= unresolved
         # This is a valuation sensitivity, never a fill or a source of cash.
         unpriced_notional = float(
-            np.abs(shares[held_now & ~printed] * marks[held_now & ~printed]).sum()
+            np.abs(shares[held_now & ~valued] * marks[held_now & ~valued]).sum()
         )
         unpriced_hedge = (
             abs(hedge_shares * hedge_mark)
@@ -3259,7 +3458,7 @@ def simulate_stateful_ledger(
             else 0.0
         )
         unpriced_notional += unpriced_hedge
-        unpriced_count = int((held_now & ~printed).sum()) + int(unpriced_hedge > 0)
+        unpriced_count = int((held_now & ~valued).sum()) + int(unpriced_hedge > 0)
         unpriced_haircut_nav = current_nav - config.unpriced_haircut * unpriced_notional
         if day == day_count - 1:
             terminal_boundary_unpriced_inventory_notional = (
@@ -3288,12 +3487,12 @@ def simulate_stateful_ledger(
         ex_ante_before = equity_beta_notional / start_nav
         ex_ante_after = (equity_beta_notional + decision_hedge_notional) / start_nav
         unresolved_stale = held_now & (
-            ~printed
+            ~valued
             | explicit_unresolved_action
             | (missing_sessions >= config.settlement_grace_sessions)
         )
         unresolved_claim_inventory = held_now & explicit_unresolved_action
-        stale_mark_inventory = held_now & ~printed
+        stale_mark_inventory = held_now & ~valued
         unresolved_stale_fraction = (
             float(np.abs(signed_values[unresolved_stale]).sum() / current_nav)
             if current_nav != 0.0
@@ -3558,6 +3757,7 @@ def simulate_stateful_ledger(
         or unresolved_count > 0
         or receivable_by_name.any()
         or payable_by_name.any()
+        or bool(pending_distributions)
         or hedge_shares != 0.0
         or terminal_boundary_unpriced_inventory_notional > 0.0
         or terminal_unpriced_hedge_notional > 0.0
@@ -3708,6 +3908,8 @@ def simulate_stateful_ledger(
         mark_price=np.stack(mark_rows),
         free_cash=np.asarray(free_cash_rows, dtype=np.float64),
         restricted_cash=np.asarray(restricted_rows, dtype=np.float64),
+        undelivered_share_notional=np.asarray(undelivered_rows, dtype=np.float64),
+        share_claim_positions=tuple(share_claim_positions),
         hedge_restricted_cash=np.asarray(hedge_restricted_rows, dtype=np.float64),
         receivables=np.asarray(receivable_rows, dtype=np.float64),
         payables=np.asarray(payable_rows, dtype=np.float64),

@@ -14,6 +14,7 @@ import torch
 from torch import Tensor
 
 from .stateful_ledger import LedgerConfig
+from .share_distributions import basket_prices
 
 
 def tensor(values) -> Tensor:
@@ -33,6 +34,8 @@ class PortfolioAccount:
     missing_sessions: np.ndarray
     ineligible_sessions: np.ndarray
     payments: list[tuple[int, Tensor]]
+    distributions: dict
+    retired_sources: set[int]
     config: LedgerConfig
 
     @classmethod
@@ -52,6 +55,8 @@ class PortfolioAccount:
             missing_sessions=np.zeros(n, dtype=np.int64),
             ineligible_sessions=np.zeros(n, dtype=np.int64),
             payments=[],
+            distributions={},
+            retired_sources=set(),
             config=config,
         )
 
@@ -67,6 +72,55 @@ class PortfolioAccount:
     @property
     def weights(self):
         return self.shares * self.marks / self.nav
+
+    @property
+    def market_weights(self):
+        """Expand basket entitlements to their actual underlying risk exposures."""
+        values = self.shares * self.marks
+        for name, legs in self.distributions.items():
+            values = values.clone()
+            values[name] = 0
+            for leg in legs:
+                destination = leg.successor_index
+                values[destination] = values[destination] + (
+                    self.shares[name]
+                    * leg.shares_per_prior_share
+                    * self.marks[destination]
+                )
+        return values / self.nav
+
+    def prepare_day(self, day):
+        """Known custody deliveries occur before the decision, using prior marks."""
+        for name, legs in tuple(self.distributions.items()):
+            for leg in tuple(legs):
+                if leg.delivery_session != day:
+                    continue
+                prices = basket_prices(legs, self.marks.detach().numpy())
+                values = [
+                    item.shares_per_prior_share * price
+                    for item, price in zip(legs, prices)
+                ]
+                allocation = values[legs.index(leg)] / sum(values)
+                self.pending_exit, _ = self._deliver_shares(
+                    name,
+                    leg.successor_index,
+                    self.shares[name] * leg.shares_per_prior_share,
+                    allocation,
+                    self.marks[leg.successor_index],
+                    self.pending_exit,
+                    torch.zeros_like(self.shares),
+                    final=len(legs) == 1,
+                )
+                legs.remove(leg)
+            if legs:
+                marks = self.marks.clone()
+                marks[name] = sum(
+                    leg.shares_per_prior_share * self.marks[leg.successor_index]
+                    for leg in legs
+                )
+                self.marks = marks
+            else:
+                del self.distributions[name]
 
     def detach(self):
         """Truncate gradients without resetting positions, financing or claims."""
@@ -88,9 +142,13 @@ class PortfolioAccount:
         self.ineligible_sessions[~held | eligible] = 0
         self.ineligible_sessions[held & ~eligible] += 1
         allowed = eligible & ~prior_unresolved & (self.marks.detach().numpy() > 0)
+        if self.retired_sources:
+            allowed[list(self.retired_sources)] = False
         required = (self.ineligible_sessions > self.config.ineligible_hold_sessions) | (
             self.missing_sessions >= self.config.settlement_grace_sessions
         )
+        if self.distributions:
+            required[list(self.distributions)] = False
         return allowed, required
 
     def _fill(self, signed_quantity: Tensor, price: Tensor, cost_rate: Tensor):
@@ -112,6 +170,92 @@ class PortfolioAccount:
         self.shares = self.shares + signed_quantity
         return costs
 
+    def _deliver_shares(
+        self,
+        name,
+        destination,
+        incoming,
+        allocation,
+        converted_mark,
+        exit_fraction,
+        entry_notional,
+        *,
+        final,
+    ):
+        shares, marks = self.shares.clone(), self.marks.clone()
+        transferred_restricted = self.restricted[name] * allocation
+        transferred_basis = self.cost_basis[name] * allocation
+        existing = self.shares[destination]
+        combined = incoming + existing
+        offset = torch.where(
+            incoming * existing < 0,
+            torch.minimum(incoming.abs(), existing.abs()),
+            0.0,
+        )
+        incoming_fraction = (incoming.abs() - offset) / incoming.abs().clamp_min(1e-30)
+        existing_fraction = (existing.abs() - offset) / existing.abs().clamp_min(1e-30)
+        restricted = self.restricted.clone()
+        restricted[destination] = (
+            transferred_restricted * incoming_fraction
+            + self.restricted[destination] * existing_fraction
+        )
+        self.cash = self.cash + (
+            transferred_restricted
+            + self.restricted[destination]
+            - restricted[destination]
+        )
+        restricted[name] = restricted[name] - transferred_restricted
+        self.restricted = restricted
+        basis = self.cost_basis.clone()
+        basis[destination] = (
+            transferred_basis * incoming_fraction
+            + self.cost_basis[destination] * existing_fraction
+        )
+        basis[name] = basis[name] - transferred_basis
+        self.cost_basis = basis
+        shares[destination] = combined
+        marks[destination] = torch.where(
+            existing != 0, self.marks[destination], converted_mark
+        )
+        if final:
+            shares[name], marks[name] = 0, 0
+        exit_quantity = (
+            incoming * exit_fraction[name] + existing * exit_fraction[destination]
+        )
+        exit_fraction = exit_fraction.clone()
+        denominator = torch.where(combined != 0, combined, 1.0)
+        exit_fraction[destination] = torch.where(
+            combined != 0, (exit_quantity / denominator).clamp(0, 1), 0.0
+        )
+        if final:
+            exit_fraction[name] = 0
+        # An entry into a cancelled predecessor is not an instruction
+        # to open its successor. Realize only the existing entitlement.
+        entry_notional = entry_notional.clone()
+        entry_notional[name] = 0
+        origins = [
+            index
+            for index, fraction in (
+                (name, incoming_fraction),
+                (destination, existing_fraction),
+            )
+            if fraction.detach().item() > 0
+        ]
+        self.entry_day[destination] = min(
+            (self.entry_day[index] for index in origins), default=-1
+        )
+        self.ineligible_sessions[destination] = max(
+            (self.ineligible_sessions[index] for index in origins), default=0
+        )
+        if existing.detach().item() == 0 and incoming.detach().item() != 0:
+            self.missing_sessions[destination] = self.missing_sessions[name]
+        if final:
+            self.entry_day[name] = -1
+            self.ineligible_sessions[name] = 0
+            self.missing_sessions[name] = 0
+        self.shares, self.marks = shares, marks
+        return exit_fraction, entry_notional
+
     def step(
         self,
         target: Tensor,
@@ -125,10 +269,17 @@ class PortfolioAccount:
         action_resolved=None,
         successor=None,
         payment_session=None,
+        share_distributions=(),
         fill_fraction=None,
         entry_fill_allowed=None,
         terminal=False,
     ):
+        self.retired_sources.update(
+            event.source_index
+            for event in share_distributions
+            if event.effective_session < day
+        )
+        self.prepare_day(day)
         n = len(self.shares)
         start_nav = self.nav
         before = self.weights
@@ -165,6 +316,14 @@ class PortfolioAccount:
         changed |= resolved & (mapping != np.arange(n))
         for name in np.flatnonzero(changed):
             name = int(name)
+            if name in self.distributions or any(
+                name == leg.successor_index
+                for legs in self.distributions.values()
+                for leg in legs
+            ):
+                raise ValueError(
+                    "an action on an outstanding basket needs explicit claim terms"
+                )
             amount = torch.zeros(n, dtype=torch.float64)
             amount[name] = self.shares[name] * d[name]
             self.claims = self.claims + amount
@@ -181,78 +340,49 @@ class PortfolioAccount:
                 self.restricted = restricted
             destination = int(mapping[name])
             if destination != name:
-                incoming = shares[name].clone()
-                existing = self.shares[destination]
-                combined = incoming + existing
-                offset = torch.where(
-                    incoming * existing < 0,
-                    torch.minimum(incoming.abs(), existing.abs()),
-                    0.0,
+                exit_fraction, entry_notional = self._deliver_shares(
+                    name,
+                    destination,
+                    shares[name].clone(),
+                    1.0,
+                    marks[name].clone(),
+                    exit_fraction,
+                    entry_notional,
+                    final=True,
                 )
-                incoming_fraction = (
-                    incoming.abs() - offset
-                ) / incoming.abs().clamp_min(1e-30)
-                existing_fraction = (
-                    existing.abs() - offset
-                ) / existing.abs().clamp_min(1e-30)
-                restricted = self.restricted.clone()
-                restricted[destination] = (
-                    self.restricted[name] * incoming_fraction
-                    + self.restricted[destination] * existing_fraction
-                )
-                self.cash = self.cash + (
-                    self.restricted[name]
-                    + self.restricted[destination]
-                    - restricted[destination]
-                )
-                restricted[name] = 0
-                self.restricted = restricted
-                basis = self.cost_basis.clone()
-                basis[destination] = (
-                    self.cost_basis[name] * incoming_fraction
-                    + self.cost_basis[destination] * existing_fraction
-                )
-                basis[name] = 0
-                self.cost_basis = basis
-                shares[destination] = combined
-                marks[destination] = torch.where(
-                    existing != 0, self.marks[destination], marks[name]
-                )
-                shares[name], marks[name] = 0, 0
-                exit_quantity = (
-                    incoming * exit_fraction[name]
-                    + existing * exit_fraction[destination]
-                )
-                exit_fraction = exit_fraction.clone()
-                denominator = torch.where(combined != 0, combined, 1.0)
-                exit_fraction[destination] = torch.where(
-                    combined != 0, (exit_quantity / denominator).clamp(0, 1), 0.0
-                )
-                exit_fraction[name] = 0
-                # An entry into a cancelled predecessor is not an instruction
-                # to open its successor. Realize only the existing entitlement.
-                entry_notional = entry_notional.clone()
-                entry_notional[name] = 0
-                origins = [
-                    index
-                    for index, fraction in (
-                        (name, incoming_fraction),
-                        (destination, existing_fraction),
-                    )
-                    if fraction.detach().item() > 0
-                ]
-                self.entry_day[destination] = min(
-                    (self.entry_day[index] for index in origins), default=-1
-                )
-                self.ineligible_sessions[destination] = max(
-                    (self.ineligible_sessions[index] for index in origins), default=0
-                )
-                if existing.detach().item() == 0 and incoming.detach().item() != 0:
-                    self.missing_sessions[destination] = self.missing_sessions[name]
-                self.entry_day[name] = -1
-                self.ineligible_sessions[name] = 0
-                self.missing_sessions[name] = 0
+                continue
             self.shares, self.marks = shares, marks
+        for event in share_distributions:
+            if event.effective_session != day:
+                continue
+            name = event.source_index
+            if changed[name] or name in self.distributions:
+                raise ValueError(
+                    "a distribution cannot duplicate an existing source action"
+                )
+            self.retired_sources.add(name)
+            amount = torch.zeros_like(self.claims)
+            amount[name] = self.shares[name] * event.cash_per_prior_share
+            self.claims = self.claims + amount
+            if event.cash_per_prior_share:
+                self.payments.append((event.payment_session, amount))
+            if self.shares[name].detach().item() != 0:
+                basket_prices(event.legs, self.marks.detach().numpy())
+                self.distributions[name] = list(event.legs)
+                marks = self.marks.clone()
+                marks[name] = sum(
+                    leg.shares_per_prior_share * self.marks[leg.successor_index]
+                    for leg in event.legs
+                )
+                self.marks = marks
+        # Same-session delivery of a newly recognized claim is a realization;
+        # later deliveries were handled before this day's decision above.
+        self.pending_exit = exit_fraction
+        self.prepare_day(day)
+        exit_fraction = self.pending_exit
+        if self.retired_sources:
+            entry_notional = entry_notional.clone()
+            entry_notional[list(self.retired_sources)] = 0
         unpaid = []
         for pay, amount in self.payments:
             if pay == day:
@@ -275,6 +405,8 @@ class PortfolioAccount:
 
         close = np.asarray(close, dtype=float)
         printed = np.isfinite(close) & (close > 0)
+        if self.retired_sources:
+            printed[list(self.retired_sources)] = False
         prices = tensor(np.where(printed, close, 0.0))
         fractions = np.ones(n) if fill_fraction is None else np.asarray(fill_fraction)
         fractions = tensor(np.where(printed, fractions, 0.0))
@@ -311,12 +443,21 @@ class PortfolioAccount:
             )
         costs = costs + self._fill(hedge_quantity, prices, cost_rate)
         self.marks = torch.where(torch.as_tensor(printed), prices, self.marks)
+        valued = printed.copy()
+        for name, legs in self.distributions.items():
+            marks = self.marks.clone()
+            marks[name] = sum(
+                leg.shares_per_prior_share * self.marks[leg.successor_index]
+                for leg in legs
+            )
+            self.marks = marks
+            valued[name] = all(printed[leg.successor_index] for leg in legs)
         held = self.shares.detach().numpy() != 0
-        self.missing_sessions[printed & held] = 0
-        self.missing_sessions[~printed & held] += 1
+        self.missing_sessions[valued & held] = 0
+        self.missing_sessions[~valued & held] += 1
         # No print means inventory remains, including at an evaluation boundary.
         unpriced_notional = (
-            self.shares.abs() * self.marks * torch.as_tensor(~printed)
+            self.shares.abs() * self.marks * torch.as_tensor(~valued)
         ).sum()
         held_after = self.shares.detach().numpy() != 0
         held_before = shares_before_fill.detach().numpy() != 0
@@ -345,4 +486,8 @@ class PortfolioAccount:
             "borrow": borrow,
             "cost": costs,
             "unpriced_inventory_notional": unpriced_notional,
+            "undelivered_share_notional": sum(
+                (self.shares[name] * self.marks[name]).abs()
+                for name in self.distributions
+            ),
         }

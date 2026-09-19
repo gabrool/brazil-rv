@@ -157,6 +157,61 @@ def test_shared_controller_and_independent_exact_ledger_agree():
     assert previous.shape == (12, len(data.inputs.security_ids) + 1)
 
 
+@pytest.mark.parametrize("sector_cap", [None, 0.02])
+def test_controller_reserves_delayed_claim_capacity_and_matches_actual_delivery(
+    sector_cap,
+):
+    from brazil_rv.execution.allocation import AllocationConfig
+    from brazil_rv.execution.share_distributions import ShareDelivery, ShareDistribution
+
+    torch.set_num_threads(1)
+    torch.manual_seed(11)
+    data = policy_fixture()
+    calibration = Calibration(np.zeros(3), np.ones(3), np.array([0.0008, 0, 0]), 0)
+    model = PreferenceModel(data, calibration, np.arange(10))
+    config = policy_ledger_config()
+    allocation = AllocationConfig(sector_net_cap=sector_cap)
+    names = len(data.inputs.security_ids)
+    data.sectors = np.broadcast_to(
+        np.array(["A", "B", "C"])[np.arange(names) % 3], data.valid.shape
+    )
+    account = data.initial_account(0, config)
+    opening = account_decision(data, model, account, 0, allocation=allocation)
+    source = int(opening[:-1].abs().argmax())
+    assert opening[source].abs().item() > 0.001
+    event = ShareDistribution(
+        source,
+        2,
+        0,
+        (
+            ShareDelivery((source + 1) % names, 0.4, 4),
+            ShareDelivery((source + 2) % names, 0.6, 5),
+        ),
+        "synthetic controller fixture",
+    )
+    closes = data.inputs.raw_close.copy()
+    closes[2:, source] = np.nan
+    data.inputs = replace(data.inputs, raw_close=closes, share_distributions=(event,))
+    records, targets = [], []
+    with torch.no_grad():
+        for day in range(8):
+            target = account_decision(data, model, account, day, allocation=allocation)
+            if day in (3, 4):
+                assert target[source].item() == pytest.approx(
+                    account.weights[source].item(), abs=1e-8
+                )
+            targets.append(target.numpy())
+            records.append(data.step(account, target, day, terminal=day == 7))
+    exact, chosen, _ = exact_replay(data, model, 0, 8, allocation=allocation)
+    np.testing.assert_allclose(chosen[:-1], targets[:-1], atol=1e-8)
+    assert [record["nav"].item() for record in records] == pytest.approx(
+        exact.nav, abs=1e-9
+    )
+    assert exact.undelivered_share_notional[2] > 0
+    assert exact.undelivered_share_notional[5] == 0
+    assert account.distributions == {}
+
+
 @pytest.mark.parametrize("hedge_weight", [-0.02, 0.02])
 @pytest.mark.parametrize("charge_fee", [True, False])
 def test_hedge_borrow_rates_and_fee_scenarios_match_both_accounts(

@@ -135,7 +135,7 @@ def utility_path(
     utilities, targets, nav = [], [], []
     for offset, day in enumerate(rows):
         day = int(day)
-        risk = portfolio_variance(data, day, account.weights)
+        risk = portfolio_variance(data, day, account.market_weights)
         final = terminal and offset == len(rows) - 1
         target = (
             tensor(np.zeros(preference.shape[1] + 1))

@@ -108,7 +108,7 @@ def run(root):
         loss = tensor(0.0)
         gross = []
         for day in range(64):
-            variance = portfolio_variance(data, day, account.weights)
+            variance = portfolio_variance(data, day, account.market_weights)
             target = account_decision(data, model, account, day)
             row = data.step(account, target, day)
             loss = loss - (row["net_excess"] - 2.5 * variance) * 1e4 / 64

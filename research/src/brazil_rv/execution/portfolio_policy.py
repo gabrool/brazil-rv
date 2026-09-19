@@ -11,6 +11,7 @@ from torch import nn
 
 from .allocation import AllocationConfig, allocate
 from .portfolio_account import PortfolioAccount, tensor
+from .share_distributions import slice_distributions, basket_betas, basket_prices
 from .stateful_ledger import (
     LedgerConfig,
     PortfolioTarget,
@@ -107,9 +108,15 @@ class PolicyData:
             if start == 0
             else self.inputs.bova11_close[start - 1]
         )
-        return PortfolioAccount.empty(
+        account = PortfolioAccount.empty(
             np.r_[self.references[start], hedge], config=config
         )
+        account.retired_sources.update(
+            event.source_index
+            for event in self.inputs.share_distributions
+            if event.effective_session < start
+        )
+        return account
 
     def prior_unresolved(self, day):
         return (
@@ -132,6 +139,7 @@ class PolicyData:
             action_resolved=np.r_[inputs.action_session_resolved[day], True],
             successor=np.r_[inputs.action_successor_index[day], n],
             payment_session=np.r_[inputs.action_payment_session[day], -1],
+            share_distributions=inputs.share_distributions,
             entry_fill_allowed=None
             if inputs.entry_fill_allowed is None
             else np.r_[inputs.entry_fill_allowed[day], True],
@@ -265,12 +273,19 @@ def decide(
     required,
     *,
     allocation=AllocationConfig(),
+    locked=None,
+    effective_beta=None,
+    claim_exposure=None,
 ):
     """Compact exactly to available or held names, preserving all real inventory."""
     if model is None:
         # Cash fallback requests liquidation through the same actual-fill ledger.
-        return torch.zeros_like(weights)
+        result = torch.zeros_like(weights)
+        if locked is not None:
+            result[:-1] = torch.where(torch.as_tensor(locked), weights[:-1], 0.0)
+        return result
     stock = weights[:-1]
+    beta = data.beta[day] if effective_beta is None else effective_beta
     names = np.flatnonzero(allowed | (stock.detach().numpy() != 0))
     ids = np.r_[names, len(stock)]
     previous = weights[ids]
@@ -284,6 +299,21 @@ def decide(
     lower, upper = torch.where(exits, 0, lower), torch.where(exits, 0, upper)
     lower = torch.cat((lower[:-1], tensor([-allocation.hedge_cap])))
     upper = torch.cat((upper[:-1], tensor([allocation.hedge_cap])))
+    if claim_exposure is not None:
+        exposure = torch.cat((claim_exposure[names], previous.new_zeros(1)))
+        lower = torch.maximum(
+            lower, torch.minimum(previous, -allocation.stock_cap - exposure)
+        )
+        upper = torch.minimum(
+            upper, torch.maximum(previous, allocation.stock_cap - exposure)
+        )
+        lower[-1], upper[-1] = -allocation.hedge_cap, allocation.hedge_cap
+    if locked is not None:
+        fixed = torch.as_tensor(np.r_[locked[names], False])
+        lower, upper = (
+            torch.where(fixed, previous, lower),
+            torch.where(fixed, previous, upper),
+        )
     features = state_features(
         weights,
         cash,
@@ -291,28 +321,57 @@ def decide(
         age,
         adverse,
         pending,
-        data.beta[day],
+        beta,
         data.volatility[day],
     )[names]
     pref = model.preference_for(data, day, names, features)
+    if claim_exposure is not None:
+        # The basket is fixed until delivery. Its idiosyncratic covariance with
+        # the same already-held underlying is an exact linear objective term.
+        pref = (
+            pref
+            - allocation.risk_aversion
+            * tensor(data.diagonal[day, names])
+            * claim_exposure[names]
+        )
     market = pref.new_tensor(model.market_return_for(day))
     # Stock preferences are benchmark residuals. A directional forecast must
     # enter stocks and the hedge coherently, once, through the same market beta.
-    preference = torch.cat(
-        (pref + tensor(data.beta[day, names]) * market, market[None])
-    )
+    preference = torch.cat((pref + tensor(beta[names]) * market, market[None]))
     groups = None
     if allocation.sector_net_cap is not None:
         labels = data.sectors[day, names]
-        known = np.unique(labels[labels != ""])
+        baskets = []
+        sector_labels = [labels]
+        for event in data.inputs.share_distributions:
+            if event.effective_session >= day or event.source_index not in names:
+                continue
+            legs = [
+                leg
+                for leg in event.legs
+                if leg.delivery_session is None or leg.delivery_session > day
+            ]
+            if legs and stock[event.source_index].detach().item() != 0:
+                sectors = data.sectors[day, [leg.successor_index for leg in legs]]
+                baskets.append((event.source_index, legs, sectors))
+                sector_labels.append(sectors)
+        observed_labels = np.concatenate(sector_labels)
+        known = np.unique(observed_labels[observed_labels != ""])
         groups = np.column_stack(
             (known[:, None] == labels[None, :], np.zeros(len(known)))
-        )
+        ).astype(float)
+        for source, legs, sectors in baskets:
+            values = basket_prices(legs, data.references[day]) * [
+                leg.shares_per_prior_share for leg in legs
+            ]
+            groups[:, np.flatnonzero(names == source)[0]] = (
+                known[:, None] == sectors
+            ) @ (values / values.sum())
     uncertainty = model.forecast_uncertainty(tensor(data.ranks[day, names]))
     chosen = allocate(
         preference,
         previous,
-        beta=np.r_[data.beta[day, names], 1.0],
+        beta=np.r_[beta[names], 1.0],
         idiosyncratic_variance=np.r_[data.diagonal[day, names], 1e-8],
         market_variance=float(data.factor[day]),
         daily_borrow=data.borrow_rates(day, policy_ledger_config())[ids],
@@ -328,6 +387,12 @@ def decide(
 
 
 def account_decision(data, model, account, day, *, allocation=AllocationConfig()):
+    account.prepare_day(day)
+    locked = np.zeros(len(data.inputs.security_ids), bool)
+    if account.distributions:
+        locked[list(account.distributions)] = True
+    claim_exposure = account.market_weights[:-1] - account.weights[:-1]
+    claim_exposure = torch.where(torch.as_tensor(locked), 0.0, claim_exposure)
     allowed, required = account.eligibility(
         np.r_[data.valid[day], True], np.r_[data.prior_unresolved(day), False]
     )
@@ -358,6 +423,11 @@ def account_decision(data, model, account, day, *, allocation=AllocationConfig()
         allowed[:-1],
         required[:-1],
         allocation=allocation,
+        locked=locked,
+        effective_beta=basket_betas(
+            account.distributions, account.marks.detach().numpy(), data.beta[day]
+        ),
+        claim_exposure=claim_exposure,
     )
 
 
@@ -408,6 +478,9 @@ def ledger_arguments(data, start, stop):
     payments = inputs.action_payment_session[start:stop].copy()
     payments[payments >= 0] -= start
     arguments["action_payment_session"] = payments
+    arguments["share_distributions"] = slice_distributions(
+        inputs.share_distributions, start, stop
+    )
     arguments["initial_reference_price"] = data.references[start]
     arguments["initial_unresolved_action"] = data.prior_unresolved(start)
     arguments["initial_hedge_reference_price"] = (
@@ -464,10 +537,16 @@ def exact_replay(
                     state.entry_allowed,
                     state.required_exit,
                     allocation=allocation,
+                    locked=state.locked,
+                    effective_beta=state.effective_beta,
+                    claim_exposure=tensor(state.claim_exposure),
                 )
             )
         chosen.append(target.numpy())
-        prior_weights.append(weights.numpy())
+        market_weights = weights.numpy().copy()
+        market_weights[:-1][state.locked] = 0.0
+        market_weights[:-1] += state.claim_exposure
+        prior_weights.append(market_weights)
         return PortfolioTarget(target[:-1].numpy(), target[-1].item())
 
     result = simulate_stateful_ledger(
@@ -479,7 +558,7 @@ def exact_replay(
     # The final day is a forced boundary rather than a controller observation.
     chosen.append(np.zeros(len(inputs.security_ids) + 1))
     stock = (
-        result.signed_shares[-2] * np.nan_to_num(result.mark_price[-2]) / result.nav[-2]
+        result.equity_market_weights[-2]
         if stop - start > 1
         else np.zeros(len(inputs.security_ids))
     )

@@ -7,8 +7,9 @@ stage. Foundation outcomes remain sealed at the canonical foundation pointer.
 
 **Current status:** A/B remain in progress; C/D have not started. Corporate-account
 research and the source censuses below are complete. BOVA11 borrowing-path
-consistency, removal of fabricated missing-quote liquidations and single-successor
-inventory netting are implemented and tested (see the latest entries); recovered historical sources are not yet
+consistency, removal of fabricated missing-quote liquidations, inventory netting and
+multi-leg/delayed-delivery mechanics are implemented and tested (see the latest
+entries); recovered historical sources are not yet
 admitted. No training or source-census worker is active.
 
 Initial inspection: the account supports only one scalar successor and rejects a
@@ -301,3 +302,71 @@ CPLE/BRML/DMMO events by treating delivery as immediate. Fixed-contract lending,
 dated fees, causal recovered-source admission, the rest of the deep audit and all
 corrected historical comparisons/scaling remain outstanding. No new input store,
 historical replay, GPU fit or promotion is implied by this repair.
+
+### Multi-leg claims and delayed delivery, 2026-09-19
+
+Implemented a sparse source-bound distribution contract in both accounting paths.
+Each event carries its information-availability/effective sessions, successor share
+ratios, separate custody-delivery sessions, cash entitlement/payment session and
+evidence reference. Later-known terms cannot be backdated. This is accounting input,
+not a new feature coordinate or a mutation of accepted stores.
+
+At the effective session, the predecessor becomes a non-tradable signed basket;
+cash becomes a separate receivable/payable. The basket retains NAV, exposure,
+restricted proceeds and financing until custody delivery. Its constituents are
+marked using causal successor references and subsequent observed quotes. Delivery
+can occur leg by leg, including into existing opposite positions, through the
+completed netting transition. No conversion trade, fee or turnover is fabricated.
+Undelivered terminal claims remain outstanding even when their constituents are
+fully priced. Priced-but-unavailable inventory is reported separately from unpriced
+inventory. A genuinely cancelled predecessor cannot reopen, including in a later
+flat-start replay; that replay does not invent historical positions or cash claims.
+
+`delivery_session` means the first decision session with custody available, not an
+automatic mapping of every calendar credit date to the start of that day. For an
+already recognized basket, that known delivery is processed before the decision
+using prior marks, allowing trading on the available session without an arbitrary
+extra-day lag. Immediate delivery of a newly recognized event is a realization
+after the decision, like the existing scalar-action contract. The historical source
+adapter must establish this timing from the issuer/B3 evidence before admission.
+
+The optimizer freezes undelivered basket exposure, includes it in remaining capacity,
+uses constituent betas/sectors, and includes the fixed basket's idiosyncratic
+covariance with an already held underlying. The legacy book cannot budget for a
+known impossible basket exit. Training utility and replay/readout risk expand
+claims to their actual constituent exposures. Compact daily claim records permit
+reconstruction and custody auditing; they avoid a dense extra date/name tensor.
+Evaluation V21 hashes the distribution contract, exposes its terms, and saves
+undelivered notional and claim positions with new books. Flat-window rebasing retains
+prior cancellation identities and future payment/delivery dates.
+
+Validation: **199 targeted tests pass**, including account, independent ledger,
+policy, action-causality, evaluation/readout, portfolio objective and controller
+learning checks. New fixtures cover both signs, mixed cash/shares, separate and
+partial delivery, existing positions, terminal/unknown delivery, ongoing financing,
+marking, gradients and truncation, and prior-identity handling. Both market-neutral
+and sector-constrained controller paths agree with the independent ledger. Mutating
+a delivery-day price leaves that day's state and original intentions unchanged.
+Ruff and diff checks pass.
+
+`docs/v2_share_distribution_acceptance.json` and the identical, verified receipt on
+the resolved D run root bind this implementation to `91ca1c4`. Four synthetic
+20-session paths without new distribution events (including outages, scalar
+splits/cash, empty successors and existing-successor netting) are bit-identical on
+13 cash/NAV/inventory/cost/exposure/claim arrays and on fills/intentions. Receipt
+SHA-256: `bfb869ccaef4ff5e447b61f47504af1f6f4ff667c8e48a74456d5a378e84a16d`.
+
+This completes the multi-leg/delivery **mechanics**, not source admission or all of
+Stage A. The current sparse contract is for preannounced distributions into listed
+successors with causal reference marks. An unpriced/new-listing leg or a nested
+action on an outstanding basket requires explicit evidenced valuation/claim terms;
+the code stops instead of allocating an invented price or discarding the security.
+Verify these boundaries, fractional entitlements and actual custody availability
+when admitting CPLE/BRML/DMMO and the remaining exposure-ranked events. No historical
+case has been silently attached to an old fit or accepted store by this change.
+
+The registration was revisited. Next are fixed-contract loan reference/rate/accrual,
+dated fees, actual corporate/lending source admission and remaining source-to-model
+audit work. Borrow accrual on these baskets still uses the existing marked-notional
+proxy pending that loan repair; it is not yet a claim of exact B3 contract accrual.
+Stages C/D remain unstarted, with no new performance result or GPU fit to report.

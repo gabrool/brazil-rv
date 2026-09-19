@@ -100,9 +100,7 @@ def legacy_replay(data, start, stop, config):
     )
     end = np.column_stack(
         (
-            result.signed_shares
-            * np.nan_to_num(result.mark_price)
-            / result.nav[:, None],
+            result.equity_market_weights,
             result.hedge_signed_notional / result.nav,
         )
     )
@@ -124,7 +122,9 @@ def book_summary(data, result, previous, start, first):
         result.signed_shares * np.nan_to_num(result.mark_price) / result.nav[:, None]
     )
     hedge = result.hedge_signed_notional / result.nav
-    beta = (positions * data.beta[start : start + len(positions)]).sum(1) + hedge
+    beta = (
+        result.equity_market_weights * data.beta[start : start + len(positions)]
+    ).sum(1) + hedge
     gross = np.abs(positions).sum(1) + np.abs(hedge)
     signed_net = positions.sum(1) + hedge
     daily = {
@@ -150,6 +150,9 @@ def book_summary(data, result, previous, start, first):
             selection
         ],
         "unpriced_inventory_fraction": result.unpriced_inventory_fraction_nav[
+            selection
+        ],
+        "undelivered_share_fraction": (result.undelivered_share_notional / result.nav)[
             selection
         ],
     }
@@ -210,6 +213,7 @@ def save_book(output, data, result, targets, previous, start, first, provenance)
         "pending_exit_count",
         "pending_entry_count",
         "unpriced_inventory_notional",
+        "undelivered_share_notional",
         "unpriced_haircut_scenario_nav",
     )
     state = {k: getattr(result, k) for k in fields}
@@ -217,6 +221,11 @@ def save_book(output, data, result, targets, previous, start, first, provenance)
     if targets is not None:
         state["targets"] = targets
     np.savez_compressed(output / "account.npz", **state)
+    if result.share_claim_positions:
+        write_json_atomic(
+            output / "share_claim_positions.json",
+            [asdict(claim) for claim in result.share_claim_positions],
+        )
     # Detailed primary audit; stresses keep exact positions/targets and daily
     # accounting, and are reproducible from the same frozen market inputs.
     if provenance["scenario"] == "base":

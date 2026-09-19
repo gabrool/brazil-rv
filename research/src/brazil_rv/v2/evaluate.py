@@ -20,6 +20,7 @@ from brazil_rv.execution.stateful_ledger import (
     simulate_stateful_ledger,
 )
 from brazil_rv.modeling.metrics import average_ranks, moving_block_bootstrap
+from brazil_rv.execution.share_distributions import ShareDistribution
 
 from .artifacts import write_json_atomic
 from .config import FULL_PROTOCOL, ProtocolPreset
@@ -46,7 +47,7 @@ MIN_CROSS_SECTION = 20
 BOOTSTRAP_SEED = 20260903
 ECONOMICS_COSTS_BPS = (2.0, 4.0, 7.0)
 ECONOMICS_HEADLINE = (4.0, 0.02)
-EVALUATION_SCHEMA = "BRAZIL_RV_V2_EVALUATION_V20"
+EVALUATION_SCHEMA = "BRAZIL_RV_V2_EVALUATION_V21"
 PRIOR_EVALUATION_SCHEMA = "BRAZIL_RV_V2_EVALUATION_V15"
 PAIRED_COMPARISON_SCHEMA = "BRAZIL_RV_V2_PAIRED_COMPARISON_V3"
 
@@ -143,6 +144,7 @@ class EvaluationInputs:
     neutral_target_fallback_flags: NDArray[np.bool_] | None = None
     execution_policy: ExecutionPolicy | None = None
     entry_fill_allowed: NDArray[np.bool_] | None = None
+    share_distributions: tuple[ShareDistribution, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -852,6 +854,7 @@ def _ledger_inputs(
         "raw_close": inputs.raw_close,
         "action_terms": _aligned_action_terms(inputs),
         "action_payment_session": inputs.action_payment_session,
+        "share_distributions": inputs.share_distributions,
         "cdi_returns": inputs.cdi_returns,
         "security_ids": inputs.security_ids,
         "initial_reference_price": inputs.initial_reference_price,
@@ -1012,6 +1015,9 @@ def _ledger_rows(
             "nav": _finite_or_none(result.nav[index]),
             "free_cash": _finite_or_none(result.free_cash[index]),
             "restricted_cash": _finite_or_none(result.restricted_cash[index]),
+            "undelivered_share_notional": _finite_or_none(
+                result.undelivered_share_notional[index]
+            ),
             "hedge_restricted_cash": _finite_or_none(
                 result.hedge_restricted_cash[index]
             ),
@@ -1302,6 +1308,9 @@ def _action_attribution(
             "not an isolated action-alpha estimate"
         ),
         "rows": action_rows,
+        "share_distribution_terms": [
+            asdict(event) for event in inputs.share_distributions
+        ],
         "daily": [
             {
                 "date": day_value.isoformat(),
@@ -1570,6 +1579,12 @@ def _declared_subperiod_readouts(
 def _input_hashes(inputs: EvaluationInputs) -> dict[str, str]:
     result = {
         "dates": _dates_sha256(inputs.dates),
+        "share_distributions": hashlib.sha256(
+            json.dumps(
+                [asdict(event) for event in inputs.share_distributions],
+                sort_keys=True,
+            ).encode()
+        ).hexdigest(),
         "canonical_calendar": inputs.calendar_identity_sha256,
         "session_indices": _array_sha256(np.asarray(inputs.session_indices)),
         "scores": _array_sha256(np.asarray(inputs.scores)),
@@ -1779,6 +1794,9 @@ def _economics_contract(inputs: EvaluationInputs) -> dict[str, object]:
             "shares, and cash claims; delivered successor shares net against existing "
             "inventory without a market fill and release only extinguished short "
             "proceeds; each declared payment session settles its cash claim"
+            "; sourced multi-leg entitlements remain non-tradable baskets until "
+            "known custody delivery before the decision, marked only with causal "
+            "successor prices; no terminal fabricated delivery"
         ),
         "short_proceeds_remuneration": config.short_proceeds_remuneration,
         "costs_bps_per_side": list(ECONOMICS_COSTS_BPS),
@@ -2930,6 +2948,7 @@ _PAIRED_INPUT_KEYS = (
     "action_has_action",
     "action_successor_index",
     "action_payment_session",
+    "share_distributions",
     "security_ids",
     "target_scale_sigma",
     "cdi_returns",

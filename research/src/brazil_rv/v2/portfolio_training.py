@@ -246,7 +246,7 @@ def fit_policy(data, root, arm, fold, seed, binding, *, max_epochs=30):
             loss = tensor(0.0)
             for day in rows:
                 day = int(day)
-                risk = portfolio_variance(data, day, account.weights)
+                risk = portfolio_variance(data, day, account.market_weights)
                 target = account_decision(data, model, account, day)
                 outcome = data.step(account, target, day)
                 utility = 1e4 * (outcome["net_excess"] - 2.5 * risk)

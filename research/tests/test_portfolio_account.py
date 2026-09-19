@@ -21,6 +21,7 @@ def compare(
     payments=None,
     fractions=None,
     config=None,
+    share_distributions=(),
 ):
     close = np.asarray(close, dtype=float)
     days, names = close.shape
@@ -38,6 +39,7 @@ def compare(
         payment_session=payments,
         fill_fraction=fractions,
         config=config,
+        share_distributions=share_distributions,
     )
     account = PortfolioAccount.empty(np.full(names + 1, 100.0), config=config)
     records = []
@@ -67,6 +69,7 @@ def compare(
             payment_session=None if payments is None else np.r_[payments[day], -1],
             fill_fraction=None if fractions is None else np.r_[fractions[day], 1.0],
             terminal=day == days - 1,
+            share_distributions=share_distributions,
         )
         assert account.shares.numpy()[:-1] == pytest.approx(
             exact.signed_shares[day], abs=1e-12
@@ -81,6 +84,9 @@ def compare(
         assert record["nav"].item() == pytest.approx(exact.nav[day], abs=1e-12)
         assert record["cost"].item() == pytest.approx(
             exact.cost_bps[day] * exact.start_nav[day] / 1e4, abs=1e-12
+        )
+        assert float(record["undelivered_share_notional"]) == pytest.approx(
+            exact.undelivered_share_notional[day], abs=1e-12
         )
         records.append(record)
     return records
