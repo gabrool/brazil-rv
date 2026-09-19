@@ -10,5 +10,10 @@
   "spot_settlement_acceptance": {
     "path": "docs\\v2_spot_settlement_acceptance.json",
     "sha256": "be8a7a157909c5fc8b0ced719efc0e5432bad7e466ad4bb65417bee02c3ec064"
+  },
+  "bova_loan_reference_audit": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\bova_loan_reference_audit\\manifest.json",
+    "sha256": "589c5d2011e8e1f1092bda6571c45dd172b2c58a3f88801d87f68edef42b27ff",
+    "status": "recovered_not_admitted"
   }
 }

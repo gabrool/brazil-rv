@@ -509,3 +509,24 @@ Incidental diagnostic found for follow-up: the legacy `StatefulLedgerResult.summ
 gross-shortfall decomposition does not reconcile on an arbitrary target-policy book.
 Current learned-policy books use their dedicated `book_summary` instead; do not feed
 such books through the legacy fixed-slot decomposition or remove its invariant check.
+
+## 2026-09-19: hedge published-average reference recovery
+
+`ops/recover_bova_loan_references.py` recovers all 3,963 BOVA11 published-average
+quotes from the already bound 2009–2024 COTAHIST archives. Exact ISIN, cash-market
+type, instrument specification and dated BDI categories are retained. Every date
+and close exactly reproduces the accepted hedge series; published quote factors
+are used rather than replacing averages with turnover/quantity or current marks.
+No held-out archive was opened and no raw/accepted source was changed. The source
+manifest and new parquet are bound by the run pointer; data SHA-256 is
+`98a6ae965e93eebe52e142ff4ea91cd047d4f7f172773c182ec56096e2c72c19`.
+This fills the missing hedge quote recovery, not causal panel admission: consumers
+must receive the appropriate prior publication and action-adjusted contract terms.
+
+Additional manual evidence for source admission: 2021 B3 manual pp.133–136 separates
+cash events from changes in the borrowed asset. Multi-asset contract principal uses
+the issuer's allocation factor; it is not generically justified by relative current
+constituent prices. Redemption can also settle loan remuneration separately from
+issuer cash payment. Preserve the original mechanics evidence, but replace these
+declared intermediate assumptions with source-bound event terms before accepting
+the affected historical cases. Do not retrospectively change earlier decisions.
