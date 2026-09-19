@@ -1,0 +1,64 @@
+{
+  "implementation": {
+    "commit": "3dbda71131cfa3035e26c73cf2ab9d70e5443822",
+    "tracked_worktree_clean": true
+  },
+  "purpose": "GRU vs attention sequence encoder only; retained full roster and 256-wide readout",
+  "cells": {
+    "TE_full": {
+      "cell": "TE_full",
+      "excluded_fields": {
+        "options": [
+          "uncovered_call_share"
+        ]
+      },
+      "families": [
+        "cross_market",
+        "events",
+        "fundamentals",
+        "lending",
+        "magnitudes",
+        "microstructure",
+        "oddlot",
+        "options",
+        "rebalance",
+        "sector"
+      ],
+      "film": true,
+      "graph": "c1",
+      "inputs": "all",
+      "peer_timing": "early",
+      "temporal_encoder": "attention"
+    },
+    "GRU_early": {
+      "cell": "GRU_early",
+      "excluded_fields": {
+        "options": [
+          "uncovered_call_share"
+        ]
+      },
+      "families": [
+        "cross_market",
+        "events",
+        "fundamentals",
+        "lending",
+        "magnitudes",
+        "microstructure",
+        "oddlot",
+        "options",
+        "rebalance",
+        "sector"
+      ],
+      "film": true,
+      "graph": "c1",
+      "inputs": "all",
+      "peer_timing": "early",
+      "temporal_encoder": "gru"
+    }
+  },
+  "name": "encoder",
+  "control": "TE_full",
+  "fit_cells": [
+    "GRU_early"
+  ]
+}

@@ -132,3 +132,19 @@ These diagnostics do not justify promoting saved-weight averaging or adding a ne
 averaging sweep. Keep original raw checkpoints. No separately admitted averaging
 candidate requires confirmation. The compact wave continues normally; completed
 F2/F6 books are being computed on CPU without making a partial-wave decision.
+
+### Compact decision and encoder contrast (2026-09-19 01:35 UTC)
+
+All 15 compact jobs and full readouts completed. Compact ensemble IC changes by
+-0.004912 and net by +0.360808 bps/day. The forecasting loss exceeds the registered
+margin, so compact does not advance despite its positive economic point estimate.
+Keep TE_full with 256-wide readout and raw selection. Full results are in
+`v2_foundation_compact_results.json`. The registration and stage plan were reread.
+
+Next frozen contrast: `v2_foundation_encoder_wave.json`, GRU sequence encoder
+versus existing temporal attention, with the same full roster, early peer attention,
+learned pooling, FiLM, adapters, 256-wide three-block readout, 64-wide sequence,
+three heads and ASAM recipe. This is not the old C6 package. Three fresh P parents
+and twelve F fits; reuse TE_full control. Source remains clean immutable 3dbda71.
+After this wave, test the retained encoder with pooling but without peer attention;
+width/depth contrasts and the CPU residual/accounting work remain required.
