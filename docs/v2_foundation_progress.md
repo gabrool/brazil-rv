@@ -312,3 +312,9 @@ and predictions unchanged. Active/reusable readout source is now clean detached
 C:/quant/brazil-rv-foundation-residual-readouts-calendar, commit 7ffc869; receipt
 readout_residual_calendar_worker.json and corresponding calendar logs supersede
 the prior worker. Preserve the initial error log as evidence.
+
+Second startup correction: save_book also requires explicit policy provenance;
+added `policy: equal_rank` in 81ba9c9. The calendar attempt had not written book.json.
+Current readout source is C:/quant/brazil-rv-foundation-residual-readouts-policy at
+81ba9c9, receipt readout_residual_policy_worker.json and policy logs. This is the
+source to resume. Earlier attempts and logs remain preserved; no fit changed.
