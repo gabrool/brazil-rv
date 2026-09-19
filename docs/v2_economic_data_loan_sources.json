@@ -1,26 +1,42 @@
 [
   {
-    "id": "b3_loan_contract",
-    "url": "https://www.b3.com.br/data/files/8F/C4/F7/7D/C8B37610515A8076AC094EA8/Contrato-Emprestimo-de-Ativos.pdf",
-    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\primary_sources\\b3_loan_contract.pdf",
-    "sha256": "a437f3a8643a6369a9e6882300e144575c2adcc72b2b4f8ed02b56ed1c8c8520",
     "bytes": 444430,
-    "retrieved_at_utc": "2026-09-19T12:46:46.331832+00:00"
+    "id": "b3_loan_contract",
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\primary_sources\\b3_loan_contract.pdf",
+    "retrieved_at_utc": "2026-09-19T12:46:46.331832+00:00",
+    "sha256": "a437f3a8643a6369a9e6882300e144575c2adcc72b2b4f8ed02b56ed1c8c8520",
+    "url": "https://www.b3.com.br/data/files/8F/C4/F7/7D/C8B37610515A8076AC094EA8/Contrato-Emprestimo-de-Ativos.pdf"
   },
   {
-    "id": "b3_125_2020",
-    "url": "https://www.b3.com.br/data/files/ED/F6/31/E2/7B6E47102C784E47AC094EA8/OC%20125%202020%20PRE%20Negocia%C3%A7%C3%A3o%20Eletr%C3%B4nica%20de%20Empr%C3%A9stimo%20de%20Ativos_vers%C3%A3o_final%20a.pdf",
-    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\primary_sources\\b3_125_2020.pdf",
-    "sha256": "4f745bd5f07bce76f34bd6be76416fd876b4f89f0459216f0d791408024330fc",
     "bytes": 173747,
-    "retrieved_at_utc": "2026-09-19T12:46:46.285823+00:00"
+    "id": "b3_125_2020",
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\primary_sources\\b3_125_2020.pdf",
+    "retrieved_at_utc": "2026-09-19T12:46:46.285823+00:00",
+    "sha256": "4f745bd5f07bce76f34bd6be76416fd876b4f89f0459216f0d791408024330fc",
+    "url": "https://www.b3.com.br/data/files/ED/F6/31/E2/7B6E47102C784E47AC094EA8/OC%20125%202020%20PRE%20Negocia%C3%A7%C3%A3o%20Eletr%C3%B4nica%20de%20Empr%C3%A9stimo%20de%20Ativos_vers%C3%A3o_final%20a.pdf"
   },
   {
-    "id": "b3_081_2022",
-    "url": "https://www.b3.com.br/data/files/0D/61/E7/6D/B5AD1810C493CD08AC094EA8/OC%20081-2022%20PRE%20Pol%C3%ADtica%20de%20Tarifa%C3%A7%C3%A3o%20de%20Empr%C3%A9stimos%20de%20Ativos%20%28PT%29.pdf",
-    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\primary_sources\\b3_081_2022.pdf",
-    "sha256": "475c0d231daa15aed6dbfd5a9489fc274874c3a6df2b892ec688fea2294834b7",
     "bytes": 183088,
-    "retrieved_at_utc": "2026-09-19T12:46:46.285823+00:00"
+    "id": "b3_081_2022",
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\primary_sources\\b3_081_2022.pdf",
+    "retrieved_at_utc": "2026-09-19T12:46:46.285823+00:00",
+    "sha256": "475c0d231daa15aed6dbfd5a9489fc274874c3a6df2b892ec688fea2294834b7",
+    "url": "https://www.b3.com.br/data/files/0D/61/E7/6D/B5AD1810C493CD08AC094EA8/OC%20081-2022%20PRE%20Pol%C3%ADtica%20de%20Tarifa%C3%A7%C3%A3o%20de%20Empr%C3%A9stimos%20de%20Ativos%20%28PT%29.pdf"
+  },
+  {
+    "bytes": 448084,
+    "id": "b3_001_2020",
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\primary_sources\\b3_001_2020.pdf",
+    "retrieved_at_utc": "2026-09-19T13:25:36.339084+00:00",
+    "sha256": "ab1e492c5c489cbb4302af4e852a9f15efce0c2fa5b14e01ae3448f4385f3485",
+    "url": "https://www.b3.com.br/data/files/A6/87/E0/62/DC56F6109A4874F6AC094EA8/001-2020-VPC-CE%20Equities_VersaoFinal1.2.pdf"
+  },
+  {
+    "bytes": 201031,
+    "id": "b3_049_2020_erratum",
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\primary_sources\\b3_049_2020_erratum.pdf",
+    "retrieved_at_utc": "2026-09-19T13:25:36.513378+00:00",
+    "sha256": "6e99fe4de868a0b2cac5cf886ed820b86ec6861a3f7500d65e413f0842d94b21",
+    "url": "https://www.b3.com.br/data/files/7D/C6/1C/C5/4F7D5710700BFA57AC094EA8/CE%20049-2020-VPC%20Errata%20-%20F%C3%B3rmula%20Empr%C3%A9stimo%20Ativos_REVISADO_RR.pdf"
   }
 ]

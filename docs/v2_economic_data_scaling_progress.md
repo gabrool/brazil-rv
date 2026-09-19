@@ -73,3 +73,69 @@ accounts and replace fabricated missing-quote liquidation. Complete the source-t
 tensor family audit and evidenced derived-store changes before the matched economic
 replications and capacity contrasts in registration C-D. Both stages A and B remain
 in progress; do not mistake these two source checks for the full data audit.
+
+### Source audit follow-up, 2026-09-19 13:30 UTC
+
+The registered-loan census is complete: 390 PDFs, 320,132 printed rows,
+zero extraction failures, and every 41,353 accepted rate observation recovered.
+The repaired parser hash is
+`310bd650446d2b3fbd11e8aa628b24cbd48d744815159a626935d5f8dcecb592`.
+Across model security axes there are 58,881 additional rate observations; restricting
+to stocks eligible at their causal next-session availability leaves 25,728 additional
+observations and 2,916 changed existing rates. Of the changed eligible observations,
+2,142 decrease and 774 increase. The average absolute change over all 38,819 eligible
+overlaps is .00009837 in annual-decimal units, so count alone must not be mistaken
+for a large economic effect. `eligible_attribution.json` binds this calculation;
+`ops/audit_lending_sources.py` reproduces it without altering any consumer store.
+
+The same source contains 344 positive-flow BOVA11 days, including the last bulletin
+whose next-session availability lies outside development. Its annual rate median
+is .8215%, range .1417%-2.7992%. The current independent ledger floors a supplied
+hedge rate at 2%, while the training account always uses a fixed 2%; the main
+EvaluationInputs contract currently carries no hedge-rate series. Both also need
+consistent B3 fee treatment. These are additional concrete account-path defects
+to fix during A, not a measured P&L improvement or an executable borrow quote.
+
+The earlier-balance audit resolves its 587 original PDFs through the accepted source
+manifest, not a recursive data scan. It uses the actual balance date's COTAHIST
+ticker/ISIN and report-D+1 publication timing. Repairs now preserve touching large
+quantity/BRL columns, a printed `02` market code touching the ticker, wrapped BRL
+amounts, and boundaries before account-margin/custody tables. Named rows reconcile
+and published BRL totals are checked where printed. Source inspection recovered
+ITSA4's previously omitted 2019-11-01 row and removed false `02ITSA3` identities.
+Twenty-five targeted lending/parser/archive tests pass.
+
+The completed `c307d68` balance census has 229,416 parsed rows, of which 149,130 map
+to model identities, spanning balance dates 2019-10-31 through 2022-03-17. It has
+zero conflicting ISIN assignments, 94 quarantined PDF attempts, and three no-table
+receipts. Sixty-two failures concern duplicate printed tickers; a rendered original
+2020-10-27 page also shows an unidentified balance row. Other failures include
+touching ungrouped numbers, wrapped company/value lines and published-total
+differences. These are preserved audit exceptions, not blanket final exclusions.
+Review remaining recoverable fields and per-security admission rather than dropping
+good securities because another row on the same page is ambiguous. Unmapped legacy
+tickers receive no guessed identity. None of these new balance rows has yet entered
+the model, so the accepted information set has not been reduced.
+
+Attempt receipts are saved separately (`extraction_attempt_f8fae21.json` and
+`extraction_attempt_44c3376.json`); `lending_balance_audit_worker.json` binds the
+latest worker and log names. It has finished. A bounded PyMuPDF extraction trial
+recovered some spacing but left genuine source ambiguities; no dependency or parser
+switch was adopted. Avoid rerunning complete successful censuses without a source
+or parser change. Inspect representative failed dates directly next.
+
+Archived B3 001/2020-VPC describes the change from a fixed annual fee with a BRL
+minimum per contract to rate-dependent fees, but explicitly leaves implementation
+timing for a later announcement. It does not establish January 2020 as the effective
+date. The 049/2020 formula erratum is also archived. Pre-2020 tariff levels, the
+actual implementation date, modality-specific aggregation and retail financing
+remain to establish or bound. Execution brokerage stays zero by user assumption;
+do not double-count borrower intermediation already embedded in published taker
+rates, or assume short-sale proceeds earn CDI merely because brokerage is free.
+
+**Current boundary:** A/B are still in progress. No accounting transition has been
+changed, no recovered source is admitted, and no GPU follow-up has started. Next
+implementation must handle multi-leg/delivery/netted succession and remove synthetic
+last-mark fills in both accounts, with meaningful conservation/causality tests and
+explicit source provenance. Finish the remaining family/label/tensor audit and
+causal source admission before C-D. The active heartbeat continues this program.
