@@ -356,3 +356,22 @@ receipt: ROOT/financing.{stdout,stderr}.log and financing_worker.json. Summary w
 be financing_summary.json with paired 20/40/60-session uncertainty against the
 matched base accounts. No new candidate was promoted. Settlement event integration,
 consolidated report and verified archive remain; do not mark program complete.
+
+### Financing results and settlement exposure audit (2026-09-19 08:33 UTC)
+
+All sixteen financing replays completed. Zero short-proceeds interest changes net
+by -3.034989 bps/day for C6 and -3.040599 for TE_full; +3% annual debit spread changes
+net by -0.104589 and -0.101031 respectively. These are matched four-fold scenario
+deltas, not broker terms or corrected absolute-return estimates. Paired intervals
+are in `v2_foundation_financing_results.json`.
+
+Inventoried actual terminal_settlement fills across foundation ensemble accounts,
+original neutral ensemble folds and prior continuous neutral/flexible accounts,
+checking fill hashes against book manifests. Full signed-side/quantity/price/date
+records are in `v2_foundation_settlement_exposure.json`. Metric is cumulative gross
+settlement notional / initial NAV, NOT PnL: earlier continuous books have material
+incidence, while some new F14 books contain only floating-point dust at events.
+Do not conclude that settlement accounting is fixed, nor compare cumulative gross
+notional directly to daily return. Next identify material event rows and quantify
+contractual-event differences or explicit unresolved sensitivities, then consolidate
+reports and recovery. Primary-source events and identity audit remain applicable.

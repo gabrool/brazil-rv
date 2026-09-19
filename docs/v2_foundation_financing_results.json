@@ -1,0 +1,146 @@
+{
+  "C6": {
+    "debit3": {
+      "20": {
+        "block_length": 20,
+        "estimate": -0.10458907894151805,
+        "fold_boundary_preserved": true,
+        "lower_90": -0.1208844112373906,
+        "lower_95": -0.12384936386117196,
+        "nominal_development_interval": true,
+        "replications": 10000,
+        "upper_90": -0.08832362212668458,
+        "upper_95": -0.08573295513390002
+      },
+      "40": {
+        "block_length": 40,
+        "estimate": -0.10458907894151805,
+        "fold_boundary_preserved": true,
+        "lower_90": -0.12429356240625963,
+        "lower_95": -0.12800260742406325,
+        "nominal_development_interval": true,
+        "replications": 10000,
+        "upper_90": -0.08532841809350146,
+        "upper_95": -0.08184046827531885
+      },
+      "60": {
+        "block_length": 60,
+        "estimate": -0.10458907894151805,
+        "fold_boundary_preserved": true,
+        "lower_90": -0.1231167913650588,
+        "lower_95": -0.1266118629101996,
+        "nominal_development_interval": true,
+        "replications": 10000,
+        "upper_90": -0.08591101222487071,
+        "upper_95": -0.08267458562096852
+      }
+    },
+    "proceeds0": {
+      "20": {
+        "block_length": 20,
+        "estimate": -3.034988568348995,
+        "fold_boundary_preserved": true,
+        "lower_90": -3.163677357508759,
+        "lower_95": -3.187709464277026,
+        "nominal_development_interval": true,
+        "replications": 10000,
+        "upper_90": -2.9215623888066546,
+        "upper_95": -2.906607498202349
+      },
+      "40": {
+        "block_length": 40,
+        "estimate": -3.034988568348995,
+        "fold_boundary_preserved": true,
+        "lower_90": -3.1686437852082086,
+        "lower_95": -3.1946229218419826,
+        "nominal_development_interval": true,
+        "replications": 10000,
+        "upper_90": -2.91635754559664,
+        "upper_95": -2.9015630555536536
+      },
+      "60": {
+        "block_length": 60,
+        "estimate": -3.034988568348995,
+        "fold_boundary_preserved": true,
+        "lower_90": -3.157699352160613,
+        "lower_95": -3.173252110741141,
+        "nominal_development_interval": true,
+        "replications": 10000,
+        "upper_90": -2.917813524852825,
+        "upper_95": -2.903277680275137
+      }
+    }
+  },
+  "TE_full": {
+    "debit3": {
+      "20": {
+        "block_length": 20,
+        "estimate": -0.10103099829156116,
+        "fold_boundary_preserved": true,
+        "lower_90": -0.11761630608086429,
+        "lower_95": -0.12044019428468228,
+        "nominal_development_interval": true,
+        "replications": 10000,
+        "upper_90": -0.0848551614666958,
+        "upper_95": -0.0815093123911746
+      },
+      "40": {
+        "block_length": 40,
+        "estimate": -0.10103099829156116,
+        "fold_boundary_preserved": true,
+        "lower_90": -0.12066129537006245,
+        "lower_95": -0.1239930597284147,
+        "nominal_development_interval": true,
+        "replications": 10000,
+        "upper_90": -0.08182708850870979,
+        "upper_95": -0.07824480610590474
+      },
+      "60": {
+        "block_length": 60,
+        "estimate": -0.10103099829156116,
+        "fold_boundary_preserved": true,
+        "lower_90": -0.11951499600963027,
+        "lower_95": -0.12289887770964,
+        "nominal_development_interval": true,
+        "replications": 10000,
+        "upper_90": -0.08252619893995307,
+        "upper_95": -0.07932116153668996
+      }
+    },
+    "proceeds0": {
+      "20": {
+        "block_length": 20,
+        "estimate": -3.040599114885442,
+        "fold_boundary_preserved": true,
+        "lower_90": -3.134126210719923,
+        "lower_95": -3.1527382832201365,
+        "nominal_development_interval": true,
+        "replications": 10000,
+        "upper_90": -2.95029734400394,
+        "upper_95": -2.93503615649782
+      },
+      "40": {
+        "block_length": 40,
+        "estimate": -3.040599114885442,
+        "fold_boundary_preserved": true,
+        "lower_90": -3.1323670189428676,
+        "lower_95": -3.149468182457491,
+        "nominal_development_interval": true,
+        "replications": 10000,
+        "upper_90": -2.9498107241020555,
+        "upper_95": -2.9347833944945347
+      },
+      "60": {
+        "block_length": 60,
+        "estimate": -3.040599114885442,
+        "fold_boundary_preserved": true,
+        "lower_90": -3.12967953433087,
+        "lower_95": -3.145195911253404,
+        "nominal_development_interval": true,
+        "replications": 10000,
+        "upper_90": -2.9540820182270786,
+        "upper_95": -2.94045048320079
+      }
+    }
+  }
+}
