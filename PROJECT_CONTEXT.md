@@ -18,6 +18,15 @@ Use the local GPU, all eligible names and full history; no forward capture, depl
 or held-out consumers. Follow the registered stages and
 `docs/v2_economic_data_scaling_progress.md`. Earlier foundation outcomes stay sealed.
 
+The current accounting code retains unpriced equity/hedge inventory and its cash,
+claims and financing obligations until an observed execution or contractual event.
+Missing quotes and evaluation boundaries never manufacture last-mark fills or
+permanently exclude a security. Evaluation V19 reports remaining inventory and a
+separate non-cash valuation sensitivity on the full comparison calendar. This is an
+implemented accounting repair, not completion of the contractual-event/source audit
+or acceptance of new historical results. Reproduce sealed books with their recorded
+source commits; use new roots for corrected replays.
+
 The user has authorized all five workstreams of the
 [model foundation program](research/preregistrations/v2_foundation.md): input
 selection/cleanup, component attribution, variance reduction, capacity scaling

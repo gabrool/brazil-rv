@@ -28,7 +28,7 @@ def headline_ledger(inputs):
     arguments["capacity_buffer_per_side"] = 30
     if policy.inverse_volatility:
         arguments["entry_sizing_volatility"] = inputs.target_scale_sigma
-    config = replace(policy.ledger_config(), settle_terminal_residuals=True)
+    config = policy.ledger_config()
     result = simulate_stateful_ledger(
         **arguments,
         config=config,

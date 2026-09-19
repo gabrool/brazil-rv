@@ -25,7 +25,6 @@ def policy_ledger_config(**changes):
     defaults = dict(
         volatility_balanced_entries=False,
         planned_absolute_net_cap=0.05,
-        settle_terminal_residuals=True,
     )
     return replace(LedgerConfig(), **(defaults | changes))
 

@@ -3,7 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 import math
-from dataclasses import asdict, dataclass, replace
+from dataclasses import asdict, dataclass
 from datetime import date
 from pathlib import Path
 from typing import Mapping, Sequence
@@ -14,7 +14,7 @@ from numpy.typing import NDArray
 from brazil_rv.execution.stateful_ledger import (
     LedgerConfig,
     StatefulLedgerResult,
-    TERMINAL_SETTLEMENT_CONVENTION,
+    MISSING_QUOTE_CONVENTION,
     ledger_configurations,
     ledger_sensitivity_grid,
     simulate_stateful_ledger,
@@ -46,7 +46,7 @@ MIN_CROSS_SECTION = 20
 BOOTSTRAP_SEED = 20260903
 ECONOMICS_COSTS_BPS = (2.0, 4.0, 7.0)
 ECONOMICS_HEADLINE = (4.0, 0.02)
-EVALUATION_SCHEMA = "BRAZIL_RV_V2_EVALUATION_V18"
+EVALUATION_SCHEMA = "BRAZIL_RV_V2_EVALUATION_V19"
 PRIOR_EVALUATION_SCHEMA = "BRAZIL_RV_V2_EVALUATION_V15"
 PAIRED_COMPARISON_SCHEMA = "BRAZIL_RV_V2_PAIRED_COMPARISON_V3"
 
@@ -1026,16 +1026,15 @@ def _ledger_rows(
                 result.unresolved_action_name_days[index]
             ),
             "valuation_scenario_count": int(result.valuation_scenario_count[index]),
-            "terminal_settlement_count": int(result.terminal_settlement_count[index]),
-            "terminal_settlement_notional": _finite_or_none(
-                result.terminal_settlement_notional[index]
+            "unpriced_inventory_count": int(result.unpriced_inventory_count[index]),
+            "unpriced_inventory_notional": _finite_or_none(
+                result.unpriced_inventory_notional[index]
             ),
-            "terminal_settlement_notional_fraction_nav": _finite_or_none(
-                result.terminal_settlement_notional_fraction_nav[index]
+            "unpriced_inventory_fraction_nav": _finite_or_none(
+                result.unpriced_inventory_fraction_nav[index]
             ),
-            "settled_then_printed_count": int(result.settled_then_printed_count[index]),
-            "terminal_settlement_haircut_scenario_nav": _finite_or_none(
-                result.settlement_haircut_scenario_nav[index]
+            "unpriced_haircut_scenario_nav": _finite_or_none(
+                result.unpriced_haircut_scenario_nav[index]
             ),
             "planned_gross_fraction_nav": _finite_or_none(
                 result.planned_gross_fraction_nav[index]
@@ -1755,7 +1754,7 @@ def _economics_contract(inputs: EvaluationInputs) -> dict[str, object]:
             "slots per side while retaining a binding directional-risk limit"
         ),
         "annual_sessions": config.annual_sessions,
-        "terminal_liquidation": True,
+        "terminal_liquidation": "attempt_exit_at_observed_print_otherwise_retain",
         "stateful_policy": (
             "buffered held inventory; same-close exits free same-decision entry "
             "slots while older pending exits remain occupied; independent side "
@@ -1768,7 +1767,7 @@ def _economics_contract(inputs: EvaluationInputs) -> dict[str, object]:
         ),
         "missing_print_policy": (
             "stale mark while an exit is pending; fill at the first print and "
-            "report a valuation scenario after 10 missing sessions"
+            "retain shares and financing at the boundary; report unpriced valuation uncertainty"
         ),
         "order_representation": "notional entries and hedge rebalances; position-fraction exits and terminal hedge liquidation",
         "action_timing": "only prior-session uncertainty affects decisions; retrospective conversion of opening inventory before fills",
@@ -2146,7 +2145,7 @@ def enforce_registered_book_bounds(report: Mapping[str, object]) -> None:
 
 
 def _evaluate_economics(
-    inputs: EvaluationInputs, *, settle_terminal_residuals: bool = False
+    inputs: EvaluationInputs,
 ) -> tuple[dict[str, object], StatefulLedgerResult, NDArray[np.bool_]]:
     """Run the canonical ledger grid without recomputing score-only statistics."""
     policy = inputs.execution_policy
@@ -2159,9 +2158,6 @@ def _evaluate_economics(
         if policy.inverse_volatility:
             ledger_inputs["entry_sizing_volatility"] = inputs.target_scale_sigma
     headline_config = policy.ledger_config() if policy is not None else LedgerConfig()
-    headline_config = replace(
-        headline_config, settle_terminal_residuals=settle_terminal_residuals
-    )
     grid = ledger_sensitivity_grid(
         shortable_by_borrow_source=inputs.shortable_by_borrow_source,
         headline_config=headline_config,
@@ -2199,9 +2195,9 @@ def _evaluate_economics(
                 ),
                 "borrow_registration_fee_floor": (config.borrow_registration_fee_floor),
                 "borrow_registration_fee_cap": config.borrow_registration_fee_cap,
-                "terminal_settlement_convention": TERMINAL_SETTLEMENT_CONVENTION,
+                "missing_quote_convention": MISSING_QUOTE_CONVENTION,
                 "settlement_grace_sessions": config.settlement_grace_sessions,
-                "settlement_haircut": config.settlement_haircut,
+                "unpriced_haircut": config.unpriced_haircut,
                 "path_model_count": 1,
                 **{
                     key: _finite_or_none(value) if isinstance(value, float) else value
@@ -2250,11 +2246,7 @@ def _evaluate_economics(
             ),
             "terminal_unresolved_inventory_fraction_nav": (
                 _finite_or_none(
-                    (
-                        headline.unresolved_inventory_notional
-                        + headline.terminal_boundary_unpriced_inventory_notional
-                    )
-                    / headline.nav[-1]
+                    (headline.unresolved_inventory_notional) / headline.nav[-1]
                 )
                 if headline.nav[-1] != 0.0
                 else None
@@ -2296,13 +2288,11 @@ def _evaluate_economics(
             "economics_unresolved": headline.economics_unresolved,
         },
     }
-    if settle_terminal_residuals:
-        economics["contract"].update(
-            terminal_residuals_settled=True,
-            terminal_boundary_convention="last_mark_after_10_sessions_with_evaluation_end_acceleration",
-            economics_pooling="full_common_calendar_unresolved_is_a_label",
-            terminal_unresolved_inventory_readout="remaining_inventory_plus_unpriced_equity_settled_at_boundary",
-        )
+    economics["contract"].update(
+        terminal_boundary_convention="observed_exit_or_retained_inventory",
+        economics_pooling="full_common_calendar_unresolved_is_a_label",
+        terminal_unresolved_inventory_readout="remaining_inventory_and_signed_claims",
+    )
     if policy is not None:
         traded = traded_readouts(inputs, economics_score, economics_mask)
         economics["execution_policy"] = {
@@ -2336,7 +2326,6 @@ def evaluate_scores(
     registration_path: Path | None = None,
     preregistration_root: Path = PREREGISTRATION_ROOT,
     protocol: ProtocolPreset = FULL_PROTOCOL,
-    settle_terminal_residuals: bool = False,
 ) -> EvaluationResult:
     """Evaluate one score cube after enforcing the v2 access boundary."""
     ledger = authorize_dates(
@@ -2393,9 +2382,7 @@ def evaluate_scores(
         TRADED_PRIMARY_HORIZONS,
     )
     persistence, persistence_rows = _persistence(inputs)
-    economics, headline, economics_mask = _evaluate_economics(
-        inputs, settle_terminal_residuals=settle_terminal_residuals
-    )
+    economics, headline, economics_mask = _evaluate_economics(inputs)
     active = np.asarray(inputs.active, dtype=np.bool_)
     scaled_mask = np.asarray(inputs.scaled_target_mask, dtype=np.bool_)
     neutral_mask = np.asarray(inputs.neutral_target_mask, dtype=np.bool_)
@@ -2915,8 +2902,10 @@ def headline_economics_excluded(report: Mapping[str, object]) -> bool:
         raise ValueError(
             "evaluation report lacks an explicit economics resolution flag"
         )
-    return value and not economics.get("contract", {}).get(
-        "terminal_residuals_settled", False
+    return (
+        value
+        and economics.get("contract", {}).get("economics_pooling")
+        != "full_common_calendar_unresolved_is_a_label"
     )
 
 

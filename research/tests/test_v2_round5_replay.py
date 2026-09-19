@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import copy
-import hashlib
 from dataclasses import replace
 from pathlib import Path
 from types import SimpleNamespace
@@ -11,48 +10,8 @@ import pytest
 
 from brazil_rv.v2 import evaluate as ev
 from brazil_rv.v2 import round5_replay as replay
-from brazil_rv.v2.artifacts import canonical_json_bytes, sha256_file, write_json_atomic
-from brazil_rv.v2.execution_policy import ExecutionPolicy
+from brazil_rv.v2.artifacts import sha256_file, write_json_atomic
 from test_v2_evaluate import _fixture
-
-
-@pytest.mark.parametrize(
-    ("settle", "selected", "expected"),
-    [
-        (
-            False,
-            False,
-            "71866c0aba5eff29870412a81c975b83474df2d73efebd90152e02abf8063d2a",
-        ),
-        (
-            True,
-            False,
-            "d4162a6b0cc304a55bacc83b8ddaf22ce4b381b16d56c06d65c42b322c2a84d3",
-        ),
-        (
-            True,
-            True,
-            "92c5a9a1018577c3da195bf41a7f9782d28cd09a4537b8fd6e6b6b7b71d075a4",
-        ),
-    ],
-)
-def test_economics_extraction_preserves_entire_pre_refactor_report(
-    settle, selected, expected
-):
-    # Hashes captured before extracting the accounting helper. These cover the
-    # entire report, including all accounting and untouched score-only statistics.
-    inputs = _fixture()
-    if selected:
-        inputs = replace(
-            inputs,
-            execution_policy=ExecutionPolicy(
-                horizons=(3, 5, 10), buffer_per_quintile=9
-            ),
-        )
-    report = ev.evaluate_scores(
-        inputs, window_name="F1", settle_terminal_residuals=settle
-    ).report
-    assert hashlib.sha256(canonical_json_bytes(report)).hexdigest() == expected
 
 
 def _new_provenance(inputs):
@@ -72,9 +31,7 @@ def _new_provenance(inputs):
 
 def test_unchanged_numerical_inputs_reuse_exact_accounting(monkeypatch):
     inputs = _fixture()
-    original = ev.evaluate_scores(
-        inputs, window_name="F1", settle_terminal_residuals=True
-    ).report
+    original = ev.evaluate_scores(inputs, window_name="F1").report
     changed = _new_provenance(inputs)
 
     def forbidden(*args, **kwargs):
@@ -98,13 +55,9 @@ def test_repaired_bova_accounting_matches_full_evaluation_without_score_statisti
     old_close = np.asarray(repaired.bova11_close).copy()
     old_close[4:9] = np.nan
     original_inputs = replace(repaired, bova11_close=old_close)
-    original = ev.evaluate_scores(
-        original_inputs, window_name="F4", settle_terminal_residuals=True
-    ).report
+    original = ev.evaluate_scores(original_inputs, window_name="F4").report
     changed = _new_provenance(repaired)
-    expected = ev.evaluate_scores(
-        changed, window_name="F4", settle_terminal_residuals=True
-    ).report
+    expected = ev.evaluate_scores(changed, window_name="F4").report
 
     def forbidden(*args, **kwargs):
         raise AssertionError("ledger replay must not recompute score-only statistics")
@@ -184,12 +137,8 @@ def test_observed_rates_change_only_cost_inputs_and_preserve_shortability():
     assert changed.shortable_by_borrow_source is inputs.shortable_by_borrow_source
     assert changed.source_archive_present is inputs.source_archive_present
     assert changed.source_feature_valid is inputs.source_feature_valid
-    original = ev.evaluate_scores(
-        inputs, window_name="F4", settle_terminal_residuals=True
-    ).report
-    expected = ev.evaluate_scores(
-        changed, window_name="F4", settle_terminal_residuals=True
-    ).report
+    original = ev.evaluate_scores(inputs, window_name="F4").report
+    expected = ev.evaluate_scores(changed, window_name="F4").report
     result, record = replay.replay_report(original, changed, treatment="lending_only")
     assert result == expected
     assert record["accounting_recomputed"]

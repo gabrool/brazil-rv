@@ -117,7 +117,6 @@ def panel(root: Path, review: Path, output: Path, omitted: int) -> str:
                         fold=fold,
                         output=dest / "evaluation.json",
                         execution_policy=policy,
-                        settle_terminal_residuals=True,
                     )
                     _finish_cell(dest, evaluated, name=arm, fold=fold)
                 except RuntimeError as error:

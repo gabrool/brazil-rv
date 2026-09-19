@@ -272,7 +272,6 @@ def evaluate_fold(root, design, choices, economic, hashes, fold, cells=None):
                 fold=fold,
                 output=output / "evaluation.json",
                 execution_policy=policy,
-                settle_terminal_residuals=True,
             )
             write_json_atomic(output / "alignment.json", alignment(evaluated.inputs))
 

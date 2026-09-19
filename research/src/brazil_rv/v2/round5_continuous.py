@@ -150,9 +150,7 @@ def evaluate_continuous(inputs: ev.EvaluationInputs, spans: list[dict]):
         raise PermissionError(
             "continuous replay requires clean development-only scores"
         )
-    economics, headline, _ = ev._evaluate_economics(
-        inputs, settle_terminal_residuals=True
-    )
+    economics, headline, _ = ev._evaluate_economics(inputs)
     boundary = boundary_evidence(headline, spans)
     return economics, headline, boundary
 

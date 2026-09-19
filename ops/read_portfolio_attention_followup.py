@@ -112,7 +112,6 @@ def run(root, source, *, remaining=False):
                     )
                 config = replace(
                     data.inputs.execution_policy.ledger_config(),
-                    settle_terminal_residuals=True,
                 )
                 result, targets, previous = legacy_replay(view, start, stop, config)
                 book = save_book(
@@ -151,8 +150,8 @@ def run(root, source, *, remaining=False):
                     "head_ic": np.nanmean(head, axis=0).tolist(),
                     "mean_ic": float(np.nanmean(ic)),
                     "daily_ic": [float(v) if np.isfinite(v) else None for v in ic],
-                    "settlement_fraction_sum": float(
-                        result.terminal_settlement_notional_fraction_nav.sum()
+                    "maximum_unpriced_inventory_fraction": float(
+                        result.unpriced_inventory_fraction_nav.max()
                     ),
                     "unresolved_action_name_days": int(
                         result.unresolved_action_name_days.sum()

@@ -6,9 +6,10 @@ follow-ups. Read `research/preregistrations/v2_economic_data_scaling.md` after e
 stage. Foundation outcomes remain sealed at the canonical foundation pointer.
 
 **Current status:** A/B remain in progress; C/D have not started. Corporate-account
-research and the source censuses below are complete. The BOVA11 borrowing-path
-repair is implemented and tested (see the latest entry); recovered historical
-sources are not yet admitted. No training or source-census worker is active.
+research and the source censuses below are complete. BOVA11 borrowing-path
+consistency and removal of fabricated missing-quote liquidations are implemented
+and tested (see the latest entries); recovered historical sources are not yet
+admitted. No training or source-census worker is active.
 
 Initial inspection: the account supports only one scalar successor and rejects a
 successor already held; multi-leg Copel delivery and mixed contractual consideration
@@ -138,7 +139,7 @@ remain to establish or bound. Execution brokerage stays zero by user assumption;
 do not double-count borrower intermediation already embedded in published taker
 rates, or assume short-sale proceeds earn CDI merely because brokerage is free.
 
-**Current boundary:** A/B are still in progress. No accounting transition has been
+**Boundary at the source-census checkpoint:** A/B were still in progress. No accounting transition had been
 changed, no recovered source is admitted, and no GPU follow-up has started. Next
 implementation must handle multi-leg/delivery/netted succession and remove synthetic
 last-mark fills in both accounts, with meaningful conservation/causality tests and
@@ -205,3 +206,54 @@ Multi-leg corporate actions, delivery/payment claims, existing-destination netti
 and removal of synthetic missing-quote liquidation remain the next accounting work,
 alongside causal source admission and the remaining source-to-model audit. No GPU
 follow-up is launched before those contracts are ready.
+
+### Missing-quote inventory repair, 2026-09-19
+
+Removed synthetic last-mark liquidation after ten missing quotes and at an
+evaluation boundary in both accounts. Unavailable equities and BOVA11 now remain
+signed inventory: no fabricated cash release, trading cost, turnover or short
+cover. Restricted short proceeds remain restricted, financing/borrow continue and
+pending exits execute only when a real quote returns or a contractual event resolves
+the claim. The ten-session rule requests an exit; it no longer fabricates its fill.
+Removed permanent post-settlement exclusion, redundant settlement intentions,
+their cancellation branches, dead exclusion counters and the terminal-settlement
+configuration switch throughout active callers. A returning quote executes at its
+observed price and the security may subsequently re-enter normally.
+
+Evaluation V19 and book readouts expose daily unpriced inventory/count/NAV fraction,
+remaining terminal inventory and the unresolved-economics flag. Summary inventory
+fields describe the terminal state; the material-exposure flag uses the maximum
+daily fraction. The configured 30% haircut is only a transparent valuation
+sensitivity on currently unpriced inventory. It does not affect cash, orders,
+financing or headline NAV and disappears when a quote resolves the uncertainty.
+It is neither a collateral haircut nor an asserted recovery value. Comparisons keep
+the common calendar and disclose unresolved exposure instead of silently dropping
+difficult folds. Previously sealed reports/results remain unchanged; historical
+source-report inspectors still read their recorded former fields.
+
+Validation: 209 targeted ledger, policy, account, causality, evaluation, checkpoint,
+readout and pipeline checks pass (208 in the broad run, the remaining numerical
+check after its bounded test correction). New/revised cases verify long and short
+outages beyond ten sessions, retained terminal hedge positions, restricted cash,
+continuing rent/CDI, resumption at a changed quote, subsequent re-entry, absence of
+synthetic fees and unchanged primary NAV under valuation-haircut changes. Both
+accounts reconcile. Ruff and diff checks pass. A pre-existing loss test demanded
+bitwise equality from batched versus per-head float32 reductions: its maximum
+gradient difference was 1.862645149230957e-9. The test now uses strict numerical
+tolerances; no loss/training implementation changed. Obsolete golden hashes of
+pre-repair full reports were removed rather than replaced with meaningless new
+goldens; score-only and independent-account agreement remain directly tested.
+
+The resolved run root contains `missing_quote_acceptance.json` and its SHA-256:
+against source commit `62e546c`, an all-printed 25-session/60-name synthetic fixture
+has bit-identical NAV, cash, positions, borrowing/trading costs, turnover, claims,
+cash benchmark and reconciliation, plus identical actual fills. This establishes
+unaffected-path agreement, not a historical performance result. The acceptance
+receipt binds the four changed accounting/consumer source files.
+
+Stage A is still open: integrate multi-leg/delivery/netted succession, dated signed
+cash/share claims, fixed-contract loan reference/rate and dated exchange fees, then
+admit recovered causal lending sources. Stage B's remaining family/identity/label/
+tensor audit also remains open. Stage C corrected historical replay and Stage D
+scaling have not started. The registration was revisited: these are repairs within
+A, not a reason to skip A/B or to claim either candidate improved economically.

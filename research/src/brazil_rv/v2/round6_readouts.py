@@ -175,7 +175,6 @@ def evaluate(
                     fold=fold,
                     output=output / "evaluation.json",
                     execution_policy=policy,
-                    settle_terminal_residuals=True,
                 )
                 _finish_cell(output, evaluated, name=arm, fold=fold)
                 del evaluated

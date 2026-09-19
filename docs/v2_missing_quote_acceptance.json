@@ -1,0 +1,29 @@
+{
+  "scope": "synthetic all-printed 25-session, 60-name fixture; not a historical financial replay",
+  "reference_commit": "62e546cd38a49f50a350b3be3b6075afbfd7aa5a",
+  "reference_boundary": "prior accelerated last-mark settlement enabled",
+  "checks_bit_identical": {
+    "nav": true,
+    "free_cash": true,
+    "restricted_cash": true,
+    "signed_shares": true,
+    "hedge_signed_shares": true,
+    "hedge_restricted_cash": true,
+    "cost_bps": true,
+    "borrow_bps": true,
+    "turnover_fraction_nav": true,
+    "gross_fraction_nav": true,
+    "receivables": true,
+    "payables": true,
+    "all_cash_nav": true,
+    "reconciliation_error": true
+  },
+  "actual_fills_identical": true,
+  "source_sha256": {
+    "research/src/brazil_rv/execution/stateful_ledger.py": "c23ab1898c0ec02f9677fc859ac6c58369dcf53d69c4961f51208b8737760f23",
+    "research/src/brazil_rv/execution/portfolio_account.py": "3afb7f8556e407125ab1d188ffaa2f223c9b1916b818566957d09eff0658786d",
+    "research/src/brazil_rv/execution/portfolio_policy.py": "b7804bbcc9831bd5e4aa460cc08d8309d667324fd0beb87dd7b1c059e3f7d038",
+    "research/src/brazil_rv/v2/evaluate.py": "227252cae736035f5e619a37529859fab6abf8cef7187eaa7d82f8d74f52ffe8"
+  },
+  "heldout_accessed": false
+}

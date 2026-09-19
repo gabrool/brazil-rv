@@ -1225,24 +1225,19 @@ def _development_acceptance(
                     "mean_pending_exit_age_sessions"
                 ),
                 "cancellations_by_reason": headline.get("cancellations_by_reason"),
-                "terminal_settlement_convention": headline.get(
-                    "terminal_settlement_convention"
-                ),
+                "missing_quote_convention": headline.get("missing_quote_convention"),
                 "settlement_grace_sessions": headline.get("settlement_grace_sessions"),
                 "ineligible_hold_sessions": headline.get("ineligible_hold_sessions"),
-                "settlement_haircut": headline.get("settlement_haircut"),
-                "terminal_settlement_count": headline.get("terminal_settlement_count"),
-                "terminal_settlement_notional": headline.get(
-                    "terminal_settlement_notional"
+                "unpriced_haircut": headline.get("unpriced_haircut"),
+                "unpriced_inventory_count": headline.get("unpriced_inventory_count"),
+                "unpriced_inventory_notional": headline.get(
+                    "unpriced_inventory_notional"
                 ),
-                "terminal_settlement_notional_fraction_nav": headline.get(
-                    "terminal_settlement_notional_fraction_nav"
+                "unpriced_inventory_fraction_nav": headline.get(
+                    "unpriced_inventory_fraction_nav"
                 ),
-                "settled_then_printed_count": headline.get(
-                    "settled_then_printed_count"
-                ),
-                "terminal_settlement_economics_unresolved": headline.get(
-                    "terminal_settlement_economics_unresolved"
+                "unpriced_economics_unresolved": headline.get(
+                    "unpriced_economics_unresolved"
                 ),
                 "exit_instructions_by_cause": headline.get(
                     "exit_instructions_by_cause"
@@ -1307,10 +1302,10 @@ def _development_acceptance(
             }
         )
         if (
-            headline.get("terminal_settlement_convention")
-            != "last_mark_after_10_sessions"
+            headline.get("missing_quote_convention")
+            != "retain_inventory_until_quote_or_contractual_event"
         ):
-            violations.append(f"{label}_terminal_settlement_convention_missing")
+            violations.append(f"{label}_missing_quote_convention_missing")
         if headline.get("ineligible_hold_sessions") != 5:
             violations.append(f"{label}_ineligible_hold_sessions_not_five")
         signatures = headline.get("entry_defect_signatures")
@@ -1408,7 +1403,7 @@ def _development_acceptance(
             "action_terms_source": action_terms_source,
             "schedule_source": schedule_source,
             "economics_tier": "development_grade_close_proxy",
-            "terminal_settlement_convention": "last_mark_after_10_sessions",
+            "missing_quote_convention": "retain_inventory_until_quote_or_contractual_event",
         },
         "sanity_bounds": {
             "naive_absolute_pooled_ic_strictly_below": 0.10,
@@ -1427,7 +1422,7 @@ def _development_acceptance(
                 "D5_ineligible_exit_within_hold_window": 0,
             },
             "per_evaluation_mean_unresolved_stale_inventory_fraction_strictly_below": 0.02,
-            "terminal_settlement_economics_unresolved_fraction_nav": 0.15,
+            "unpriced_economics_unresolved_fraction_nav": 0.15,
         },
         "naive_pooled_primary_neutral_target_ic": pooled_ic,
         "inverse_volatility_neutral_ic_by_fold": inverse_volatility_by_fold,

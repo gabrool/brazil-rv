@@ -149,15 +149,20 @@ def test_identity_conversion_transfers_inventory_and_exit_instruction():
     )
 
 
-def test_stale_settlement_and_terminal_last_mark_parity():
+@pytest.mark.parametrize("missing_name", [0, 1])
+def test_long_quote_outage_and_terminal_inventory_parity(missing_name):
     close = np.full((13, 2), 100.0)
-    close[1:, 0] = np.nan
+    close[1:, missing_name] = np.nan
     targets = [[0.4, -0.4]] + [[0, 0]] * 12
-    compare(
+    records = compare(
         close,
         targets,
-        config=_config(cost_bps_per_side=4, settle_terminal_residuals=True),
+        cdi=np.full(13, 0.0004),
+        config=_config(cost_bps_per_side=4, annual_borrow_rate=0.02),
     )
+    assert records[-1]["unpriced_inventory_notional"].item() == pytest.approx(0.4)
+    if missing_name == 1:
+        assert records[-1]["borrow"].item() > 0.0
 
 
 def test_sequential_gradient_includes_future_inventory_payoff_and_chunk_carry():

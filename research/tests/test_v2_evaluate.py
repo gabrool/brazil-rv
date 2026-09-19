@@ -757,18 +757,12 @@ def test_paired_comparison_does_not_treat_transfer_flag_as_population_identity()
 
 
 @pytest.mark.parametrize(
-    ("candidate_unresolved", "baseline_unresolved", "expected_reason"),
-    [
-        (True, False, "candidate_headline_economics_unresolved"),
-        (False, True, "baseline_headline_economics_unresolved"),
-        (True, True, "candidate_and_baseline_headline_economics_unresolved"),
-    ],
+    ("candidate_unresolved", "baseline_unresolved"),
+    [(True, False), (False, True), (True, True)],
 )
-def test_paired_economics_is_wholly_undefined_when_either_ledger_is_unresolved(
-    candidate_unresolved: bool,
-    baseline_unresolved: bool,
-    expected_reason: str,
-) -> None:
+def test_paired_economics_retains_common_calendar_and_uncertainty_labels(
+    candidate_unresolved, baseline_unresolved
+):
     evaluated = evaluate_scores(_fixture(), window_name="F2")
     candidate_report = copy.deepcopy(evaluated.report)
     baseline_report = copy.deepcopy(evaluated.report)
@@ -788,25 +782,18 @@ def test_paired_economics_is_wholly_undefined_when_either_ledger_is_unresolved(
         report=baseline_report,
         headline_net_excess_bps=np.zeros(len(evaluated.dates)),
     )
-
     comparison = paired_comparison(candidate, baseline, protocol=TRIAGE_PROTOCOL)
-
-    assert comparison["economics_comparison_undefined_reason"] == expected_reason
-    assert comparison["daily_headline_net_excess_bps_delta"] == {
-        "estimate": None,
-        "lower_95": None,
-        "upper_95": None,
-        "possible_date_count": len(evaluated.dates),
-        "defined_date_count": 0,
-        "undefined_reason": "no_defined_daily_values",
-    }
-    assert {
-        row["undefined_reason"]
-        for row in comparison["daily_headline_net_excess_bps_delta_table"]
-    } == {expected_reason}
-    assert all(
-        row["delta"] is None
-        for row in comparison["daily_headline_net_excess_bps_delta_table"]
+    assert comparison["economics_comparison_undefined_reason"] is None
+    delta = comparison["daily_headline_net_excess_bps_delta"]
+    assert delta["estimate"] == pytest.approx(3.0)
+    assert delta["defined_date_count"] == len(evaluated.dates)
+    assert (
+        candidate.report["economics"]["headline"]["economics_unresolved"]
+        is candidate_unresolved
+    )
+    assert (
+        baseline.report["economics"]["headline"]["economics_unresolved"]
+        is baseline_unresolved
     )
 
 

@@ -155,7 +155,6 @@ def _audit_omission(source: Path, output: Path, omitted: int) -> dict:
                             fold=fold,
                             output=dest / "evaluation.json",
                             execution_policy=policy,
-                            settle_terminal_residuals=True,
                         )
                     if not _completed(dest):
                         _finish_cell(dest, evaluated, name=arm, fold=fold)

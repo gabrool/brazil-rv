@@ -482,7 +482,7 @@ def promotion_trace(
         if "S0" not in eligible
         else "paired_IC_upper_bound_below_zero_or_undefined",
         "read_2025_authorized": False,
-        "economics_basis": "full_common_calendar_with_registered_terminal_settlement; unresolved_is_a_label; not_an_implementability_claim",
+        "economics_basis": "full_common_calendar_with_retained_unpriced_inventory; unresolved_is_a_label; not_an_implementability_claim",
         "read_bar_status": "Gabriel_to_set",
         "in_sample_selection_label": True,
     }
@@ -546,9 +546,7 @@ def replay_cpu(root: Path) -> str:
                     continue
                 destination.mkdir(parents=True, exist_ok=False)
                 original = retained(context, source, fold)
-                replayed = evaluate_scores(
-                    original.inputs, window_name=fold, settle_terminal_residuals=True
-                )
+                replayed = evaluate_scores(original.inputs, window_name=fold)
                 replayed.report.update(rr.RESEARCH_FLAGS)
                 write_json_atomic(destination / "evaluation.json", replayed.report)
                 if settlement_replay_projection(
@@ -790,7 +788,6 @@ def evaluate_phase(root: Path, phase: str) -> str:
                     fold=fold,
                     output=destination / "evaluation.json",
                     execution_policy=policy,
-                    settle_terminal_residuals=True,
                 )
                 _finish_cell(destination, evaluated, name=arm, fold=fold)
                 trajectories[f"{arm}/{fold}"] = records

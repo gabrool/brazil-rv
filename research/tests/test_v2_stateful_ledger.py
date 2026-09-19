@@ -128,52 +128,45 @@ def _constructed_inputs(days: int, names: int) -> dict[str, np.ndarray]:
     }
 
 
-def test_boundary_no_print_settles_before_grace_with_haircut_and_same_prior_path():
+def test_boundary_no_print_retains_inventory_without_a_fabricated_fill():
     close = np.full((3, 2), 100.0)
     close[-1, 1] = np.nan
     scores = np.broadcast_to([-1.0, 1.0], close.shape).copy()
-    old = _run(close, scores, initial_reference_price=np.full(2, 100.0))
-    new = _run(
-        close,
-        scores,
-        initial_reference_price=np.full(2, 100.0),
-        config=_config(settle_terminal_residuals=True),
-    )
-    np.testing.assert_array_equal(new.nav[:-1], old.nav[:-1])
-    assert old.signed_shares[-1, 1] > 0
-    assert not new.signed_shares[-1].any()
-    assert new.terminal_settlement_count[-1] == 1
-    assert new.terminal_boundary_unpriced_inventory_notional == pytest.approx(1.0)
-    assert new.nav[-1] == pytest.approx(old.nav[-1])
-    assert new.settlement_haircut_scenario_nav[-1] == pytest.approx(new.nav[-1] - 0.3)
-    assert new.economics_unresolved  # The label survives cash settlement.
-    assert (
-        next(f for f in new.fills if f.purpose == "terminal_settlement").price == 100.0
-    )
+    result = _run(close, scores, initial_reference_price=np.full(2, 100.0))
+    assert result.signed_shares[-1, 1] == pytest.approx(0.01)
+    assert result.unpriced_inventory_count[-1] == 1
+    assert result.terminal_boundary_unpriced_inventory_notional == pytest.approx(1.0)
+    assert result.nav[-1] == pytest.approx(1.0)
+    assert result.free_cash[-1] == pytest.approx(0.0)
+    assert result.unpriced_haircut_scenario_nav[-1] == pytest.approx(0.7)
+    assert result.economics_unresolved
+    assert not any(f.security_index == 1 and f.fill_session == 2 for f in result.fills)
 
 
 @pytest.mark.parametrize("terminal_price", [120.0, np.nan])
-def test_boundary_hedge_closes_at_print_or_labelled_last_mark(terminal_price):
+def test_boundary_hedge_closes_only_at_an_observed_print(terminal_price):
     close = np.full((3, 2), 100.0)
-    scores = np.broadcast_to([-1.0, 1.0], close.shape).copy()
     result = _run(
         close,
-        scores,
+        np.broadcast_to([-1.0, 1.0], close.shape).copy(),
         initial_reference_price=np.full(2, 100.0),
         hedge_beta=np.broadcast_to([0.0, 0.5], close.shape).copy(),
         hedge_close=np.asarray([100.0, 110.0, terminal_price]),
-        config=_config(beta_hedge=True, settle_terminal_residuals=True),
+        config=_config(beta_hedge=True),
     )
     assert result.hedge_signed_shares[-2] != 0
-    assert result.hedge_signed_shares[-1] == 0
-    fill = [f for f in result.fills if f.security_index == 2][-1]
-    assert fill.price == (120.0 if np.isfinite(terminal_price) else 110.0)
-    assert fill.purpose == (
-        "hedge" if np.isfinite(terminal_price) else "terminal_settlement"
-    )
-    assert (result.terminal_hedge_last_mark_settlement_notional > 0) == (
-        not np.isfinite(terminal_price)
-    )
+    fills = [f for f in result.fills if f.security_index == 2 and f.fill_session == 2]
+    if np.isfinite(terminal_price):
+        assert result.hedge_signed_shares[-1] == 0
+        assert fills[0].price == 120.0
+        assert fills[0].purpose == "hedge"
+        assert result.terminal_unpriced_hedge_notional == 0
+    else:
+        assert result.hedge_signed_shares[-1] == result.hedge_signed_shares[-2]
+        assert not fills
+        assert result.terminal_unpriced_hedge_notional > 0
+        assert result.hedge_restricted_cash[-1] == result.hedge_restricted_cash[-2]
+        assert result.economics_unresolved
 
 
 def test_pending_overweight_name_does_not_block_other_names_entries() -> None:
@@ -641,7 +634,7 @@ def test_held_short_exits_on_sixth_ineligible_session() -> None:
     assert result.position_sign[6, 2] == 0
 
 
-def test_ineligible_nonprinter_stays_held_until_unchanged_settlement_path() -> None:
+def test_ineligible_nonprinter_stays_held_until_an_observed_exit() -> None:
     close = np.full((13, 3), 100.0)
     close[1:11, 0] = np.nan
     scores = np.asarray([[3.0, 0.0, -3.0]] * 13)
@@ -654,16 +647,12 @@ def test_ineligible_nonprinter_stays_held_until_unchanged_settlement_path() -> N
         initial_reference_price=np.full(3, 100.0),
     )
 
-    np.testing.assert_array_equal(result.position_sign[:10, 0], 1)
-    assert result.position_sign[10, 0] == 0
-    assert result.terminal_settlement_count[10] == 1
-    assert not any(
-        fill.security_index == 0 and fill.purpose == "exit" for fill in result.fills
-    )
-    assert any(
-        fill.security_index == 0 and fill.purpose == "terminal_settlement"
-        for fill in result.fills
-    )
+    np.testing.assert_array_equal(result.position_sign[:11, 0], 1)
+    assert result.position_sign[11, 0] == 0
+    exits = [f for f in result.fills if f.security_index == 0 and f.side == "sell"]
+    assert len(exits) == 1
+    assert exits[0].fill_session == 11
+    assert exits[0].price == 100.0
 
 
 def test_ineligible_streak_resets_after_rank_exit_and_reentry() -> None:
@@ -1091,7 +1080,7 @@ def test_terminal_missing_inventory_inside_grace_is_not_settled() -> None:
     assert result.signed_shares[-1, 0] == 0.01
     assert result.free_cash[-1] == 0.0
     assert result.nav[-1] == 1.0
-    assert result.settlement_haircut_scenario_nav[-1] == 1.0
+    assert result.unpriced_haircut_scenario_nav[-1] == 0.7
     assert result.unresolved_excluded_nav[-1] == 0.0
     assert result.valuation_scenario_count.sum() == 1
 
@@ -1110,64 +1099,47 @@ def test_terminal_missing_inventory_inside_grace_is_not_settled() -> None:
     assert short_result.free_cash[-1] == 1.0
     assert short_result.restricted_cash[-1] == 1.0
     assert short_result.nav[-1] == 1.0
-    assert short_result.settlement_haircut_scenario_nav[-1] == 1.0
+    assert short_result.unpriced_haircut_scenario_nav[-1] == 0.7
     assert short_result.unresolved_excluded_nav[-1] == 1.0
 
 
-def test_long_settles_at_last_mark_on_tenth_missing_session_with_cost() -> None:
+def test_missing_long_cannot_release_cash_or_pay_fictitious_exit_costs():
     close = np.full((12, 2), 100.0)
     close[1:, 0] = np.nan
-    scores = np.asarray([[1.0, -1.0]] * len(close))
     result = _run(
         close,
-        scores,
+        np.asarray([[1.0, -1.0]] * len(close)),
         initial_reference_price=np.full(2, 100.0),
         config=_config(cost_bps_per_side=10.0),
     )
-
-    settlement = next(
-        fill
-        for fill in result.fills
-        if fill.security_index == 0 and fill.purpose == "terminal_settlement"
-    )
-    assert settlement.fill_session == 10
-    assert settlement.side == "sell"
-    assert settlement.price == 100.0
-    assert np.isclose(settlement.cost, 0.001)
-    assert result.signed_shares[10, 0] == 0.0
-    assert result.terminal_settlement_count.sum() == 1
-    assert np.isclose(result.terminal_settlement_notional.sum(), 1.0)
-    assert not any(
-        order.security_index == 0
-        and order.purpose == "entry"
-        and order.decision_session > 10
-        for order in result.intended_orders
-    )
+    assert result.signed_shares[-1, 0] == pytest.approx(0.01)
+    assert not any(f.security_index == 0 and f.side == "sell" for f in result.fills)
+    assert result.unpriced_inventory_notional[-1] == pytest.approx(1.0)
+    paid = result.cost_bps * result.start_nav / 1e4
+    assert paid.sum() == pytest.approx(sum(f.cost for f in result.fills))
+    assert result.free_cash[-1] == pytest.approx(result.nav[-1] - 1.0)
 
 
-def test_short_settles_at_last_mark_on_tenth_missing_session() -> None:
+def test_missing_short_keeps_restricted_cash_and_continues_borrowing():
     close = np.full((12, 2), 100.0)
     close[1:, 1] = np.nan
-    scores = np.asarray([[1.0, -1.0]] * len(close))
     result = _run(
         close,
-        scores,
+        np.asarray([[1.0, -1.0]] * len(close)),
         initial_reference_price=np.full(2, 100.0),
+        config=_config(annual_borrow_rate=0.02),
     )
-
-    settlement = next(
-        fill
-        for fill in result.fills
-        if fill.security_index == 1 and fill.purpose == "terminal_settlement"
-    )
-    assert settlement.fill_session == 10
-    assert settlement.side == "buy"
-    assert settlement.price == 100.0
-    assert result.signed_shares[10, 1] == 0.0
-    assert result.restricted_cash[10] == 0.0
+    assert result.signed_shares[-1, 1] == pytest.approx(-0.01)
+    assert result.restricted_cash[-1] == pytest.approx(1.0)
+    assert not any(f.security_index == 1 and f.side == "buy" for f in result.fills)
+    daily_rent = np.expm1(np.log1p(0.02) / 252)
+    for day in (10, 11):
+        assert result.borrow_bps[day] * result.start_nav[day] / 1e4 == pytest.approx(
+            daily_rent
+        )
 
 
-def test_terminal_settlement_haircut_scenario_reconciles() -> None:
+def test_terminal_unpriced_haircut_scenario_reconciles() -> None:
     close = np.full((12, 2), 100.0)
     close[1:, 0] = np.nan
     scores = np.asarray([[1.0, -1.0]] * len(close))
@@ -1179,14 +1151,14 @@ def test_terminal_settlement_haircut_scenario_reconciles() -> None:
 
     np.testing.assert_allclose(result.reconciliation_error, 0.0, atol=1e-15)
     assert np.isclose(result.nav[10], 1.0)
-    assert np.isclose(result.settlement_haircut_scenario_nav[10], 0.7)
+    assert np.isclose(result.unpriced_haircut_scenario_nav[10], 0.7)
     assert np.isclose(
-        result.summary()["compounded_net_excess_terminal_settlement_haircut_scenario"],
+        result.summary()["compounded_net_excess_unpriced_haircut_scenario"],
         -0.3,
     )
 
 
-def test_print_on_ninth_missing_session_prevents_terminal_settlement() -> None:
+def test_resumed_print_removes_valuation_uncertainty() -> None:
     close = np.full((13, 2), 100.0)
     close[1:10, 0] = np.nan
     scores = np.asarray([[1.0, -1.0]] * len(close))
@@ -1196,13 +1168,14 @@ def test_print_on_ninth_missing_session_prevents_terminal_settlement() -> None:
         initial_reference_price=np.full(2, 100.0),
     )
 
-    assert not any(fill.purpose == "terminal_settlement" for fill in result.fills)
-    assert result.terminal_settlement_count.sum() == 0
+    assert result.unpriced_inventory_count[1:10].sum() == 9
+    assert not result.unpriced_inventory_count[10:].any()
+    np.testing.assert_array_equal(
+        result.unpriced_haircut_scenario_nav[10:], result.nav[10:]
+    )
 
 
-def test_settlement_incidence_above_fifteen_percent_marks_economics_unresolved() -> (
-    None
-):
+def test_unpriced_exposure_above_fifteen_percent_marks_economics_unresolved() -> None:
     close = np.full((12, 2), 100.0)
     close[1:, 0] = np.nan
     scores = np.asarray([[1.0, -1.0]] * len(close))
@@ -1214,30 +1187,28 @@ def test_settlement_incidence_above_fifteen_percent_marks_economics_unresolved()
 
     summary = result.summary()
     assert result.economics_unresolved
-    assert summary["terminal_settlement_economics_unresolved"] is True
-    assert summary["terminal_settlement_notional_fraction_nav"] > 0.15
+    assert summary["unpriced_economics_unresolved"] is True
+    assert summary["unpriced_inventory_fraction_nav"] > 0.15
 
 
-def test_print_after_terminal_settlement_is_counted_without_reopening() -> None:
-    close = np.full((13, 2), 100.0)
+def test_resumed_quote_executes_at_new_price_and_allows_later_reentry():
+    close = np.full((15, 2), 100.0)
     close[1:11, 0] = np.nan
-    scores = np.asarray([[1.0, -1.0]] * len(close))
+    close[11:, 0] = 120.0
     result = _run(
         close,
-        scores,
+        np.asarray([[1.0, -1.0]] * len(close)),
         initial_reference_price=np.full(2, 100.0),
     )
-
-    assert result.terminal_settlement_count.sum() == 1
-    assert result.settled_then_printed_count.sum() == 1
-    assert result.signed_shares[10, 0] == 0.0
-    assert result.signed_shares[11, 0] == 0.0
-    assert not any(
-        order.security_index == 0
-        and order.purpose == "entry"
-        and order.decision_session > 10
-        for order in result.intended_orders
+    assert result.signed_shares[10, 0] == pytest.approx(0.01)
+    fill = next(f for f in result.fills if f.security_index == 0 and f.side == "sell")
+    assert fill.fill_session == 11
+    assert fill.price == 120.0
+    assert any(
+        f.security_index == 0 and f.side == "buy" and f.fill_session > 11
+        for f in result.fills
     )
+    assert result.nav[-1] == pytest.approx(1.2)
 
 
 def test_unresolved_once_then_resolved_name_exits_on_next_instruction() -> None:
@@ -1868,7 +1839,7 @@ def test_rev4f_hedge_fallback_does_not_block_entries_and_is_reported() -> None:
     np.testing.assert_array_equal(result.hedge_target_notional, 0.0)
 
 
-def test_terminal_settlement_intention_precedes_possible_last_print() -> None:
+def test_missing_quote_exit_intention_does_not_see_same_day_print() -> None:
     close = np.full((13, 2), 100.0)
     close[1:, 1] = np.nan
     scores = np.tile([-1.0, 1.0], (13, 1))
@@ -1878,8 +1849,8 @@ def test_terminal_settlement_intention_precedes_possible_last_print() -> None:
     assert [o for o in original.intended_orders if o.decision_session == 10] == [
         o for o in changed.intended_orders if o.decision_session == 10
     ]
-    assert original.terminal_settlement_count[10] == 1
-    assert changed.terminal_settlement_count[10] == 0
+    assert original.unpriced_inventory_count[10] == 1
+    assert changed.unpriced_inventory_count[10] == 0
 
 
 def test_ledger_signature_does_not_accept_model_feature_beta() -> None:

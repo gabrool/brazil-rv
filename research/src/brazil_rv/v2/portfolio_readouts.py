@@ -149,7 +149,7 @@ def book_summary(data, result, previous, start, first):
         "unresolved_claim_fraction": result.unresolved_claim_inventory_fraction_nav[
             selection
         ],
-        "settlement_fraction": result.terminal_settlement_notional_fraction_nav[
+        "unpriced_inventory_fraction": result.unpriced_inventory_fraction_nav[
             selection
         ],
     }
@@ -185,7 +185,7 @@ def book_summary(data, result, previous, start, first):
             ).sum()
         ),
         "terminal_haircut_scenario_relative_difference": float(
-            (result.settlement_haircut_scenario_nav[-1] - result.nav[-1]) / base
+            (result.unpriced_haircut_scenario_nav[-1] - result.nav[-1]) / base
         ),
     }
     return summary, {k: v.tolist() for k, v in daily.items()}
@@ -209,8 +209,8 @@ def save_book(output, data, result, targets, previous, start, first, provenance)
         "reconciliation_error",
         "pending_exit_count",
         "pending_entry_count",
-        "terminal_settlement_notional",
-        "settlement_haircut_scenario_nav",
+        "unpriced_inventory_notional",
+        "unpriced_haircut_scenario_nav",
     )
     state = {k: getattr(result, k) for k in fields}
     state["prior_weights"] = previous
@@ -334,7 +334,6 @@ def evaluate_books(root, arm, *, fold=None, continuous=False, loaded=None):
             config = (
                 replace(
                     data.inputs.execution_policy.ledger_config(),
-                    settle_terminal_residuals=True,
                     **changes,
                 )
                 if policy == "legacy"
@@ -422,9 +421,7 @@ def bridge(root, data, arm, fold, bounds, binding, implementation):
     if (output / "book.json").exists():
         verify_book(output, provenance)
     else:
-        config = replace(
-            data.inputs.execution_policy.ledger_config(), settle_terminal_residuals=True
-        )
+        config = data.inputs.execution_policy.ledger_config()
         result, targets, previous = legacy_replay(data, first, last + 1, config)
         save_book(output, data, result, targets, previous, first, first, provenance)
     if (output / "forecast.json").exists():

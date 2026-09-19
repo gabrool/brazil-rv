@@ -238,6 +238,34 @@ def test_preference_gradient_survives_sequential_account_and_detach_preserves_va
     assert not account.shares.requires_grad
 
 
+@pytest.mark.parametrize("weight", [-0.02, 0.02])
+def test_unpriced_terminal_hedge_remains_in_both_accounts(weight):
+    data = policy_fixture()
+    close = data.inputs.bova11_close.copy()
+    close[5:8] = np.nan
+    data.inputs = replace(data.inputs, bova11_close=close)
+    config = policy_ledger_config()
+    targets = np.zeros((8, len(data.inputs.security_ids) + 1))
+    targets[:-1, -1] = weight
+    account = data.initial_account(0, config)
+    records = [
+        data.step(account, tensor(target), day, terminal=day == 7)
+        for day, target in enumerate(targets)
+    ]
+    result, _, _ = exact_replay(data, None, 0, 8, targets=targets, config=config)
+    assert [r["nav"].item() for r in records] == pytest.approx(result.nav, abs=1e-12)
+    assert account.shares[-1].item() == pytest.approx(result.hedge_signed_shares[-1])
+    assert result.hedge_signed_shares[-1] != 0
+    assert result.terminal_unpriced_hedge_notional > 0
+    assert not [f for f in result.fills if f.fill_session >= 5]
+    no_haircut, _, _ = exact_replay(
+        data, None, 0, 8, targets=targets, config=replace(config, unpriced_haircut=0.0)
+    )
+    np.testing.assert_array_equal(result.nav, no_haircut.nav)
+    assert result.fills == no_haircut.fills
+    assert result.unpriced_haircut_scenario_nav[-1] < no_haircut.nav[-1]
+
+
 def test_missing_prior_cdi_stays_masked_and_never_uses_current_accrual():
     data = policy_fixture()
     prior = data.prior_cdi.copy()

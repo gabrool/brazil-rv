@@ -15,7 +15,7 @@ from pathlib import Path
 import numpy as np
 from numpy.typing import NDArray
 
-from brazil_rv.execution.stateful_ledger import TERMINAL_SETTLEMENT_CONVENTION
+from brazil_rv.execution.stateful_ledger import MISSING_QUOTE_CONVENTION
 
 from .artifacts import inventory, sha256_file, verify_inventory, write_json_atomic
 from .baselines import BaselinePanel, build_store_baselines
@@ -704,7 +704,6 @@ def _evaluate(
     fold: str,
     output: Path,
     execution_policy: ExecutionPolicy | None = None,
-    settle_terminal_residuals: bool = False,
 ) -> _ResearchEvaluation:
     inputs = _evaluation_inputs(
         store,
@@ -719,9 +718,7 @@ def _evaluate(
         transfer_chronology_clean=True,
         execution_policy=execution_policy,
     )
-    result = evaluate_scores(
-        inputs, window_name=fold, settle_terminal_residuals=settle_terminal_residuals
-    )
+    result = evaluate_scores(inputs, window_name=fold)
     result.report.update(RESEARCH_FLAGS)
     write_json_atomic(output, result.report)
     if execution_policy is not None:
@@ -1314,7 +1311,7 @@ def _economics_scenario_detail(
             "persistence_1": _folded_bootstrap((readouts["persistence_1"],)),
             "persistence_5": _folded_bootstrap((readouts["persistence_5"],)),
             "gross_label": "equity gross excludes BOVA11 hedge notional",
-            "settlement_label": TERMINAL_SETTLEMENT_CONVENTION,
+            "settlement_label": MISSING_QUOTE_CONVENTION,
             "mean_component_bps_per_day": components,
             "maximum_absolute_daily_reconciliation_error_bps": max(
                 (abs(value) for value in reconciliation), default=0.0
@@ -1339,7 +1336,7 @@ def _economics_scenario_detail(
                 for name, values in pooled_components.items()
             },
             "gross_label": "equity gross excludes BOVA11 hedge notional",
-            "settlement_label": TERMINAL_SETTLEMENT_CONVENTION,
+            "settlement_label": MISSING_QUOTE_CONVENTION,
         },
     }
 
@@ -2104,11 +2101,11 @@ def freeze_round1(
         },
         "economics_tier": {
             "price_source": "close_proxy",
-            "terminal_settlement_convention": "last_mark_after_10_sessions",
+            "missing_quote_convention": "retain_inventory_until_quote_or_contractual_event",
             "ineligible_hold_sessions": 5,
             "settlement_grace_sessions": 10,
-            "settlement_haircut": 0.30,
-            "settlement_economics_unresolved_fraction_nav": 0.15,
+            "unpriced_haircut": 0.30,
+            "unpriced_economics_unresolved_fraction_nav": 0.15,
             "headline_uses_executable_borrow": True,
             "direct_lending_archive_readout_present": True,
             "volatility_balanced_entries": True,

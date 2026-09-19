@@ -171,9 +171,6 @@ def replay_report(
         ev._validate(inputs)
         economics, headline, _ = ev._evaluate_economics(
             inputs,
-            settle_terminal_residuals=original["economics"]["contract"].get(
-                "terminal_residuals_settled", False
-            ),
         )
         report["economics"] = economics
         report["diagnostics"]["realized_beta"] = ev._realized_beta_diagnostic(

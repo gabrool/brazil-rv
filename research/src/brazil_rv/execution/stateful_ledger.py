@@ -13,9 +13,7 @@ from brazil_rv.v2.hedge_beta import resolve_hedge_beta
 
 OrderSide = Literal["buy", "sell"]
 BorrowSource = Literal["uniform", "borrow_strict", "borrow_balance", "borrow_open"]
-OrderPurpose = Literal[
-    "entry", "exit", "risk_exit", "terminal_exit", "terminal_settlement", "hedge"
-]
+OrderPurpose = Literal["entry", "exit", "risk_exit", "terminal_exit", "hedge"]
 ExitInstructionCause = Literal[
     "ineligible_hold_exhausted",
     "settlement_grace",
@@ -32,7 +30,6 @@ CancellationReason = Literal[
     "position_closed",
     "risk_net_cap",
     "risk_name_cap",
-    "terminal_settlement",
     "policy_replaced",
 ]
 _CANCELLATION_REASONS: tuple[CancellationReason, ...] = (
@@ -44,11 +41,10 @@ _CANCELLATION_REASONS: tuple[CancellationReason, ...] = (
     "position_closed",
     "risk_net_cap",
     "risk_name_cap",
-    "terminal_settlement",
     "policy_replaced",
 )
 
-TERMINAL_SETTLEMENT_CONVENTION = "last_mark_after_10_sessions"
+MISSING_QUOTE_CONVENTION = "retain_inventory_until_quote_or_contractual_event"
 EXIT_INSTRUCTION_CAUSE_CODES: dict[ExitInstructionCause, int] = {
     "ineligible_hold_exhausted": 1,
     "settlement_grace": 2,
@@ -97,9 +93,8 @@ class LedgerConfig:
     cancel_pending_outside_retention: bool = True
     ineligible_hold_sessions: int = 5
     settlement_grace_sessions: int = 10
-    settlement_haircut: float = 0.30
-    settlement_economics_unresolved_fraction_nav: float = 0.15
-    settle_terminal_residuals: bool = False
+    unpriced_haircut: float = 0.30
+    unpriced_economics_unresolved_fraction_nav: float = 0.15
     annual_sessions: int = 252
 
     def __post_init__(self) -> None:
@@ -154,10 +149,10 @@ class LedgerConfig:
             raise ValueError("ineligible hold must be non-negative")
         if self.settlement_grace_sessions < 1:
             raise ValueError("settlement grace must be at least one session")
-        if not 0 <= self.settlement_haircut < 1:
-            raise ValueError("settlement haircut must be in [0, 1)")
-        if self.settlement_economics_unresolved_fraction_nav <= 0:
-            raise ValueError("settlement incidence bound must be positive")
+        if not 0 <= self.unpriced_haircut < 1:
+            raise ValueError("unpriced haircut must be in [0, 1)")
+        if self.unpriced_economics_unresolved_fraction_nav <= 0:
+            raise ValueError("unpriced exposure bound must be positive")
 
 
 def equity_borrow_registration_fee(
@@ -334,7 +329,7 @@ class StatefulLedgerResult:
     marked_signed_holdings: NDArray[np.float64]
     reconciliation_error: NDArray[np.float64]
     all_cash_nav: NDArray[np.float64]
-    settlement_haircut_scenario_nav: NDArray[np.float64]
+    unpriced_haircut_scenario_nav: NDArray[np.float64]
     unresolved_excluded_nav: NDArray[np.float64]
     pending_entry_count: NDArray[np.int64]
     pending_exit_count: NDArray[np.int64]
@@ -362,10 +357,9 @@ class StatefulLedgerResult:
     planned_net_fraction_nav: NDArray[np.float64]
     planned_name_weight_fraction_nav: NDArray[np.float64]
     holding_age_sessions: NDArray[np.int64]
-    terminal_settlement_count: NDArray[np.int64]
-    terminal_settlement_notional: NDArray[np.float64]
-    terminal_settlement_notional_fraction_nav: NDArray[np.float64]
-    settled_then_printed_count: NDArray[np.int64]
+    unpriced_inventory_count: NDArray[np.int64]
+    unpriced_inventory_notional: NDArray[np.float64]
+    unpriced_inventory_fraction_nav: NDArray[np.float64]
     k_eff_per_side: NDArray[np.int64]
     held_count_start_of_day_long: NDArray[np.int64]
     held_count_start_of_day_short: NDArray[np.int64]
@@ -379,8 +373,6 @@ class StatefulLedgerResult:
     band_candidates_short: NDArray[np.int64]
     band_excluded_unresolved_long: NDArray[np.int64]
     band_excluded_unresolved_short: NDArray[np.int64]
-    band_excluded_settled_long: NDArray[np.int64]
-    band_excluded_settled_short: NDArray[np.int64]
     band_candidates_without_prior_session_print_long: NDArray[np.int64]
     band_candidates_without_prior_session_print_short: NDArray[np.int64]
     band_exhausted_open_slots_long: NDArray[np.int64]
@@ -433,12 +425,12 @@ class StatefulLedgerResult:
     insolvency_date: date | None
     economics_unresolved: bool
     terminal_boundary_unpriced_inventory_notional: float
-    terminal_hedge_last_mark_settlement_notional: float
+    terminal_unpriced_hedge_notional: float
     gross_target: float
     ineligible_hold_sessions: int
     settlement_grace_sessions: int
-    settlement_haircut: float
-    settlement_economics_unresolved_fraction_nav: float
+    unpriced_haircut: float
+    unpriced_economics_unresolved_fraction_nav: float
     share_sizing_mode: Literal[
         "fractional_notional_research_proxy", "round_lot_close_proxy"
     ]
@@ -572,8 +564,8 @@ class StatefulLedgerResult:
             "compounded_net_excess_vs_all_cash": float(
                 self.nav[-1] / all_cash_terminal - 1.0
             ),
-            "compounded_net_excess_terminal_settlement_haircut_scenario": float(
-                self.settlement_haircut_scenario_nav[-1] / all_cash_terminal - 1.0
+            "compounded_net_excess_unpriced_haircut_scenario": float(
+                self.unpriced_haircut_scenario_nav[-1] / all_cash_terminal - 1.0
             ),
             "compounded_net_excess_unresolved_excluded": float(
                 self.unresolved_excluded_nav[-1] / all_cash_terminal - 1.0
@@ -656,18 +648,15 @@ class StatefulLedgerResult:
             "same_day_action_sessions": int(self.same_day_action_sessions.sum()),
             "unresolved_action_name_days": int(self.unresolved_action_name_days.sum()),
             "valuation_scenario_count": int(self.valuation_scenario_count.sum()),
-            "terminal_settlement_convention": TERMINAL_SETTLEMENT_CONVENTION,
+            "missing_quote_convention": MISSING_QUOTE_CONVENTION,
             "ineligible_hold_sessions": self.ineligible_hold_sessions,
             "settlement_grace_sessions": self.settlement_grace_sessions,
-            "settlement_haircut": self.settlement_haircut,
-            "terminal_settlement_count": int(self.terminal_settlement_count.sum()),
-            "terminal_settlement_notional": float(
-                self.terminal_settlement_notional.sum()
+            "unpriced_haircut": self.unpriced_haircut,
+            "unpriced_inventory_count": int(self.unpriced_inventory_count[-1]),
+            "unpriced_inventory_notional": float(self.unpriced_inventory_notional[-1]),
+            "unpriced_inventory_fraction_nav": float(
+                self.unpriced_inventory_fraction_nav[-1]
             ),
-            "terminal_settlement_notional_fraction_nav": float(
-                self.terminal_settlement_notional_fraction_nav.sum()
-            ),
-            "settled_then_printed_count": int(self.settled_then_printed_count.sum()),
             "gross_shortfall_decomposition": decomposition,
             "entry_defect_signatures": defect_signatures,
             "exit_instructions_by_cause": {
@@ -694,12 +683,12 @@ class StatefulLedgerResult:
             "ineligible_exit_reeligible_within_10_sessions_share": (
                 self.ineligible_exit_reeligible_within_10_sessions_share
             ),
-            "terminal_settlement_economics_unresolved": bool(
-                self.terminal_settlement_notional_fraction_nav.sum()
-                > self.settlement_economics_unresolved_fraction_nav
+            "unpriced_economics_unresolved": bool(
+                self.unpriced_inventory_fraction_nav.max()
+                > self.unpriced_economics_unresolved_fraction_nav
             ),
-            "settlement_economics_unresolved_fraction_nav": (
-                self.settlement_economics_unresolved_fraction_nav
+            "unpriced_economics_unresolved_fraction_nav": (
+                self.unpriced_economics_unresolved_fraction_nav
             ),
             "cancelled_entry_count": int(self.cancelled_entry_count.sum()),
             "zero_entry_days_by_cause": {
@@ -755,8 +744,8 @@ class StatefulLedgerResult:
             "unresolved_receivable": self.unresolved_receivable,
             "unresolved_payable": self.unresolved_payable,
             "terminal_nav": float(self.nav[-1]),
-            "terminal_nav_settlement_haircut_scenario": float(
-                self.settlement_haircut_scenario_nav[-1]
+            "terminal_nav_unpriced_haircut_scenario": float(
+                self.unpriced_haircut_scenario_nav[-1]
             ),
             "terminal_nav_unresolved_excluded": float(self.unresolved_excluded_nav[-1]),
             "insolvent": self.insolvent,
@@ -767,7 +756,7 @@ class StatefulLedgerResult:
             ),
             "economics_unresolved": self.economics_unresolved,
             "terminal_boundary_unpriced_inventory_notional": self.terminal_boundary_unpriced_inventory_notional,
-            "terminal_hedge_last_mark_settlement_notional": self.terminal_hedge_last_mark_settlement_notional,
+            "terminal_unpriced_hedge_notional": self.terminal_unpriced_hedge_notional,
             "mark_mode": "raw",
             "share_sizing_mode": self.share_sizing_mode,
             "volatility_balanced_entries": self.volatility_balanced_entries,
@@ -1347,9 +1336,6 @@ def simulate_stateful_ledger(
     entry_cost_basis = np.zeros(name_count, dtype=np.float64)
     submission_nav = np.zeros(name_count, dtype=np.float64)
     scenario_seen = np.zeros(name_count, dtype=np.bool_)
-    settled_names = np.zeros(name_count, dtype=np.bool_)
-    settled_then_printed_seen = np.zeros(name_count, dtype=np.bool_)
-    settlement_scenario_adjustment = 0.0
     free_cash = config.initial_capital_brl
     previous_nav = config.initial_capital_brl
     all_cash = config.initial_capital_brl
@@ -1430,10 +1416,9 @@ def simulate_stateful_ledger(
     planned_net_rows: list[float] = []
     planned_name_rows: list[float] = []
     age_rows: list[NDArray[np.int64]] = []
-    settlement_count_rows: list[int] = []
-    settlement_notional_rows: list[float] = []
-    settlement_fraction_rows: list[float] = []
-    settled_then_printed_rows: list[int] = []
+    unpriced_count_rows: list[int] = []
+    unpriced_notional_rows: list[float] = []
+    unpriced_fraction_rows: list[float] = []
     k_eff_rows: list[int] = []
     held_start_long_rows: list[int] = []
     held_start_short_rows: list[int] = []
@@ -1447,8 +1432,6 @@ def simulate_stateful_ledger(
     band_candidates_short_rows: list[int] = []
     band_excluded_unresolved_long_rows: list[int] = []
     band_excluded_unresolved_short_rows: list[int] = []
-    band_excluded_settled_long_rows: list[int] = []
-    band_excluded_settled_short_rows: list[int] = []
     band_without_prior_print_long_rows: list[int] = []
     band_without_prior_print_short_rows: list[int] = []
     band_exhausted_long_rows: list[int] = []
@@ -1515,7 +1498,7 @@ def simulate_stateful_ledger(
     action_uncertainty_seen = False
     terminal_printed = np.zeros(name_count, dtype=np.bool_)
     terminal_boundary_unpriced_inventory_notional = 0.0
-    terminal_hedge_last_mark_settlement_notional = 0.0
+    terminal_unpriced_hedge_notional = 0.0
     terminal_prior_pending_exit = np.zeros(name_count, dtype=np.bool_)
 
     def submit_order(
@@ -1622,14 +1605,11 @@ def simulate_stateful_ledger(
             entry_eligible = (
                 eligible
                 & ~decision_unresolved
-                & ~settled_names
                 & np.isfinite(last_observed)
                 & (last_observed > 0.0)
             )
-            required_exit = (
-                (ineligible_streak > config.ineligible_hold_sessions)
-                | (missing_sessions >= config.settlement_grace_sessions)
-                | settled_names
+            required_exit = (ineligible_streak > config.ineligible_hold_sessions) | (
+                missing_sessions >= config.settlement_grace_sessions
             )
             pending_entry_weights = np.zeros(name_count, dtype=np.float64)
             pending_exit_fractions = np.zeros(name_count, dtype=np.float64)
@@ -1801,8 +1781,6 @@ def simulate_stateful_ledger(
             excluded_short_candidate_rows.append(0)
             band_excluded_unresolved_long_rows.append(0)
             band_excluded_unresolved_short_rows.append(0)
-            band_excluded_settled_long_rows.append(0)
-            band_excluded_settled_short_rows.append(0)
             band_without_prior_print_long_rows.append(0)
             band_without_prior_print_short_rows.append(0)
             band_exhausted_long_rows.append(0)
@@ -2218,8 +2196,6 @@ def simulate_stateful_ledger(
             band_candidates_short = 0
             band_excluded_unresolved_long = 0
             band_excluded_unresolved_short = 0
-            band_excluded_settled_long = 0
-            band_excluded_settled_short = 0
             band_without_prior_print_long = 0
             band_without_prior_print_short = 0
             band_exhausted_long = 0
@@ -2294,9 +2270,7 @@ def simulate_stateful_ledger(
                     name
                     for name in long_band
                     if entry_eligible[name]
-                    if name not in unavailable
-                    and not decision_unresolved[name]
-                    and not settled_names[name]
+                    if name not in unavailable and not decision_unresolved[name]
                 ]
                 short_candidates = [
                     name
@@ -2304,7 +2278,6 @@ def simulate_stateful_ledger(
                     if entry_eligible[name]
                     if name not in unavailable
                     and not decision_unresolved[name]
-                    and not settled_names[name]
                     and inputs.shortable[day, name]
                 ]
                 long_candidates.sort(
@@ -2318,7 +2291,6 @@ def simulate_stateful_ledger(
                     entry_eligible[name]
                     and name not in unavailable
                     and not decision_unresolved[name]
-                    and not settled_names[name]
                     and not inputs.shortable[day, name]
                     for name in short_band
                 )
@@ -2330,18 +2302,6 @@ def simulate_stateful_ledger(
                 )
                 band_excluded_unresolved_short = sum(
                     name not in unavailable and bool(decision_unresolved[name])
-                    for name in short_band
-                )
-                band_excluded_settled_long = sum(
-                    name not in unavailable
-                    and not decision_unresolved[name]
-                    and bool(settled_names[name])
-                    for name in long_band
-                )
-                band_excluded_settled_short = sum(
-                    name not in unavailable
-                    and not decision_unresolved[name]
-                    and bool(settled_names[name])
                     for name in short_band
                 )
                 band_without_prior_print_long = sum(
@@ -2629,8 +2589,6 @@ def simulate_stateful_ledger(
             excluded_short_candidate_rows.append(excluded_short_candidates)
             band_excluded_unresolved_long_rows.append(band_excluded_unresolved_long)
             band_excluded_unresolved_short_rows.append(band_excluded_unresolved_short)
-            band_excluded_settled_long_rows.append(band_excluded_settled_long)
-            band_excluded_settled_short_rows.append(band_excluded_settled_short)
             band_without_prior_print_long_rows.append(band_without_prior_print_long)
             band_without_prior_print_short_rows.append(band_without_prior_print_short)
             band_exhausted_long_rows.append(band_exhausted_long)
@@ -2649,30 +2607,6 @@ def simulate_stateful_ledger(
             net_cap_balanced_rows.append(net_cap_balanced)
             gross_cap_below_target_rows.append(gross_cap_below_target)
             name_cap_fresh_rows.append(name_cap_fresh)
-
-        # A last-mark settlement is conditional accounting, not an observed
-        # market execution. Freeze its fraction before the possible final print;
-        # expire the intention if a print makes the settlement unnecessary.
-        settlement_orders = {
-            int(name): submit_order(
-                day,
-                int(name),
-                "sell" if shares[name] > 0.0 else "buy",
-                1.0,
-                float(marks[name]),
-                "terminal_settlement",
-                day,
-                position_fraction=True,
-            )
-            for name in np.flatnonzero(
-                (shares != 0.0)
-                & ~settled_names
-                & (
-                    (missing_sessions >= config.settlement_grace_sessions - 1)
-                    | (config.settle_terminal_residuals and day == day_count - 1)
-                )
-            )
-        }
 
         # Freeze the hedge before reading any current-session fill or close.
         planned_equity = np.zeros(name_count, dtype=np.float64)
@@ -2821,10 +2755,9 @@ def simulate_stateful_ledger(
                 shares[name] = 0.0
                 marks[name] = np.nan
                 last_observed[name] = np.nan
-                for pending_map in (pending_exits, settlement_orders):
-                    pending = pending_map.pop(int(name), None)
-                    if pending is not None:
-                        pending_map[successor] = pending
+                pending = pending_exits.pop(int(name), None)
+                if pending is not None:
+                    pending_exits[successor] = pending
                 missing_sessions[successor] = missing_sessions[name]
                 missing_sessions[name] = 0
                 shares[successor] = float(new_shares)
@@ -2973,7 +2906,6 @@ def simulate_stateful_ledger(
         held_short_imputed_notional_rows.append(imputed_short_notional)
         held_short_placeholder_notional_rows.append(placeholder_short_notional)
         free_cash += interest - borrow
-        settlement_scenario_adjustment *= 1.0 + cash_rate
 
         # Only now may current-session prints affect the result. This makes the
         # immutable intended-order set invariant to those later observations.
@@ -3114,10 +3046,6 @@ def simulate_stateful_ledger(
             for name, pending in pending_entries.items()
         )
 
-        newly_reprinted = printed & settled_names & ~settled_then_printed_seen
-        settled_then_printed_seen |= newly_reprinted
-        settled_then_printed_today = int(newly_reprinted.sum())
-
         for name in range(name_count):
             if printed[name]:
                 last_print_session[name] = day
@@ -3128,91 +3056,6 @@ def simulate_stateful_ledger(
             elif shares[name] != 0.0:
                 missing_sessions[name] += 1
 
-        settlement_count = 0
-        settlement_notional = 0.0
-        if config.settle_terminal_residuals and day == day_count - 1:
-            boundary_unpriced = (shares != 0.0) & ~printed
-            terminal_boundary_unpriced_inventory_notional = float(
-                np.abs(shares[boundary_unpriced] * marks[boundary_unpriced]).sum()
-            )
-        due_for_settlement = (
-            (shares != 0.0)
-            & ~printed
-            & ~settled_names
-            & (
-                (missing_sessions >= config.settlement_grace_sessions)
-                | (config.settle_terminal_residuals and day == day_count - 1)
-            )
-        )
-        for name, pending in settlement_orders.items():
-            if not due_for_settlement[name]:
-                cancellations.append(
-                    pending.cancellation(day, inputs.dates[day], "expired")
-                )
-        for name in np.flatnonzero(due_for_settlement):
-            pending = pending_exits.pop(int(name), None)
-            if pending is not None:
-                cancellations.append(
-                    pending.cancellation(day, inputs.dates[day], "terminal_settlement")
-                )
-            price = float(marks[name])
-            if not np.isfinite(price) or price <= 0.0:
-                raise RuntimeError("terminal settlement requires a positive last mark")
-            before = float(shares[name])
-            quantity = abs(before)
-            side: OrderSide = "sell" if before > 0.0 else "buy"
-            settlement = settlement_orders[int(name)]
-            scenario_price = price * (
-                1.0 - config.settlement_haircut
-                if before > 0.0
-                else 1.0 + config.settlement_haircut
-            )
-            scenario_price_delta = scenario_price - price
-            settlement_scenario_adjustment += (
-                before * scenario_price_delta
-                - cost_rate * quantity * scenario_price_delta
-            )
-            free_cash, notional = _book_fill(
-                name=int(name),
-                side=side,
-                quantity=quantity,
-                price=price,
-                shares=shares,
-                marks=marks,
-                restricted_by_name=restricted_by_name,
-                free_cash=free_cash,
-                cost_rate=cost_rate,
-            )
-            exit_fill_long_today += int(before > 0.0)
-            exit_fill_short_today += int(before < 0.0)
-            entry_cost_basis[name] = 0.0
-            submission_nav[name] = 0.0
-            fill_cost = cost_rate * notional
-            fills.append(
-                Fill(
-                    order_id=settlement.order.order_id,
-                    security=inputs.securities[name],
-                    security_index=int(name),
-                    fill_date=inputs.dates[day],
-                    fill_session=day,
-                    side=side,
-                    quantity=quantity,
-                    price=price,
-                    gross_notional=notional,
-                    cost=fill_cost,
-                    purpose="terminal_settlement",
-                )
-            )
-            traded_notional += notional
-            costs += fill_cost
-            settlement_count += 1
-            settlement_notional += notional
-            settled_names[name] = True
-            entry_session[name] = -1
-            ineligible_streak[name] = 0
-            missing_sessions[name] = 0
-            unresolved_action[name] = False
-            explicit_unresolved_action[name] = False
         stale = int(np.sum((shares != 0.0) & ~printed))
 
         hedge_traded_notional = 0.0
@@ -3227,28 +3070,7 @@ def simulate_stateful_ledger(
             hedge_mark = current_hedge_close
         if hedge_order is not None:
             order = hedge_order.order
-            settle_hedge_last_mark = (
-                config.settle_terminal_residuals
-                and day == day_count - 1
-                and not bova_printed
-                and hedge_shares != 0.0
-            )
-            if settle_hedge_last_mark:
-                # Boundary accounting only: never present a stale mark as a print.
-                current_hedge_close = float(hedge_mark)
-                terminal_hedge_last_mark_settlement_notional = abs(
-                    hedge_shares * hedge_mark
-                )
-                settlement_count += 1
-                settlement_notional += terminal_hedge_last_mark_settlement_notional
-                scenario_delta = (
-                    -terminal_hedge_last_mark_settlement_notional
-                    * config.settlement_haircut
-                )
-                settlement_scenario_adjustment += scenario_delta * (
-                    1.0 - hedge_cost_rate if hedge_shares > 0 else 1.0 + hedge_cost_rate
-                )
-            if bova_printed or settle_hedge_last_mark:
+            if bova_printed:
                 hedge_share_array = np.asarray([hedge_shares], dtype=np.float64)
                 hedge_mark_array = np.asarray([hedge_mark], dtype=np.float64)
                 hedge_restricted_array = np.asarray(
@@ -3287,9 +3109,7 @@ def simulate_stateful_ledger(
                         price=current_hedge_close,
                         gross_notional=hedge_traded_notional,
                         cost=hedge_cost,
-                        purpose="terminal_settlement"
-                        if settle_hedge_last_mark
-                        else "hedge",
+                        purpose="hedge",
                     )
                 )
             else:
@@ -3334,8 +3154,26 @@ def simulate_stateful_ledger(
         )
         newly_scenario = unresolved & ~scenario_seen
         scenario_seen |= unresolved
-        settlement_haircut_nav = current_nav + settlement_scenario_adjustment
+        # This is a valuation sensitivity, never a fill or a source of cash.
+        unpriced_notional = float(
+            np.abs(shares[held_now & ~printed] * marks[held_now & ~printed]).sum()
+        )
+        unpriced_hedge = (
+            abs(hedge_shares * hedge_mark)
+            if hedge_shares != 0.0 and not bova_printed
+            else 0.0
+        )
+        unpriced_notional += unpriced_hedge
+        unpriced_count = int((held_now & ~printed).sum()) + int(unpriced_hedge > 0)
+        unpriced_haircut_nav = current_nav - config.unpriced_haircut * unpriced_notional
+        if day == day_count - 1:
+            terminal_boundary_unpriced_inventory_notional = (
+                unpriced_notional - unpriced_hedge
+            )
+            terminal_unpriced_hedge_notional = unpriced_hedge
         excluded_nav = current_nav
+        if unpriced_hedge:
+            excluded_nav -= hedge_restricted_cash + hedge_shares * hedge_mark
         if unresolved.any():
             excluded_nav -= float(restricted_by_name[unresolved].sum())
             excluded_nav -= float(np.sum(shares[unresolved] * marks[unresolved]))
@@ -3523,7 +3361,7 @@ def simulate_stateful_ledger(
         holding_value_rows.append(marked_holdings)
         reconciliation_rows.append(reconciliation)
         all_cash_rows.append(all_cash)
-        haircut_rows.append(settlement_haircut_nav)
+        haircut_rows.append(unpriced_haircut_nav)
         excluded_rows.append(excluded_nav)
         pending_entry_rows.append(len(pending_entries))
         pending_exit_rows.append(len(pending_exits))
@@ -3549,10 +3387,9 @@ def simulate_stateful_ledger(
         ages[held_with_age] = day - entry_session[held_with_age] + 1
         age_rows.append(ages)
         ineligible_streak_rows.append(ineligible_streak.copy())
-        settlement_count_rows.append(settlement_count)
-        settlement_notional_rows.append(settlement_notional)
-        settlement_fraction_rows.append(settlement_notional / start_nav)
-        settled_then_printed_rows.append(settled_then_printed_today)
+        unpriced_count_rows.append(unpriced_count)
+        unpriced_notional_rows.append(unpriced_notional)
+        unpriced_fraction_rows.append(unpriced_notional / current_nav)
         held_end_long_rows.append(held_end_long)
         held_end_short_rows.append(held_end_short)
         pending_end_long_rows.append(pending_end_long)
@@ -3619,7 +3456,7 @@ def simulate_stateful_ledger(
     gross_array = np.asarray(gross_rows, dtype=np.float64)
     finite_gross = gross_array[np.isfinite(gross_array)]
     mean_gross = float(np.mean(finite_gross)) if finite_gross.size else 0.0
-    settlement_fraction = float(np.sum(settlement_fraction_rows))
+    unpriced_fraction = float(np.max(unpriced_fraction_rows))
     economics_unresolved = (
         insolvent
         or action_uncertainty_seen
@@ -3628,8 +3465,8 @@ def simulate_stateful_ledger(
         or payable_by_name.any()
         or hedge_shares != 0.0
         or terminal_boundary_unpriced_inventory_notional > 0.0
-        or terminal_hedge_last_mark_settlement_notional > 0.0
-        or settlement_fraction > config.settlement_economics_unresolved_fraction_nav
+        or terminal_unpriced_hedge_notional > 0.0
+        or unpriced_fraction > config.unpriced_economics_unresolved_fraction_nav
         or (portfolio_policy is None and mean_gross < 0.5 * config.gross_target)
     )
     exit_cause_array = np.stack(exit_cause_rows).astype(np.int8, copy=False)
@@ -3782,7 +3619,7 @@ def simulate_stateful_ledger(
         marked_signed_holdings=np.asarray(holding_value_rows, dtype=np.float64),
         reconciliation_error=np.asarray(reconciliation_rows, dtype=np.float64),
         all_cash_nav=np.asarray(all_cash_rows, dtype=np.float64),
-        settlement_haircut_scenario_nav=np.asarray(haircut_rows, dtype=np.float64),
+        unpriced_haircut_scenario_nav=np.asarray(haircut_rows, dtype=np.float64),
         unresolved_excluded_nav=np.asarray(excluded_rows, dtype=np.float64),
         pending_entry_count=np.asarray(pending_entry_rows, dtype=np.int64),
         pending_exit_count=np.asarray(pending_exit_rows, dtype=np.int64),
@@ -3846,15 +3683,12 @@ def simulate_stateful_ledger(
             planned_name_rows, dtype=np.float64
         ),
         holding_age_sessions=np.stack(age_rows),
-        terminal_settlement_count=np.asarray(settlement_count_rows, dtype=np.int64),
-        terminal_settlement_notional=np.asarray(
-            settlement_notional_rows, dtype=np.float64
+        unpriced_inventory_count=np.asarray(unpriced_count_rows, dtype=np.int64),
+        unpriced_inventory_notional=np.asarray(
+            unpriced_notional_rows, dtype=np.float64
         ),
-        terminal_settlement_notional_fraction_nav=np.asarray(
-            settlement_fraction_rows, dtype=np.float64
-        ),
-        settled_then_printed_count=np.asarray(
-            settled_then_printed_rows, dtype=np.int64
+        unpriced_inventory_fraction_nav=np.asarray(
+            unpriced_fraction_rows, dtype=np.float64
         ),
         k_eff_per_side=np.asarray(k_eff_rows, dtype=np.int64),
         held_count_start_of_day_long=np.asarray(held_start_long_rows, dtype=np.int64),
@@ -3880,12 +3714,6 @@ def simulate_stateful_ledger(
         ),
         band_excluded_unresolved_short=np.asarray(
             band_excluded_unresolved_short_rows, dtype=np.int64
-        ),
-        band_excluded_settled_long=np.asarray(
-            band_excluded_settled_long_rows, dtype=np.int64
-        ),
-        band_excluded_settled_short=np.asarray(
-            band_excluded_settled_short_rows, dtype=np.int64
         ),
         band_candidates_without_prior_session_print_long=np.asarray(
             band_without_prior_print_long_rows, dtype=np.int64
@@ -3999,13 +3827,13 @@ def simulate_stateful_ledger(
         insolvency_date=insolvency_date,
         economics_unresolved=economics_unresolved,
         terminal_boundary_unpriced_inventory_notional=terminal_boundary_unpriced_inventory_notional,
-        terminal_hedge_last_mark_settlement_notional=terminal_hedge_last_mark_settlement_notional,
+        terminal_unpriced_hedge_notional=terminal_unpriced_hedge_notional,
         gross_target=config.gross_target,
         ineligible_hold_sessions=config.ineligible_hold_sessions,
         settlement_grace_sessions=config.settlement_grace_sessions,
-        settlement_haircut=config.settlement_haircut,
-        settlement_economics_unresolved_fraction_nav=(
-            config.settlement_economics_unresolved_fraction_nav
+        unpriced_haircut=config.unpriced_haircut,
+        unpriced_economics_unresolved_fraction_nav=(
+            config.unpriced_economics_unresolved_fraction_nav
         ),
         share_sizing_mode="notional_entries_position_fraction_exits",
         borrow_source=config.borrow_source,

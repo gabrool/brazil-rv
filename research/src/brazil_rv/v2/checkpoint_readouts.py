@@ -33,18 +33,16 @@ def candidate_readout(paths: dict[str, Path]) -> dict:
             "unresolved_receivable": summary["unresolved_receivable"],
             "unresolved_payable": summary["unresolved_payable"],
             "terminal_no_print_dominates": summary["terminal_no_print_dominates"],
-            "terminal_settlement_economics_unresolved": summary[
-                "terminal_settlement_economics_unresolved"
+            "unpriced_economics_unresolved": summary["unpriced_economics_unresolved"],
+            "unpriced_inventory_fraction_nav": summary[
+                "unpriced_inventory_fraction_nav"
             ],
-            "terminal_settlement_notional_fraction_nav": summary[
-                "terminal_settlement_notional_fraction_nav"
-            ],
-            "terminal_settlement_haircut_delta_nav": summary[
-                "terminal_nav_settlement_haircut_scenario"
+            "terminal_unpriced_haircut_delta_nav": summary[
+                "terminal_nav_unpriced_haircut_scenario"
             ]
             - summary["terminal_nav"],
-            "terminal_hedge_last_mark_settlement_notional": summary.get(
-                "terminal_hedge_last_mark_settlement_notional", 0.0
+            "terminal_unpriced_hedge_notional": summary.get(
+                "terminal_unpriced_hedge_notional", 0.0
             ),
         }
         fields = saved["series"]
@@ -92,7 +90,7 @@ def candidate_readout(paths: dict[str, Path]) -> dict:
             "pooling_rule": report["economics"]["contract"].get(
                 "economics_pooling", "resolved_folds_only"
             ),
-            "interpretation": "inspect_terminal_settlement_and_unresolved_labels; resolved_fold_only_net_excess_bps_retains_secondary_pool",
+            "interpretation": "inspect_unpriced_inventory_and_unresolved_labels; resolved_fold_only_net_excess_bps_retains_secondary_pool",
         },
         "turnover_note": "includes_initial_and_terminal_book_trades; unchanged_non_circular_block_intervals_underweight_boundary_spikes",
         "pooled": {
@@ -147,14 +145,20 @@ def paired_readouts(
             right = retained(context, paths[right_name][fold], fold)
             if experiment_hashes is not None:
                 for name, retained_result in ((left_name, left), (right_name, right)):
-                    sources = dict(retained_result.result.report["source_artifact_hashes"])
-                    if sources.pop("round7_frozen_design") != experiment_hashes[str(paths[name][fold])]:
+                    sources = dict(
+                        retained_result.result.report["source_artifact_hashes"]
+                    )
+                    if (
+                        sources.pop("round7_frozen_design")
+                        != experiment_hashes[str(paths[name][fold])]
+                    ):
                         raise ValueError("paired experiment differs from bound freeze")
                     retained_result.result.report["source_artifact_hashes"] = sources
             pair = rr._paired_readouts({fold: left}, {fold: right})
             if experiment_hashes is not None:
                 pair["experiment_design_hashes"] = {
-                    name: experiment_hashes[str(paths[name][fold])] for name in (left_name, right_name)
+                    name: experiment_hashes[str(paths[name][fold])]
+                    for name in (left_name, right_name)
                 }
             write_json_atomic(output / key / f"{fold}.json", pair)
             daily[key][fold] = {

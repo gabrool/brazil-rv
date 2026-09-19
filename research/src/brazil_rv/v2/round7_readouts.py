@@ -164,7 +164,6 @@ def evaluate(root, cells, folds, group, seeds=SEEDS, *, cells_only=False):
                     fold=fold,
                     output=output / "evaluation.json",
                     execution_policy=policy,
-                    settle_terminal_residuals=True,
                 )
                 seed_ic = {}
                 for seed, values in zip(seeds, members, strict=True):

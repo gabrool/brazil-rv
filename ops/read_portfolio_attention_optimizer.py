@@ -148,8 +148,8 @@ def run(root, source):
                 "unresolved_action_name_days": int(
                     result.unresolved_action_name_days.sum()
                 ),
-                "settlement_fraction_sum": float(
-                    result.terminal_settlement_notional_fraction_nav.sum()
+                "maximum_unpriced_inventory_fraction": float(
+                    result.unpriced_inventory_fraction_nav.max()
                 ),
                 "unresolved_inventory_notional": result.unresolved_inventory_notional,
                 "insolvent": result.insolvent,

@@ -32,7 +32,6 @@ class PortfolioAccount:
     entry_day: np.ndarray
     missing_sessions: np.ndarray
     ineligible_sessions: np.ndarray
-    settled: np.ndarray
     payments: list[tuple[int, Tensor]]
     config: LedgerConfig
 
@@ -52,7 +51,6 @@ class PortfolioAccount:
             entry_day=np.full(n, -1, dtype=np.int64),
             missing_sessions=np.zeros(n, dtype=np.int64),
             ineligible_sessions=np.zeros(n, dtype=np.int64),
-            settled=np.zeros(n, dtype=bool),
             payments=[],
             config=config,
         )
@@ -89,16 +87,9 @@ class PortfolioAccount:
         eligible = np.asarray(active_score, dtype=bool)
         self.ineligible_sessions[~held | eligible] = 0
         self.ineligible_sessions[held & ~eligible] += 1
-        allowed = (
-            eligible
-            & ~prior_unresolved
-            & ~self.settled
-            & (self.marks.detach().numpy() > 0)
-        )
-        required = (
-            (self.ineligible_sessions > self.config.ineligible_hold_sessions)
-            | (self.missing_sessions >= self.config.settlement_grace_sessions)
-            | self.settled
+        allowed = eligible & ~prior_unresolved & (self.marks.detach().numpy() > 0)
+        required = (self.ineligible_sessions > self.config.ineligible_hold_sessions) | (
+            self.missing_sessions >= self.config.settlement_grace_sessions
         )
         return allowed, required
 
@@ -271,27 +262,10 @@ class PortfolioAccount:
         held = self.shares.detach().numpy() != 0
         self.missing_sessions[printed & held] = 0
         self.missing_sessions[~printed & held] += 1
-        settle = (
-            held
-            & ~printed
-            & (
-                (self.missing_sessions >= config.settlement_grace_sessions)
-                | (terminal and config.settle_terminal_residuals)
-            )
-        )
-        settle[-1] = bool(
-            terminal
-            and config.settle_terminal_residuals
-            and held[-1]
-            and not printed[-1]
-        )
-        settlement_notional = (
-            self.shares.abs() * self.marks * torch.as_tensor(settle)
+        # No print means inventory remains, including at an evaluation boundary.
+        unpriced_notional = (
+            self.shares.abs() * self.marks * torch.as_tensor(~printed)
         ).sum()
-        costs = costs + self._fill(
-            -self.shares * torch.as_tensor(settle), self.marks, cost_rate
-        )
-        self.settled |= settle
         held_after = self.shares.detach().numpy() != 0
         held_before = shares_before_fill.detach().numpy() != 0
         changed_side = (
@@ -318,5 +292,5 @@ class PortfolioAccount:
             "interest": interest,
             "borrow": borrow,
             "cost": costs,
-            "settlement_notional": settlement_notional,
+            "unpriced_inventory_notional": unpriced_notional,
         }
