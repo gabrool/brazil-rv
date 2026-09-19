@@ -21,6 +21,7 @@ def evaluate(root, folds):
     design = read(root / "frozen_design.json")
     prior = Path(design["prior_decision_root"])
     data, binding = load_data(prior, "C6")
+    store_dates = np.load(Path(design["store"]["root"]) / "date_index.npy")
     benchmark = Path(read(PROJECT / "docs/v2_opportunity_run.json")["root"])
     implementation = _git_identity()
     cells = ("ridge_score", "ridge_rich", "tree_score", "tree_rich")
@@ -44,7 +45,8 @@ def evaluate(root, folds):
                     raise ValueError("residual fit identity differs")
                 with np.load(fit / "scores.npz") as scores:
                     if not np.array_equal(
-                        scores["dates"], rows[day]
+                        store_dates[scores["dates"]],
+                        np.asarray(data.inputs.dates, dtype="datetime64[D]")[rows[day]],
                     ) or not np.array_equal(scores["names"], name):
                         raise ValueError(
                             "residual forecast population differs from original control"
