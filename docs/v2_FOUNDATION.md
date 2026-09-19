@@ -1,4 +1,4 @@
-# Model foundation experiments: interim review
+# Model foundation experiments: combined review
 
 2026-09-18. The user authorized all five workstreams. This report distinguishes
 completed diagnostics from the new matched experiments, which are still running.
@@ -213,24 +213,150 @@ Do not repair them by relabelling every historical ticker or changing the live
 fit store. Verify the dated share-class/ISIN succession first; bind any required
 target/history repair separately and report its effect on the comparison.
 
-## Remaining authorized work
+## Completed matched screens and decisions
 
-1. Finish the matched input wave and its economic/IC readouts, then apply the
-   registered improvement/noninferiority gates. A wide interval spanning zero is
-   not evidence that deletion is harmless.
-2. Score fixed checkpoint averages using compatible original inference code;
-   finish EMA comparisons (the fixed cross-architecture blend is complete).
-3. Test compact post-pooling readout, then matched encoder/peer contrasts and
-   separate width/depth changes according to the registered conditional order.
-4. Resolve and quantify the specific accounting cases; do the bounded rich-data
-   residual probe on genuine earlier OOS forecasts and the retained roster.
-   [Its implementation specification](../research/preregistrations/v2_foundation_residual.md)
-   freezes matched score-only/rich ridge and shallow-tree cells, prior selection,
-   correction strengths including zero, and equal-date weighting before new outcomes.
-5. Confirm admitted candidates only, report continuous accounts and all three
-   currency-consistent Sharpes, archive recovery artifacts, and close each branch
-   explicitly. No new model is promoted at this interim point.
+All comparisons below use seeds 11/29/47 and F2/F6/F10/F14. Values are ensemble
+changes against the matched full-input, raw-checkpoint attention control, except
+where explicitly labelled C6. None passed its registered admission gate.
 
-The [progress record](v2_foundation_progress.md) and [run pointer](v2_foundation_run.json)
-identify the source, workers and next actions. Training continues from an immutable
-source worktree while documentation and CPU readouts evolve separately.
+| Contrast | IC change | Net change, bps/day | Decision |
+|---|---:|---:|---|
+| Remove microstructure | -.002301 | -1.112 | Retain family |
+| Remove oddlot + sector + rebalance | -.003061 | -.344 | Retain group; individual usefulness not established |
+| One-epoch-half-life EMA | -.000726 | -.035 | Retain raw checkpoint |
+| Readout width/inner width 256 to 128 | -.004912 | +.361 | Forecasting loss exceeds margin |
+| Matched GRU encoder with early peer attention | +.001348 | +.669 | Only two of four folds improve either endpoint |
+| Remove peer attention, preserve learned pooling | -.003562 | -.625 | Retain peer attention |
+| Temporal width 64 to 96 | -.002271 | +1.338 | Forecasting loss exceeds margin |
+| Readout depth three to two | -.002282 | -1.048 | Retain depth |
+
+The gates were frozen before outcomes. Improvement requires at least +.001 IC or
++.25 net bps/day, neither endpoint below -.001 IC/-.25 bps, and improvement in at
+least two seeds and three folds. Simplification can alternatively pass if both
+paired 90% lower bounds exceed those loss margins. Averaging requires improvement.
+These gates intentionally reject some positive-PnL point estimates; that is a
+research decision rule, not a claim their economic potential is zero. Changing the
+gates now to rescue a candidate would require a separately registered future study.
+All intervals are nominal reused-development evidence, not untouched-test inference.
+
+Fresh compatible pretraining was used for every graph/input change. The GRU bridge
+preserves the rich adapters, FiLM, early peers, learned pooling, readout and three
+heads; it is not the original five-head C6 package. A five-head bridge was not run
+because no direct GRU-versus-C6 component claim is made. No combined width/depth
+candidate, union of removed families, additional seeds or broad optimizer grid was
+run. None of the new neural fits hit the 60-epoch ceiling.
+
+Original C6 capacity was conditional on a demonstrated curve bottleneck. Among 42
+original histories, one reached epoch 60; its last six selection ICs were nearly
+flat (.02083 to .02106), with fit IC around .097. The remaining histories stopped
+by patience. This did not trigger a C6 expansion. It does not prove C6 is optimally
+sized. [Curve evidence](v2_foundation_c6_curves.json).
+
+## Averaging and rich-data residual outcomes
+
+All 84 original-neutral trailing-weight averages were scored with compatible
+historical inference code. On all fourteen folds, C6 changes IC by -.000123 and net
+by -.071 bps/day; attention changes IC by -.000401 and net by -.060. The registered
+four-fold screen also fails for both. Retain raw checkpoints; no averaging
+confirmation or new averaging-rule sweep was triggered.
+
+The residual probe used genuine per-seed C6 OOS forecasts from July 2016 onward,
+including hash-verified P preludes. Parent selection labels mature before the
+first prelude forecast. Fit-only accepted scalar conditioning preserves values,
+masks and known ages; common scalers sample once per date. Each learner has its
+own matched score-only control. Per-head neutral-rank residual targets use only
+mature labels, equal total fitting weight per date, and prior selection chooses
+one shared strength from 0/.1/.25/.5/1. Predictions retain every eligible name.
+
+| Rich learner | Comparator | IC change | Net change, bps/day | Interpretation |
+|---|---|---:|---:|---|
+| Ridge | Unchanged C6 | -.000044 | +.784 | Fails fold consistency; gain concentrated in F14 |
+| Ridge | Score-only ridge | +.002598 | +.756 | Fails fold consistency |
+| Seven-leaf tree | Unchanged C6 | +.000239 | -.096 | Insufficient improvement |
+| Seven-leaf tree | Score-only tree | +.001781 | +1.333 | Passes this comparator, but not unchanged C6 |
+
+Neither learner qualifies for confirmation. Improving a weaker correction does not
+establish improvement over the original model. This bounded current-state residual
+probe does not settle whether different temporal representations of rich data help.
+Forty-eight cell/fold/seed fits, three heads each, and 64 matched books completed.
+Readout startup failures (store versus cache indices, missing policy metadata and
+an incomplete output directory) were corrected and retained in logs. Fitted models
+and predictions were unchanged; calendar/population checks then passed.
+
+## Comparability, performance and the earlier six-bps result
+
+[Combined metrics](v2_foundation_combined_metrics.json) contain all thirteen screen
+ensembles: three Sharpes, turnover, exposure, win/loss rates and drawdown. Brazilian
+Sharpe subtracts CDI from BRL returns; US Sharpe converts returns to USD using
+historical PTAX then subtracts calendar-accrued EFFR; zero-rate Sharpe uses BRL
+absolute returns. PTAX valuation is not an executable FX-fill assumption.
+
+The four screen folds are noncontiguous, and each account starts in cash. C6's
+screen net is .657 bps/day and fresh TE_full's .400. Their concatenated drawdown
+and compounded returns describe screened sessions, not continuous 2018–2024.
+Do not compare those directly to the earlier all-history four/six-bps numbers.
+
+| Earlier continuous 2018–2024 book | C6 net bps/day | Attention net bps/day |
+|---|---:|---:|
+| Tight neutral, 5% net cap | 4.000 | 4.497 |
+| Flexible net, 45% cap; same 5% beta cap | 6.707 | 5.937 |
+
+Those use earlier sealed forecasts and continuous inventory. Flexible books were
+persistently net long, not evidence of learned confidence timing. They remain
+research candidates with financing/settlement limitations, not discarded results.
+The original all-fourteen-fold reset ensembles earn 4.245/4.258; the fixed equal
+forecast blend earns 4.948. Policy, dates, forecast generation and account continuity
+must accompany any future headline result.
+
+## Confidence limits and accounting sensitivity
+
+Matched four-fold retained-control replays quantify two independent scenarios:
+zero interest on short-sale proceeds changes C6/TE_full net by -3.035/-3.041 bps/day;
+a 3% annual debit spread changes them by -.105/-.101. These are scenarios, not
+verified broker terms. [Financing evidence](v2_foundation_financing_results.json).
+
+[Settlement exposure](v2_foundation_settlement_exposure.json) records actual synthetic
+settlement quantities. [Contractual mark sensitivity](v2_foundation_settlement_marks.json)
+compares four verified event terms with the generic marks on those original
+quantities, using exact same-session successor quotes. Earlier continuous C6
+neutral/flexible nominal differences are +164.911/+250.329 bps of INITIAL NAV;
+attention's are +69.433/+261.966. These are cumulative valuation differences, not
+daily returns, corrected PnL, or asserted successor sales.
+
+This bounded study has NOT implemented a corrected contractual settlement ledger.
+Payment financing, delivery timing, changed inventory/policy paths, loan elections,
+other events and dated ALLOS/ISA identity succession remain unresolved. Copel needs
+two successor legs; the current account cannot represent that or merge a successor
+already held. The source store and historical targets were not silently repaired.
+No model is deployment-ready, and absolute economic confidence remains conditional.
+These limitations should precede live implementation or strong absolute-PnL claims.
+
+## Runtime, provenance and recovery
+
+| Neural wave | Fits including parents | Summed fit time |
+|---|---:|---:|
+| Inputs | 45 | 102.2 min |
+| Compact readout | 15 | 40.8 min |
+| Encoder | 15 | 81.4 min |
+| Peer removal | 15 | 22.4 min |
+| Separate capacity contrasts | 30 | 73.6 min |
+
+Total: 120 new fits, 1,484 epochs, about 5.34 hours of summed fit time, plus six
+disposable engineering checks, score export, preprocessing, readouts and review.
+Wall time spans successive registered waves; fit time is not total completion time.
+The matched GRU was slower than temporal attention on this RTX 2060 implementation.
+Full 60-session histories and all eligible names were preserved throughout.
+
+Initial training source d21a93a stayed immutable. Later graphs used 3dbda71;
+base readouts used 75a5b75; residual fitting used 19872de; corrected residual
+readouts used 81ba9c9; financing used 9cda3ae. Exact artifact hashes and worker
+receipts are under the [canonical run](v2_foundation_run.json). Main report changes
+do not rebind completed fits. Tests covered EMA/resume invariants, pathway masks
+and pooling, residual date weighting, intercept and age semantics; actual runs
+checked accepted-store, source, score identities and eligible populations.
+
+No neural, averaging or residual candidate qualified for new confirmation, so no
+confirmation fits were run. Preserve the current reference models, full cleaned
+roster and raw selection. The most defensible positive findings are existing seed
+ensembling and forecast diversity; neither alone establishes a deployable advance.
+Recovery archiving and canonical completion verification are still in progress.
