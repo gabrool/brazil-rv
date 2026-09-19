@@ -304,3 +304,11 @@ and neutral accounts. Paired rich-vs-anchor and rich-vs-score comparisons follow
 Use this same source to resume accounts; source bindings are part of book identity.
 No residual promotion decision yet. Remaining: review results, any admitted
 confirmation, accounting sensitivity/limitations and consolidated recovery/report.
+
+Readout correction: initial 77c3556 attempt stopped before any book creation:
+residual date indices were store-global, while portfolio rows are cache-local.
+7ffc869 compares actual calendar dates through the bound store date axis. Fits
+and predictions unchanged. Active/reusable readout source is now clean detached
+C:/quant/brazil-rv-foundation-residual-readouts-calendar, commit 7ffc869; receipt
+readout_residual_calendar_worker.json and corresponding calendar logs supersede
+the prior worker. Preserve the initial error log as evidence.
