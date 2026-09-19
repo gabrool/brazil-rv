@@ -1,0 +1,40 @@
+{
+  "accepted_store_mutated": false,
+  "allowlist": {
+    "path": "research\\configs\\v2\\isin_links_allowlist.csv",
+    "sha256": "54d6896c2ae593347223de5d966948d03ec75d901603c9cecfa6c025b25340ac"
+  },
+  "cases": [
+    {
+      "effective_prior_history_after": 1051,
+      "effective_prior_history_before": 0,
+      "first_repaired_eligible_date": "2023-10-25",
+      "gained_eligible_days": 60,
+      "retired_stale_predecessor_days": 6,
+      "ticker": "ALOS3"
+    },
+    {
+      "effective_prior_history_after": 3689,
+      "effective_prior_history_before": 0,
+      "first_repaired_eligible_date": "2024-11-18",
+      "gained_eligible_days": 28,
+      "retired_stale_predecessor_days": 6,
+      "ticker": "ISAE4"
+    },
+    {
+      "effective_prior_history_after": 3679,
+      "effective_prior_history_before": 0,
+      "first_repaired_eligible_date": null,
+      "gained_eligible_days": 0,
+      "retired_stale_predecessor_days": 0,
+      "ticker": "ISAE3"
+    }
+  ],
+  "evidence": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\identity_source_admission.json",
+    "sha256": "52e4e8dbb5d898498a37a10dc3f24031586a37cf9d201f8f801da0561405e353"
+  },
+  "labels_or_forecasts_read": false,
+  "note": "Bounded six-name original-contract replay, not a new accepted data store. Actual feature/wealth/label/sidecar propagation still required in B.",
+  "status": "continuation_loader_and_universe_verified_derived_store_pending"
+}

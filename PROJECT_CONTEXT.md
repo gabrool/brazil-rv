@@ -48,6 +48,17 @@ physical returns are superseded and principal cash is separately attributed.
 Static policy coordinates remain frozen and effective borrowing prohibitions also
 apply to later flat-start windows. See `docs/v2_CORPORATE_EVENTS.md` for Cielo's
 distinct dates and SELIC correction, and BR Malls' recovered custody/loan terms.
+
+The economic/data run pointer now binds Cielo's separate source-based accounting
+amendment and its verified historical event arithmetic. Apply it explicitly after
+loading frozen policy inputs; accepted stores and static feature coordinates stay
+unchanged. The source-backed ISIN allowlist now also contains the ALLOS and ISA
+renames, with a repaired admission loader that validates dated original identities
+without requiring an unchanged ticker. A bounded causal-universe audit recovers
+88 eligible successor days and retires 12 stale predecessor cells. These links are
+for the next derived store: full history/features/labels/auxiliary propagation and
+lending aliases remain unaccepted until Stage B verification. See
+`docs/v2_identity_source_admission.json`; no new fit or profitability is accepted.
 Event-axis admission and the wider source audit still remain; no historical result
 is accepted by the synthetic mechanics evidence.
 

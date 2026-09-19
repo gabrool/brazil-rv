@@ -1997,9 +1997,7 @@ def build_daily_store(
             }
         )
     else:
-        isin_successions = load_isin_link_allowlist(
-            isin_link_allowlist, proposed_isin_successions
-        )
+        isin_successions = load_isin_link_allowlist(isin_link_allowlist, cash)
     continuation_isins = continuation_identity_axis(panel.isins, isin_successions)
     decision_timestamps = tuple(row.decision_at for row in session_schedule)
     daily_action_cutoffs = next_session_decision_cutoffs(

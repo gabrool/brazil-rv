@@ -1,0 +1,65 @@
+{
+  "accepted_store_mutated": false,
+  "changed_cells": {
+    "action_cash_per_prior_share": 1,
+    "action_has_action": 1,
+    "action_payment_session": 1,
+    "action_session_resolved": 86,
+    "action_shares_per_prior_share": 1,
+    "action_successor_index": 0,
+    "active": 0,
+    "raw_close": 0
+  },
+  "elapsed_seconds": 0.5249877000023844,
+  "historical_mechanics_oracles": [
+    {
+      "actual_nav_brl": 10004116.64336735,
+      "cash_per_share_brl": 5.89,
+      "entry_brl": 5.829999923706055,
+      "expected_nav_brl": 10004116.64336735,
+      "loan_invoice_cent_bound_brl": 0,
+      "max_account_difference_brl": 0.0,
+      "quantity": 68610.63554623947,
+      "side": 1
+    },
+    {
+      "actual_nav_brl": 9999115.221458167,
+      "cash_per_share_brl": 5.842895570784521,
+      "entry_brl": 5.829999923706055,
+      "expected_nav_brl": 9999115.221458167,
+      "loan_invoice_cent_bound_brl": 686.1063554623947,
+      "max_account_difference_brl": 0.0,
+      "quantity": 68610.63554623947,
+      "side": -1
+    }
+  ],
+  "loan_panel_sha256": "0b3ea912bd5e798f7e7a4dbf1b4007fc97698f98bb6805411fdc899d6f2a7e94",
+  "manifest": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\corporate_replay\\manifest.json",
+    "sha256": "dd201256a751186b368d629d0fce33bf4f52e6c0fb397d662d1d4f14c7c1a5ab",
+    "status": "cielo_admitted_accounting_only_other_cases_pending"
+  },
+  "model_arrays_mutated": false,
+  "model_predictions_and_labels_read": false,
+  "resolved_eligible_stock_days": 6,
+  "scope": "zero-cost predetermined 4% position; actual Cielo quotes and sourced claims; other names flat",
+  "shape": [
+    3717,
+    933
+  ],
+  "source_array_hashes": {
+    "action_cash_per_prior_share": "d530ec6c93794b97980848cba40cafe39cf8e6cd2d1a48569d964e80e5aa72c2",
+    "action_has_action": "a08ab57918e9b5805537cb06b81a9994174e9de7588b702c972c65432ccdf1f6",
+    "action_payment_session": "8601338a3e65a9c9c0393e2f0821849ebe8601812f1d53cbfa41532950dc2753",
+    "action_session_resolved": "1d1f277649264bd63edbc54d88507b5257a690fcc053c8899e9e1018f461dace",
+    "action_shares_per_prior_share": "8554e23cec96561745ac7232ec87efe3e93a5f4ce8863b4fdc541c8aa799d3ea",
+    "action_successor_index": "cf0a8df8e100f2ab29b40221f51841dc1d46800a0458ddcb045b18a25208a65e",
+    "active": "1e7f0e3c10592bcb99942b37359534e37485bdfdb6eab26f117ebf846d21629e",
+    "raw_close": "d822a557e79452270d897c9c0df470efd56519754e56b44840243b5024fd0e16"
+  },
+  "status": "cielo_source_admission_verified_not_model_profitability",
+  "store": {
+    "manifest_sha256": "61149d43a23fc55fcd92b43aaa4e74d747fbdf62f852bedbbbdb2cf18281f3cc",
+    "root": "C:\\quant-data\\b3\\processed\\v2_data_store_2d59b9d_20260913T211700Z"
+  }
+}

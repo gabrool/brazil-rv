@@ -11,7 +11,9 @@ consistency, removal of fabricated missing-quote liquidations, inventory netting
 multi-leg/delayed-delivery, fixed-contract loans and dated money settlement are
 implemented and tested. Reconciled lending observations are now admitted to a
 separate economic archive; prior stock/hedge references are bound. Event-specific
-terms and full historical account acceptance remain open. No training or
+terms and full historical account acceptance remain open. Cielo's source-based
+accounting artifact and ALLOS/ISA rename admissions are now verified as described
+at the end of this log; a corrected full model store remains pending. No training or
 source-census worker is active.
 
 Initial inspection: the account supports only one scalar successor and rejects a
@@ -653,3 +655,50 @@ Acceptance SHA-256 is
 All members were read back, and all eleven original source receipts were verified.
 The run pointer and its hash sidecar were refreshed together; no immutable dataset
 was copied into the archive. Main implementation was pushed to GitHub.
+
+## 2026-09-19: Cielo historical admission and rename-loader repair
+
+The new explicit `corporate_replay` pointer binds Cielo to the original full
+3717-session/933-name axes. Loan cash closes August 30 at the independently sourced
+SELIC-adjusted R$5.842895570784521. Remaining shareholders retain inventory until
+September 24 recognition of the September 23 announcement, with R$5.89 paid
+September 26. Coverage is resolved from the known August 27 closed-register state.
+Changes: 86 coverage cells, including six eligible days, and one q/cash/action/
+payment cell each. No quote, eligibility, score, feature or target changes. A
+full-axis hash check confirms the eight input source arrays are unchanged.
+
+Predetermined 4% long and short positions opened at the actual August 26 quote,
+with the other 932 names flat and zero costs/CDI, exactly reconcile both accounts
+against closed-form event cash flows. Source/reference/calendar hashes are bound
+in `v2_corporate_replay_acceptance.json`. This is a mechanical historical oracle,
+not a candidate outcome. The one-cent loan invoice convention remains bounded
+per actual share count. Flat-start slicing retains prior borrowing prohibition and
+future payment dates; static serialized policy features retain their original
+objects. No old policy was reconstructed with changed static cost features.
+
+The identity admission review found a distinct loader defect: verified ticker-plus-
+ISIN renames could not pass the same-ticker heuristic candidate gate. Explicit
+evidenced pairs now bind directly to exact original quote boundaries, with
+non-overlap, successor ticker and one-to-one checks. Same-ticker proposals still
+do not auto-admit anything. The newly recovered issuer November 7 ISA notice is
+archived, hash-bound and visually checked; its source typo TRLP4 is explicitly
+resolved by the November 18 issuer notice and COTAHIST TRPL4 observations.
+
+Three unit-ratio/no-cash rename links are now bound for the next derived store:
+ALSO3→ALOS3, TRPL4→ISAE4 and TRPL3→ISAE3. In a bounded six-name replay of the
+existing causal history/universe functions, ALOS3 recovers 60 eligible days and
+ISAE4 recovers 28. ISAE3 gains no eligible days under unchanged liquidity rules.
+Twelve stale predecessor-active cells retire, no existing eligible successor days
+are lost, and successor eligibility never predates the identity boundary. This
+does not yet update actual model tensors, shareholder wealth, labels or sidecars.
+`v2_identity_source_admission.json` records the exact source rows and hashes.
+Original accepted inputs and foundation fits are untouched.
+
+Validation: 23 targeted corporate-admission, data-foundation and causal-continuation
+checks passed, plus the full-store conversion test (one passed, 49 deselected).
+Ruff passed for all changed Python files. Earlier mechanics/censuses were not rerun.
+The registration remains unchanged and was revisited: A/B are incomplete; C/D have
+not started. Next resolve corporate custody/loan lifecycle and BRML/DMMO/CPLE,
+then propagate these identity links and finish the deep source-to-tensor audit.
+The BDI's predecessor loan aliases can outlast a spot rename; do not silently map
+those onto new neural features or infer a loan renewal date from the quote change.

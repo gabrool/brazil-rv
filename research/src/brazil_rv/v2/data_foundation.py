@@ -542,13 +542,12 @@ def detect_isin_successions(daily: pl.DataFrame) -> pl.DataFrame:
     ).select(*schema)
 
 
-def load_isin_link_allowlist(path: Path, candidates: pl.DataFrame) -> pl.DataFrame:
-    """Load source-backed ISIN conversions and bind them to detected candidates.
+def load_isin_link_allowlist(path: Path, daily: pl.DataFrame) -> pl.DataFrame:
+    """Bind explicit source-backed conversions to dated original observations.
 
-    The repository allowlist is intentionally empty until contractual terms
-    and their historical availability have been verified.  A populated row is
-    accepted only when it names a detected adjacency and supplies complete,
-    dimensionally meaningful conversion terms and immutable source evidence.
+    Ticker renames may accompany an ISIN change. Heuristic same-ticker proposals
+    are therefore not an admission gate. Only explicit evidenced rows are linked;
+    exact non-overlapping adjacency and the successor's dated ticker are checked.
     """
 
     if not path.is_file():
@@ -604,33 +603,70 @@ def load_isin_link_allowlist(path: Path, candidates: pl.DataFrame) -> pl.DataFra
     )
     if invalid.height:
         raise ValueError(f"invalid ISIN-link allowlist rows: {invalid.to_dicts()}")
-    required_candidates = {
-        "ticker",
-        "predecessor_isin",
-        "successor_isin",
-        "predecessor_last_date",
-        "successor_first_date",
-    }
-    if not required_candidates.issubset(candidates.columns):
-        raise ValueError("ISIN-link candidates have the wrong schema")
+    identity = _identity_column(daily)
+    observations = daily.select(
+        pl.col(identity).alias("isin"), "trade_date", "ticker"
+    ).unique()
+    bounds = observations.group_by("isin").agg(
+        pl.col("trade_date").min().alias("first_date"),
+        pl.col("trade_date").max().alias("last_date"),
+    )
     bound = links.join(
-        candidates.select(*required_candidates),
-        on=("ticker", "predecessor_isin", "successor_isin"),
+        bounds.select(
+            pl.col("isin").alias("predecessor_isin"),
+            pl.col("last_date").alias("predecessor_last_date"),
+        ),
+        on="predecessor_isin",
         how="left",
-        validate="1:1",
+        validate="m:1",
+    ).join(
+        bounds.select(
+            pl.col("isin").alias("successor_isin"),
+            pl.col("first_date").alias("successor_first_date"),
+        ),
+        on="successor_isin",
+        how="left",
+        validate="m:1",
+    )
+    calendar = (
+        observations.select("trade_date")
+        .unique()
+        .sort("trade_date")
+        .with_columns(pl.col("trade_date").shift(1).alias("prior_session"))
+    )
+    bound = bound.join(
+        calendar, left_on="successor_first_date", right_on="trade_date", how="left"
+    )
+    tickers = observations.select(
+        pl.col("isin").alias("successor_isin"),
+        pl.col("trade_date").alias("successor_first_date"),
+        "ticker",
+    ).with_columns(pl.lit(True).alias("ticker_matches"))
+    bound = bound.join(
+        tickers, on=("successor_isin", "successor_first_date", "ticker"), how="left"
     )
     unmatched = bound.filter(
         pl.col("successor_first_date").is_null()
+        | pl.col("predecessor_last_date").is_null()
+        | pl.col("prior_session").is_null()
         | (pl.col("effective_date") != pl.col("successor_first_date"))
+        | (pl.col("predecessor_last_date") != pl.col("prior_session"))
+        | ~pl.col("ticker_matches").fill_null(False)
     )
     if unmatched.height:
         raise ValueError(
-            "ISIN-link allowlist row is not an exact detected transition: "
+            "ISIN-link allowlist row is not an exact dated transition: "
             f"{unmatched.to_dicts()}"
         )
+    if (
+        bound.get_column("predecessor_isin").n_unique() != bound.height
+        or bound.get_column("successor_isin").n_unique() != bound.height
+    ):
+        raise ValueError("ISIN succession links must be one-to-one")
+    bound = bound.sort("successor_first_date")
     roots: dict[str, str] = {}
     continuation: list[str] = []
-    for row in bound.sort("successor_first_date").iter_rows(named=True):
+    for row in bound.iter_rows(named=True):
         predecessor = str(row["predecessor_isin"])
         successor = str(row["successor_isin"])
         root = roots.get(predecessor, predecessor)

@@ -1,6 +1,8 @@
 ops/lambda-gh200-bootstrap.sh text eol=lf
 # This immutable calendar is byte-bound by its reconstruction audit.
 research/configs/v2/b3_session_schedule_reconstructed_v1.csv text eol=lf
+# Sourced identity admissions are byte-bound by their audit receipt.
+research/configs/v2/isin_links_allowlist.csv text eol=lf
 # These registrations are byte-bound across the Windows-to-GH200 handoff.
 research/preregistrations/v2_round1_round2_rev4f.md text eol=lf
 research/preregistrations/v2_round3.md text eol=lf

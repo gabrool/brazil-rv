@@ -47,11 +47,22 @@ intention. The event's effective prohibition prevents new shorts, including in a
 flat-start replay begun after the event. Policy inputs keep their serialized static
 coordinates; event terms are hashed as an accounting input in Evaluation V25.
 
-Admission still requires binding the dated equity cancellation/payment and coverage
-overrides alongside the loan event on each actual replay axis. The accepted store
-has CIEL at axis 235, ISIN BRCIELACNOR3, with no cancellation cash term and unresolved
-action coverage after August 26. Do not mutate that store or silently regenerate
-labels. The model-data consequences belong to Stage B. The general physical-custody
+The run pointer now binds a separate `corporate_replay` manifest. Its sparse loader
+applies CIEL (axis 235, ISIN BRCIELACNOR3) loan settlement on August 30, resolves
+known closed-register coverage from August 27, and recognizes the shareholder
+cash cancellation on September 24 for September 26 payment. Recognition is after
+the September 23 announcement, avoiding any earlier use of the later cash term.
+The accepted store remains immutable. Only 86 coverage cells and one cell each
+of q/cash/action/payment change; six of the coverage cells were eligible stock-days.
+Quotes, membership, prediction coordinates and labels are unchanged. Both accounts
+exactly reproduce the sourced cash flows on the actual August–September calendar
+for predetermined long/short positions with zero fees/CDI, against closed-form
+oracles. This is historical event arithmetic, not model profitability. See
+`v2_corporate_replay_acceptance.json`. A saved `PolicyData` object must be shallow
+copied and have only its inputs replaced; reconstructing it regenerates static
+features and is forbidden for an accounting-only comparison.
+
+The model-data consequences belong to Stage B. The general physical-custody
 and holding-basis treatment of superseded purchases remains a separate boundary;
 under Cielo's regular T+2 convention, final-day purchases settle before the D+4 loan
 closeout. The synthetic superseded-return test establishes cash/NAV conservation,
@@ -80,3 +91,36 @@ every eligible security and signed obligation. Unknown terms require a documente
 bound or explicit retained claim, never guessed successor marks, double cash payment,
 or a permanent blanket exclusion. Neither these sources nor the mechanics tests
 complete Stages A/B or authorize interpreting new model profitability yet.
+
+## Verified ticker renames and the data admission defect
+
+The original continuation loader required a same-ticker heuristic proposal. That
+made it impossible to admit an explicitly sourced rename that also changes ISIN.
+The loader now validates explicit source-backed pairs directly against original
+dated observations: predecessor last date, successor first date on the next
+session, successor ticker, non-overlap and one-to-one identity. Heuristic candidates
+remain diagnostics and never automatically authorize links.
+
+The now populated allowlist binds ALSO3/BRALSOACNOR5 to ALOS3/BRALOSACNOR5 on
+2023-10-25, and TRPL4/BRTRPLACNPR1 to ISAE4/BRISAEACNPR9 plus
+TRPL3/BRTRPLACNOR4 to ISAE3/BRISAEACNOR2 on 2024-11-18. These are the same issued
+share classes under new codes, with q=1 and no cash. The October 17 ALLOS notice,
+newly archived November 7 ISA notice (CVM protocol 1299634), November 18 issuer
+confirmation and dated COTAHIST rows establish the mapping. The November 7 notice
+contains the typo `TRLP4`; the other issuer notice and original quotes establish
+`TRPL4`. Raw documents retain the typo. No price-ratio heuristic supplies the terms.
+Availability is conservatively the next local day after each advance notice,
+comfortably before the effective sessions, without inventing an exact release time.
+
+Running the existing causal history routing and unchanged universe rules on the
+six relevant axes recovers 60 ALOS3 days and 28 ISAE4 days; ISAE3 retains its history
+but gains no eligible days because it still fails the original liquidity tests.
+Twelve stale predecessor-active cells retire; no eligible successor cell is lost
+and no successor becomes eligible before its dated identity boundary. This is a
+bounded audit, not an accepted full derived store. Actual tensors, wealth, labels
+and every auxiliary join still need propagation and verification in Stage B.
+`v2_identity_source_admission.json` binds the exact evidence and allowlist.
+
+Stock-loan aliases require separate dated handling: the BDI can continue publishing
+predecessor loan codes after spot trading has renamed. The equity continuation does
+not silently relabel lending sources or assert a loan conversion/renewal date.

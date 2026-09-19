@@ -1,1 +1,4 @@
 ticker,predecessor_isin,successor_isin,effective_date,first_known_at,shares_received_per_prior_share,cash_entitlement_per_prior_share,currency,source,evidence_sha256
+ALOS3,BRALSOACNOR5,BRALOSACNOR5,2023-10-25,2023-10-18T03:00:00Z,1.0,0.0,BRL,D:\quant-data\b3\processed\model_runs\v2_economic_data_scaling_20260919\identity_source_admission.json,52e4e8dbb5d898498a37a10dc3f24031586a37cf9d201f8f801da0561405e353
+ISAE4,BRTRPLACNPR1,BRISAEACNPR9,2024-11-18,2024-11-08T03:00:00Z,1.0,0.0,BRL,D:\quant-data\b3\processed\model_runs\v2_economic_data_scaling_20260919\identity_source_admission.json,52e4e8dbb5d898498a37a10dc3f24031586a37cf9d201f8f801da0561405e353
+ISAE3,BRTRPLACNOR4,BRISAEACNOR2,2024-11-18,2024-11-08T03:00:00Z,1.0,0.0,BRL,D:\quant-data\b3\processed\model_runs\v2_economic_data_scaling_20260919\identity_source_admission.json,52e4e8dbb5d898498a37a10dc3f24031586a37cf9d201f8f801da0561405e353

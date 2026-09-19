@@ -9,6 +9,19 @@
     "sha256": "0076c63306393870e2a68595935d581a6284b9ba37efcc33108105225a026b3a",
     "status": "source_rules_recovered_historical_axis_admission_pending"
   },
+  "corporate_replay": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\corporate_replay\\manifest.json",
+    "sha256": "dd201256a751186b368d629d0fce33bf4f52e6c0fb397d662d1d4f14c7c1a5ab",
+    "status": "cielo_admitted_accounting_only_other_cases_pending"
+  },
+  "corporate_replay_acceptance": {
+    "path": "docs\\v2_corporate_replay_acceptance.json",
+    "sha256": "feee8988ac27cf408c7c844b0d02ce06d69834d5ba94504f816b3eb223228c24"
+  },
+  "identity_source_admission": {
+    "path": "docs\\v2_identity_source_admission.json",
+    "sha256": "8d3f3d2c04a8bb55cd83d69ddd35541e0049588494b92acc9c03056a741daab8"
+  },
   "lending_source_admission": {
     "bytes": 7260,
     "path": "docs\\v2_lending_source_admission.json",
