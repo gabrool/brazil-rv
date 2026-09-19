@@ -2,6 +2,16 @@
 
 Last verified: 2026-09-19.
 
+The user now authorizes the [economic/data/scaling program](research/preregistrations/v2_economic_data_scaling.md):
+contractual accounting and stock-borrow investigation/repairs, a deep source-to-model
+data audit with additional historical B3 retrieval, and economic-primary replication
+plus bounded attention/GRU scaling experiments. Assume zero brokerage for a likely
+retail-adjacent account; keep unverified financing terms explicit. This permits new
+evidenced derived-data contracts, not overwriting accepted inputs or old fit roots.
+Use the local GPU, all eligible names and full history; no forward capture, deployment
+or held-out consumers. Follow the registered stages and
+`docs/v2_economic_data_scaling_progress.md`. Earlier foundation outcomes stay sealed.
+
 The user has authorized all five workstreams of the
 [model foundation program](research/preregistrations/v2_foundation.md): input
 selection/cleanup, component attribution, variance reduction, capacity scaling
