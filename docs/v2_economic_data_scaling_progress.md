@@ -945,3 +945,9 @@ renewal/recall and actual clearing/accrual calendars; presettlement disposal and
 remaining exposed events; upstream source-clock/unit audit and complete rename
 propagation through wealth/features/labels/actual tensors. Then corrected matched
 replay and the registered conditional scaling waves. No GPU job launched.
+
+Recovery: implementation `6576955`; `dommo_fraction_auxiliary_6576955.zip` SHA-256
+`b6155b590e7cccdea587530f4d43bbbbc8397cf5ff78f627ba0cf6f220ce45b5`. All 278 members restored and hash-checked,
+including the complete current research source package and acceptance code hashes;
+18 primary-source references verified. Immutable stores, family parquets,
+raw datasets and old fits were not copied. The run pointer binds the recovery receipt.

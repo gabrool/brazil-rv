@@ -56,6 +56,10 @@
     "path": "docs\\v2_dommo_election_acceptance.json",
     "sha256": "f0fad28b48c5f4dd29290c71737db690a80fee394f00abfe98f26171ea964684"
   },
+  "dommo_fraction_auxiliary_recovery": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\dommo_fraction_auxiliary_recovery.json",
+    "sha256": "f87894da4161d2c0e04fdaf7d6c697e36b38137cc76f49a896acd76809d0e9a8"
+  },
   "dommo_pnb_scenario": {
     "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\corporate_replay\\dommo_pnb_with_default_manifest.json",
     "sha256": "055c07344bdf2509b012cb88e54da547de174df2fb3394bfbfff9b3f5435494c",
