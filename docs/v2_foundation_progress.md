@@ -103,3 +103,20 @@ The registration and section 9 were reread after completion. No input deletion o
 EMA rule is admitted until the full four-fold summary is reviewed. Next: review
 `input_summary.json`, run average economic readouts after all 84 score outputs,
 and freeze the compact-readout contrast and its source binding before dispatch.
+
+### Input-wave decision and compact contrast (2026-09-19 00:35 UTC)
+
+Neither removal admits: microstructure removal changes ensemble IC by -0.002301
+and net by -1.111561 bps/day; grouped removal changes IC by -0.003061 and net by
+-0.344460. EMA changes IC by -0.000726 and net by -0.034654. No screen gate passes.
+Retain TE_full and raw checkpoint selection; these are four-fold development
+comparisons, not proof each field is individually useful. Full paired results:
+`v2_foundation_input_results.json`.
+
+After rereading the registered stages, freeze `v2_foundation_compact_wave.json`:
+only readout width/inner width 256 to 128, three blocks, same full roster, 64-wide
+history, early peer attention, FiLM, three heads and training recipe. Reuse existing
+TE_full control; fit three new P parents and twelve F fits. Source is clean detached
+3dbda71 at C:/quant/brazil-rv-foundation-3dbda71. No running source is modified.
+Original saved-average inference completed all 84 checkpoints; its CPU economic
+readout is dispatched separately from frozen readout source 75a5b75.

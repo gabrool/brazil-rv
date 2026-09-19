@@ -1,0 +1,68 @@
+{
+  "fit_cells": [
+    "TE_compact"
+  ],
+  "cells": {
+    "TE_full": {
+      "cell": "TE_full",
+      "excluded_fields": {
+        "options": [
+          "uncovered_call_share"
+        ]
+      },
+      "families": [
+        "cross_market",
+        "events",
+        "fundamentals",
+        "lending",
+        "magnitudes",
+        "microstructure",
+        "oddlot",
+        "options",
+        "rebalance",
+        "sector"
+      ],
+      "film": true,
+      "graph": "c1",
+      "inputs": "all",
+      "peer_timing": "early",
+      "temporal_encoder": "attention"
+    },
+    "TE_compact": {
+      "cell": "TE_compact",
+      "excluded_fields": {
+        "options": [
+          "uncovered_call_share"
+        ]
+      },
+      "families": [
+        "cross_market",
+        "events",
+        "fundamentals",
+        "lending",
+        "magnitudes",
+        "microstructure",
+        "oddlot",
+        "options",
+        "rebalance",
+        "sector"
+      ],
+      "film": true,
+      "graph": "c1",
+      "inputs": "all",
+      "peer_timing": "early",
+      "temporal_encoder": "attention",
+      "model": {
+        "inner_width": 128,
+        "width": 128
+      }
+    }
+  },
+  "implementation": {
+    "commit": "3dbda71131cfa3035e26c73cf2ab9d70e5443822",
+    "tracked_worktree_clean": true
+  },
+  "purpose": "Readout width and inner width 128 vs 256 only; full roster retained; raw primary",
+  "control": "TE_full",
+  "name": "compact"
+}
