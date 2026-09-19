@@ -213,3 +213,25 @@ policy features are preserved. The current account's dynamic cash state changes
 as part of the accounting repair and must be labelled as such in an accounting replay;
 the evaluation schema is V24. The spot receipt binds synthetic correctness checks
 and timings, not historical profitability or completion of Stage A.
+
+## Recovered source inputs
+
+The economic/data/scaling run pointer binds the newly admitted reconciled lending
+archive separately from the sealed Round-6 archive. It expands positive-flow rate
+coverage and earlier balance history, with the same causal 60-session own-rate and
+cross-sectional fallback rules. The 2% pre-July-2023 placeholder is unchanged.
+Taker and donor averages are retained; their difference is not asserted to be the
+account's executable intermediation charge. Borrowing availability can change and
+needs its own replay attribution rather than being labelled a pure cost adjustment.
+
+The stock/hedge source panel implements section 3 of the archived B3 loan contract:
+the previous session's published average, or the last available one. It retains
+the same-ISIN publication date and never substitutes a current mark. These prices
+are contract references, not observed model inputs, executable marks or labels.
+The contract does not establish a generic adjustment based on successor prices;
+event-specific adjustments still require source terms before the affected accounts
+are admitted. The first model-store date lacks 125 stock references; all subsequent
+eligible stock-days and every hedge session have prior references. No new loan may
+silently replace a missing reference. BOVA11 observed rates are aligned separately,
+with NaN explicitly delegating to the configured fallback, and do not contaminate
+the equity cross-sectional imputation universe. See `v2_lending_source_admission.json`.

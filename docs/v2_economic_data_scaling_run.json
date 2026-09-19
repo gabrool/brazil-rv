@@ -15,5 +15,28 @@
     "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\bova_loan_reference_audit\\manifest.json",
     "sha256": "589c5d2011e8e1f1092bda6571c45dd172b2c58a3f88801d87f68edef42b27ff",
     "status": "recovered_not_admitted"
+  },
+  "recovered_lending": {
+    "root": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\recovered_lending",
+    "manifest_sha256": "14a8465fe850d2a78e22bc247cb9b06383aa73af10c2e16090b1dd8a9431f6f2",
+    "source_label": "bdi_recovered_development",
+    "balances_sha256": "9357a8c1a3d413a28fd7f61663c6e34b81185cae4bd6f88764c37093763c2b3c",
+    "rates_sha256": "96c55a454973e44f9a1506d7e4d222913c42dcca0ede266d1cee6ac7f5004def",
+    "admission": {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\recovered_lending\\admission.json",
+      "sha256": "040ed27c2e53484b948e481c278aeeadf6741327e03fce64c59f0ba13ad9c373"
+    },
+    "status": "observations_admitted_for_new_economics_no_model_feature_change"
+  },
+  "loan_source_panels": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\loan_source_panels\\manifest.json",
+    "sha256": "a6741a98d505a049c543cb0c8ed45934b5eadfd6fd2e344fbc916db8ff46cf02",
+    "bytes": 3553,
+    "status": "source_panels_bound_event_overrides_pending"
+  },
+  "lending_source_admission": {
+    "path": "docs\\v2_lending_source_admission.json",
+    "sha256": "39031ab45e5984d989f13bd3e392d7c33fbab195934bdde6fa11542138f13640",
+    "bytes": 7260
   }
 }

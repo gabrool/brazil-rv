@@ -42,6 +42,16 @@ implemented accounting repair, not completion of the contractual-event/source au
 or acceptance of new historical results. Reproduce sealed books with their recorded
 source commits; use new roots for corrected replays.
 
+The economic/data/scaling run pointer now binds a separately admitted archive of
+reconciled BDI lending observations and causal stock/BOVA11 loan-source panels.
+These preserve the accepted model store and serialized feature coordinates. Own-rate
+coverage improves after July 2023; the earlier 2% assumption remains explicit and
+unchanged. Published rates/balances are not executable quotes/locates. Loan-reference
+panels retain the prior publication date on the same ISIN; event overrides, custody
+and renewal assumptions still require admission before historical account acceptance.
+See `docs/v2_lending_source_admission.json` and the progress document. Do not silently
+replace the sealed Round-6 economics or feed these observations into old policies.
+
 The user has authorized all five workstreams of the
 [model foundation program](research/preregistrations/v2_foundation.md): input
 selection/cleanup, component attribution, variance reduction, capacity scaling

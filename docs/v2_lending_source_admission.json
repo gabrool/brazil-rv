@@ -1,0 +1,153 @@
+{
+  "status": "reconciled_observations_admitted_source_panels_bound_not_full_account_acceptance",
+  "base_commit": "5c3f931f9c366a8a6fd55cd24d5e21183b76d40f",
+  "lending": {
+    "accepted_balances": 81324,
+    "accepted_rates": 41353,
+    "active_balance_shortable_gained": 21133,
+    "active_balance_shortable_lost": 0,
+    "active_imputed_after": 2,
+    "active_imputed_before": 21144,
+    "active_placeholder_after": 498823,
+    "active_placeholder_before": 498823,
+    "active_rate_changed": 29994,
+    "active_rate_higher": 15357,
+    "active_rate_lower": 14637,
+    "balances": 230454,
+    "current_feature_coordinates_changed": false,
+    "dates": 3717,
+    "eligible_stock_days": 568815,
+    "historical_outcomes_read": false,
+    "manifest": {
+      "bytes": 278390,
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\recovered_lending\\manifest.json",
+      "sha256": "14a8465fe850d2a78e22bc247cb9b06383aa73af10c2e16090b1dd8a9431f6f2"
+    },
+    "panels": {
+      "bytes": 676396,
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\recovered_lending\\equity_borrow_panels.npz",
+      "sha256": "0ad785c1bf56e20d6cd69bdcad4a2e1438aad4190e86c66f3bfab068afdf7352"
+    },
+    "rates": 202698,
+    "securities": 933,
+    "source_unavailable_after": 0,
+    "source_unavailable_before": 0
+  },
+  "loan_sources": {
+    "contract_source": {
+      "bytes": 444430,
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\primary_sources\\b3_loan_contract.pdf",
+      "sha256": "a437f3a8643a6369a9e6882300e144575c2adcc72b2b4f8ed02b56ed1c8c8520"
+    },
+    "current_feature_coordinates_changed": false,
+    "dates": 3717,
+    "eligible_prior_quote_older_than_7_calendar_days": 148,
+    "eligible_reference_missing": 125,
+    "eligible_stock_days": 568815,
+    "equity_names": 933,
+    "events": "contractual successor/loan allocation and ex-date overrides require event-specific admission; no historical account or profitability acceptance claimed",
+    "hedge_fallback_sessions": 3348,
+    "hedge_observed_rate_sessions": 369,
+    "hedge_rate_rule": "own positive-flow taker rate, available D+1, at most 60 sessions; NaN explicitly delegates to configured 2% fallback",
+    "hedge_reference_missing": 0,
+    "historical_outcomes_read": false,
+    "lending": {
+      "admission": {
+        "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\recovered_lending\\admission.json",
+        "sha256": "040ed27c2e53484b948e481c278aeeadf6741327e03fce64c59f0ba13ad9c373"
+      },
+      "balances_sha256": "9357a8c1a3d413a28fd7f61663c6e34b81185cae4bd6f88764c37093763c2b3c",
+      "manifest_sha256": "14a8465fe850d2a78e22bc247cb9b06383aa73af10c2e16090b1dd8a9431f6f2",
+      "rates_sha256": "96c55a454973e44f9a1506d7e4d222913c42dcca0ede266d1cee6ac7f5004def",
+      "root": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\recovered_lending",
+      "source_label": "bdi_recovered_development",
+      "status": "observations_admitted_for_new_economics_no_model_feature_change"
+    },
+    "median_observed_hedge_annual_rate": 0.007820733355531883,
+    "panels": {
+      "bytes": 6896718,
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\loan_source_panels\\panels.npz",
+      "sha256": "0b3ea912bd5e798f7e7a4dbf1b4007fc97698f98bb6805411fdc899d6f2a7e94"
+    },
+    "reference_rule": "same-ISIN last published average strictly before session; literal contract reference, no inferred ex-date adjustment or current-mark substitution",
+    "schema": "BRAZIL_RV_LOAN_SOURCE_PANELS_V1",
+    "source_rows": 1210076,
+    "sources": [
+      {
+        "bytes": 12480,
+        "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\daily_source_audit\\result.json",
+        "sha256": "cff3c9d7e864c83b7ddf08a011cc2aed546139731304561621ce43c48e834fda"
+      },
+      {
+        "bytes": 15287805,
+        "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\daily_source_audit\\loan_reference_quotes.parquet",
+        "sha256": "957d2a3b5720144d9c775300b84c62a0d6064ea0be2b479eb6900f149a7b129f"
+      },
+      {
+        "bytes": 6785,
+        "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\bova_loan_reference_audit\\manifest.json",
+        "sha256": "589c5d2011e8e1f1092bda6571c45dd172b2c58a3f88801d87f68edef42b27ff"
+      },
+      {
+        "bytes": 33346,
+        "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\bova_loan_reference_audit\\loan_reference_quotes.parquet",
+        "sha256": "98a6ae965e93eebe52e142ff4ea91cd047d4f7f172773c182ec56096e2c72c19"
+      }
+    ],
+    "status": "source_panels_bound_event_overrides_pending",
+    "store": {
+      "manifest_sha256": "61149d43a23fc55fcd92b43aaa4e74d747fbdf62f852bedbbbdb2cf18281f3cc",
+      "root": "C:\\quant-data\\b3\\processed\\v2_data_store_2d59b9d_20260913T211700Z"
+    }
+  },
+  "reference_boundary_diagnostic": {
+    "missing_eligible_cells": 125,
+    "all_on_date": "2010-01-04",
+    "after_first_store_date_missing": 0
+  },
+  "implementation": [
+    {
+      "path": "research\\src\\brazil_rv\\v2\\lending_archive.py",
+      "sha256": "035ecdfbd9dc69ad8b987d10878f5820bfad0695ec635bd194a72437ba69746d",
+      "bytes": 23378
+    },
+    {
+      "path": "research\\src\\brazil_rv\\v2\\lending_recovery.py",
+      "sha256": "150552e95ebd6101db28ee128de8e4aa148417e6fe31060d7da90c0a4fa6e6a3",
+      "bytes": 5484
+    },
+    {
+      "path": "research\\tests\\test_lending_recovery.py",
+      "sha256": "e4cad76bf65fba5feb0d558a13c20748014aee3db40baebdcba8f566c238cfe7",
+      "bytes": 5697
+    },
+    {
+      "path": "ops\\admit_recovered_lending.py",
+      "sha256": "b7afbaea9b3888bbdfc95e74a387dcc8e9e7569efc26cf8aeecd673be8892b80",
+      "bytes": 9830
+    },
+    {
+      "path": "ops\\build_loan_source_panels.py",
+      "sha256": "cdcbe24bd91dab469f5d1cf5753ec78ef64eb65639400995c2973658afa5108b",
+      "bytes": 5551
+    }
+  ],
+  "validation": {
+    "source_admission_and_existing_loader_tests_passed": 10,
+    "expanded_recovery_tests_passed": 6,
+    "counts_overlap": true,
+    "ruff": "passed",
+    "full_population_source_build_wall_seconds": 2.92,
+    "measurements_are_single_observations": true
+  },
+  "limitations": [
+    "Taker/donor proxy averages do not establish an executable locate or isolated broker commission.",
+    "Earlier 2% rate placeholders remain; earlier balances cannot provide rates.",
+    "94 legacy balance extraction attempts remain individually unresolved, without blanket exclusion.",
+    "Source panel does not infer ex-date adjustments or successor price substitutions; event-specific admission remains.",
+    "Maturity/renewal/custody/dated-cost completion and deep source-to-model audit remain before corrected economics and new fits."
+  ],
+  "model_features_changed": false,
+  "heldout_consumer_accessed": false,
+  "historical_profitability_evaluated": false
+}

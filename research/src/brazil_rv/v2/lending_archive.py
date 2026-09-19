@@ -389,7 +389,6 @@ def load_lending_borrow_panels(
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     if (
         manifest.get("schema") != LENDING_ARCHIVE_SCHEMA
-        or manifest.get("source_label") != BORROW_SOURCE_LABEL
         or manifest.get("status") != "complete"
         or manifest.get("official_validation_accessed") is not False
         or manifest.get("test_accessed") is not False
@@ -416,7 +415,7 @@ def load_lending_borrow_panels(
         manifest_sha256=manifest_sha,
         balance_sha256=str(artifacts["lending_balances.parquet"]["sha256"]),
         rate_sha256=str(artifacts["lending_rates.parquet"]["sha256"]),
-        source_label=BORROW_SOURCE_LABEL,
+        source_label=str(manifest["source_label"]),
     )
 
 

@@ -8,9 +8,11 @@ stage. Foundation outcomes remain sealed at the canonical foundation pointer.
 **Current status:** A/B remain in progress; C/D have not started. Corporate-account
 research and the source censuses below are complete. BOVA11 borrowing-path
 consistency, removal of fabricated missing-quote liquidations, inventory netting and
-multi-leg/delayed-delivery and fixed-contract loan mechanics are implemented and tested (see the latest
-entries); recovered historical sources are not yet
-admitted. No training or source-census worker is active.
+multi-leg/delayed-delivery, fixed-contract loans and dated money settlement are
+implemented and tested. Reconciled lending observations are now admitted to a
+separate economic archive; prior stock/hedge references are bound. Event-specific
+terms and full historical account acceptance remain open. No training or
+source-census worker is active.
 
 Initial inspection: the account supports only one scalar successor and rejects a
 successor already held; multi-leg Copel delivery and mixed contractual consideration
@@ -530,3 +532,63 @@ constituent prices. Redemption can also settle loan remuneration separately from
 issuer cash payment. Preserve the original mechanics evidence, but replace these
 declared intermediate assumptions with source-bound event terms before accepting
 the affected historical cases. Do not retrospectively change earlier decisions.
+
+## 2026-09-19: recovered lending admission and causal loan inputs
+
+The run pointer now binds `recovered_lending`, a new economic archive built from the
+completed source censuses without parsing the PDFs again. Verified printed rows
+yield 202,698 rate observations versus 41,353 previously, and 230,454 balances versus
+81,324. Positive-flow quantity-weighted taker and donor rates remain separate; a
+zero-flow carried rate never refreshes an observation. Historical balances use the
+printed ISIN or same-date COTAHIST identity and become available after the report,
+not after a potentially older position date. Unknown identities remain explicit.
+All previously admitted balances are preserved. Reconciled rates repair their own
+dated keys; source-specific rates are not clipped or replaced by a universal floor.
+
+The real loader was exercised on all 3,717 dates and 933 security axes, including
+568,815 eligible stock-days. Eligible imputed rates fall from **21,144 to 2**;
+29,994 eligible aligned rates change (14,637 lower, 15,357 higher). Balance-policy
+borrowing availability gains **21,133** eligible stock-days and loses none. These
+aligned/aged-panel counts differ from the previously reported counts of new printed
+observations. The **498,823 eligible placeholder cells remain unchanged**: these
+source balances do not manufacture historical borrowing prices before July 2023.
+Both cost-only changes and changed borrowing availability must be attributed
+separately in the corrected replay. No P&L improvement is inferred from coverage.
+
+`loan_source_panels` binds the last same-ISIN published average strictly before each
+session, retaining the source date. This follows the B3 contract's previous/last
+available quote rule; it is not a forward-filled model price or label endpoint.
+No current quote, successor mark or guessed adjustment enters that reference.
+All eligible stock-days after the first store date have a reference; the only 125
+missing cells are on 2010-01-04, before the model's history warm-up. 148 eligible
+references are over seven calendar days old and retain that fact; the contract
+permits the last available average. Every hedge session has its prior reference.
+The separate BOVA11 rate series has 369 decision-available observed sessions,
+median annual rate .7821%, and 3,348 explicitly fallback sessions. Computing this
+series separately does not alter the stock cross-sectional imputation universe.
+
+The 94 failed legacy balance attempts remain individually auditable. Direct
+inspection of 2020-10-27 finds multiple printed AGRO3 rows with different quantities
+in the same open-balance section, plus an unidentified row. It is not safe to call
+these duplicate extraction artifacts, pick one or sum them without interpretation.
+Other failures include spacing defects and residual printed totals; their old
+receipts and originals are preserved for targeted resolution. None is a blanket
+permanent security exclusion. These pre-2023 balance uncertainties cannot establish
+missing rates; the unchanged placeholder convention already preserves eligibility.
+
+Validation: ten source-admission/loader tests passed; six recovery tests then passed
+after adding prior-reference alignment (overlapping counts). The new cases verify
+zero versus missing rates, report-date timing, future mutations, reference dates,
+security-axis isolation, conflicts and preservation of unaffected rows. Ruff passed.
+Full-population assembly took approximately three seconds, including interpreter
+startup and source verification. Neural inputs, accepted stores and original fits
+were not changed, and no historical outcome or GPU fit was read/run.
+
+Source admission is not full accounting acceptance. Event-specific reference and
+principal allocation, fractional entitlements, custody offsets, maturity/renewal,
+loan modality and remaining dated costs still need completion. The source panel
+deliberately does not infer an ex-date adjustment absent an explicit source term.
+The registration was revisited: continue A and the remaining deep source-to-tensor
+B audit, then corrected comparisons C and bounded capacity D. The receipt is
+`docs/v2_lending_source_admission.json`; its artifact bindings and recovery archive
+make this work resumable without repeating either census.
