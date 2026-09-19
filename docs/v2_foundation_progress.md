@@ -120,3 +120,15 @@ TE_full control; fit three new P parents and twelve F fits. Source is clean deta
 3dbda71 at C:/quant/brazil-rv-foundation-3dbda71. No running source is modified.
 Original saved-average inference completed all 84 checkpoints; its CPU economic
 readout is dispatched separately from frozen readout source 75a5b75.
+
+### Saved-average decision (2026-09-19 01:02 UTC)
+
+All 84 original neutral averages were scored and economically evaluated. Neither
+arm passes the registered improvement gate. Four-fold screen changes: C6 IC
+-0.000200 and net -0.130038 bps/day; TE IC -0.000483 and net -0.747769.
+All-14-fold descriptive changes: C6 IC -0.000123/net -0.070575; TE IC
+-0.000401/net -0.059731. Full results: `v2_foundation_averaging_results.json`.
+These diagnostics do not justify promoting saved-weight averaging or adding a new
+averaging sweep. Keep original raw checkpoints. No separately admitted averaging
+candidate requires confirmation. The compact wave continues normally; completed
+F2/F6 books are being computed on CPU without making a partial-wave decision.
