@@ -409,3 +409,16 @@ Run artifacts total 12.43 GB across 9,753 files; D has 42.8 GB free. Recovery ar
 can include run evidence/checkpoints without duplicating the immutable source store.
 Final combined narrative, source snapshot, archive/hash/recovery check and canonical
 completion updates remain. No background model fits are needed or running.
+
+### Registered bounded program completed (2026-09-19 09:40 UTC)
+
+Combined review and all result ledgers published. No candidate admitted; no new
+confirmation runs required. D recovery archive verified all 9,755 regular members
+against their source SHA256/size: 10,486,533,603 bytes compressed, archive SHA256
+0807d71e6db23263a65933bb136183889787380e9922c589a362b14b34671515.
+The archive contains source.bundle (verified complete Git history through report
+commit 96c976b), run checkpoints, scores, accounts, evidence and failures; immutable
+source data is referenced, not duplicated. Canonical receipt v2_foundation_recovery.json.
+Full contractual settlement replay remains an explicit limitation; the completed
+accounting scope is bounded source verification and quantified sensitivity.
+All research workers are finished. Recurring continuation may now be paused.

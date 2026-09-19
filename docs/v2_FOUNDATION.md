@@ -358,5 +358,6 @@ No neural, averaging or residual candidate qualified for new confirmation, so no
 confirmation fits were run. Preserve the current reference models, full cleaned
 roster and raw selection. The most defensible positive findings are existing seed
 ensembling and forecast diversity; neither alone establishes a deployable advance.
-Recovery archiving and canonical completion verification are still in progress.
+Recovery verified: 9,755 files, 12.44 GB source content, 10.49 GB compressed on D. Every decompressed member matched its SHA-256 and size; immutable source datasets were not duplicated. The archive includes a verified Git bundle. See [recovery receipt](v2_foundation_recovery.json). The registered bounded program is complete; unresolved full contractual accounting is a stated limitation, not a completed repair.
+
 

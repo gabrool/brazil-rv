@@ -1,0 +1,13 @@
+{
+  "verified": true,
+  "archive": "D:\\quant-data\\b3\\processed\\model_runs\\v2_foundation_d21a93a_20260918\\archives\\foundation_recovery.tar.gz",
+  "sha256": "0807d71e6db23263a65933bb136183889787380e9922c589a362b14b34671515",
+  "bytes": 10486533603,
+  "members": 9755,
+  "inventory": "D:\\quant-data\\b3\\processed\\model_runs\\v2_foundation_d21a93a_20260918\\archives\\inventory.json",
+  "inventory_sha256": "e0e961df85f10bfa5a603fe3242d3750d39229011183f38d7111f9b65ee66fe5",
+  "source": "C:\\quant-data\\b3\\processed\\model_runs\\v2_foundation_d21a93a_20260918",
+  "source_bytes": 12444653504,
+  "immutable_store_duplicated": false,
+  "verification": "Every decompressed regular member byte count and SHA256 matched source inventory"
+}

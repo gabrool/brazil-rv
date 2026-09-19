@@ -1,6 +1,6 @@
 # Brazil-RV project context
 
-Last verified: 2026-09-18.
+Last verified: 2026-09-19.
 
 The user has authorized all five workstreams of the
 [model foundation program](research/preregistrations/v2_foundation.md): input
@@ -12,6 +12,13 @@ preserve the entire eligible population and 60-session history. Continue the
 bounded settlement/financing review. This authorizes the registered new neural
 fits but no held-out access, forward capture or deployment. Earlier results and
 source stores remain sealed. Progress is in `docs/v2_foundation_progress.md`.
+
+The foundation program is complete with no new candidate promoted. All five research
+workstreams, conditional C6 curve review, and bounded financing/settlement sensitivity
+were assessed. Retain the full cleaned attention roster and raw checkpoints; no
+confirmation candidate qualified. Full contractual settlement integration and broker
+financing terms remain unresolved, so economic conclusions are conditional. See
+[combined review](docs/v2_FOUNDATION.md) and [verified recovery](docs/v2_foundation_recovery.json).
 
 The user subsequently authorized the [direct portfolio-objective program](research/preregistrations/v2_portfolio_objective.md):
 bounded portfolio/financing closeout, then matched ranking, hybrid and direct
@@ -2365,3 +2372,4 @@ before its end; terminal settlement does not repair those missing hedge returns.
 The old CPU seal remains immutable. The proposed 2025-read bar remains unapproved.
 
 Round 4 is now complete under A4/A4.1 as a fixed three-seed development result. The working research parent is `S0`; the research designation is `S0`. P is disqualified across all choice panels after one two-seed F14 book exceeded the unchanged occupancy bound. Original full screening and every fixed seed omission remain reported. No further neural fits were made; all roots are recovered and verified. See [Round 4](docs/v2_ROUND4.md) for exact comparisons, amendments and limits. No new round, 2025/2026 consumer access or deployment is authorized.
+
