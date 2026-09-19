@@ -174,6 +174,15 @@ def parse_registered_lines(
                     is None
                 ):
                     line = prefix + continuation.group(2)
+        # Currency cents can touch a large donor percentage (AMER3 in 2024).
+        # Both columns print exactly two decimals; preserve all rate digits.
+        if REGISTERED_ROW.fullmatch(line) is None:
+            line = re.sub(
+                r"([0-9]+[.,][0-9]{2})([0-9]+[.,][0-9]{2}%)(?=\s)",
+                r"\1 \2",
+                line,
+                count=1,
+            )
         # Large quantity and BRL columns can touch. Thousands-group boundaries
         # make this split unambiguous; ungrouped ambiguous digits remain errors.
         for thousands, decimal in ((",", r"\."), (r"\.", ",")):

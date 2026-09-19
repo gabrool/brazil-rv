@@ -135,6 +135,20 @@ def test_lending_electronic_rows_can_follow_the_wrapped_date() -> None:
     assert rows[0].taker_avg == 1.01
 
 
+def test_lending_large_percentage_touching_brl_keeps_its_scale() -> None:
+    rows = parse_registered_lines(
+        [
+            "25/07/2024 AMER3 BRAMERACNOR6 AMERICANAS Registro "
+            "1.450 15.474.459 11.915.333,43300,00% 323,90% 400,00% "
+            "300,00% 323,90% 400,00%"
+        ],
+        date(2024, 7, 25),
+    )
+    assert rows[0].value_brl == 11915333.43
+    assert rows[0].donor_min == 300
+    assert rows[0].taker_avg == 323.9
+
+
 def test_lending_wrapped_isin_uses_its_own_printed_check_digit() -> None:
     rows = parse_registered_lines(
         [
