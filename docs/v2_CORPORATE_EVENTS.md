@@ -213,7 +213,8 @@ must not be backdated into December valuation. This path needs causal accrued CD
 and separate liability/payment handling. The borrower cannot choose it afterward.
 The B3 circular also provisions PNA loan fractions; BRML's special retention of
 fractional loan shares cannot automatically be applied to Dommo. These recovered
-terms are not yet admitted to the accounts.
+terms are now admitted through the separate PNB endpoint and default PNA manifest
+described below.
 
 The CVM 2023 delivery index currently names this CNPJ PRIO FORTE. Source retrieval
 therefore used CNPJ 08.926.302/0001-05 / CVM 23493 and the dated issuer document,
@@ -224,12 +225,12 @@ the index's current name must not become a point-in-time model attribute.
 ### Dommo lender-elected PNB endpoint admitted (2026-09-19)
 
 The run pointer now binds `dommo_pnb_scenario`, separate from the primary
-Cielo/BRML/Copel manifest. This freezes all legally eligible pre-existing lender
+Cielo/BRML/Copel/Dommo-default manifest. This freezes all legally eligible pre-existing lender
 contracts electing PNB on Dec26; it does not assert actual participation or let the
 borrower select a favorable future outcome. The event runs after actual Dec26
 fills, excludes whole roots with pending returns and same-day D+1 registrations,
-and permits later non-elected DMMO borrowing. Default PNA and its provisioned loan
-fractions remain required before any full model replay spanning this event.
+and permits later non-elected DMMO borrowing. The current endpoint also includes
+default PNA for contracts that remain after the election.
 
 The Oct24 approval notice and 58 original SGS12 observations are archived. R$1.85
 compounded Oct24 inclusive/Jan13 exclusive equals R$1.9043246860694236, matching
@@ -248,3 +249,40 @@ R$10m 4% Dec23 short has original principal R$395721.92412462615, rent R$61.5940
 and redemption R$407342.1777998081. These are accounting amounts, not model alpha.
 Actual lender election, finite maturity, partial-return exception handling and
 custodian restrictions remain assumptions to bound in actual books.
+
+### Default Dommo PNA admitted with provisioned loan fractions
+
+The primary `corporate_replay` now binds `dommo_manifest.json`: .0375 PRIO and
+R$.4625 per DMMO, January9 economic succession, January11 custody and January17
+cash. Payment terms from the January6 notice first enter January9. No learned
+feature, quote, label or eligibility array changes. This adds 494 resolved coverage
+cells, six eligible, for a total 1,328/24 with Cielo, BRML and Copel.
+
+The B3 manual (pp135–137) truncates the resulting quantity contract by contract,
+preserves original financial principal and provisions fractions for issuer auction
+cash. Unlike BRML's special rule, Dommo fractions cannot be covered by trading a
+fractional PRIO loan share. Both books retain a signed, non-tradable fraction
+marked from contemporaneously available PRIO prices. The March30 result first
+enters March31; R$31.94031 is paid April6, with original precision and earlier
+custodian-sweep sensitivities retained. Remaining restricted proceeds earn CDI
+until that payment, including after the whole successor shares have been covered.
+
+Rounding is per original loan, not per net position. Last DMMO purchases and covers
+on January6 settle January10 under the registered T+2 convention, before January11
+credit. Pending source purchases/returns or already split loan roots stop this
+specific path explicitly; they need their own gross-custody allocation rather
+than an invented net rounding. No security is dropped. A tiny original loan that
+converts into less than one whole PRIO share has a documented research convention:
+stop rent at the preceding conversion close and pay accrued rent on January11.
+The alternative retains original-principal rent through April6; neither is claimed
+as a recovered invoice. Ordinary research quantities remain continuous.
+
+Six full-933-name actual-calendar 4% long/short oracles at R$1m/R$5m/R$10m agree
+exactly across the two accounts and independent original-reference cash formulas.
+At R$10m the original reference is R$1.78 and principal R$404,545.4567375262;
+8,522 whole shares deliver, .7273189085572085 share remains provisioned, and 4%
+annual rent through the January13 whole-share return is R$314.93524816795866.
+The oracle has zero execution/B3/CDI to isolate arithmetic. It does not revise
+registered economic assumptions or establish model alpha. Presettlement disposal,
+actual lender election, fractional payment timing and clearing/lifecycle bounds
+still belong in the corrected model replays.

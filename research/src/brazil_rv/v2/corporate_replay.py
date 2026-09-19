@@ -103,6 +103,8 @@ def apply_corporate_replay(inputs, terms, calendar, manifest_sha256):
                             session(auction["available_date"]),
                             auction["cash_per_share"],
                             session(auction["payment_date"]),
+                            auction.get("provision_loan_fractions", False),
+                            auction.get("zero_quantity_rent_through_payment", False),
                         ),
                         leg["loan_principal_fraction"],
                     )

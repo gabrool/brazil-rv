@@ -1,0 +1,73 @@
+{
+  "evaluation_schema": "BRAZIL_RV_V2_EVALUATION_V29",
+  "evidence": {
+    "auxiliary_tensor_audit": {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\auxiliary_tensor_audit\\report.json",
+      "sha256": "ca53993c49424f7383a02064cae6b137c612115d10bbf639549d4820a30337d5"
+    },
+    "corporate_replay": {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\corporate_replay\\dommo_manifest.json",
+      "sha256": "b4dcc7467a5eaafe70c2d57b55217deaafe6fb6dc3e711d7fce91ffc13f91ff9",
+      "status": "default_dommo_pna_admitted_with_explicit_fraction_and_custody_bounds"
+    },
+    "dommo_conversion_acceptance": {
+      "path": "docs\\v2_dommo_conversion_acceptance.json",
+      "sha256": "82b22397367baffce9eafc7d16f8b43ba99d8b50d7cc69a568f08256f3ca1464"
+    },
+    "dommo_pnb_scenario": {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\corporate_replay\\dommo_pnb_with_default_manifest.json",
+      "sha256": "055c07344bdf2509b012cb88e54da547de174df2fb3394bfbfff9b3f5435494c",
+      "status": "all_eligible_lender_pnb_endpoint_with_default_pna_for_remaining_contracts"
+    },
+    "loan_fraction_unchanged": {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\loan_fraction_unchanged\\result.json",
+      "sha256": "1013c343994bcbb7ebdb47cb9483a882ef738701cc4b7c9dda08a30712b7428e"
+    },
+    "oddlot_tensor_audit": {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\auxiliary_tensor_audit\\oddlot.json",
+      "sha256": "1952956f665fde2f211969d5d8571383af7fccb3dd654ea8b33106d8750f4ab5"
+    }
+  },
+  "immutable_inputs_or_old_fits_modified": false,
+  "initial_findings_fixed": [
+    "Signed fraction was initially booked as negative receivable; now separately positive payable and clears at payment",
+    "Quantity-dependent proceeds allocation exposed an in-place tensor view; clone preserves analytic gradient",
+    "Known corporate payable must settle before decision with proceeds release; newly announced current-day terms still occur after intention"
+  ],
+  "limitations": [
+    "Default disposal waits for custody despite issuer authorizing earlier trading; prearranged presettlement disposal remains a required execution sensitivity",
+    "Zero-whole original loan rent convention is bounded, not quoted; actual lender elections and loan grouping unknown",
+    "Source loan returns and source owned purchases must be settled at truncation; true under dated Jan6 T+2 versus Jan11 primary; do not extend to unreviewed gross/nested custody",
+    "Auxiliary boundary is exact for 113 fields and 41942683 active valid cells; upstream publication/revisions, complete identities and final fit conditioning remain",
+    "A/B incomplete; C/D not started; no corrected profitability or GPU fit"
+  ],
+  "lint": "Ruff passed",
+  "previous_source_commit": "d7c6a2fc38f53af56416e4ece8bbea1fffbfe527",
+  "source_lf_sha256": {
+    "ops/admit_dommo_conversion.py": "ef9cdccfbed92b7daf37e0eeb8df000b55201e0a24172a2577bb29a94e5ea6dd",
+    "ops/audit_auxiliary_tensors.py": "157d444cdc4794ade498d9883898967f6c1d505eba1daa97db1d06cdb9ba5004",
+    "ops/audit_oddlot_tensors.py": "6b844621240cfcc17e5cee06aeac1446efc6b30583d88f9fba9641b22e73441f",
+    "ops/verify_dommo_conversion.py": "5e8799426f9818a8c13743e673e03f589fcb2212a1484ce0de6e132098c76431",
+    "research/src/brazil_rv/execution/loan_contracts.py": "8eb04a8ae49627c2dd766ee97c9892facf127ef1fd13bf948a270d4b647bf907",
+    "research/src/brazil_rv/execution/portfolio_account.py": "dacf627837a71a01587f12212e89aef7c0bc484fbc2c447faea67126e035718e",
+    "research/src/brazil_rv/execution/share_distributions.py": "940c3c63c0628f28ba8f32d300f8647bcafe22885153cfa06aaaa853f5942cb0",
+    "research/src/brazil_rv/execution/stateful_ledger.py": "c612252d1e346cdfa9d7ff8631a35107560036ba5557e59f22a73d0ce40814a8",
+    "research/src/brazil_rv/v2/corporate_replay.py": "0a285f46f2e12d5e6953b35d4204a6b5c9ea0c82723468dcce57b2deb5f23620",
+    "research/src/brazil_rv/v2/evaluate.py": "c3cd8f6b52a795071c3639636072bd35f60e7a9aa52c0b8296dfe8c2f1d420ce",
+    "research/tests/test_loan_fraction_provision.py": "5d2c06b42f7c74c7fc8e2f67ff787596b527ece0fd5a6d862b2c50fd467c0e2c"
+  },
+  "status": "dommo_default_fraction_accounting_and_auxiliary_boundary_verified_not_full_A_B_or_model_alpha",
+  "tests": [
+    {
+      "passed": 132,
+      "scope": "affected loan, custody, distribution, account, ledger, source loader and evaluation tests before known-claim payment ordering refinement",
+      "seconds": 59.99
+    },
+    {
+      "passed": 73,
+      "scope": "affected cash/claim/custody/distribution/account/loader checks after ordering refinement; includes seven new fractional-loan cases; overlaps preceding batch",
+      "seconds": 3.51
+    }
+  ],
+  "verified_utc": "2026-09-19T22:17:26.718046+00:00"
+}

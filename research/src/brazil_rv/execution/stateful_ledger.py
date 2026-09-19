@@ -1850,6 +1850,7 @@ def simulate_stateful_ledger(
             submission_nav[name] = 0.0
 
     def deliver_due(day, *, realize_auctions=False):
+        nonlocal free_cash
         # Each delivery uses the same netting transition as a one-leg conversion.
         # Value weights allocate existing proceeds/basis; they create no cash.
         for name, legs in tuple(pending_distributions.items()):
@@ -1866,10 +1867,22 @@ def simulate_stateful_ledger(
                         * leg.shares_per_prior_share
                         * auction.cash_per_share
                     )
-                    receivable_by_name[name] += claim
+                    if claim >= 0:
+                        receivable_by_name[name] += claim
+                    else:
+                        payable_by_name[name] -= claim
                     pending_claims.append(
                         _PendingClaim(name, claim, auction.payment_session)
                     )
+                    if auction.provision_loan_fractions:
+                        release = restricted_by_name[name]
+                        flow = np.zeros(name_count + 1)
+                        flow[name] = -release
+                        settlements.append((auction.payment_session, release, flow))
+                        restricted_by_name[name] = 0.0
+                        # The financial release below has a matching value-date
+                        # queue: proceeds stay remunerated until auction payment.
+                        free_cash += release
                     shares[name], marks[name] = 0.0, np.nan
                     entry_cost_basis[name], entry_session[name] = 0.0, -1
                     pending_exits.pop(name, None)
@@ -1887,6 +1900,25 @@ def simulate_stateful_ledger(
                 source_entry = entry_session[name]
                 incoming = float(shares[name]) * leg.shares_per_prior_share
                 fraction = fraction_basis = 0.0
+                if auction is not None and auction.provision_loan_fractions:
+                    if any(float(q[name]) > 1e-12 for _, q in custody.receipts):
+                        raise ValueError(
+                            "provisioned fractions require settled source purchases"
+                        )
+                    loan_fraction = float(
+                        loans.provision_fractions(
+                            name, leg.shares_per_prior_share, day, auction
+                        )
+                    )
+                    if loan_fraction > 0:
+                        if incoming >= 0:
+                            raise ValueError(
+                                "gross custody offsets require separate fraction terms"
+                            )
+                        fraction = -loan_fraction
+                        fraction_basis = entry_cost_basis[name] * fraction / incoming
+                        allocation = (incoming - fraction) / incoming
+                        incoming -= fraction
                 if auction is not None and incoming > 0:
                     if any(float(q[name]) > 1e-12 for _, q in custody.receipts):
                         raise ValueError(
@@ -1913,7 +1945,7 @@ def simulate_stateful_ledger(
                         else 1.0
                     ),
                 )
-                if fraction > 0:
+                if fraction != 0:
                     shares[name] = fraction / leg.shares_per_prior_share
                     entry_cost_basis[name], entry_session[name] = (
                         fraction_basis,
@@ -1931,10 +1963,30 @@ def simulate_stateful_ledger(
             else:
                 del pending_distributions[name]
 
+    def pay_claims(day):
+        nonlocal free_cash, pending_claims
+        unpaid = []
+        for claim in pending_claims:
+            if claim.payment_session != day:
+                unpaid.append(claim)
+                continue
+            name = claim.security_index
+            free_cash += claim.signed_amount
+            if claim.signed_amount > 0:
+                receivable_by_name[name] -= claim.signed_amount
+                if abs(receivable_by_name[name]) <= 1e-12:
+                    receivable_by_name[name] = 0.0
+            else:
+                payable_by_name[name] += claim.signed_amount
+                if abs(payable_by_name[name]) <= 1e-12:
+                    payable_by_name[name] = 0.0
+        pending_claims = unpaid
+
     for day in range(day_count):
         funding_cash, funding_restricted = _settled_balances(
             free_cash, np.r_[restricted_by_name, hedge_restricted_cash], settlements
         )
+        pay_claims(day)
         free_cash -= float(
             loans.settle_cash_claims(
                 day, payments=loan_cash_payments, pay_only=True
@@ -3331,22 +3383,7 @@ def simulate_stateful_ledger(
 
         deliver_due(day, realize_auctions=True)
 
-        unpaid_claims: list[_PendingClaim] = []
-        for claim in pending_claims:
-            if claim.payment_session != day:
-                unpaid_claims.append(claim)
-                continue
-            name = claim.security_index
-            free_cash += claim.signed_amount
-            if claim.signed_amount > 0.0:
-                receivable_by_name[name] -= claim.signed_amount
-                if abs(receivable_by_name[name]) <= 1e-12:
-                    receivable_by_name[name] = 0.0
-            else:
-                payable_by_name[name] += claim.signed_amount
-                if abs(payable_by_name[name]) <= 1e-12:
-                    payable_by_name[name] = 0.0
-        pending_claims = unpaid_claims
+        pay_claims(day)
 
         cash_rate = float(inputs.cdi[day])
         debit_rate = cash_rate + config.annual_debit_spread / config.annual_sessions

@@ -1,0 +1,105 @@
+{
+  "boundaries": "presettlement disposal; actual lender participation; invoice precision/custodian sweep; zero-whole-contract rent endpoints; changed clearing/return assumptions need corresponding physical custody terms",
+  "manifest": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\corporate_replay\\dommo_manifest.json",
+    "sha256": "b4dcc7467a5eaafe70c2d57b55217deaafe6fb6dc3e711d7fce91ffc13f91ff9",
+    "status": "default_dommo_pna_admitted_with_explicit_fraction_and_custody_bounds"
+  },
+  "model_predictions_labels_or_heldout_read": false,
+  "new_dommo_coverage_cells": 494,
+  "new_dommo_eligible_coverage_cells": 6,
+  "reproducer": {
+    "path": "C:\\Brazil-RV\\quant\\b3-quant\\ops\\verify_dommo_conversion.py",
+    "sha256": "5e8799426f9818a8c13743e673e03f589fcb2212a1484ce0de6e132098c76431"
+  },
+  "results": [
+    {
+      "capital_brl": 1000000,
+      "expected_nav_brl": 1003765.115224476,
+      "fractional_quantity": 0.2727318908557663,
+      "max_account_error_brl": 0.0,
+      "original_principal": 40454.545673752626,
+      "original_quantity": 22727.27285042282,
+      "original_reference": 1.78,
+      "rent_brl": 0,
+      "sign": 1,
+      "terminal_nav_brl": 1003765.115224476,
+      "whole_successor_quantity": 852.0
+    },
+    {
+      "capital_brl": 1000000,
+      "expected_nav_brl": 996203.3912507072,
+      "fractional_quantity": 0.2727318908557663,
+      "max_account_error_brl": 0.0,
+      "original_principal": 40454.545673752626,
+      "original_quantity": 22727.27285042282,
+      "original_reference": 1.78,
+      "rent_brl": 31.493524816795873,
+      "sign": -1,
+      "terminal_nav_brl": 996203.3912507072,
+      "whole_successor_quantity": 852.0
+    },
+    {
+      "capital_brl": 5000000,
+      "expected_nav_brl": 5018832.655812838,
+      "fractional_quantity": 0.36365945427860424,
+      "max_account_error_brl": 0.0,
+      "original_principal": 202272.7283687631,
+      "original_quantity": 113636.3642521141,
+      "original_reference": 1.78,
+      "rent_brl": 0,
+      "sign": 1,
+      "terminal_nav_brl": 5018832.655812838,
+      "whole_successor_quantity": 4261.0
+    },
+    {
+      "capital_brl": 5000000,
+      "expected_nav_brl": 4981009.876563078,
+      "fractional_quantity": 0.36365945427860424,
+      "max_account_error_brl": 0.0,
+      "original_principal": 202272.7283687631,
+      "original_quantity": 113636.3642521141,
+      "original_reference": 1.78,
+      "rent_brl": 157.46762408397933,
+      "sign": -1,
+      "terminal_nav_brl": 4981009.876563078,
+      "whole_successor_quantity": 4261.0
+    },
+    {
+      "capital_brl": 10000000,
+      "expected_nav_brl": 10037665.311625676,
+      "fractional_quantity": 0.7273189085572085,
+      "max_account_error_brl": 0.0,
+      "original_principal": 404545.4567375262,
+      "original_quantity": 227272.7285042282,
+      "original_reference": 1.78,
+      "rent_brl": 0,
+      "sign": 1,
+      "terminal_nav_brl": 10037665.311625676,
+      "whole_successor_quantity": 8522.0
+    },
+    {
+      "capital_brl": 10000000,
+      "expected_nav_brl": 9962019.753126156,
+      "fractional_quantity": 0.7273189085572085,
+      "max_account_error_brl": 0.0,
+      "original_principal": 404545.4567375262,
+      "original_quantity": 227272.7285042282,
+      "original_reference": 1.78,
+      "rent_brl": 314.93524816795866,
+      "sign": -1,
+      "terminal_nav_brl": 9962019.753126156,
+      "whole_successor_quantity": 8522.0
+    }
+  ],
+  "scope": "six predeclared full-name four-percent long/short books, original-reference 4% rent; zero execution/B3/CDI isolate cash and principal arithmetic, not the registered model-cost assumptions",
+  "seconds": 1.3923309000092559,
+  "shape": [
+    3717,
+    933
+  ],
+  "static_policy_coordinates_preserved": true,
+  "status": "default_pna_actual_calendar_oracles_pass_not_model_profitability",
+  "total_coverage_cells": 1328,
+  "total_eligible_coverage_cells": 24
+}

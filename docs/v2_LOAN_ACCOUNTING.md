@@ -282,7 +282,8 @@ and Jan11 credit permit. Multi-leg/nested fractional auctions remain unadmitted 
 their specific allocation and registration terms exist. Long fractions remain in
 the existing share-claim machinery, including constituent risk and causal marking,
 and become cash receivables only when the later auction result is available.
-Loan fractions remain contractual quantities.
+BRML loan fractions remain contractual quantities under its explicit circular;
+Dommo's separate provisioned-fraction treatment is described below.
 
 The source/calendar oracles are bound in `v2_corporate_replay_acceptance.json`.
 Runtime verification preserves bit-identical ordinary book cash, NAV, loans, fills
@@ -294,7 +295,7 @@ work in long replays with frequent trading.
 
 ### Deferred loan redemption and cash-calendar amendment
 
-Evaluation V28 separates `loan_redemption_liability` from the total loan liability.
+Evaluation V29 separates `loan_redemption_liability` from the total loan liability.
 Cash election removes physical quantity at its event, retains original accrued
 rent/fees until their own payment date, and carries the marked redemption liability
 until actual payment. No rent accrues after the source-bound extinction date.
@@ -315,4 +316,22 @@ session. This is not strategy alpha. Old fits/features/results remain frozen;
 corrected replay must explicitly apply the panel to all income/debit/benchmark
 paths. Early unsupported intervals remain NaN and fail requested replay; no
 fabricated rates. Loan day-count and actual clearing closures still need the
-separate lifecycle audit, and the other auxiliary families remain unaudited.
+separate lifecycle audit. All ten auxiliary producer-to-store paths have now been
+independently reconciled, but their upstream publication/revision clocks and final
+fit conditioning still require the remaining deep audit.
+
+### Provisioned loan fractions
+
+Default Dommo conversion now truncates each original loan independently and keeps
+its original reference principal/rate on the whole successor quantity. The signed
+fraction is a marked share claim, followed by a payable when auction terms become
+available, not a tradable loan share. Its proportional proceeds remain restricted
+until cash payment. The separate tiny-zero-quantity rent endpoints and the actual
+last-trade/settlement boundary are recorded in `v2_CORPORATE_EVENTS.md` and the
+source-bound manifest. SAM/TBPTT retains differentiable fractional claims; a
+finite-difference check protects the quantity-dependent proceeds allocation.
+Previously known corporate cash claims pay before the decision together with
+their known proceeds release; newly announced same-day cash remains a realization
+after the intention. Prior-close balances still determine interval income.
+Old ordinary books remain bit-identical against d7c6a2f. See
+`v2_dommo_conversion_acceptance.json` for actual-calendar arithmetic evidence.

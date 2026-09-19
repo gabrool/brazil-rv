@@ -377,7 +377,10 @@ class LoanContracts:
             value = getattr(self, key)
             setattr(self, key, np.concatenate((value, value[ids])))
         self.return_day = np.r_[self.return_day, np.full(len(ids), settlement_day)]
-        self._keep(self.quantity.detach().numpy() > 0)
+        self._keep(
+            (self.quantity.detach().numpy() > 0)
+            | (self.principal.detach().numpy() != 0)
+        )
 
     def fill(self, cover, new_short, session):
         self.request_return(cover, session.return_day)
@@ -499,6 +502,44 @@ class LoanContracts:
             np.where(self.name == name, shares_per_prior_share, 1.0)
         )
 
+    def provision_fractions(self, name, ratio, day, auction):
+        """Truncate each remaining original contract, preserving its principal.
+
+        Dommo's last spot settlement precedes conversion. Pending returns or
+        already split roots require their own custody/rounding terms, not net
+        position rounding. Returned fractional units are a separate signed
+        auction obligation in the share/cash book, not tradable loan quantity.
+
+        A sub-one-share contract has no deliverable quantity. Primary research
+        stops its rent at the preceding conversion close and pays accrued rent
+        today; the explicit alternative retains rent until fraction payment.
+        Neither convention is claimed as an observed B3 invoice for that case.
+        """
+        ids = np.flatnonzero(self.name == name)
+        if not len(ids):
+            return _tensor(0.0)
+        if np.any(self.return_day[ids] >= 0) or len(np.unique(self.root[ids])) != len(
+            ids
+        ):
+            raise ValueError(
+                "loan fractions require settled returns and unsplit original contracts"
+            )
+        converted = self.quantity[ids] * ratio
+        whole = converted.floor()
+        fraction = (converted - whole).sum()
+        quantity = self.quantity.clone()
+        quantity[ids] = whole / ratio
+        self.quantity = quantity
+        zero = ids[whole.detach().numpy() == 0]
+        self.return_day[zero] = (
+            auction.payment_session
+            if auction.zero_quantity_rent_through_payment
+            else day
+        )
+        if not auction.zero_quantity_rent_through_payment:
+            self.accrual_end[zero] = day - 1
+        return fraction
+
     def deliver(self, source, destination, ratio, allocation, *, final):
         """Transfer a contractual portion without repricing its principal/rate.
 
@@ -532,7 +573,10 @@ class LoanContracts:
         ):
             value = getattr(self, key)
             setattr(self, key, np.concatenate((value, value[ids])))
-        self._keep(self.quantity.detach().numpy() > 0)
+        self._keep(
+            (self.quantity.detach().numpy() > 0)
+            | (self.principal.detach().numpy() != 0)
+        )
 
     def detach(self):
         for key in ("quantity", "principal", "rent_due", "fees_due", "root_fees"):

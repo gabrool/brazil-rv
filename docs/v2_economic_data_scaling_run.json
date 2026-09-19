@@ -1,4 +1,8 @@
 {
+  "auxiliary_tensor_audit": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\auxiliary_tensor_audit\\report.json",
+    "sha256": "ca53993c49424f7383a02064cae6b137c612115d10bbf639549d4820a30337d5"
+  },
   "bova_loan_reference_audit": {
     "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\bova_loan_reference_audit\\manifest.json",
     "sha256": "589c5d2011e8e1f1092bda6571c45dd172b2c58a3f88801d87f68edef42b27ff",
@@ -31,9 +35,9 @@
     "status": "source_rules_recovered_historical_axis_admission_pending"
   },
   "corporate_replay": {
-    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\corporate_replay\\copel_manifest.json",
-    "sha256": "6af736a991fbf14a9a986de86c5cd5996b785fcd8332ee1874da563f98c6adc3",
-    "status": "cielo_brmalls_copel_accounting_amendment_copel_loan_allocation_bounded"
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\corporate_replay\\dommo_manifest.json",
+    "sha256": "b4dcc7467a5eaafe70c2d57b55217deaafe6fb6dc3e711d7fce91ffc13f91ff9",
+    "status": "default_dommo_pna_admitted_with_explicit_fraction_and_custody_bounds"
   },
   "corporate_replay_acceptance": {
     "path": "docs\\v2_corporate_replay_acceptance.json",
@@ -44,14 +48,18 @@
     "reproducer_sha256": "93b1616d1eac81ed5507f2432b7984430a2d71c703af5ec5b23056d34045ded8",
     "sha256": "788fce91bce7c1f0b7035e9b8ee1bd1b1e93047b4f68332f4f0c1fb19792de3d"
   },
+  "dommo_conversion_acceptance": {
+    "path": "docs\\v2_dommo_conversion_acceptance.json",
+    "sha256": "82b22397367baffce9eafc7d16f8b43ba99d8b50d7cc69a568f08256f3ca1464"
+  },
   "dommo_election_acceptance": {
     "path": "docs\\v2_dommo_election_acceptance.json",
     "sha256": "f0fad28b48c5f4dd29290c71737db690a80fee394f00abfe98f26171ea964684"
   },
   "dommo_pnb_scenario": {
-    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\corporate_replay\\dommo_pnb_manifest.json",
-    "sha256": "384584ad5657e7f55322c634c35ebeb6bf6d46019d8282f2bda2c569655bad98",
-    "status": "dommo_legal_lender_election_endpoint_default_PNA_separate"
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\corporate_replay\\dommo_pnb_with_default_manifest.json",
+    "sha256": "055c07344bdf2509b012cb88e54da547de174df2fb3394bfbfff9b3f5435494c",
+    "status": "all_eligible_lender_pnb_endpoint_with_default_pna_for_remaining_contracts"
   },
   "dommo_source_terms": {
     "path": "docs\\v2_dommo_source_terms.json",
@@ -98,11 +106,23 @@
     "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\loan_election_unchanged\\result.json",
     "sha256": "8c64fbad4c0526d08203b79512717af7889da3a7880988c66793c4a668209639"
   },
+  "loan_fraction_acceptance": {
+    "path": "docs\\v2_loan_fraction_acceptance.json",
+    "sha256": "e6df26b298547d0d4d375993882874f67af1b915f178584dc0f992095be17889"
+  },
+  "loan_fraction_unchanged": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\loan_fraction_unchanged\\result.json",
+    "sha256": "1013c343994bcbb7ebdb47cb9483a882ef738701cc4b7c9dda08a30712b7428e"
+  },
   "loan_source_panels": {
     "bytes": 3553,
     "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\loan_source_panels\\manifest.json",
     "sha256": "a6741a98d505a049c543cb0c8ed45934b5eadfd6fd2e344fbc916db8ff46cf02",
     "status": "source_panels_bound_event_overrides_pending"
+  },
+  "oddlot_tensor_audit": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\auxiliary_tensor_audit\\oddlot.json",
+    "sha256": "1952956f665fde2f211969d5d8571383af7fccb3dd654ea8b33106d8750f4ab5"
   },
   "recovered_lending": {
     "admission": {

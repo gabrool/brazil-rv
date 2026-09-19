@@ -16,6 +16,8 @@ class FractionAuction:
     available_session: int
     cash_per_share: float
     payment_session: int
+    provision_loan_fractions: bool = False
+    zero_quantity_rent_through_payment: bool = False
 
     def __post_init__(self):
         if self.payment_session < self.available_session:

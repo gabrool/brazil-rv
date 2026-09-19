@@ -140,6 +140,7 @@ class PortfolioAccount:
             self.funding_cash, restricted = self.settled_balances()
             self.funding_restricted = restricted.sum()
             self.funding_day = day
+            self._pay_claims(day)
             # A previously valued liability pays with the same known arrival
             # that releases its proceeds; do not expose spendable proceeds to
             # today's policy while hiding the simultaneous principal debit.
@@ -170,6 +171,13 @@ class PortfolioAccount:
                     )
                     self.claims = self.claims + amount
                     self.payments.append((auction.payment_session, amount))
+                    if auction.provision_loan_fractions:
+                        release = self.trade_restricted[name]
+                        r = torch.zeros_like(self.trade_restricted)
+                        r[name] = -release
+                        self.settlements.append((auction.payment_session, release, r))
+                        self.trade_cash = self.trade_cash + release
+                        self.trade_restricted = self.trade_restricted + r
                     for field in ("shares", "marks", "cost_basis", "pending_exit"):
                         values = getattr(self, field).clone()
                         values[name] = 0
@@ -189,6 +197,26 @@ class PortfolioAccount:
                 incoming = self.shares[name] * leg.shares_per_prior_share
                 fraction = tensor(0.0)
                 fraction_basis = tensor(0.0)
+                if auction is not None and auction.provision_loan_fractions:
+                    if any(
+                        float(q[name].detach()) > 1e-12
+                        for _, q in self.custody.receipts
+                    ):
+                        raise ValueError(
+                            "provisioned fractions require settled source purchases"
+                        )
+                    loan_fraction = self.loans.provision_fractions(
+                        name, leg.shares_per_prior_share, day, auction
+                    )
+                    if loan_fraction.detach().item() > 0:
+                        if incoming.detach().item() >= 0:
+                            raise ValueError(
+                                "gross custody offsets require separate fraction terms"
+                            )
+                        fraction = -loan_fraction
+                        fraction_basis = self.cost_basis[name] * fraction / incoming
+                        allocation = (incoming - fraction) / incoming
+                        incoming = incoming - fraction
                 if auction is not None and incoming.detach().item() > 0:
                     # Shareholder fractions remain a non-tradable claim. Loan
                     # quantities retain all fractions under the separate B3 rule.
@@ -223,7 +251,7 @@ class PortfolioAccount:
                         else 1.0
                     ),
                 )
-                if fraction.detach().item() > 0:
+                if fraction.detach().item() != 0:
                     shares, basis = self.shares.clone(), self.cost_basis.clone()
                     shares[name] = fraction / leg.shares_per_prior_share
                     basis[name] = fraction_basis
@@ -241,6 +269,16 @@ class PortfolioAccount:
                 self.marks = marks
             else:
                 del self.distributions[name]
+
+    def _pay_claims(self, day):
+        unpaid = []
+        for pay, amount in self.payments:
+            if pay == day:
+                self.trade_cash = self.trade_cash + amount.sum()
+                self.claims = self.claims - amount
+            else:
+                unpaid.append((pay, amount))
+        self.payments = unpaid
 
     def detach(self):
         """Truncate gradients without resetting positions, financing or claims."""
@@ -333,7 +371,7 @@ class PortfolioAccount:
         adjusted = []
         for due, free, restricted in self.settlements:
             r = restricted.clone()
-            amount = r[name] * allocation
+            amount = r[name].clone() * allocation
             r[destination] = r[destination] + amount
             r[name] = r[name] - amount
             adjusted.append((due, free, r))
@@ -648,14 +686,7 @@ class PortfolioAccount:
         if self.retired_sources:
             entry_notional = entry_notional.clone()
             entry_notional[list(self.retired_sources)] = 0
-        unpaid = []
-        for pay, amount in self.payments:
-            if pay == day:
-                self.trade_cash = self.trade_cash + amount.sum()
-                self.claims = self.claims - amount
-            else:
-                unpaid.append((pay, amount))
-        self.payments = unpaid
+        self._pay_claims(day)
 
         config = self.config
         interest = (

@@ -896,3 +896,52 @@ cash calendar and source availability separately in corrected model replays. Kee
 old static coordinates; refit only under an explicit changed data contract.
 
 Implementation `4640921` is archived in `loan_election_cash_calendar_4640921.zip` (39 restored/hash-verified members; 20 original source checks), with no immutable dataset duplication. Restored source acceptance hashes and cash-panel arrays match. Archive SHA-256: `1f26d000daf75526d684d1b652d2ede10f0849768d7a08350ba0bf0254cb14f6`. Recovery is bound by `loan_election_cash_calendar_recovery`; prior archives remain valid for their source commits.
+
+
+### Default Dommo conversion and all-family tensor boundary (2026-09-19)
+
+Default PNA is now admitted on original 3717-session/933-name axes: .0375 PRIO
+and R$.4625 per DMMO, Jan9 effect, Jan11 credit, Jan17 cash. The primary manifest
+is `dommo_manifest.json`; the lender PNB endpoint now also binds the default for
+remaining non-elected contracts. Source receipts are unchanged. Per-original-loan
+truncation preserves original principal/rate and provisions the signed fraction;
+whole loan shares alone can be traded/returned. Mark the fraction until Mar31
+recognition of the Mar30 result, then pay the printed approximate R$31.94031 by
+Apr6. Proportional proceeds remain remunerated until payment. Sub-one-share loans
+have an explicit stopped-rent reference and continued-rent-to-payment endpoint,
+not a recovered invoice. Last Jan6 source trades settle Jan10 under registered
+T+2 before Jan11 credit; gross custody/return variants require their own terms.
+
+Six prescribed actual-calendar long/short oracles at R$1m/R$5m/R$10m reconcile
+both accounts and closed forms exactly. R$10m original reference is R$1.78,
+principal R$404545.4567375262, whole PRIO quantity 8522, provisioned fraction
+.7273189085572085 and 4% annual rent R$314.93524816795866 through Jan13 return.
+Zero execution/B3/CDI isolates these mechanics; no model alpha is inferred. Dommo
+adds 494 resolved coverage cells/six eligible; all four cases total 1328/24.
+No quote, eligibility, label, feature or static learned-policy coordinate changes.
+
+Independently implemented row/transform oracles reconcile all ten auxiliary
+families, 113 fields and 41942683 valid active observations, with zero value/mask/
+age mismatches. Nine decision-dated producers took 16.51 seconds. The separate
+odd-lot oracle took .61 seconds, verifies exact D+1 for all 1253007 archived rows,
+and retains 2009 lag-five warmup (125 valid names per field at first store date).
+This is the producer-to-sealed-tensor boundary; upstream original publication,
+revision, denominator, conditioning and final neural-tensor audits still remain.
+Completed quote/lending censuses and old stress benchmarks were not repeated.
+See `v2_AUXILIARY_TENSOR_AUDIT.md` and pointer-bound receipts.
+
+Validation: 132 affected checks passed in 59.99s, then 73 overlapping checks in
+3.51s after a payment-order refinement, including seven new fractional-loan tests.
+Ruff passes. These new tests found and repaired separate payable classification,
+a differentiable tensor-view issue and known-claim payment/proceeds ordering.
+Previously known corporate cash settles before the decision; new same-day terms
+still realize after the intention and funding uses prior-close balances. Two
+ordinary long/mixed books remain bit-identical against d7c6a2f in every original
+array, fills, intentions and nonzero loan charge. Acceptance and reproduction
+identities are in `v2_loan_fraction_acceptance.json`.
+
+A/B remain incomplete and C/D unstarted. Next priorities: finite loan maturity,
+renewal/recall and actual clearing/accrual calendars; presettlement disposal and
+remaining exposed events; upstream source-clock/unit audit and complete rename
+propagation through wealth/features/labels/actual tensors. Then corrected matched
+replay and the registered conditional scaling waves. No GPU job launched.

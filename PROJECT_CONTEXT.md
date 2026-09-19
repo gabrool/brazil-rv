@@ -26,7 +26,7 @@ against existing inventory in both accounts, preserving signed cash claims and
 releasing only the extinguished short portion's restricted proceeds. Sparse sourced
 multi-leg distributions can now retain signed, non-tradable baskets until separately
 dated custody delivery, with separate cash claims/payment. Allocation reserves their
-capacity and risk/readouts use the underlying exposures. Evaluation V28 binds these
+capacity and risk/readouts use the underlying exposures. Evaluation V29 binds these
 terms and reports undelivered and unpriced inventory separately on the full calendar.
 Both cost paths now use dated B3 loan components, with stock/hedge rent separated
 from exchange fees. Both accounts now retain fixed-principal/rate loan cohorts,
@@ -49,8 +49,14 @@ physical returns are superseded and principal cash is separately attributed.
 Deferred lender elections now separate quantity extinction, stopped rent, rent
 payment and cash redemption. Cash liabilities revalue only from dated published
 terms and retain proceeds until payment; whole contracts with pending returns are
-excluded. Dommo's legally eligible PNB election endpoint is bound separately from
-its still-pending default PNA conversion. Static policy coordinates remain frozen
+excluded. Dommo's default PNA now provisions each original loan's fractional PRIO
+entitlement separately from whole tradable quantity, retaining original principal
+and rate. Signed fractions stay marked until the March31 auction announcement
+recognition and pay by April6. Tiny contracts with no whole successor share use
+an explicit stopped-rent primary and continued-rent-to-payment sensitivity.
+The separate PNB endpoint includes PNA for remaining non-elected contracts.
+Both use source custody assumptions; unresolved gross custody/return variants
+must not be rounded as net holdings. Static policy coordinates remain frozen
 and effective borrowing prohibitions also apply to later flat-start windows. See `docs/v2_CORPORATE_EVENTS.md` for Cielo's
 distinct dates and SELIC correction, and BR Malls' recovered custody/loan terms.
 
