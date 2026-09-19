@@ -1,0 +1,32 @@
+[
+  {
+    "maximum_label_horizon": 10,
+    "store_matched": true,
+    "first_forecast_index": 1618,
+    "parent_manifest_sha256": "db289dbf0b47e818b9dd96d841423b26736905772e2e6162dd02d5b168fe54a8",
+    "checkpoint_matched": true,
+    "selection_last_index": 1606.0,
+    "chronology_passed": true,
+    "seed": 11
+  },
+  {
+    "maximum_label_horizon": 10,
+    "store_matched": true,
+    "first_forecast_index": 1618,
+    "parent_manifest_sha256": "88767232e642f96577dc5e2d9b99dd5a24cd21d226fdf8ed61829f1a2f3d11d5",
+    "checkpoint_matched": true,
+    "selection_last_index": 1606.0,
+    "chronology_passed": true,
+    "seed": 29
+  },
+  {
+    "maximum_label_horizon": 10,
+    "store_matched": true,
+    "first_forecast_index": 1618,
+    "parent_manifest_sha256": "c3e4b4ed7326ea9c2afa76931381b789ace2a067343c7826e1feafe2cbcb58c8",
+    "checkpoint_matched": true,
+    "selection_last_index": 1606.0,
+    "chronology_passed": true,
+    "seed": 47
+  }
+]

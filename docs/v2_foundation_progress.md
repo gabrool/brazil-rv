@@ -222,3 +222,14 @@ every referenced score payload hash also matches. Receipts:
 in-sample replacement. Remaining before residual fitting: verify training cutoff,
 store/identity/date bindings and construct per-seed historical OOS anchors with
 original neutral F scores, then implement the registered ridge/tree comparison.
+
+### Residual prelude chronology verified (2026-09-19 06:12 UTC)
+
+Recovered the three bootstrap parent manifests from the forecast archive and
+verified against its inventory. Their raw-patience checkpoint hashes match the
+prelude score manifests; the store hash matches the accepted foundation store.
+For every seed, parent selection ends at index 1606 (2016-06-30), and prelude
+forecasts start at 1618 (2016-07-18): even the maximum ten-session label horizon
+matures before the first forecast. Evidence: `v2_foundation_residual_prelude.json`.
+Residual model implementation and execution remain pending; this is source
+validation, not a residual experiment result.
