@@ -3,5 +3,5 @@
   "financial_source_commit": "d21a93a212e02de7d34623ff149ea8e723eef835",
   "registration": "research/preregistrations/v2_foundation.md",
   "root": "C:\\quant-data\\b3\\processed\\model_runs\\v2_foundation_d21a93a_20260918",
-  "status": "input_training_complete_readouts_and_average_inference_active"
+  "status": "neural_screens_complete_residual_and_accounting_pending"
 }

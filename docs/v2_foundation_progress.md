@@ -175,3 +175,23 @@ readout blocks three to two. They do not combine changes. Both retain full roste
 early peer attention, 256-wide readout, three heads and recipes. Six fresh parents
 and 24 F fits, same clean 3dbda71 source; reuse existing full control. This respects
 the two-candidate cap. Review before any confirmation or synthesis decision.
+
+### Capacity decision and remaining CPU work (2026-09-19 05:20 UTC)
+
+All 30 capacity jobs and full readouts completed. TE_wide changes IC by -0.002271
+and net by +1.338212 bps/day; its IC loss exceeds the registered margin. TE_shallow
+changes IC by -0.002282 and net by -1.047773. Neither admits. Retain TE_full;
+`v2_foundation_capacity_results.json` contains full paired evidence. No neural or
+averaging candidate has qualified for confirmation. Do not change the gates after
+seeing favorable economic point estimates. Width, depth, encoder and peer branches
+have each received the planned matched tests.
+
+The GPU is now idle. The program is NOT complete: implement and run the frozen
+`research/preregistrations/v2_foundation_residual.md` CPU probe with the full retained
+roster (excluding only the structurally empty option field), verified genuine C6
+OOS preludes and neutral F anchors; inspect original C6 curves for the conditional
+capacity clause; complete bounded settlement/financing sensitivity and identity
+boundary implications; produce combined report and verified D recovery archive.
+The residual specification was reread. Do not substitute the old unmodified
+round7_corrector implementation or use fitted training anchors. All relevant
+source evidence and provenance are described earlier in this progress document.
