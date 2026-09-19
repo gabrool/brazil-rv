@@ -79,6 +79,7 @@ def evaluate(root, folds):
                     {
                         "implementation": implementation,
                         "scenario": "base",
+                        "policy": "equal_rank",
                         "economic_cache_binding": binding,
                         "mapping": bound(mapping_path),
                         "forecasts": sources,
