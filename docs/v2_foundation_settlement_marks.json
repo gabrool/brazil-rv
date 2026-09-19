@@ -1,0 +1,886 @@
+{
+  "books": [
+    {
+      "book": "C:\\quant-data\\b3\\processed\\model_runs\\v2_foundation_d21a93a_20260918\\books\\C6\\average\\F11\\ensemble\\book.json",
+      "book_sha256": "c49c304ed21ceeb77bedda78523925dd3527eb600add284e4f58783b84424225",
+      "difference_initial_nav_bps": 78.65715289018624,
+      "events": [
+        {
+          "contractual_mark_per_old_share": 8.563791401302595,
+          "date": "2023-01-20",
+          "difference_initial_nav_bps": 18.367912165821913,
+          "nominal_value_difference": 0.0018367912165821914,
+          "note": "Issuer default terms",
+          "security": "BRBRMLACNOR9",
+          "signed_old_quantity": 0.006046229724009841,
+          "successor_quotes": [
+            17.399999618530273
+          ],
+          "synthetic_price": 8.260000228881836
+        },
+        {
+          "contractual_mark_per_old_share": 2.003749942779541,
+          "date": "2023-01-20",
+          "difference_initial_nav_bps": 60.28924072436432,
+          "nominal_value_difference": 0.006028924072436432,
+          "note": "Non-electing default; borrowed-share elections unresolved",
+          "security": "BRDMMOACNOR0",
+          "signed_old_quantity": 0.024734052315273647,
+          "successor_quotes": [
+            41.099998474121094
+          ],
+          "synthetic_price": 1.7599999904632568
+        }
+      ]
+    },
+    {
+      "book": "C:\\quant-data\\b3\\processed\\model_runs\\v2_foundation_d21a93a_20260918\\books\\C6\\average\\F12\\ensemble\\book.json",
+      "book_sha256": "cfa49113ce46eaddd69e2d40df4d7c2f3d9dc716d1bba8c62ce5e9c13f8817f9",
+      "difference_initial_nav_bps": -7.015745659711912e-13,
+      "events": [
+        {
+          "contractual_mark_per_old_share": 50.92999839782715,
+          "date": "2023-12-28",
+          "difference_initial_nav_bps": -7.015745659711912e-13,
+          "nominal_value_difference": -7.015745659711912e-17,
+          "note": "Two-share-class basket",
+          "security": "BRCPLECDAM13",
+          "signed_old_quantity": -8.661420105443574e-17,
+          "successor_quotes": [
+            9.489999771118164,
+            10.359999656677246
+          ],
+          "synthetic_price": 50.119998931884766
+        }
+      ]
+    },
+    {
+      "book": "C:\\quant-data\\b3\\processed\\model_runs\\v2_foundation_d21a93a_20260918\\books\\C6\\average\\F14\\ensemble\\book.json",
+      "book_sha256": "37dbc4344066f19d2576f3cfc4dc62bdaa8e3fcfec4628516e2ec0d9d742b30e",
+      "difference_initial_nav_bps": 4.768977739955785e-13,
+      "events": [
+        {
+          "contractual_mark_per_old_share": 5.89,
+          "date": "2024-09-09",
+          "difference_initial_nav_bps": 4.768977739955785e-13,
+          "nominal_value_difference": 4.768977739955785e-17,
+          "note": "Later-known redemption; not earlier model input",
+          "security": "BRCIELACNOR3",
+          "signed_old_quantity": 7.948286126491233e-16,
+          "successor_quotes": [],
+          "synthetic_price": 5.829999923706055
+        }
+      ]
+    },
+    {
+      "book": "C:\\quant-data\\b3\\processed\\model_runs\\v2_foundation_d21a93a_20260918\\books\\GRU_early\\ema\\F14\\ensemble\\book.json",
+      "book_sha256": "dc2d3a6340a9fd4ab1df28b124002ce1de76bbfb70a3887b9bdc29741b9c5483",
+      "difference_initial_nav_bps": 2.474266504695532,
+      "events": [
+        {
+          "contractual_mark_per_old_share": 5.89,
+          "date": "2024-09-09",
+          "difference_initial_nav_bps": 2.474266504695532,
+          "nominal_value_difference": 0.0002474266504695532,
+          "note": "Later-known redemption; not earlier model input",
+          "security": "BRCIELACNOR3",
+          "signed_old_quantity": 0.004123772264178315,
+          "successor_quotes": [],
+          "synthetic_price": 5.829999923706055
+        }
+      ]
+    },
+    {
+      "book": "C:\\quant-data\\b3\\processed\\model_runs\\v2_foundation_d21a93a_20260918\\books\\GRU_early\\raw\\F14\\ensemble\\book.json",
+      "book_sha256": "86fbc462e5761d192e5cd47fde0b3770db09fce15121dfbf236ac6e793dca661",
+      "difference_initial_nav_bps": 1.5730287504597373,
+      "events": [
+        {
+          "contractual_mark_per_old_share": 5.89,
+          "date": "2024-09-09",
+          "difference_initial_nav_bps": 1.5730287504597373,
+          "nominal_value_difference": 0.00015730287504597373,
+          "note": "Later-known redemption; not earlier model input",
+          "security": "BRCIELACNOR3",
+          "signed_old_quantity": 0.00262171125042133,
+          "successor_quotes": [],
+          "synthetic_price": 5.829999923706055
+        }
+      ]
+    },
+    {
+      "book": "C:\\quant-data\\b3\\processed\\model_runs\\v2_foundation_d21a93a_20260918\\books\\ridge_rich\\raw\\F14\\ensemble\\book.json",
+      "book_sha256": "566e7b7e2fa01eb3e28848f3da8f0ac70632e965cde0386edffd2be12628f181",
+      "difference_initial_nav_bps": 1.4935988120227093e-13,
+      "events": [
+        {
+          "contractual_mark_per_old_share": 5.89,
+          "date": "2024-09-09",
+          "difference_initial_nav_bps": 1.4935988120227093e-13,
+          "nominal_value_difference": 1.4935988120227093e-17,
+          "note": "Later-known redemption; not earlier model input",
+          "security": "BRCIELACNOR3",
+          "signed_old_quantity": 2.489328188026718e-16,
+          "successor_quotes": [],
+          "synthetic_price": 5.829999923706055
+        }
+      ]
+    },
+    {
+      "book": "C:\\quant-data\\b3\\processed\\model_runs\\v2_foundation_d21a93a_20260918\\books\\ridge_score\\raw\\F14\\ensemble\\book.json",
+      "book_sha256": "2d5badf43464502cb0840c4a201b2542ffa54fa132846a05399ce7925170b063",
+      "difference_initial_nav_bps": 1.1121326345967004e-12,
+      "events": [
+        {
+          "contractual_mark_per_old_share": 5.89,
+          "date": "2024-09-09",
+          "difference_initial_nav_bps": 1.1121326345967004e-12,
+          "nominal_value_difference": 1.1121326345967004e-16,
+          "note": "Later-known redemption; not earlier model input",
+          "security": "BRCIELACNOR3",
+          "signed_old_quantity": 1.8535520340812184e-15,
+          "successor_quotes": [],
+          "synthetic_price": 5.829999923706055
+        }
+      ]
+    },
+    {
+      "book": "C:\\quant-data\\b3\\processed\\model_runs\\v2_foundation_d21a93a_20260918\\books\\TE_all\\average\\F11\\ensemble\\book.json",
+      "book_sha256": "cb066dfcb18afd5867ae8bf6e09b8a855023e1655cb69f79a7767fb3bb7b6b3e",
+      "difference_initial_nav_bps": 18.416188830151174,
+      "events": [
+        {
+          "contractual_mark_per_old_share": 8.563791401302595,
+          "date": "2023-01-20",
+          "difference_initial_nav_bps": 18.416188830151174,
+          "nominal_value_difference": 0.0018416188830151173,
+          "note": "Issuer default terms",
+          "security": "BRBRMLACNOR9",
+          "signed_old_quantity": 0.00606212112202005,
+          "successor_quotes": [
+            17.399999618530273
+          ],
+          "synthetic_price": 8.260000228881836
+        }
+      ]
+    },
+    {
+      "book": "C:\\quant-data\\b3\\processed\\model_runs\\v2_foundation_d21a93a_20260918\\books\\TE_all\\average\\F12\\ensemble\\book.json",
+      "book_sha256": "364f99631bfd577afd3ca639c91e3b230b079a989a8b8c8b5fad04e24d42280a",
+      "difference_initial_nav_bps": 8.536493145225847,
+      "events": [
+        {
+          "contractual_mark_per_old_share": 50.92999839782715,
+          "date": "2023-12-28",
+          "difference_initial_nav_bps": 8.536493145225847,
+          "nominal_value_difference": 0.0008536493145225848,
+          "note": "Two-share-class basket",
+          "security": "BRCPLECDAM13",
+          "signed_old_quantity": 0.001053888737481349,
+          "successor_quotes": [
+            9.489999771118164,
+            10.359999656677246
+          ],
+          "synthetic_price": 50.119998931884766
+        }
+      ]
+    },
+    {
+      "book": "C:\\quant-data\\b3\\processed\\model_runs\\v2_foundation_d21a93a_20260918\\books\\TE_all\\average\\F14\\ensemble\\book.json",
+      "book_sha256": "297d6c5854b5d9a3f659b2d9287787d023fc303c3a6302e72ffaae42c3c3cb92",
+      "difference_initial_nav_bps": 6.457481113854432e-12,
+      "events": [
+        {
+          "contractual_mark_per_old_share": 5.89,
+          "date": "2024-09-09",
+          "difference_initial_nav_bps": 6.457481113854432e-12,
+          "nominal_value_difference": 6.457481113854432e-16,
+          "note": "Later-known redemption; not earlier model input",
+          "security": "BRCIELACNOR3",
+          "signed_old_quantity": 1.0762454837921764e-14,
+          "successor_quotes": [],
+          "synthetic_price": 5.829999923706055
+        }
+      ]
+    },
+    {
+      "book": "C:\\quant-data\\b3\\processed\\model_runs\\v2_foundation_d21a93a_20260918\\books\\TE_compact\\ema\\F14\\ensemble\\book.json",
+      "book_sha256": "652bbf60208fed67c457ea588a9f138a086505b94aaff771c4aac2e0c1576c8e",
+      "difference_initial_nav_bps": 2.6926412032771773e-12,
+      "events": [
+        {
+          "contractual_mark_per_old_share": 5.89,
+          "date": "2024-09-09",
+          "difference_initial_nav_bps": 2.6926412032771773e-12,
+          "nominal_value_difference": 2.6926412032771773e-16,
+          "note": "Later-known redemption; not earlier model input",
+          "security": "BRCIELACNOR3",
+          "signed_old_quantity": 4.487729632352e-15,
+          "successor_quotes": [],
+          "synthetic_price": 5.829999923706055
+        }
+      ]
+    },
+    {
+      "book": "C:\\quant-data\\b3\\processed\\model_runs\\v2_foundation_d21a93a_20260918\\books\\TE_compact\\raw\\F14\\ensemble\\book.json",
+      "book_sha256": "4750cfd2d61386eb7203ae08ceb74339ff8a65ce6f9bdb797d62747d7b835df0",
+      "difference_initial_nav_bps": 1.186552366345567e-12,
+      "events": [
+        {
+          "contractual_mark_per_old_share": 5.89,
+          "date": "2024-09-09",
+          "difference_initial_nav_bps": 1.186552366345567e-12,
+          "nominal_value_difference": 1.186552366345567e-16,
+          "note": "Later-known redemption; not earlier model input",
+          "security": "BRCIELACNOR3",
+          "signed_old_quantity": 1.97758476261356e-15,
+          "successor_quotes": [],
+          "synthetic_price": 5.829999923706055
+        }
+      ]
+    },
+    {
+      "book": "C:\\quant-data\\b3\\processed\\model_runs\\v2_foundation_d21a93a_20260918\\books\\TE_full\\ema\\F14\\ensemble\\book.json",
+      "book_sha256": "9629aed32175dd29635c24d0afee435eb3bab4489272c46877adc0ba0d4c2e1f",
+      "difference_initial_nav_bps": 1.127536998651011e-11,
+      "events": [
+        {
+          "contractual_mark_per_old_share": 5.89,
+          "date": "2024-09-09",
+          "difference_initial_nav_bps": 1.127536998651011e-11,
+          "nominal_value_difference": 1.127536998651011e-15,
+          "note": "Later-known redemption; not earlier model input",
+          "security": "BRCIELACNOR3",
+          "signed_old_quantity": 1.879225941525675e-14,
+          "successor_quotes": [],
+          "synthetic_price": 5.829999923706055
+        }
+      ]
+    },
+    {
+      "book": "C:\\quant-data\\b3\\processed\\model_runs\\v2_foundation_d21a93a_20260918\\books\\TE_full\\raw\\F14\\ensemble\\book.json",
+      "book_sha256": "0f4035a2e59c931161be101170d33e516943480d4d6497908f21e20b062caf40",
+      "difference_initial_nav_bps": 1.0408354090750588e-13,
+      "events": [
+        {
+          "contractual_mark_per_old_share": 5.89,
+          "date": "2024-09-09",
+          "difference_initial_nav_bps": 1.0408354090750588e-13,
+          "nominal_value_difference": 1.0408354090750588e-17,
+          "note": "Later-known redemption; not earlier model input",
+          "security": "BRCIELACNOR3",
+          "signed_old_quantity": 1.734723475976807e-16,
+          "successor_quotes": [],
+          "synthetic_price": 5.829999923706055
+        }
+      ]
+    },
+    {
+      "book": "C:\\quant-data\\b3\\processed\\model_runs\\v2_foundation_d21a93a_20260918\\books\\TE_no_micro\\ema\\F14\\ensemble\\book.json",
+      "book_sha256": "0286b0da1a835432fabc0fbc1795fa3fcc03a71222149e9babbe25346d2cf2d5",
+      "difference_initial_nav_bps": 6.208583215132725e-13,
+      "events": [
+        {
+          "contractual_mark_per_old_share": 5.89,
+          "date": "2024-09-09",
+          "difference_initial_nav_bps": 6.208583215132725e-13,
+          "nominal_value_difference": 6.208583215132725e-17,
+          "note": "Later-known redemption; not earlier model input",
+          "security": "BRCIELACNOR3",
+          "signed_old_quantity": 1.0347625534201654e-15,
+          "successor_quotes": [],
+          "synthetic_price": 5.829999923706055
+        }
+      ]
+    },
+    {
+      "book": "C:\\quant-data\\b3\\processed\\model_runs\\v2_foundation_d21a93a_20260918\\books\\TE_no_micro\\raw\\F14\\ensemble\\book.json",
+      "book_sha256": "ba9dc2a766ba3afa2c682c8b04b6e53e5e3900f3a6ca63bc903c7b36749a264e",
+      "difference_initial_nav_bps": 6.682163326261878e-13,
+      "events": [
+        {
+          "contractual_mark_per_old_share": 5.89,
+          "date": "2024-09-09",
+          "difference_initial_nav_bps": 6.682163326261878e-13,
+          "nominal_value_difference": 6.682163326261878e-17,
+          "note": "Later-known redemption; not earlier model input",
+          "security": "BRCIELACNOR3",
+          "signed_old_quantity": 1.1136924715771102e-15,
+          "successor_quotes": [],
+          "synthetic_price": 5.829999923706055
+        }
+      ]
+    },
+    {
+      "book": "C:\\quant-data\\b3\\processed\\model_runs\\v2_foundation_d21a93a_20260918\\books\\TE_no_peer\\ema\\F14\\ensemble\\book.json",
+      "book_sha256": "e06b3bed705bbea90306cf08b4fc724effd77210834635162cd94057d1a9b414",
+      "difference_initial_nav_bps": 4.0878810691422935e-13,
+      "events": [
+        {
+          "contractual_mark_per_old_share": 5.89,
+          "date": "2024-09-09",
+          "difference_initial_nav_bps": 4.0878810691422935e-13,
+          "nominal_value_difference": 4.0878810691422935e-17,
+          "note": "Later-known redemption; not earlier model input",
+          "security": "BRCIELACNOR3",
+          "signed_old_quantity": 6.81312645189891e-16,
+          "successor_quotes": [],
+          "synthetic_price": 5.829999923706055
+        }
+      ]
+    },
+    {
+      "book": "C:\\quant-data\\b3\\processed\\model_runs\\v2_foundation_d21a93a_20260918\\books\\TE_no_peer\\raw\\F14\\ensemble\\book.json",
+      "book_sha256": "721779f09d1f6818dbf1d828a87009606a1aa6d73bcf6fb913d4d59ea80cb411",
+      "difference_initial_nav_bps": 9.721402720761048e-13,
+      "events": [
+        {
+          "contractual_mark_per_old_share": 5.89,
+          "date": "2024-09-09",
+          "difference_initial_nav_bps": 9.721402720761048e-13,
+          "nominal_value_difference": 9.721402720761049e-17,
+          "note": "Later-known redemption; not earlier model input",
+          "security": "BRCIELACNOR3",
+          "signed_old_quantity": 1.6202317265623378e-15,
+          "successor_quotes": [],
+          "synthetic_price": 5.829999923706055
+        }
+      ]
+    },
+    {
+      "book": "C:\\quant-data\\b3\\processed\\model_runs\\v2_foundation_d21a93a_20260918\\books\\TE_no_weak\\ema\\F14\\ensemble\\book.json",
+      "book_sha256": "ec5d91b259e120e81a56d1a8986201e9631544b5ffdc3547e31147b8c0d49553",
+      "difference_initial_nav_bps": 4.24660846902624e-13,
+      "events": [
+        {
+          "contractual_mark_per_old_share": 5.89,
+          "date": "2024-09-09",
+          "difference_initial_nav_bps": 4.24660846902624e-13,
+          "nominal_value_difference": 4.24660846902624e-17,
+          "note": "Later-known redemption; not earlier model input",
+          "security": "BRCIELACNOR3",
+          "signed_old_quantity": 7.077671781985373e-16,
+          "successor_quotes": [],
+          "synthetic_price": 5.829999923706055
+        }
+      ]
+    },
+    {
+      "book": "C:\\quant-data\\b3\\processed\\model_runs\\v2_foundation_d21a93a_20260918\\books\\TE_no_weak\\raw\\F14\\ensemble\\book.json",
+      "book_sha256": "202ba82e1f2c028fa1dfedfe93117c8063d4a322f69be176284dc4e0d809af55",
+      "difference_initial_nav_bps": 4.293446062434618e-14,
+      "events": [
+        {
+          "contractual_mark_per_old_share": 5.89,
+          "date": "2024-09-09",
+          "difference_initial_nav_bps": 4.293446062434618e-14,
+          "nominal_value_difference": 4.293446062434618e-18,
+          "note": "Later-known redemption; not earlier model input",
+          "security": "BRCIELACNOR3",
+          "signed_old_quantity": 7.155734338404329e-17,
+          "successor_quotes": [],
+          "synthetic_price": 5.829999923706055
+        }
+      ]
+    },
+    {
+      "book": "C:\\quant-data\\b3\\processed\\model_runs\\v2_foundation_d21a93a_20260918\\books\\TE_shallow\\ema\\F14\\ensemble\\book.json",
+      "book_sha256": "dc300e2953b3608cb0124d463bfc4f83775f0590680a90b4c43e1112fa9f23bd",
+      "difference_initial_nav_bps": 2.5176563613959713e-13,
+      "events": [
+        {
+          "contractual_mark_per_old_share": 5.89,
+          "date": "2024-09-09",
+          "difference_initial_nav_bps": 2.5176563613959713e-13,
+          "nominal_value_difference": 2.5176563613959713e-17,
+          "note": "Later-known redemption; not earlier model input",
+          "security": "BRCIELACNOR3",
+          "signed_old_quantity": 4.196088600057405e-16,
+          "successor_quotes": [],
+          "synthetic_price": 5.829999923706055
+        }
+      ]
+    },
+    {
+      "book": "C:\\quant-data\\b3\\processed\\model_runs\\v2_foundation_d21a93a_20260918\\books\\TE_shallow\\raw\\F14\\ensemble\\book.json",
+      "book_sha256": "9022084f205b1f559647694ae600e5b7f42e89cd6c121cc2a57948202b842eed",
+      "difference_initial_nav_bps": 1.1079692929604001e-12,
+      "events": [
+        {
+          "contractual_mark_per_old_share": 5.89,
+          "date": "2024-09-09",
+          "difference_initial_nav_bps": 1.1079692929604001e-12,
+          "nominal_value_difference": 1.1079692929604001e-16,
+          "note": "Later-known redemption; not earlier model input",
+          "security": "BRCIELACNOR3",
+          "signed_old_quantity": 1.846613140177311e-15,
+          "successor_quotes": [],
+          "synthetic_price": 5.829999923706055
+        }
+      ]
+    },
+    {
+      "book": "C:\\quant-data\\b3\\processed\\model_runs\\v2_foundation_d21a93a_20260918\\books\\TE_wide\\ema\\F14\\ensemble\\book.json",
+      "book_sha256": "543b8bffedb26111dd58281129bba465be99cf5e4eb50eb7f740f5e30aa2404f",
+      "difference_initial_nav_bps": 5.068868442195536e-13,
+      "events": [
+        {
+          "contractual_mark_per_old_share": 5.89,
+          "date": "2024-09-09",
+          "difference_initial_nav_bps": 5.068868442195536e-13,
+          "nominal_value_difference": 5.068868442195536e-17,
+          "note": "Later-known redemption; not earlier model input",
+          "security": "BRCIELACNOR3",
+          "signed_old_quantity": 8.448103328007051e-16,
+          "successor_quotes": [],
+          "synthetic_price": 5.829999923706055
+        }
+      ]
+    },
+    {
+      "book": "C:\\quant-data\\b3\\processed\\model_runs\\v2_foundation_d21a93a_20260918\\books\\TE_wide\\raw\\F14\\ensemble\\book.json",
+      "book_sha256": "533d9b39797ee6b4d38f44ba7bf55c4b2f30196447022424b3569235a102ced4",
+      "difference_initial_nav_bps": 9.437775071788095e-13,
+      "events": [
+        {
+          "contractual_mark_per_old_share": 5.89,
+          "date": "2024-09-09",
+          "difference_initial_nav_bps": 9.437775071788095e-13,
+          "nominal_value_difference": 9.437775071788095e-17,
+          "note": "Later-known redemption; not earlier model input",
+          "security": "BRCIELACNOR3",
+          "signed_old_quantity": 1.5729605118419698e-15,
+          "successor_quotes": [],
+          "synthetic_price": 5.829999923706055
+        }
+      ]
+    },
+    {
+      "book": "C:\\quant-data\\b3\\processed\\model_runs\\v2_foundation_d21a93a_20260918\\books\\tree_rich\\raw\\F14\\ensemble\\book.json",
+      "book_sha256": "5b8f682886928c2f76b35b81ea9236dabef35f9e346635f4a3a82eeefc04b51f",
+      "difference_initial_nav_bps": 2.006210250992176e-12,
+      "events": [
+        {
+          "contractual_mark_per_old_share": 5.89,
+          "date": "2024-09-09",
+          "difference_initial_nav_bps": 2.006210250992176e-12,
+          "nominal_value_difference": 2.0062102509921758e-16,
+          "note": "Later-known redemption; not earlier model input",
+          "security": "BRCIELACNOR3",
+          "signed_old_quantity": 3.3436794999452957e-15,
+          "successor_quotes": [],
+          "synthetic_price": 5.829999923706055
+        }
+      ]
+    },
+    {
+      "book": "C:\\quant-data\\b3\\processed\\model_runs\\v2_foundation_d21a93a_20260918\\books\\tree_score\\raw\\F14\\ensemble\\book.json",
+      "book_sha256": "963d0a518361d876571388ad999513f18a1318f1934970f8ef82c30f1d81860b",
+      "difference_initial_nav_bps": 1.0566430968503862e-12,
+      "events": [
+        {
+          "contractual_mark_per_old_share": 5.89,
+          "date": "2024-09-09",
+          "difference_initial_nav_bps": 1.0566430968503862e-12,
+          "nominal_value_difference": 1.0566430968503862e-16,
+          "note": "Later-known redemption; not earlier model input",
+          "security": "BRCIELACNOR3",
+          "signed_old_quantity": 1.7610695887682049e-15,
+          "successor_quotes": [],
+          "synthetic_price": 5.829999923706055
+        }
+      ]
+    },
+    {
+      "book": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\books\\F11\\C6\\neutral\\ensemble\\book.json",
+      "book_sha256": "84ebb283fc4e31dffc5a4634dc45fd4d20eb2f8bfb8466a1012b425f96ffd39c",
+      "difference_initial_nav_bps": 80.50312787102027,
+      "events": [
+        {
+          "contractual_mark_per_old_share": 8.563791401302595,
+          "date": "2023-01-20",
+          "difference_initial_nav_bps": 18.382753592352145,
+          "nominal_value_difference": 0.0018382753592352146,
+          "note": "Issuer default terms",
+          "security": "BRBRMLACNOR9",
+          "signed_old_quantity": 0.0060511151281550535,
+          "successor_quotes": [
+            17.399999618530273
+          ],
+          "synthetic_price": 8.260000228881836
+        },
+        {
+          "contractual_mark_per_old_share": 2.003749942779541,
+          "date": "2023-01-20",
+          "difference_initial_nav_bps": 62.12037427866812,
+          "nominal_value_difference": 0.006212037427866812,
+          "note": "Non-electing default; borrowed-share elections unresolved",
+          "security": "BRDMMOACNOR0",
+          "signed_old_quantity": 0.025485286740923,
+          "successor_quotes": [
+            41.099998474121094
+          ],
+          "synthetic_price": 1.7599999904632568
+        }
+      ]
+    },
+    {
+      "book": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\books\\F12\\C6\\neutral\\ensemble\\book.json",
+      "book_sha256": "50a6c32e0818d3146dd380fd299785fc86945a5bf4e77d2e14b16ead0dc747f1",
+      "difference_initial_nav_bps": -1.6896629196414605e-12,
+      "events": [
+        {
+          "contractual_mark_per_old_share": 50.92999839782715,
+          "date": "2023-12-28",
+          "difference_initial_nav_bps": -1.6896629196414605e-12,
+          "nominal_value_difference": -1.6896629196414605e-16,
+          "note": "Two-share-class basket",
+          "security": "BRCPLECDAM13",
+          "signed_old_quantity": -2.0860049798621105e-16,
+          "successor_quotes": [
+            9.489999771118164,
+            10.359999656677246
+          ],
+          "synthetic_price": 50.119998931884766
+        }
+      ]
+    },
+    {
+      "book": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\books\\F14\\C6\\neutral\\ensemble\\book.json",
+      "book_sha256": "0e7d071503462c61992d31a81f0640e668384ff2057aaa688a9119b252af8aad",
+      "difference_initial_nav_bps": 1.3595262008912283e-12,
+      "events": [
+        {
+          "contractual_mark_per_old_share": 5.89,
+          "date": "2024-09-09",
+          "difference_initial_nav_bps": 1.3595262008912283e-12,
+          "nominal_value_difference": 1.3595262008912283e-16,
+          "note": "Later-known redemption; not earlier model input",
+          "security": "BRCIELACNOR3",
+          "signed_old_quantity": 2.2658741202774557e-15,
+          "successor_quotes": [],
+          "synthetic_price": 5.829999923706055
+        }
+      ]
+    },
+    {
+      "book": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\books\\F11\\TE_all\\neutral\\ensemble\\book.json",
+      "book_sha256": "1177591f2391352753595136977c0440bb367b634036a3e6cf59b769fb39fc42",
+      "difference_initial_nav_bps": 18.403718683136592,
+      "events": [
+        {
+          "contractual_mark_per_old_share": 8.563791401302595,
+          "date": "2023-01-20",
+          "difference_initial_nav_bps": 18.403718683132954,
+          "nominal_value_difference": 0.0018403718683132955,
+          "note": "Issuer default terms",
+          "security": "BRBRMLACNOR9",
+          "signed_old_quantity": 0.006058016280224006,
+          "successor_quotes": [
+            17.399999618530273
+          ],
+          "synthetic_price": 8.260000228881836
+        },
+        {
+          "contractual_mark_per_old_share": 2.003749942779541,
+          "date": "2023-01-20",
+          "difference_initial_nav_bps": 3.638527568963812e-12,
+          "nominal_value_difference": 3.6385275689638127e-16,
+          "note": "Non-electing default; borrowed-share elections unresolved",
+          "security": "BRDMMOACNOR0",
+          "signed_old_quantity": 1.4927295510780425e-15,
+          "successor_quotes": [
+            41.099998474121094
+          ],
+          "synthetic_price": 1.7599999904632568
+        }
+      ]
+    },
+    {
+      "book": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\books\\F12\\TE_all\\neutral\\ensemble\\book.json",
+      "book_sha256": "b9c9f3253029f2a17cbc5fd4233c81e19d8cb3693f50711e8e85e90d1ea8cae5",
+      "difference_initial_nav_bps": 6.847467876605355,
+      "events": [
+        {
+          "contractual_mark_per_old_share": 50.92999839782715,
+          "date": "2023-12-28",
+          "difference_initial_nav_bps": 6.847467876605355,
+          "nominal_value_difference": 0.0006847467876605355,
+          "note": "Two-share-class basket",
+          "security": "BRCPLECDAM13",
+          "signed_old_quantity": 0.0008453669618953097,
+          "successor_quotes": [
+            9.489999771118164,
+            10.359999656677246
+          ],
+          "synthetic_price": 50.119998931884766
+        }
+      ]
+    },
+    {
+      "book": "C:\\quant-data\\b3\\processed\\model_runs\\v2_decision_60dc9a2_20260914T212110Z\\phase3\\books\\F14\\TE_all\\neutral\\ensemble\\book.json",
+      "book_sha256": "a503d72365403276c6f830c880fe8b08edcbe4053aceeff442a7aa9b6b1531d6",
+      "difference_initial_nav_bps": 3.7756304464197757e-13,
+      "events": [
+        {
+          "contractual_mark_per_old_share": 5.89,
+          "date": "2024-09-09",
+          "difference_initial_nav_bps": 3.7756304464197757e-13,
+          "nominal_value_difference": 3.7756304464197756e-17,
+          "note": "Later-known redemption; not earlier model input",
+          "security": "BRCIELACNOR3",
+          "signed_old_quantity": 6.292709409105868e-16,
+          "successor_quotes": [],
+          "synthetic_price": 5.829999923706055
+        }
+      ]
+    },
+    {
+      "book": "C:\\quant-data\\b3\\processed\\model_runs\\v2_opportunity_056aad2_20260917\\C6\\books\\neutral\\book.json",
+      "book_sha256": "4c742437d57d8c355ec230a1df3757b23fa3c8e13bc6ee1f6cecc2badd90e6d7",
+      "difference_initial_nav_bps": 164.91123034683508,
+      "events": [
+        {
+          "contractual_mark_per_old_share": 8.563791401302595,
+          "date": "2023-01-20",
+          "difference_initial_nav_bps": 36.88712200411126,
+          "nominal_value_difference": 0.0036887122004111263,
+          "note": "Issuer default terms",
+          "security": "BRBRMLACNOR9",
+          "signed_old_quantity": 0.012142262630667098,
+          "successor_quotes": [
+            17.399999618530273
+          ],
+          "synthetic_price": 8.260000228881836
+        },
+        {
+          "contractual_mark_per_old_share": 2.003749942779541,
+          "date": "2023-01-20",
+          "difference_initial_nav_bps": 128.02410834270728,
+          "nominal_value_difference": 0.012802410834270727,
+          "note": "Non-electing default; borrowed-share elections unresolved",
+          "security": "BRDMMOACNOR0",
+          "signed_old_quantity": 0.052522721389740484,
+          "successor_quotes": [
+            41.099998474121094
+          ],
+          "synthetic_price": 1.7599999904632568
+        },
+        {
+          "contractual_mark_per_old_share": 49.949997901916504,
+          "date": "2024-01-10",
+          "difference_initial_nav_bps": -1.0622470225091709e-13,
+          "nominal_value_difference": -1.0622470225091709e-17,
+          "note": "Two-share-class basket",
+          "security": "BRCPLECDAM13",
+          "signed_old_quantity": 6.248474039877798e-17,
+          "successor_quotes": [
+            9.1899995803833,
+            10.1899995803833
+          ],
+          "synthetic_price": 50.119998931884766
+        },
+        {
+          "contractual_mark_per_old_share": 5.89,
+          "date": "2024-09-09",
+          "difference_initial_nav_bps": 1.6656489051428164e-11,
+          "nominal_value_difference": 1.6656489051428165e-15,
+          "note": "Later-known redemption; not earlier model input",
+          "security": "BRCIELACNOR3",
+          "signed_old_quantity": 2.7760779786056844e-14,
+          "successor_quotes": [],
+          "synthetic_price": 5.829999923706055
+        }
+      ]
+    },
+    {
+      "book": "C:\\quant-data\\b3\\processed\\model_runs\\v2_opportunity_056aad2_20260917\\C6\\books\\flexible_net\\book.json",
+      "book_sha256": "55895e41aa965a3baa4608e37ecd5b18060c483bce59eebcba38f6982bb8b10e",
+      "difference_initial_nav_bps": 250.3292504949885,
+      "events": [
+        {
+          "contractual_mark_per_old_share": 8.563791401302595,
+          "date": "2023-01-20",
+          "difference_initial_nav_bps": 49.10972504372853,
+          "nominal_value_difference": 0.004910972504372853,
+          "note": "Issuer default terms",
+          "security": "BRBRMLACNOR9",
+          "signed_old_quantity": 0.01616561951171848,
+          "successor_quotes": [
+            17.399999618530273
+          ],
+          "synthetic_price": 8.260000228881836
+        },
+        {
+          "contractual_mark_per_old_share": 2.003749942779541,
+          "date": "2023-01-20",
+          "difference_initial_nav_bps": 178.64481471190015,
+          "nominal_value_difference": 0.017864481471190016,
+          "note": "Non-electing default; borrowed-share elections unresolved",
+          "security": "BRDMMOACNOR0",
+          "signed_old_quantity": 0.07329019473205672,
+          "successor_quotes": [
+            41.099998474121094
+          ],
+          "synthetic_price": 1.7599999904632568
+        },
+        {
+          "contractual_mark_per_old_share": 49.949997901916504,
+          "date": "2024-01-10",
+          "difference_initial_nav_bps": -0.02763240597900767,
+          "nominal_value_difference": -2.763240597900767e-06,
+          "note": "Two-share-class basket",
+          "security": "BRCPLECDAM13",
+          "signed_old_quantity": 1.6254257979593705e-05,
+          "successor_quotes": [
+            9.1899995803833,
+            10.1899995803833
+          ],
+          "synthetic_price": 50.119998931884766
+        },
+        {
+          "contractual_mark_per_old_share": 5.89,
+          "date": "2024-09-09",
+          "difference_initial_nav_bps": 22.6023431453388,
+          "nominal_value_difference": 0.00226023431453388,
+          "note": "Later-known redemption; not earlier model input",
+          "security": "BRCIELACNOR3",
+          "signed_old_quantity": 0.037670524008349894,
+          "successor_quotes": [],
+          "synthetic_price": 5.829999923706055
+        }
+      ]
+    },
+    {
+      "book": "C:\\quant-data\\b3\\processed\\model_runs\\v2_opportunity_056aad2_20260917\\TE_all\\books\\neutral\\book.json",
+      "book_sha256": "6a1c4f4533d203f0fb1b26b686b72baf25fea81ad88e012bda345f1ad701abe8",
+      "difference_initial_nav_bps": 69.43284033174767,
+      "events": [
+        {
+          "contractual_mark_per_old_share": 8.563791401302595,
+          "date": "2023-01-20",
+          "difference_initial_nav_bps": 42.175685230881534,
+          "nominal_value_difference": 0.004217568523088153,
+          "note": "Issuer default terms",
+          "security": "BRBRMLACNOR9",
+          "signed_old_quantity": 0.013883117437154188,
+          "successor_quotes": [
+            17.399999618530273
+          ],
+          "synthetic_price": 8.260000228881836
+        },
+        {
+          "contractual_mark_per_old_share": 2.003749942779541,
+          "date": "2023-01-20",
+          "difference_initial_nav_bps": 31.690544591430925,
+          "nominal_value_difference": 0.0031690544591430926,
+          "note": "Non-electing default; borrowed-share elections unresolved",
+          "security": "BRDMMOACNOR0",
+          "signed_old_quantity": 0.0130012516065275,
+          "successor_quotes": [
+            41.099998474121094
+          ],
+          "synthetic_price": 1.7599999904632568
+        },
+        {
+          "contractual_mark_per_old_share": 49.949997901916504,
+          "date": "2024-01-10",
+          "difference_initial_nav_bps": -4.433389490577247,
+          "nominal_value_difference": -0.0004433389490577247,
+          "note": "Two-share-class basket",
+          "security": "BRCPLECDAM13",
+          "signed_old_quantity": 0.0026078603708488924,
+          "successor_quotes": [
+            9.1899995803833,
+            10.1899995803833
+          ],
+          "synthetic_price": 50.119998931884766
+        },
+        {
+          "contractual_mark_per_old_share": 5.89,
+          "date": "2024-09-09",
+          "difference_initial_nav_bps": 1.2465044859082903e-11,
+          "nominal_value_difference": 1.2465044859082903e-15,
+          "note": "Later-known redemption; not earlier model input",
+          "security": "BRCIELACNOR3",
+          "signed_old_quantity": 2.0775048348298242e-14,
+          "successor_quotes": [],
+          "synthetic_price": 5.829999923706055
+        }
+      ]
+    },
+    {
+      "book": "C:\\quant-data\\b3\\processed\\model_runs\\v2_opportunity_056aad2_20260917\\TE_all\\books\\flexible_net\\book.json",
+      "book_sha256": "f7788c5d8af92ee35b1222e1abdf343f62686d5aee6787354383db065a54905f",
+      "difference_initial_nav_bps": 261.9664980142874,
+      "events": [
+        {
+          "contractual_mark_per_old_share": 8.563791401302595,
+          "date": "2023-01-20",
+          "difference_initial_nav_bps": 53.40714306307471,
+          "nominal_value_difference": 0.0053407143063074715,
+          "note": "Issuer default terms",
+          "security": "BRBRMLACNOR9",
+          "signed_old_quantity": 0.017580215592671793,
+          "successor_quotes": [
+            17.399999618530273
+          ],
+          "synthetic_price": 8.260000228881836
+        },
+        {
+          "contractual_mark_per_old_share": 2.003749942779541,
+          "date": "2023-01-20",
+          "difference_initial_nav_bps": 193.01399309635235,
+          "nominal_value_difference": 0.019301399309635234,
+          "note": "Non-electing default; borrowed-share elections unresolved",
+          "security": "BRDMMOACNOR0",
+          "signed_old_quantity": 0.07918524342761794,
+          "successor_quotes": [
+            41.099998474121094
+          ],
+          "synthetic_price": 1.7599999904632568
+        },
+        {
+          "contractual_mark_per_old_share": 49.949997901916504,
+          "date": "2024-01-10",
+          "difference_initial_nav_bps": -4.552868310941999,
+          "nominal_value_difference": -0.0004552868310942,
+          "note": "Two-share-class basket",
+          "security": "BRCPLECDAM13",
+          "signed_old_quantity": 0.002678141604078514,
+          "successor_quotes": [
+            9.1899995803833,
+            10.1899995803833
+          ],
+          "synthetic_price": 50.119998931884766
+        },
+        {
+          "contractual_mark_per_old_share": 5.89,
+          "date": "2024-09-09",
+          "difference_initial_nav_bps": 20.098230165802384,
+          "nominal_value_difference": 0.0020098230165802385,
+          "note": "Later-known redemption; not earlier model input",
+          "security": "BRCIELACNOR3",
+          "signed_old_quantity": 0.033497007682689615,
+          "successor_quotes": [],
+          "synthetic_price": 5.829999923706055
+        }
+      ]
+    }
+  ],
+  "definition": "Signed contractual cash plus exact same-date successor marks minus generic settlement mark, on original recorded quantity",
+  "limitations": [
+    "No changed inventory or policy path",
+    "No payment-delay financing or fees adjustment",
+    "No asserted successor sale",
+    "ALLOS and ISA excluded pending permanent identity proof",
+    "Borrow elections unresolved",
+    "Other unverified events remain"
+  ],
+  "not_a_corrected_replay": true,
+  "primary_sources_sha256": "1d9cec3ee72d68a59787eab008154b8f91b572021d1ad7bbb76a1fc3353aa2b2",
+  "store": {
+    "manifest_sha256": "61149d43a23fc55fcd92b43aaa4e74d747fbdf62f852bedbbbdb2cf18281f3cc",
+    "root": "C:\\quant-data\\b3\\processed\\v2_data_store_2d59b9d_20260913T211700Z"
+  }
+}

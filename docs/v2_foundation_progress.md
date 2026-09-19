@@ -375,3 +375,23 @@ Do not conclude that settlement accounting is fixed, nor compare cumulative gros
 notional directly to daily return. Next identify material event rows and quantify
 contractual-event differences or explicit unresolved sensitivities, then consolidate
 reports and recovery. Primary-source events and identity audit remain applicable.
+
+### Bounded contractual valuation sensitivity (2026-09-19 08:49 UTC)
+
+Compared verified Cielo, brMalls, Dommo default and Copel basket terms against each
+recorded generic settlement price, using signed original quantities and exact
+same-session successor quotes. No stale-price interpolation. Results are in
+`v2_foundation_settlement_marks.json`; source script and receipt remain in ROOT.
+Earlier continuous books' nominal differences / INITIAL NAV are +164.911 bps C6
+neutral, +250.329 C6 flexible, +69.433 TE neutral, +261.966 TE flexible. These are
+cumulative mark differences, NOT daily bps, corrected profits, or hypothetical
+actual fills. Financing/payment timing, changed inventory/policy paths, delivery,
+borrow elections and other unverified events are not included. ALLOS/ISA identity
+succession remains explicitly unresolved. This quantifies source confidence without
+silently modifying sealed accounts or allowing later-known cash into features.
+
+For final reporting separate completed bounded sensitivity from unresolved full
+contractual-account integration. No model is deployment-ready. Remaining closeout:
+consolidated metrics/report, complete branch/timing ledger, verify recoverable
+archive on D, canonical pointer/context and GitHub checks. Do not claim an exact
+corrected settlement backtest; this program has not produced one.
