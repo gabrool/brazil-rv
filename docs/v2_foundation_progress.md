@@ -273,3 +273,20 @@ residual invariant tests pass, including known-zero-age versus missing separatio
 Next: chronological per-head target/rank construction, fitting and prior-selection
 strength driver, source-bound saved predictions, then original-neutral economic
 readouts. No residual outcome has been computed yet.
+
+### Residual screen dispatched (2026-09-19 07:21 UTC)
+
+Implemented chronological per-head residual ranks with label maturity strictly
+before the next window; preserved per-head masks and every eligible prediction.
+Four fixed cells (ridge/tree x score-only/rich), three seeds, F2/F6/F10/F14 now
+run on CPU. First ridge score-only F2/seed11 completed; no startup errors.
+Source 19872de, worker receipt ROOT/residual_worker.json, logs residual.stdout.log
+and residual.stderr.log, results ROOT/residual/{cell}/{fold}_seed_{seed}.
+
+The active worker imports source once and captures its source binding. Resume
+from clean detached C:/quant/brazil-rv-foundation-residual-19872de with PYTHONPATH
+pointing to that worktree/research/src and the shared research environment, not
+from later main. Three targeted helper tests pass; full per-fold runs additionally
+enforce anchor matching and store target capabilities. After completion audit
+selected strengths/iterations and saved forecasts, build matched C6 economic
+readouts and registered comparisons. Accounting and final archival work remain.
