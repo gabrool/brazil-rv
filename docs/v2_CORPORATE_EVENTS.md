@@ -115,8 +115,8 @@ physically returning borrowed stock.
 
 ## Remaining source admission
 
-Complete the DMMO lender-election/default distinction, CPLE multi-asset issuer
-principal allocation and delayed credit, ALLOS/ISA dated identity transitions, then
+Complete the DMMO lender-election/default distinction, bound the admitted Copel
+loan allocation in actual model books, propagate ALLOS/ISA dated identity transitions, then
 remaining exposed events. The archived Dommo B3 circular specifies that the lender
 chooses PNB; the borrower cannot pick the cheapest consideration afterward. Preserve
 every eligible security and signed obligation. Unknown terms require a documented
@@ -156,3 +156,66 @@ and every auxiliary join still need propagation and verification in Stage B.
 Stock-loan aliases require separate dated handling: the BDI can continue publishing
 predecessor loan codes after spot trading has renamed. The equity continuation does
 not silently relabel lending sources or assert a loan conversion/renewal date.
+
+
+## Copel units: sourced shares and bounded loan allocation
+
+The December 18 issuer notice binds CPLE11 / BRCPLECDAM13 (axis 262) to one
+CPLE3 / BRCPLEACNOR8 (259) and four CPLE6 / BRCPLEACNPB9 (261). December 22
+is the last unit trading day; December 26, 2023 is the economic split and
+December 28 is custody credit. The accounting amendment preserves those dates,
+original market observations and all model coordinates. No new fractional shares
+arise from an integer unit. The normal research order quantities remain continuous.
+Coverage gains 254 cells, including six eligible unit-days, on the existing axes.
+
+The B3 manual specifies issuer factors for allocating original loan principal
+across multiple assets. We have not recovered Copel's issuer K. The account now
+requires explicit fractions summing to one and no longer substitutes constituent
+market values for that contractual allocation. The reference is an openly labelled
+20% ON / 80% PN research assumption, with the entire 0%-100% ON allocation range
+as a one-factor sensitivity. Original total principal, rate and accrued charges
+are preserved. Inventory cost basis/proceeds retain their separate causal
+market-value allocation. Conversion at the night preceding December 28 custody
+is an inference from the general manual and the issuer credit date; a one-session
+timing range remains to be assessed along with prearranged presettlement disposal.
+This is a bounded accounting amendment, not a claim to have recovered exact K.
+
+`ops/verify_copel_replay.py` checks 36 actual-calendar cases: R$1m/R$5m/R$10m,
+long/short 4% predetermined positions, same-day versus one-session-later ON disposal,
+and 0%/20%/100% ON principal. Both accounts and independent original-reference
+cash-flow formulas agree. At R$10m the original short principal is
+R$395,131.69237921346, using the causal published-average R$49.51. With both
+returns on January 3, rent at 4% annual is R$307.606711497966 for every K.
+Delaying the ON return to January 4 gives a full allocation-range rent span of
+R$61.5500726458255, or 0.0615501 bp of initial NAV over that prescribed path;
+the reference rent is R$319.91672602713106. This is not a daily model improvement
+or a bound for an adaptive policy. Model replays still need those sensitivities.
+The arithmetic oracle uses zero execution/B3 fees and CDI to isolate the new
+contract; the registered corporate account cost assumptions are unchanged.
+
+## Additional Dommo receipts and remaining distinct obligations
+
+`v2_dommo_source_terms.json` binds two newly recovered original CVM notices:
+March 17 auction scheduling (protocol 1074297) and March 30 result (1080446).
+They confirm that the PRIO shareholder fractions remain until the March 29 auction;
+its amount becomes available for our decisions March 31. The printed result is
+approximately R$31.94031 per share (R$565,024 / 17,690). The March 30 notice gives
+five business days from that notice, an April 6 deadline, superseding the earlier
+tentative April 5 deadline. Do not backdate the auction value to January or mistake
+option/warrant fractions for ordinary PRIO share fractions.
+
+The default PNA case is .0375 PRIO plus R$.4625 per DMMO: January 9 economic
+conversion, January 11 custody, January 17 cash. A qualifying lender's PNB election
+was due December 26 at 16:00 and applied to the whole loan. That loan's quantity
+was extinguished December 26, with rent through that day paid December 28, and a
+separate redemption liability paid January 13. The January 6 final R$1.90432468607
+must not be backdated into December valuation. This path needs causal accrued CDI
+and separate liability/payment handling. The borrower cannot choose it afterward.
+The B3 circular also provisions PNA loan fractions; BRML's special retention of
+fractional loan shares cannot automatically be applied to Dommo. These recovered
+terms are not yet admitted to the accounts.
+
+The CVM 2023 delivery index currently names this CNPJ PRIO FORTE. Source retrieval
+therefore used CNPJ 08.926.302/0001-05 / CVM 23493 and the dated issuer document,
+not an assumed historical company name. This is a useful identity-audit boundary;
+the index's current name must not become a point-in-time model attribute.

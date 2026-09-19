@@ -118,13 +118,16 @@ not change the accepted fills, dates, eligible population or training budget.
    legal loan maturity, or a broker renewal toll. The B3 contract permits at most
    two years, so unresolved long-lived inventory needs explicit treatment before
    historical admission.
-3. Admit each corporate case's loan terms. Present basket transfers allocate loan
-   principal using the same marked constituent proportions as inventory and preserve
-   contracted rates. This is a declared intermediate assumption, not proof of B3's
-   treatment. Existing-listed successor mechanics are covered; nested actions,
+3. Admit each corporate case's loan terms. Basket transfers now require explicit
+   loan principal fractions that sum to one, independently of market-value allocation
+   of inventory cost basis and proceeds. Original principal/rate survive staged
+   delivery and returns. Copel's unquoted issuer allocation uses the explicitly
+   labelled 20% ON / 80% PN research case and the full 0%-100% ON sensitivity;
+   it is not a recovered contractual K. Existing-listed successor mechanics are covered; nested actions,
    unavailable successor marks, loan obligations during a delivery interval,
    fractional entitlements and event-specific cash/loan settlements need evidence.
-   No historical corporate case has been admitted by this implementation.
+   Cielo and BR Malls have source amendments; Copel's shares/custody are sourced
+   with a separately bounded loan-allocation assumption. These do not finish A.
 4. Check minimum billing at partial returns and old/new tariff transitions against
    invoices/manual terms. Current calculations use continuous float64 currency for
    differentiability, rather than invoice cent truncation. Measure/bound these small

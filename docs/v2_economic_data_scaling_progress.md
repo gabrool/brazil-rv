@@ -781,3 +781,55 @@ duplicated. `brmalls_custody_recovery.json` is bound by the run pointer. ZIP SHA
 `b6393f8f6d4747a84cfb7eb20e7553a8e41fc8b66899fb211530af2142ce4e3c`.
 Acceptance SHA-256:
 `e8ef32f90f97ed6f55d716c7bc706bed922d330106801d03c284c0315de498ff`.
+
+
+## Copel accounting admission and recovered Dommo fraction notices (September 19)
+
+The run pointer now resolves `corporate_replay/copel_manifest.json` (schema V3,
+SHA `6af736a991fbf14a9a986de86c5cd5996b785fcd8332ee1874da563f98c6adc3`).
+Cielo/BRML terms remain, with one canonical leg representation shared by single
+and multi-leg distributions. Copel delivers one ON plus four PN per unit on
+December 28 after December 26 economic succession. The coverage amendment adds
+254 cells/six eligible cells; total amendments now cover 834 cells/18 eligible.
+Accepted quotes, eligibility, model features/targets and serialized static policy
+coordinates are unchanged. No new model store or neural fit has been created.
+
+Evaluation V27 binds explicit loan principal fractions, which must sum to one.
+Both accounts allocate original loan principal/rent independently of market-value
+inventory basis/proceeds. The unquoted Copel issuer K is openly bounded using a
+20%/80% reference and 0%/100% ON endpoint sensitivities; it is not represented as
+an obtained contractual term. Original total principal/rate and partial-return
+liabilities remain intact, including zero-principal endpoint legs. This replaces
+the earlier marked-value loan allocation, without a legacy parallel path.
+
+`v2_copel_replay_acceptance.json` binds 36 prescribed full-axis historical oracles
+at R$1m/R$5m/R$10m. Both accounts agree exactly and match closed-form cash/rent.
+When both legs return January 3, K has no effect. With ON returned January 4,
+its entire allocation-range rent span is R$61.55 at R$10m (0.06155 bp NAV over
+the prescribed path). These are mechanics/sensitivity figures, not daily alpha.
+The oracle took 1.62 seconds. Four new allocation tests cover endpoint conservation,
+staggered delivery/returns, rejection of unstated multi-leg allocations and analytic
+gradients. The affected account/claim/policy/objective/evaluation batch passed 145
+tests in 42.92 seconds. Initial new fixtures needed a missing annual-rate argument
+and float64 scalar conversion; no production financial mismatch was concealed.
+Ruff and diff checks passed. No old stress benchmark or completed census was repeated.
+
+Recovered Dommo's March 17/30 original fraction notices through the public CVM
+2023 IPE index; both were visually checked and preserved on D. The March 30 result
+changes the tentative payment deadline to April 6, with March 31 recognition of
+the later-known price. `v2_dommo_source_terms.json` binds these and the earlier
+loan/payment sources. It also records why PNB requires December quantity extinction,
+December28 rent payment and a separately valued January13 liability, rather than
+reusing Cielo immediate cash closeout. Default PNA loan fractions need their own
+provisioned-cash treatment, unlike BRML's special fractional loans. No Dommo event
+was silently applied. Its CVM index now displays PRIO FORTE: use CNPJ/CVM plus dated
+original issuer text, never that current display name as historical identity.
+
+The registration was reread. A/B remain incomplete and C/D unstarted. Next prioritize
+Dommo's distinct loan liability/fraction terms, finite loan lifecycle and
+presettlement execution bounds; use independent CPU work for the full deep audit
+and actual propagation of the accepted identity links. Nine of ten current auxiliary
+family parquets carry a decision date and field ages but not original timestamps;
+trace their bound upstream sources rather than treating these final parquet dates
+as proof of public availability. This schema inspection is not completion of B.
+Do not repeat the completed quote/lending censuses or passed mechanics checks.

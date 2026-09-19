@@ -77,7 +77,7 @@ def apply_corporate_replay(inputs, terms, calendar, manifest_sha256):
     for event in terms.get("share_distributions", ()):
         if event["isin"] not in names:
             continue
-        if event["successor_isin"] not in names:
+        if any(leg["successor_isin"] not in names for leg in event["legs"]):
             raise ValueError("corporate replay is missing its contractual successor")
         name = names[event["isin"]]
         effective = session(event["effective_date"])
@@ -89,26 +89,34 @@ def apply_corporate_replay(inputs, terms, calendar, manifest_sha256):
             changed["action_session_resolved"][max(0, effective) :, name] = True
             if effective < 0:
                 initial[name] = False
-            auction = event["fractional_auction"]
+            legs = []
+            for leg in event["legs"]:
+                auction = leg.get("fractional_auction")
+                legs.append(
+                    ShareDelivery(
+                        names[leg["successor_isin"]],
+                        leg["shares_per_prior_share"],
+                        session(leg["delivery_date"]),
+                        None
+                        if auction is None
+                        else FractionAuction(
+                            session(auction["available_date"]),
+                            auction["cash_per_share"],
+                            session(auction["payment_date"]),
+                        ),
+                        leg["loan_principal_fraction"],
+                    )
+                )
             distributions.append(
                 ShareDistribution(
                     source_index=name,
                     effective_session=effective,
                     available_session=session(event["available_date"]),
-                    legs=(
-                        ShareDelivery(
-                            names[event["successor_isin"]],
-                            event["shares_per_prior_share"],
-                            session(event["delivery_date"]),
-                            FractionAuction(
-                                session(auction["available_date"]),
-                                auction["cash_per_share"],
-                                session(auction["payment_date"]),
-                            ),
-                        ),
-                    ),
+                    legs=tuple(legs),
                     cash_per_prior_share=event["cash_per_prior_share"],
-                    payment_session=session(event["payment_date"]),
+                    payment_session=None
+                    if event["payment_date"] is None
+                    else session(event["payment_date"]),
                     source=source,
                 )
             )

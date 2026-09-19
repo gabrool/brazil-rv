@@ -1695,6 +1695,7 @@ def simulate_stateful_ledger(
         *,
         final,
         ratio,
+        loan_allocation=1.0,
     ):
         nonlocal free_cash, cancelled_today
         transferred_restricted = restricted_by_name[name] * allocation
@@ -1705,7 +1706,7 @@ def simulate_stateful_ledger(
         transferred_basis = entry_cost_basis[name] * allocation
         prior_destination = float(shares[successor])
         combined = prior_destination + float(new_shares)
-        loans.deliver(name, successor, ratio, allocation, final=final)
+        loans.deliver(name, successor, ratio, loan_allocation, final=final)
         custody_dates = custody.deliver(
             name, successor, ratio, new_shares, prior_destination, day, final=final
         )
@@ -1902,6 +1903,12 @@ def simulate_stateful_ledger(
                     float(last_observed[destination]),
                     final=len(legs) == 1,
                     ratio=leg.shares_per_prior_share,
+                    loan_allocation=(
+                        leg.loan_principal_fraction
+                        / sum(item.loan_principal_fraction for item in legs)
+                        if sum(item.loan_principal_fraction for item in legs) > 0
+                        else 1.0
+                    ),
                 )
                 if fraction > 0:
                     shares[name] = fraction / leg.shares_per_prior_share

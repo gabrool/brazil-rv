@@ -1,0 +1,41 @@
+{
+  "code_sha256_lf": {
+    "ops/admit_corporate_replay.py": "2ec6117df7a24065ff786f3fdb744a88ce06da43fa62fb183d0ea232ca0fb7ea",
+    "ops/verify_copel_replay.py": "fd9a273984d4a09428af5d7caa7b7640b28353c60e0cf1e3ad57cce9679f4c0e",
+    "research/src/brazil_rv/execution/portfolio_account.py": "be3ef3aab0e215bafaa5bfb67b099f65fbf0a3b86726e4fd34b147c2ee29f1ba",
+    "research/src/brazil_rv/execution/share_distributions.py": "b83b39bab99443c29465ded0731bb81725e58ab95540e7801146f031accbb706",
+    "research/src/brazil_rv/execution/stateful_ledger.py": "2846cd30c1d618dc996187a013fc4f6eb811602ca21655a9e425df8280241340",
+    "research/src/brazil_rv/v2/corporate_replay.py": "ad6848c8a066693d68fa962fd386d8b07ff9cb03927d5a277ca420335735a410",
+    "research/src/brazil_rv/v2/evaluate.py": "375b6864950c8ed02c6511769de6b4e3f1ce72e9c081d473036de0ff4e5f7f3c",
+    "research/tests/test_share_distributions.py": "ba00098a3fc6c6e1f59e4722d413499d426d271f50bcc54fd9c703f00164db1a"
+  },
+  "copel": {
+    "path": "docs\\v2_copel_replay_acceptance.json",
+    "sha256": "f3c79690011a0ca7af3bf252f6ed36f15b4e292c75ef17db3f5cc7b95eec6056"
+  },
+  "corporate_replay": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\corporate_replay\\copel_manifest.json",
+    "sha256": "6af736a991fbf14a9a986de86c5cd5996b785fcd8332ee1874da563f98c6adc3",
+    "status": "cielo_brmalls_copel_accounting_amendment_copel_loan_allocation_bounded"
+  },
+  "dommo_sources": {
+    "path": "docs\\v2_dommo_source_terms.json",
+    "sha256": "feb7483d455f9c77093814c1fdfc52725acabfbaa6c8f9d6e6c183777932ae50"
+  },
+  "previous_source_commit": "f2756205ad9199ad379c937062baabe0706676eb",
+  "remaining": "Copel K is an explicit bounded research allocation, not a quoted issuer value. Physical timing/presettlement route, Dommo loan/fraction paths, finite lifecycle and full deep audit remain. No corrected model performance or completed A/B/C/D claimed.",
+  "ruff": "passed",
+  "status": "explicit_multi_asset_loan_principal_and_copel_source_sensitivity_verified",
+  "tests": [
+    {
+      "passed": 145,
+      "scope": "claims/custody/accounts/ledger/policy/objective/evaluation affected tests; includes three endpoint closed-form/analytic-gradient cases and missing-allocation rejection",
+      "seconds": 42.92
+    },
+    {
+      "passed": 7,
+      "scope": "overlapping corporate source loader checks after fixture cleanup",
+      "seconds": 1.97
+    }
+  ]
+}

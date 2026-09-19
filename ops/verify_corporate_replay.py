@@ -191,6 +191,7 @@ def main():
             }
         )
     event = terms["share_distributions"][0]
+    event = {**event, **event["legs"][0]}
     source = full.security_ids.index(event["isin"])
     destination = full.security_ids.index(event["successor_isin"])
     rows = np.flatnonzero(

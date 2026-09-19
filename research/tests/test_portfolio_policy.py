@@ -184,8 +184,8 @@ def test_controller_reserves_delayed_claim_capacity_and_matches_actual_delivery(
         2,
         0,
         (
-            ShareDelivery((source + 1) % names, 0.4, 4),
-            ShareDelivery((source + 2) % names, 0.6, 5),
+            ShareDelivery((source + 1) % names, 0.4, 4, loan_principal_fraction=0.4),
+            ShareDelivery((source + 2) % names, 0.6, 5, loan_principal_fraction=0.6),
         ),
         "synthetic controller fixture",
     )

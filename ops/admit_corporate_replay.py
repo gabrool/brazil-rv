@@ -16,7 +16,7 @@ def main():
     pointer_path = PROJECT / "docs/v2_economic_data_scaling_run.json"
     pointer = json.loads(pointer_path.read_text())
     output = Path(pointer["root"]) / "corporate_replay"
-    path = output / "brmalls_manifest.json"
+    path = output / "copel_manifest.json"
     if path.exists():
         raise FileExistsError(path)
     binding = json.loads((PROJECT / "docs/v2_data_inputs.json").read_text())["store"]
@@ -57,6 +57,7 @@ def main():
         fraction,
         foundation["brmalls_schedule_20221219"],
         foundation["brmalls_delivery_20221219_mirror"],
+        foundation["copel_units_20231218"],
     ]
     for record in receipts:
         if sha256_file(Path(record["path"])) != record["sha256"]:
@@ -93,34 +94,38 @@ def main():
     # Source announcement after the market close on Sep23: recognize at the next
     # session, never retroactively at the August conversion or Sept23 decision.
     terms = {
-        "schema": "BRAZIL_RV_CORPORATE_REPLAY_V2",
+        "schema": "BRAZIL_RV_CORPORATE_REPLAY_V3",
         "store": binding,
-        "status": "cielo_and_brmalls_admitted_accounting_only_other_cases_pending",
+        "status": "cielo_brmalls_copel_accounting_amendment_copel_loan_allocation_bounded",
         "supersedes": pointer["corporate_replay"],
         "share_distributions": [
             {
                 "isin": "BRBRMLACNOR9",
-                "successor_isin": "BRALSOACNOR5",
                 "available_date": "2023-01-04",
                 "effective_date": "2023-01-09",
                 "last_trade_date": "2023-01-06",
                 "loan_conversion_close_date": "2023-01-10",
-                "delivery_date": "2023-01-11",
                 "payment_date": "2023-01-20",
-                "shares_per_prior_share": 0.398551577675763,
                 "cash_per_prior_share": 1.62899410177968,
-                "loan_principal_allocation": 1.0,
                 "loan_conversion_convention": "Jan10 close represented at Jan11 opening before new decisions; unchanged principal/rate across that zero-session boundary; no daily repricing",
                 "cash_basis": "announced final amount already includes projected CDI to Jan13; no additional invented Jan13-Jan20 correction",
-                "fractional_auction": {
-                    "auction_date": "2023-01-24",
-                    "announcement_date": "2023-01-25",
-                    "available_date": "2023-01-26",
-                    "payment_date": "2023-02-02",
-                    "cash_per_share": 17.694416,
-                    "payment_convention": "issuer's by-Feb2 deadline; no invented earlier sweep; bound earliest known Jan26 receipt separately",
-                    "basis": "whole shareholder shares delivered; residual remains marked non-tradable successor claim until next-session recognition of auction result; fractional loan quantities retained",
-                },
+                "legs": [
+                    {
+                        "successor_isin": "BRALSOACNOR5",
+                        "delivery_date": "2023-01-11",
+                        "shares_per_prior_share": 0.398551577675763,
+                        "loan_principal_fraction": 1.0,
+                        "fractional_auction": {
+                            "auction_date": "2023-01-24",
+                            "announcement_date": "2023-01-25",
+                            "available_date": "2023-01-26",
+                            "payment_date": "2023-02-02",
+                            "cash_per_share": 17.694416,
+                            "payment_convention": "issuer's by-Feb2 deadline; no invented earlier sweep; bound earliest known Jan26 receipt separately",
+                            "basis": "whole shareholder shares delivered; residual remains marked non-tradable successor claim until next-session recognition of auction result; fractional loan quantities retained",
+                        },
+                    }
+                ],
             }
         ],
         "calendar": {
@@ -157,11 +162,52 @@ def main():
         "unchanged": "model features, scores, targets, eligibility, raw quotes and accepted store",
         "pending_cases": [
             "DMMO",
-            "CPLE",
             "ALLOS/ISA identity audit",
             "other exposed events",
         ],
     }
+    copel = isins.index("BRCPLECDAM13")
+    quoted = np.isfinite(prices[:, copel]) & (prices[:, copel] > 0)
+    if str(calendar[np.flatnonzero(quoted)[-1]]) != "2023-12-22":
+        raise ValueError("Copel unit terminal quote differs from issuer schedule")
+    preceding = np.searchsorted(calendar, np.datetime64("2023-12-26")) - 1
+    for isin in ["BRCPLEACNOR8", "BRCPLEACNPB9"]:
+        if not np.isfinite(prices[preceding, isins.index(isin)]):
+            raise ValueError("Copel constituent lacks a causal existing-listing mark")
+    terms["share_distributions"].append(
+        {
+            "isin": "BRCPLECDAM13",
+            "available_date": "2023-12-19",
+            "effective_date": "2023-12-26",
+            "last_trade_date": "2023-12-22",
+            "cash_per_prior_share": 0.0,
+            "payment_date": None,
+            "legs": [
+                {
+                    "successor_isin": "BRCPLEACNOR8",
+                    "delivery_date": "2023-12-28",
+                    "shares_per_prior_share": 1.0,
+                    "loan_principal_fraction": 0.2,
+                },
+                {
+                    "successor_isin": "BRCPLEACNPB9",
+                    "delivery_date": "2023-12-28",
+                    "shares_per_prior_share": 4.0,
+                    "loan_principal_fraction": 0.8,
+                },
+            ],
+            "loan_principal_allocation_basis": "explicit research allocation per underlying share; issuer K not recovered; NOT a source-verified contractual allocation",
+            "loan_principal_allocation_sensitivity": {
+                "on_fraction": [0.0, 1.0],
+                "pn_fraction": "1 - on_fraction",
+                "scope": "entire admissible allocation interval; original total principal/rate retained; report cost and admission sensitivity before interpreting model results",
+            },
+            "loan_conversion_convention": "night processing preceding Dec28 custody, represented at Dec28 opening; inferred from manual and issuer credit, not a dated loan instruction",
+            "loan_conversion_timing_sensitivity": "one session either side; same total principal/rate until physically deliverable offsets",
+            "custody_disposal": "reference waits for credit; prearranged Dec26-Dec27 disposal settling after credit remains a separate execution sensitivity",
+            "fraction_convention": "1 ON plus 4 PN per unit creates no new entitlement fractions for integer units; regular research fills remain continuous as elsewhere",
+        }
+    )
     output.mkdir(exist_ok=True)
     digest = write_json_atomic(path, terms)
     pointer["corporate_replay"] = {

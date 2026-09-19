@@ -30,6 +30,7 @@ class ShareDelivery:
     shares_per_prior_share: float
     delivery_session: int | None
     fractional_auction: FractionAuction | None = None
+    loan_principal_fraction: float = 1.0
 
 
 @dataclass(frozen=True)
@@ -55,6 +56,14 @@ class ShareDistribution:
     def __post_init__(self):
         if not self.legs or not self.source:
             raise ValueError("share distributions require legs and source evidence")
+        if any(
+            not math.isfinite(leg.loan_principal_fraction)
+            or not 0 <= leg.loan_principal_fraction <= 1
+            for leg in self.legs
+        ) or not math.isclose(
+            sum(leg.loan_principal_fraction for leg in self.legs), 1, abs_tol=1e-12
+        ):
+            raise ValueError("loan principal fractions must be explicit and sum to one")
         if self.available_session > self.effective_session:
             raise ValueError("later-known distribution terms cannot be backdated")
         if (

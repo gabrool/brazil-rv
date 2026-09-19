@@ -207,6 +207,12 @@ class PortfolioAccount:
                     final=len(legs) == 1,
                     day=day,
                     ratio=leg.shares_per_prior_share,
+                    loan_allocation=(
+                        leg.loan_principal_fraction
+                        / sum(item.loan_principal_fraction for item in legs)
+                        if sum(item.loan_principal_fraction for item in legs) > 0
+                        else 1.0
+                    ),
                 )
                 if fraction.detach().item() > 0:
                     shares, basis = self.shares.clone(), self.cost_basis.clone()
@@ -310,6 +316,7 @@ class PortfolioAccount:
         final,
         day,
         ratio,
+        loan_allocation=1.0,
     ):
         shares, marks = self.shares.clone(), self.marks.clone()
         transferred_restricted = self.trade_restricted[name] * allocation
@@ -324,7 +331,7 @@ class PortfolioAccount:
         transferred_basis = self.cost_basis[name] * allocation
         existing = self.shares[destination]
         combined = incoming + existing
-        self.loans.deliver(name, destination, ratio, allocation, final=final)
+        self.loans.deliver(name, destination, ratio, loan_allocation, final=final)
         custody_dates = self.custody.deliver(
             name, destination, ratio, incoming, existing, day, final=final
         )

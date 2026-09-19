@@ -1,0 +1,135 @@
+{
+  "default_PNA": {
+    "cash_payment": "2023-01-17",
+    "cash_per_share": 0.4625,
+    "custody": "2023-01-11",
+    "effective": "2023-01-09",
+    "last_trade": "2023-01-06",
+    "payment_schedule_known_from": "2023-01-09",
+    "ratio": 0.0375
+  },
+  "fractions": {
+    "announcement": "2023-03-30",
+    "auction": "2023-03-29",
+    "available": "2023-03-31",
+    "interpretation": "March30 notice states five business days from that notice, superseding tentative March17 schedule; exact custodian sweep unknown; retain marked claims until recognition and bound funding timing",
+    "printed_cash_is_approximate": true,
+    "printed_cash_per_share": 31.94031,
+    "prior_deadline": "2023-04-05",
+    "ratio_total_per_share": 31.940305257207463,
+    "total_brl": 565024.0,
+    "updated_deadline": "2023-04-06",
+    "whole_auction_shares": 17690
+  },
+  "identity": {
+    "cnpj": "08.926.302/0001-05",
+    "cvm_code": "23493",
+    "source_axis": 313,
+    "source_isin": "BRDMMOACNOR0",
+    "successor_axis": 667,
+    "successor_isin": "BRPRIOACNOR1"
+  },
+  "ipe_index": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\primary_sources\\ipe_cia_aberta_2023.zip",
+    "retrieved_utc": "2026-09-19T20:47:20.252553+00:00",
+    "sha256": "ef1093983df55399b8ec02255eaa822d941ea797f881d00b8f61f23fb63fb1b0",
+    "url": "https://dados.cvm.gov.br/dados/CIA_ABERTA/DOC/IPE/DADOS/ipe_cia_aberta_2023.zip"
+  },
+  "lender_elected_PNB": {
+    "earlier_value_basis": "1.85 plus causal accrued CDI from approving AGE; do not backdate Jan6 final amount; Jan13 liability is separate from Dec28 rent",
+    "election_deadline": "2022-12-26T16:00:00-03:00",
+    "final_cash_available": "2023-01-09",
+    "final_cash_per_share": 1.90432468607,
+    "loan_quantity_zero_at": "2022-12-26 close",
+    "redemption_payment": "2023-01-13",
+    "rent_payment": "2022-12-28",
+    "rent_through": "2022-12-26",
+    "scope": "whole eligible lender contract, active without early return and maturity after Dec26; not borrower choice"
+  },
+  "model_predictions_or_heldout_data_read": false,
+  "pit_caution": "CVM IPE current catalog displays PRIO FORTE for 2023 Dommo documents; identify with CNPJ/CVM and dated original issuer text, not this current name",
+  "remaining": [
+    "PNA fractional loan treatment differs from BRML special rule; source says fractions provisioned, do not blindly retain all as tradable loan shares",
+    "PNB requires separate quantity extinction, accrued liability, rent payment and cash payment with causal amount",
+    "presettlement disposal and loan conversion night require source or bounded assumptions"
+  ],
+  "sources": [
+    {
+      "bytes": 119298,
+      "mime": "application/pdf",
+      "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_foundation_d21a93a_20260918\\primary_sources\\dommo_borrow_b3_20221220.pdf",
+      "resolved_url": "https://www.b3.com.br/data/files/C6/01/2D/98/58135810F534EB48AC094EA8/OC%20188-2022%20PRE%20%20DMMO%20%28PT%29.pdf",
+      "retrieved_at": "2026-09-18T22:28:52.580641+00:00",
+      "sha256": "c715e3bb9ad6480c44bdb85e3b47076c31ae68ba683eb220637f06a896dad062",
+      "url": "https://www.b3.com.br/data/files/C6/01/2D/98/58135810F534EB48AC094EA8/OC%20188-2022%20PRE%20%20DMMO%20%28PT%29.pdf"
+    },
+    {
+      "bytes": 139958,
+      "mime": "application/pdf",
+      "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_foundation_d21a93a_20260918\\primary_sources\\dommo_payment_20230106.pdf",
+      "resolved_url": "https://api.mziq.com/mzfilemanager/v2/d/848ef34b-7dd8-49fe-b128-ac48ffa6bf38/a180c284-337c-1a35-bbd2-6a062ffbb28b",
+      "retrieved_at": "2026-09-18T22:19:55.232240+00:00",
+      "sha256": "7555ff6a80180276b827dea941434d99232fcc1c726ec54ea2aec3905acdbe6e",
+      "url": "https://api.mziq.com/mzfilemanager/v2/d/848ef34b-7dd8-49fe-b128-ac48ffa6bf38/a180c284-337c-1a35-bbd2-6a062ffbb28b",
+      "verified_document_date": "2023-01-06"
+    },
+    {
+      "bytes": 149453,
+      "mime": "text/html; charset=UTF-8",
+      "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_foundation_d21a93a_20260918\\primary_sources\\dommo_options_20221216.html",
+      "resolved_url": "https://mzgroup.com.br/fatosrelevantes/fato-relevante-periodo-de-opcao-procedimentos-e-data-de-fechamento/",
+      "retrieved_at": "2026-09-18T22:20:56.497008+00:00",
+      "sha256": "bfc6efc31bde073a0fe21b1dd06456fd352f3b6e2e390263c49b8a26224817e0",
+      "url": "https://mzgroup.com.br/fatosrelevantes/fato-relevante-periodo-de-opcao-procedimentos-e-data-de-fechamento/"
+    },
+    {
+      "bytes": 120620,
+      "cvm_ipe_row": {
+        "Assunto": "DATA DO LEILÃO DE FRAÇÕES APÓS INCORPORAÇÃO DE AÇÕES",
+        "CNPJ_Companhia": "08.926.302/0001-05",
+        "Categoria": "Comunicado ao Mercado",
+        "Codigo_CVM": "23493",
+        "Data_Entrega": "2023-03-17",
+        "Data_Referencia": "2023-03-17",
+        "Especie": "",
+        "Link_Download": "https://www.rad.cvm.gov.br/ENET/frmDownloadDocumento.aspx?Tela=ext&descTipo=IPE&CodigoInstituicao=1&numProtocolo=1074297&numSequencia=599027&numVersao=1",
+        "Nome_Companhia": "PRIO FORTE S.A.",
+        "Protocolo_Entrega": "023493IPE170320230104500211-04",
+        "Tipo": "Outros Comunicados Não Considerados Fatos Relevantes",
+        "Tipo_Apresentacao": "AP - Apresentação",
+        "Versao": "1"
+      },
+      "id": "dommo_fraction_schedule_20230317",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\primary_sources\\dommo_fraction_schedule_20230317.pdf",
+      "resolved_url": "https://www.rad.cvm.gov.br/ENETWeb/frmDownloadDocumento.aspx?Tela=ext&descTipo=IPE&CodigoInstituicao=1&numProtocolo=1074297&numSequencia=599027&numVersao=1",
+      "retrieved_utc": "2026-09-19T20:47:46.926606+00:00",
+      "sha256": "b1dda7fd6301349086af8e61f6317e97ec5356d0106d16232f720222c2ff9e35",
+      "url": "https://www.rad.cvm.gov.br/ENETWeb/frmDownloadDocumento.aspx?Tela=ext&descTipo=IPE&CodigoInstituicao=1&numProtocolo=1074297&numSequencia=599027&numVersao=1"
+    },
+    {
+      "bytes": 124290,
+      "cvm_ipe_row": {
+        "Assunto": "RESULTADO DO LEILÃO DE FRAÇÕES DE AÇÕES",
+        "CNPJ_Companhia": "08.926.302/0001-05",
+        "Categoria": "Comunicado ao Mercado",
+        "Codigo_CVM": "23493",
+        "Data_Entrega": "2023-03-30",
+        "Data_Referencia": "2023-03-30",
+        "Especie": "",
+        "Link_Download": "https://www.rad.cvm.gov.br/ENET/frmDownloadDocumento.aspx?Tela=ext&descTipo=IPE&CodigoInstituicao=1&numProtocolo=1080446&numSequencia=605175&numVersao=1",
+        "Nome_Companhia": "PRIO FORTE S.A.",
+        "Protocolo_Entrega": "023493IPE300320230104501511-70",
+        "Tipo": "Outros Comunicados Não Considerados Fatos Relevantes",
+        "Tipo_Apresentacao": "AP - Apresentação",
+        "Versao": "1"
+      },
+      "id": "dommo_fraction_result_20230330",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\primary_sources\\dommo_fraction_result_20230330.pdf",
+      "resolved_url": "https://www.rad.cvm.gov.br/ENETWeb/frmDownloadDocumento.aspx?Tela=ext&descTipo=IPE&CodigoInstituicao=1&numProtocolo=1080446&numSequencia=605175&numVersao=1",
+      "retrieved_utc": "2026-09-19T20:47:47.305804+00:00",
+      "sha256": "c1efb5e9f158193ab921e36549cc3e7345ba4662e8d1fed363adb485f5b7631e",
+      "url": "https://www.rad.cvm.gov.br/ENETWeb/frmDownloadDocumento.aspx?Tela=ext&descTipo=IPE&CodigoInstituicao=1&numProtocolo=1080446&numSequencia=605175&numVersao=1"
+    }
+  ],
+  "status": "additional_primary_terms_recovered_not_yet_admitted_to_accounts"
+}

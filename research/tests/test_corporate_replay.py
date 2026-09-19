@@ -188,18 +188,23 @@ def test_distribution_admission_keeps_source_and_later_fraction_clocks_separate(
     terms["share_distributions"] = [
         {
             "isin": data.inputs.security_ids[0],
-            "successor_isin": data.inputs.security_ids[1],
             "effective_date": str(calendar[2]),
             "available_date": str(calendar[1]),
-            "delivery_date": str(calendar[4]),
-            "shares_per_prior_share": 0.5,
             "cash_per_prior_share": 3.0,
             "payment_date": str(calendar[7]),
-            "fractional_auction": {
-                "available_date": str(calendar[6]),
-                "payment_date": str(calendar[8]),
-                "cash_per_share": 20,
-            },
+            "legs": [
+                {
+                    "successor_isin": data.inputs.security_ids[1],
+                    "delivery_date": str(calendar[4]),
+                    "shares_per_prior_share": 0.5,
+                    "loan_principal_fraction": 1.0,
+                    "fractional_auction": {
+                        "available_date": str(calendar[6]),
+                        "payment_date": str(calendar[8]),
+                        "cash_per_share": 20,
+                    },
+                }
+            ],
         }
     ]
     revised = apply_corporate_replay(data.inputs, terms, calendar, "a" * 64)

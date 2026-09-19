@@ -8,15 +8,19 @@
     "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\brmalls_custody_recovery.json",
     "sha256": "dbbf7c4db7906d3a273b9c63a4cf6720c02e1b501efa96c241079df4dcf2e3c0"
   },
+  "copel_replay_acceptance": {
+    "path": "docs\\v2_copel_replay_acceptance.json",
+    "sha256": "f3c79690011a0ca7af3bf252f6ed36f15b4e292c75ef17db3f5cc7b95eec6056"
+  },
   "corporate_loan_sources": {
     "path": "docs\\v2_corporate_loan_sources.json",
     "sha256": "0076c63306393870e2a68595935d581a6284b9ba37efcc33108105225a026b3a",
     "status": "source_rules_recovered_historical_axis_admission_pending"
   },
   "corporate_replay": {
-    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\corporate_replay\\brmalls_manifest.json",
-    "sha256": "f9e42a83a091b06ef54aa6ca99f2dc55d5583e466c0efd793a26bd7c29fdf2a6",
-    "status": "cielo_and_brmalls_admitted_accounting_only_other_cases_pending"
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\corporate_replay\\copel_manifest.json",
+    "sha256": "6af736a991fbf14a9a986de86c5cd5996b785fcd8332ee1874da563f98c6adc3",
+    "status": "cielo_brmalls_copel_accounting_amendment_copel_loan_allocation_bounded"
   },
   "corporate_replay_acceptance": {
     "path": "docs\\v2_corporate_replay_acceptance.json",
@@ -26,6 +30,10 @@
     "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\custody_acceptance\\result.json",
     "reproducer_sha256": "93b1616d1eac81ed5507f2432b7984430a2d71c703af5ec5b23056d34045ded8",
     "sha256": "788fce91bce7c1f0b7035e9b8ee1bd1b1e93047b4f68332f4f0c1fb19792de3d"
+  },
+  "dommo_source_terms": {
+    "path": "docs\\v2_dommo_source_terms.json",
+    "sha256": "feb7483d455f9c77093814c1fdfc52725acabfbaa6c8f9d6e6c183777932ae50"
   },
   "identity_source_admission": {
     "path": "docs\\v2_identity_source_admission.json",
@@ -39,6 +47,10 @@
   "lending_source_recovery": {
     "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\lending_source_recovery.json",
     "sha256": "0c7a643b3840b43372111ebfcaf93dc8cc81f31f4d77108409e6ab8070a8bbbd"
+  },
+  "loan_allocation_acceptance": {
+    "path": "docs\\v2_loan_allocation_acceptance.json",
+    "sha256": "3245e35dafc8ed0e3d24b7f3367690ef47cc129d7c5d1e9b2de7b0755b72491d"
   },
   "loan_cash_acceptance": {
     "path": "docs\\v2_loan_cash_acceptance.json",

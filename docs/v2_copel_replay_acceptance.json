@@ -1,0 +1,619 @@
+{
+  "accepted_store_mutated": false,
+  "changed_cells": {
+    "action_cash_per_prior_share": 1,
+    "action_has_action": 1,
+    "action_payment_session": 1,
+    "action_session_resolved": 834,
+    "action_shares_per_prior_share": 1,
+    "action_successor_index": 0,
+    "active": 0,
+    "raw_close": 0
+  },
+  "copel_resolved_cells": 254,
+  "copel_resolved_eligible_cells": 6,
+  "elapsed_seconds": 1.6243612999969628,
+  "loan_panel_sha256": "0b3ea912bd5e798f7e7a4dbf1b4007fc97698f98bb6805411fdc899d6f2a7e94",
+  "manifest": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\corporate_replay\\copel_manifest.json",
+    "sha256": "6af736a991fbf14a9a986de86c5cd5996b785fcd8332ee1874da563f98c6adc3",
+    "status": "cielo_brmalls_copel_accounting_amendment_copel_loan_allocation_bounded"
+  },
+  "model_predictions_and_labels_read": false,
+  "outcomes": [
+    {
+      "actual_nav_brl": 1000646.4481110969,
+      "capital_brl": 1000000,
+      "delayed_on_exit": false,
+      "expected_nav_brl": 1000646.4481110969,
+      "max_account_difference_brl": 0.0,
+      "on_principal_fraction": 0.0,
+      "original_principal_brl": 39513.16923792135,
+      "original_reference_brl": 49.51,
+      "rent_brl": 0.0,
+      "return_dates": [
+        "2024-01-03",
+        "2024-01-03"
+      ],
+      "side": 1
+    },
+    {
+      "actual_nav_brl": 1000646.4481110969,
+      "capital_brl": 1000000,
+      "delayed_on_exit": false,
+      "expected_nav_brl": 1000646.4481110969,
+      "max_account_difference_brl": 0.0,
+      "on_principal_fraction": 0.2,
+      "original_principal_brl": 39513.16923792135,
+      "original_reference_brl": 49.51,
+      "rent_brl": 0.0,
+      "return_dates": [
+        "2024-01-03",
+        "2024-01-03"
+      ],
+      "side": 1
+    },
+    {
+      "actual_nav_brl": 1000646.4481110969,
+      "capital_brl": 1000000,
+      "delayed_on_exit": false,
+      "expected_nav_brl": 1000646.4481110969,
+      "max_account_difference_brl": 0.0,
+      "on_principal_fraction": 1.0,
+      "original_principal_brl": 39513.16923792135,
+      "original_reference_brl": 49.51,
+      "rent_brl": 0.0,
+      "return_dates": [
+        "2024-01-03",
+        "2024-01-03"
+      ],
+      "side": 1
+    },
+    {
+      "actual_nav_brl": 1000462.8890152167,
+      "capital_brl": 1000000,
+      "delayed_on_exit": true,
+      "expected_nav_brl": 1000462.8890152167,
+      "max_account_difference_brl": 0.0,
+      "on_principal_fraction": 0.0,
+      "original_principal_brl": 39513.16923792135,
+      "original_reference_brl": 49.51,
+      "rent_brl": 0.0,
+      "return_dates": [
+        "2024-01-04",
+        "2024-01-03"
+      ],
+      "side": 1
+    },
+    {
+      "actual_nav_brl": 1000462.8890152167,
+      "capital_brl": 1000000,
+      "delayed_on_exit": true,
+      "expected_nav_brl": 1000462.8890152167,
+      "max_account_difference_brl": 0.0,
+      "on_principal_fraction": 0.2,
+      "original_principal_brl": 39513.16923792135,
+      "original_reference_brl": 49.51,
+      "rent_brl": 0.0,
+      "return_dates": [
+        "2024-01-04",
+        "2024-01-03"
+      ],
+      "side": 1
+    },
+    {
+      "actual_nav_brl": 1000462.8890152167,
+      "capital_brl": 1000000,
+      "delayed_on_exit": true,
+      "expected_nav_brl": 1000462.8890152167,
+      "max_account_difference_brl": 0.0,
+      "on_principal_fraction": 1.0,
+      "original_principal_brl": 39513.16923792135,
+      "original_reference_brl": 49.51,
+      "rent_brl": 0.0,
+      "return_dates": [
+        "2024-01-04",
+        "2024-01-03"
+      ],
+      "side": 1
+    },
+    {
+      "actual_nav_brl": 999322.7912177532,
+      "capital_brl": 1000000,
+      "delayed_on_exit": false,
+      "expected_nav_brl": 999322.7912177533,
+      "max_account_difference_brl": 1.1641532182693481e-10,
+      "on_principal_fraction": 0.0,
+      "original_principal_brl": 39513.16923792135,
+      "original_reference_brl": 49.51,
+      "rent_brl": 30.7606711497966,
+      "return_dates": [
+        "2024-01-03",
+        "2024-01-03"
+      ],
+      "side": -1
+    },
+    {
+      "actual_nav_brl": 999322.7912177532,
+      "capital_brl": 1000000,
+      "delayed_on_exit": false,
+      "expected_nav_brl": 999322.7912177533,
+      "max_account_difference_brl": 1.1641532182693481e-10,
+      "on_principal_fraction": 0.2,
+      "original_principal_brl": 39513.16923792135,
+      "original_reference_brl": 49.51,
+      "rent_brl": 30.7606711497966,
+      "return_dates": [
+        "2024-01-03",
+        "2024-01-03"
+      ],
+      "side": -1
+    },
+    {
+      "actual_nav_brl": 999322.7912177532,
+      "capital_brl": 1000000,
+      "delayed_on_exit": false,
+      "expected_nav_brl": 999322.7912177533,
+      "max_account_difference_brl": 1.1641532182693481e-10,
+      "on_principal_fraction": 1.0,
+      "original_principal_brl": 39513.16923792135,
+      "original_reference_brl": 49.51,
+      "rent_brl": 30.7606711497966,
+      "return_dates": [
+        "2024-01-03",
+        "2024-01-03"
+      ],
+      "side": -1
+    },
+    {
+      "actual_nav_brl": 999506.3503136334,
+      "capital_brl": 1000000,
+      "delayed_on_exit": true,
+      "expected_nav_brl": 999506.3503136334,
+      "max_account_difference_brl": 0.0,
+      "on_principal_fraction": 0.0,
+      "original_principal_brl": 39513.16923792135,
+      "original_reference_brl": 49.51,
+      "rent_brl": 30.7606711497966,
+      "return_dates": [
+        "2024-01-04",
+        "2024-01-03"
+      ],
+      "side": -1
+    },
+    {
+      "actual_nav_brl": 999505.1193121806,
+      "capital_brl": 1000000,
+      "delayed_on_exit": true,
+      "expected_nav_brl": 999505.1193121806,
+      "max_account_difference_brl": 0.0,
+      "on_principal_fraction": 0.2,
+      "original_principal_brl": 39513.16923792135,
+      "original_reference_brl": 49.51,
+      "rent_brl": 31.99167260271311,
+      "return_dates": [
+        "2024-01-04",
+        "2024-01-03"
+      ],
+      "side": -1
+    },
+    {
+      "actual_nav_brl": 999500.1953063689,
+      "capital_brl": 1000000,
+      "delayed_on_exit": true,
+      "expected_nav_brl": 999500.1953063689,
+      "max_account_difference_brl": 0.0,
+      "on_principal_fraction": 1.0,
+      "original_principal_brl": 39513.16923792135,
+      "original_reference_brl": 49.51,
+      "rent_brl": 36.91567841437916,
+      "return_dates": [
+        "2024-01-04",
+        "2024-01-03"
+      ],
+      "side": -1
+    },
+    {
+      "actual_nav_brl": 5003232.240555484,
+      "capital_brl": 5000000,
+      "delayed_on_exit": false,
+      "expected_nav_brl": 5003232.240555485,
+      "max_account_difference_brl": 9.313225746154785e-10,
+      "on_principal_fraction": 0.0,
+      "original_principal_brl": 197565.84618960673,
+      "original_reference_brl": 49.51,
+      "rent_brl": 0.0,
+      "return_dates": [
+        "2024-01-03",
+        "2024-01-03"
+      ],
+      "side": 1
+    },
+    {
+      "actual_nav_brl": 5003232.240555484,
+      "capital_brl": 5000000,
+      "delayed_on_exit": false,
+      "expected_nav_brl": 5003232.240555485,
+      "max_account_difference_brl": 9.313225746154785e-10,
+      "on_principal_fraction": 0.2,
+      "original_principal_brl": 197565.84618960673,
+      "original_reference_brl": 49.51,
+      "rent_brl": 0.0,
+      "return_dates": [
+        "2024-01-03",
+        "2024-01-03"
+      ],
+      "side": 1
+    },
+    {
+      "actual_nav_brl": 5003232.240555484,
+      "capital_brl": 5000000,
+      "delayed_on_exit": false,
+      "expected_nav_brl": 5003232.240555485,
+      "max_account_difference_brl": 9.313225746154785e-10,
+      "on_principal_fraction": 1.0,
+      "original_principal_brl": 197565.84618960673,
+      "original_reference_brl": 49.51,
+      "rent_brl": 0.0,
+      "return_dates": [
+        "2024-01-03",
+        "2024-01-03"
+      ],
+      "side": 1
+    },
+    {
+      "actual_nav_brl": 5002314.445076084,
+      "capital_brl": 5000000,
+      "delayed_on_exit": true,
+      "expected_nav_brl": 5002314.445076084,
+      "max_account_difference_brl": 0.0,
+      "on_principal_fraction": 0.0,
+      "original_principal_brl": 197565.84618960673,
+      "original_reference_brl": 49.51,
+      "rent_brl": 0.0,
+      "return_dates": [
+        "2024-01-04",
+        "2024-01-03"
+      ],
+      "side": 1
+    },
+    {
+      "actual_nav_brl": 5002314.445076084,
+      "capital_brl": 5000000,
+      "delayed_on_exit": true,
+      "expected_nav_brl": 5002314.445076084,
+      "max_account_difference_brl": 0.0,
+      "on_principal_fraction": 0.2,
+      "original_principal_brl": 197565.84618960673,
+      "original_reference_brl": 49.51,
+      "rent_brl": 0.0,
+      "return_dates": [
+        "2024-01-04",
+        "2024-01-03"
+      ],
+      "side": 1
+    },
+    {
+      "actual_nav_brl": 5002314.445076084,
+      "capital_brl": 5000000,
+      "delayed_on_exit": true,
+      "expected_nav_brl": 5002314.445076084,
+      "max_account_difference_brl": 0.0,
+      "on_principal_fraction": 1.0,
+      "original_principal_brl": 197565.84618960673,
+      "original_reference_brl": 49.51,
+      "rent_brl": 0.0,
+      "return_dates": [
+        "2024-01-04",
+        "2024-01-03"
+      ],
+      "side": 1
+    },
+    {
+      "actual_nav_brl": 4996613.956088766,
+      "capital_brl": 5000000,
+      "delayed_on_exit": false,
+      "expected_nav_brl": 4996613.956088766,
+      "max_account_difference_brl": 0.0,
+      "on_principal_fraction": 0.0,
+      "original_principal_brl": 197565.84618960673,
+      "original_reference_brl": 49.51,
+      "rent_brl": 153.803355748983,
+      "return_dates": [
+        "2024-01-03",
+        "2024-01-03"
+      ],
+      "side": -1
+    },
+    {
+      "actual_nav_brl": 4996613.956088766,
+      "capital_brl": 5000000,
+      "delayed_on_exit": false,
+      "expected_nav_brl": 4996613.956088766,
+      "max_account_difference_brl": 0.0,
+      "on_principal_fraction": 0.2,
+      "original_principal_brl": 197565.84618960673,
+      "original_reference_brl": 49.51,
+      "rent_brl": 153.803355748983,
+      "return_dates": [
+        "2024-01-03",
+        "2024-01-03"
+      ],
+      "side": -1
+    },
+    {
+      "actual_nav_brl": 4996613.956088766,
+      "capital_brl": 5000000,
+      "delayed_on_exit": false,
+      "expected_nav_brl": 4996613.956088766,
+      "max_account_difference_brl": 0.0,
+      "on_principal_fraction": 1.0,
+      "original_principal_brl": 197565.84618960673,
+      "original_reference_brl": 49.51,
+      "rent_brl": 153.803355748983,
+      "return_dates": [
+        "2024-01-03",
+        "2024-01-03"
+      ],
+      "side": -1
+    },
+    {
+      "actual_nav_brl": 4997531.7515681675,
+      "capital_brl": 5000000,
+      "delayed_on_exit": true,
+      "expected_nav_brl": 4997531.7515681675,
+      "max_account_difference_brl": 0.0,
+      "on_principal_fraction": 0.0,
+      "original_principal_brl": 197565.84618960673,
+      "original_reference_brl": 49.51,
+      "rent_brl": 153.803355748983,
+      "return_dates": [
+        "2024-01-04",
+        "2024-01-03"
+      ],
+      "side": -1
+    },
+    {
+      "actual_nav_brl": 4997525.596560903,
+      "capital_brl": 5000000,
+      "delayed_on_exit": true,
+      "expected_nav_brl": 4997525.596560903,
+      "max_account_difference_brl": 0.0,
+      "on_principal_fraction": 0.2,
+      "original_principal_brl": 197565.84618960673,
+      "original_reference_brl": 49.51,
+      "rent_brl": 159.95836301356553,
+      "return_dates": [
+        "2024-01-04",
+        "2024-01-03"
+      ],
+      "side": -1
+    },
+    {
+      "actual_nav_brl": 4997500.976531845,
+      "capital_brl": 5000000,
+      "delayed_on_exit": true,
+      "expected_nav_brl": 4997500.976531845,
+      "max_account_difference_brl": 0.0,
+      "on_principal_fraction": 1.0,
+      "original_principal_brl": 197565.84618960673,
+      "original_reference_brl": 49.51,
+      "rent_brl": 184.57839207189576,
+      "return_dates": [
+        "2024-01-04",
+        "2024-01-03"
+      ],
+      "side": -1
+    },
+    {
+      "actual_nav_brl": 10006464.481110968,
+      "capital_brl": 10000000,
+      "delayed_on_exit": false,
+      "expected_nav_brl": 10006464.48111097,
+      "max_account_difference_brl": 1.862645149230957e-09,
+      "on_principal_fraction": 0.0,
+      "original_principal_brl": 395131.69237921346,
+      "original_reference_brl": 49.51,
+      "rent_brl": 0.0,
+      "return_dates": [
+        "2024-01-03",
+        "2024-01-03"
+      ],
+      "side": 1
+    },
+    {
+      "actual_nav_brl": 10006464.481110968,
+      "capital_brl": 10000000,
+      "delayed_on_exit": false,
+      "expected_nav_brl": 10006464.48111097,
+      "max_account_difference_brl": 1.862645149230957e-09,
+      "on_principal_fraction": 0.2,
+      "original_principal_brl": 395131.69237921346,
+      "original_reference_brl": 49.51,
+      "rent_brl": 0.0,
+      "return_dates": [
+        "2024-01-03",
+        "2024-01-03"
+      ],
+      "side": 1
+    },
+    {
+      "actual_nav_brl": 10006464.481110968,
+      "capital_brl": 10000000,
+      "delayed_on_exit": false,
+      "expected_nav_brl": 10006464.48111097,
+      "max_account_difference_brl": 1.862645149230957e-09,
+      "on_principal_fraction": 1.0,
+      "original_principal_brl": 395131.69237921346,
+      "original_reference_brl": 49.51,
+      "rent_brl": 0.0,
+      "return_dates": [
+        "2024-01-03",
+        "2024-01-03"
+      ],
+      "side": 1
+    },
+    {
+      "actual_nav_brl": 10004628.890152168,
+      "capital_brl": 10000000,
+      "delayed_on_exit": true,
+      "expected_nav_brl": 10004628.890152168,
+      "max_account_difference_brl": 0.0,
+      "on_principal_fraction": 0.0,
+      "original_principal_brl": 395131.69237921346,
+      "original_reference_brl": 49.51,
+      "rent_brl": 0.0,
+      "return_dates": [
+        "2024-01-04",
+        "2024-01-03"
+      ],
+      "side": 1
+    },
+    {
+      "actual_nav_brl": 10004628.890152168,
+      "capital_brl": 10000000,
+      "delayed_on_exit": true,
+      "expected_nav_brl": 10004628.890152168,
+      "max_account_difference_brl": 0.0,
+      "on_principal_fraction": 0.2,
+      "original_principal_brl": 395131.69237921346,
+      "original_reference_brl": 49.51,
+      "rent_brl": 0.0,
+      "return_dates": [
+        "2024-01-04",
+        "2024-01-03"
+      ],
+      "side": 1
+    },
+    {
+      "actual_nav_brl": 10004628.890152168,
+      "capital_brl": 10000000,
+      "delayed_on_exit": true,
+      "expected_nav_brl": 10004628.890152168,
+      "max_account_difference_brl": 0.0,
+      "on_principal_fraction": 1.0,
+      "original_principal_brl": 395131.69237921346,
+      "original_reference_brl": 49.51,
+      "rent_brl": 0.0,
+      "return_dates": [
+        "2024-01-04",
+        "2024-01-03"
+      ],
+      "side": 1
+    },
+    {
+      "actual_nav_brl": 9993227.912177533,
+      "capital_brl": 10000000,
+      "delayed_on_exit": false,
+      "expected_nav_brl": 9993227.912177533,
+      "max_account_difference_brl": 0.0,
+      "on_principal_fraction": 0.0,
+      "original_principal_brl": 395131.69237921346,
+      "original_reference_brl": 49.51,
+      "rent_brl": 307.606711497966,
+      "return_dates": [
+        "2024-01-03",
+        "2024-01-03"
+      ],
+      "side": -1
+    },
+    {
+      "actual_nav_brl": 9993227.912177533,
+      "capital_brl": 10000000,
+      "delayed_on_exit": false,
+      "expected_nav_brl": 9993227.912177533,
+      "max_account_difference_brl": 0.0,
+      "on_principal_fraction": 0.2,
+      "original_principal_brl": 395131.69237921346,
+      "original_reference_brl": 49.51,
+      "rent_brl": 307.606711497966,
+      "return_dates": [
+        "2024-01-03",
+        "2024-01-03"
+      ],
+      "side": -1
+    },
+    {
+      "actual_nav_brl": 9993227.912177533,
+      "capital_brl": 10000000,
+      "delayed_on_exit": false,
+      "expected_nav_brl": 9993227.912177533,
+      "max_account_difference_brl": 0.0,
+      "on_principal_fraction": 1.0,
+      "original_principal_brl": 395131.69237921346,
+      "original_reference_brl": 49.51,
+      "rent_brl": 307.606711497966,
+      "return_dates": [
+        "2024-01-03",
+        "2024-01-03"
+      ],
+      "side": -1
+    },
+    {
+      "actual_nav_brl": 9995063.503136335,
+      "capital_brl": 10000000,
+      "delayed_on_exit": true,
+      "expected_nav_brl": 9995063.503136335,
+      "max_account_difference_brl": 0.0,
+      "on_principal_fraction": 0.0,
+      "original_principal_brl": 395131.69237921346,
+      "original_reference_brl": 49.51,
+      "rent_brl": 307.606711497966,
+      "return_dates": [
+        "2024-01-04",
+        "2024-01-03"
+      ],
+      "side": -1
+    },
+    {
+      "actual_nav_brl": 9995051.193121806,
+      "capital_brl": 10000000,
+      "delayed_on_exit": true,
+      "expected_nav_brl": 9995051.193121806,
+      "max_account_difference_brl": 0.0,
+      "on_principal_fraction": 0.2,
+      "original_principal_brl": 395131.69237921346,
+      "original_reference_brl": 49.51,
+      "rent_brl": 319.91672602713106,
+      "return_dates": [
+        "2024-01-04",
+        "2024-01-03"
+      ],
+      "side": -1
+    },
+    {
+      "actual_nav_brl": 9995001.95306369,
+      "capital_brl": 10000000,
+      "delayed_on_exit": true,
+      "expected_nav_brl": 9995001.95306369,
+      "max_account_difference_brl": 0.0,
+      "on_principal_fraction": 1.0,
+      "original_principal_brl": 395131.69237921346,
+      "original_reference_brl": 49.51,
+      "rent_brl": 369.1567841437915,
+      "return_dates": [
+        "2024-01-04",
+        "2024-01-03"
+      ],
+      "side": -1
+    }
+  ],
+  "remaining": "issuer K and loan conversion night not independently quoted; presettlement disposal and full clearing calendar remain explicit sensitivities",
+  "scope": "actual-calendar 4% prescribed positions, full name axes, 4% original-reference rent; zero execution/B3 fees and CDI for independent arithmetic; loan K bounds on fixed disposal paths, not on adaptive model policies",
+  "shape": [
+    3717,
+    933
+  ],
+  "source_array_hashes": {
+    "action_cash_per_prior_share": "d530ec6c93794b97980848cba40cafe39cf8e6cd2d1a48569d964e80e5aa72c2",
+    "action_has_action": "a08ab57918e9b5805537cb06b81a9994174e9de7588b702c972c65432ccdf1f6",
+    "action_payment_session": "8601338a3e65a9c9c0393e2f0821849ebe8601812f1d53cbfa41532950dc2753",
+    "action_session_resolved": "1d1f277649264bd63edbc54d88507b5257a690fcc053c8899e9e1018f461dace",
+    "action_shares_per_prior_share": "8554e23cec96561745ac7232ec87efe3e93a5f4ce8863b4fdc541c8aa799d3ea",
+    "action_successor_index": "cf0a8df8e100f2ab29b40221f51841dc1d46800a0458ddcb045b18a25208a65e",
+    "active": "1e7f0e3c10592bcb99942b37359534e37485bdfdb6eab26f117ebf846d21629e",
+    "raw_close": "d822a557e79452270d897c9c0df470efd56519754e56b44840243b5024fd0e16"
+  },
+  "static_policy_coordinates_preserved": true,
+  "status": "copel_sourced_shares_custody_and_bounded_loan_allocation_verified_not_model_profitability"
+}

@@ -20,7 +20,10 @@ def distribution(delivery=3):
         source_index=0,
         effective_session=1,
         available_session=0,
-        legs=(ShareDelivery(1, 1.0, 2), ShareDelivery(2, 2.0, delivery)),
+        legs=(
+            ShareDelivery(1, 1.0, 2, loan_principal_fraction=1 / 3),
+            ShareDelivery(2, 2.0, delivery, loan_principal_fraction=2 / 3),
+        ),
         cash_per_prior_share=10,
         payment_session=4,
         source="synthetic signed claim fixture",
@@ -68,7 +71,11 @@ def test_separate_effective_delivery_and_payment_with_existing_positions(sign):
 def test_terminal_and_unknown_delivery_retain_valued_claim_and_financing(sign):
     close = np.array([[100, 30, 30], [np.nan, 31, 32], [np.nan, 32, 34]])
     event = replace(
-        distribution(None), legs=(ShareDelivery(1, 1, None), ShareDelivery(2, 2, 7))
+        distribution(None),
+        legs=(
+            ShareDelivery(1, 1, None, loan_principal_fraction=1 / 3),
+            ShareDelivery(2, 2, 7, loan_principal_fraction=2 / 3),
+        ),
     )
     targets = np.array([[0.4, 0, 0], [0, 0, 0], [0, 0, 0]]) * sign
     config = _config(annual_borrow_rate=0.04)
@@ -189,3 +196,63 @@ def test_flat_start_keeps_prior_cancellation_without_inventing_historical_claims
     assert not result.share_claim_positions
     assert result.receivables == pytest.approx(np.zeros(3))
     compare(np.full((3, 3), 100.0), np.zeros((3, 3)), share_distributions=events)
+
+
+@pytest.mark.parametrize("on_fraction", [0.0, 0.2, 1.0])
+def test_contract_principal_allocation_is_independent_of_constituent_marks(on_fraction):
+    import torch
+
+    close = np.array([[100.0, 10.0, 30.0]] + [[np.nan, 10.0, 30.0]] * 7)
+    event = ShareDistribution(
+        0,
+        1,
+        0,
+        (
+            ShareDelivery(1, 1, 2, loan_principal_fraction=on_fraction),
+            ShareDelivery(2, 3, 3, loan_principal_fraction=1 - on_fraction),
+        ),
+        "explicit fixed-principal allocation fixture",
+    )
+    config = _config(annual_borrow_rate=0.04)
+    targets = np.zeros((8, 3))
+    targets[0, 0] = -0.4
+    compare(close, targets, share_distributions=(event,), config=config)
+    result = replay(
+        close,
+        lambda state: PortfolioTarget(targets[state.day]),
+        share_distributions=(event,),
+        config=config,
+    )
+    # Synthetic dates are in 2022: each exit returns on T+2. Both legs inherit
+    # the original rate/principal, despite markedly different constituent prices.
+    expected_rent = 0.4 * (
+        on_fraction * (1.04 ** (4 / 252) - 1)
+        + (1 - on_fraction) * (1.04 ** (5 / 252) - 1)
+    )
+    assert result.nav[-1] == pytest.approx(1 - expected_rent, abs=1e-12)
+    scale = torch.tensor(0.4, dtype=torch.float64, requires_grad=True)
+    account = PortfolioAccount.empty(np.r_[close[0], 100.0], config=config)
+    for day in range(8):
+        target = torch.zeros(4, dtype=torch.float64)
+        if day == 0:
+            target[0] = -scale
+        account.step(
+            target,
+            day=day,
+            close=np.r_[close[day], 100.0],
+            cdi=0.0,
+            session_date=result.dates[day],
+            loan_reference=np.full(4, 100.0),
+            annual_borrow=np.full(4, 0.04),
+            share_distributions=(event,),
+            terminal=day == 7,
+        )
+    account.nav.backward()
+    assert scale.grad.item() == pytest.approx(-expected_rent / 0.4, abs=1e-12)
+
+
+def test_multi_leg_loan_terms_cannot_silently_use_price_allocations():
+    with pytest.raises(ValueError, match="sum to one"):
+        ShareDistribution(
+            0, 1, 0, (ShareDelivery(1, 1, 2), ShareDelivery(2, 4, 2)), "terms"
+        )

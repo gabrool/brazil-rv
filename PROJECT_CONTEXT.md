@@ -26,7 +26,7 @@ against existing inventory in both accounts, preserving signed cash claims and
 releasing only the extinguished short portion's restricted proceeds. Sparse sourced
 multi-leg distributions can now retain signed, non-tradable baskets until separately
 dated custody delivery, with separate cash claims/payment. Allocation reserves their
-capacity and risk/readouts use the underlying exposures. Evaluation V26 binds these
+capacity and risk/readouts use the underlying exposures. Evaluation V27 binds these
 terms and reports undelivered and unpriced inventory separately on the full calendar.
 Both cost paths now use dated B3 loan components, with stock/hedge rent separated
 from exchange fees. Both accounts now retain fixed-principal/rate loan cohorts,
@@ -50,11 +50,14 @@ Static policy coordinates remain frozen and effective borrowing prohibitions als
 apply to later flat-start windows. See `docs/v2_CORPORATE_EVENTS.md` for Cielo's
 distinct dates and SELIC correction, and BR Malls' recovered custody/loan terms.
 
-The economic/data run pointer now binds Cielo and BR Malls source-based accounting
+The economic/data run pointer now binds Cielo, BR Malls and Copel accounting
 amendments and verified historical event arithmetic. BR Malls preserves original
 loan principal/rates across conversion, separate Jan9 effect/Jan11 custody/Jan20
 cash, and non-tradable shareholder fractions until known auction terms/payment.
-The reference uses custody-first disposal; feasibility of Jan9-Jan10 presettlement
+Copel separates the Dec26 2023 economic split from Dec28 custody: one ON and four
+PN shares per unit. Loan principal allocation is now explicit and independent of
+constituent marks; unquoted Copel issuer K uses a labelled 20%/80% research case
+and full 0%-100% allocation sensitivities before model acceptance. The reference uses custody-first disposal; feasibility of Jan9-Jan10 presettlement
 disposal remains a separate execution assumption. Apply amendments explicitly after
 loading frozen policy inputs; accepted stores and static feature coordinates stay
 unchanged. The source-backed ISIN allowlist now also contains the ALLOS and ISA
