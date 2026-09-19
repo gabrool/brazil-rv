@@ -1043,3 +1043,10 @@ units/financial denominators across the remaining families, and full identity,
 universe, warmup, wealth and label propagation. Completed conditioning and auxiliary
 tensor checks need not be repeated. Accounting-only replay must preserve frozen
 static policy coordinates; data repairs require a separately bound store/refit.
+
+Recovery: implementation `7982bcd`; `loan_accrual_us_audit_7982bcd.zip` SHA-256
+`2eb0769e3865432528b9d8cdebcf7d2b1fba074ae53b43242acb342da0af71aa`.
+All 264 members were restored and hash-checked, including complete current research
+source, the patch, audit reproducers/results and acceptance source-code hashes.
+All 28 bound original source receipts were verified. Immutable inputs and old fits
+were not duplicated. The canonical run pointer binds loan_accrual_us_recovery.

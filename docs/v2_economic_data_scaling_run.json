@@ -110,6 +110,10 @@
     "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\loan_accrual_unchanged\\result.json",
     "sha256": "d4015907bab5c4ba398d6648c5a44000c44d7ca87df7c201cf966f2319ba9a0a"
   },
+  "loan_accrual_us_recovery": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\loan_accrual_us_recovery.json",
+    "sha256": "fec225afa4f683d9af4c70bbf5245725dffe7be12dfbb60be8d1d12e6fcec684"
+  },
   "loan_allocation_acceptance": {
     "path": "docs\\v2_loan_allocation_acceptance.json",
     "sha256": "3245e35dafc8ed0e3d24b7f3367690ef47cc129d7c5d1e9b2de7b0755b72491d"
