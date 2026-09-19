@@ -30,8 +30,11 @@ def policy_ledger_config(**changes):
     return replace(LedgerConfig(), **(defaults | changes))
 
 
-def daily_borrow(rates, config, *, hedge_rates=None):
-    equity = daily_borrow_cost(rates, config=config)
+def daily_borrow(rates, dates, config, *, hedge_rates=None):
+    dates = np.asarray(dates, dtype="datetime64[D]")
+    if config.borrow_source == "uniform":
+        rates = np.full_like(rates, config.annual_borrow_rate, dtype=np.float64)
+    equity = daily_borrow_cost(rates, dates[..., None], config=config)
     hedge_rates = (
         config.hedge_annual_borrow_rate
         if hedge_rates is None
@@ -40,7 +43,7 @@ def daily_borrow(rates, config, *, hedge_rates=None):
         )
     )
     hedge = np.broadcast_to(
-        daily_borrow_cost(hedge_rates, config=config), equity.shape[:-1]
+        daily_borrow_cost(hedge_rates, dates, config=config), equity.shape[:-1]
     )
     return np.concatenate((equity, hedge[..., None]), axis=-1)
 
@@ -62,6 +65,7 @@ class PolicyData:
         self.valid = inputs.active & inputs.score_mask[..., HEADS].all(-1)
         borrow = daily_borrow(
             inputs.annual_borrow_rate_by_name,
+            inputs.dates,
             policy_ledger_config(),
             hedge_rates=inputs.hedge_annual_borrow_rate,
         )
@@ -98,6 +102,7 @@ class PolicyData:
         rates = self.inputs.hedge_annual_borrow_rate
         return daily_borrow(
             self.inputs.annual_borrow_rate_by_name[day],
+            self.inputs.dates[day],
             config,
             hedge_rates=None if rates is None else rates[day],
         )

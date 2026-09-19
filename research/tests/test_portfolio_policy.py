@@ -225,9 +225,7 @@ def test_hedge_borrow_rates_and_fee_scenarios_match_both_accounts(
         {}
         if charge_fee
         else dict(
-            borrow_registration_fee_fraction=0.0,
-            borrow_registration_fee_floor=0.0,
-            borrow_registration_fee_cap=0.0,
+            borrow_fee_multiplier=0.0,
         )
     )
     config = policy_ledger_config(
@@ -246,10 +244,19 @@ def test_hedge_borrow_rates_and_fee_scenarios_match_both_accounts(
     # Observed zero/below/above fallback rates, then missing. The first close
     # opens the hedge, so rent starts only on the following session.
     rent = np.array([0.0, 0.0, 0.005, 0.03, 0.02, 0.02])
-    fee = np.array([0.0, 0.00025, 0.001, 0.006, 0.004, 0.004])
+    fees = np.array(
+        [
+            [0, 0],
+            [0.000025, 0.000225],
+            [0.0001, 0.0009],
+            [0.0006, 0.0054],
+            [0.0004, 0.0036],
+            [0.0004, 0.0036],
+        ]
+    )
     expected = np.expm1(np.log1p(rent) / 252)
     if charge_fee:
-        expected += np.expm1(np.log1p(fee) / 252)
+        expected += np.expm1(np.log1p(fees) / 252).sum(axis=-1)
     if hedge_weight > 0:
         expected[:] = 0.0
     opening_nav = np.r_[config.initial_capital_brl, exact.nav[:-1]]

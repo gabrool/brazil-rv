@@ -370,3 +370,48 @@ dated fees, actual corporate/lending source admission and remaining source-to-mo
 audit work. Borrow accrual on these baskets still uses the existing marked-notional
 proxy pending that loan repair; it is not yet a claim of exact B3 contract accrual.
 Stages C/D remain unstarted, with no new performance result or GPU fit to report.
+
+## 2026-09-19: dated B3 loan tariff implementation
+
+Implemented `execution/loan_fees.py` and replaced the undated aggregate fee formula
+in the independent ledger, Torch account's cost provider, allocation cost estimates
+and original-trade attribution. The primary scenario explicitly assumes normal
+electronic sourcing after platform launch; direct, OTC and compulsory schedules
+are represented separately. The schedule uses the prior fixed annual tariff before
+2020-10-26 and separate component floors/caps thereafter, with the 2022-11-14 cap
+transition. Rate rounding and component compounding follow the archived circular.
+Removed the three obsolete aggregate fee configuration fields and their callers.
+The uniform-borrow Torch path now also honors its configured equity rate, matching
+the independent comparator. Readouts separate all stock/hedge loan rent from B3 fees.
+
+New archived evidence: B3's BDR loan guide (`872b9e39...`) and the historical
+BM&FBOVESPA cost page confirm the former voluntary 25 annual bp/R$10-minimum
+tariff. These add to the existing 125/2020, 049/2020 and 081/2022 circulars.
+The seven-file source manifest hashes to
+`ebccf40949c6ba719cd6b8244aa2ac0c98733ab30bf9c5620aaba6b123e04db7`;
+all archived source hashes were verified. No new historical loan observations or
+corporate cases were admitted. No accepted datasets or completed fits were changed.
+
+Validation: 191 targeted tests passed for the dated-fee integration, followed by
+101 targeted tests after adding the stock/hedge component reporting. These runs
+overlap and must not be added as a unique test count. Tests include date boundaries,
+component caps, equity/hedge NumPy–Torch agreement, uniform/sourced scenarios,
+future-rate mutation, gradients and downstream consumers. Unaffected synthetic
+long-only and fee-disabled long/short books are bit-identical to `b1eed6c` on 13
+arrays, fills and intentions. The acceptance receipt is
+`docs/v2_loan_fee_acceptance.json`, identical to the verified D-root copy, SHA-256
+`0474a68fcde867916a63730da2439d8e3620143ad8776a3bd8e3f95a14de32bd`.
+
+**This is an intermediate Stage A repair.** Evaluation V22 explicitly reports
+that fixed loan principal/rate, accrued liabilities versus cash payment, return
+settlement and the historical R$10 minimum are still pending. It must not be read
+as accepted full contractual economics. Newly built policy cost features differ;
+preserve the serialized policy-data contract for any accounting-only replay rather
+than silently feeding new coordinates to an old learned policy. Details and next
+steps are in `docs/v2_LOAN_ACCOUNTING.md`.
+
+The registration was revisited. Next: integrate the contract lifecycle and its
+published-average references, then actual source admission and remaining Stage B
+audits. Preserve the completed corporate-claim mechanics and resolve event-specific
+loan transformations from source terms. Stages C/D remain unstarted; no GPU worker
+or historical performance comparison launched in this step.

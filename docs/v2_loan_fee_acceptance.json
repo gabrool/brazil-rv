@@ -1,0 +1,68 @@
+{
+  "reference_commit": "b1eed6c46335b1d165670d436ec694dc2e730fa1",
+  "scope": "Synthetic unchanged loan-fee paths; no historical performance or source admission",
+  "unaffected_bit_identical": {
+    "long_only_with_fees": {
+      "nav": true,
+      "free_cash": true,
+      "restricted_cash": true,
+      "signed_shares": true,
+      "mark_price": true,
+      "cost_bps": true,
+      "borrow_bps": true,
+      "turnover_fraction_nav": true,
+      "gross_fraction_nav": true,
+      "receivables": true,
+      "payables": true,
+      "all_cash_nav": true,
+      "reconciliation_error": true,
+      "fills_identical": true,
+      "intentions_identical": true
+    },
+    "long_short_fee_disabled": {
+      "nav": true,
+      "free_cash": true,
+      "restricted_cash": true,
+      "signed_shares": true,
+      "mark_price": true,
+      "cost_bps": true,
+      "borrow_bps": true,
+      "turnover_fraction_nav": true,
+      "gross_fraction_nav": true,
+      "receivables": true,
+      "payables": true,
+      "all_cash_nav": true,
+      "reconciliation_error": true,
+      "fills_identical": true,
+      "intentions_identical": true
+    }
+  },
+  "heldout_accessed": false,
+  "test_runs": [
+    {
+      "passed": 191,
+      "scope": "dated loan fees, portfolio account/policy, stateful ledger, evaluation, execution attribution; before adding the hedge component report columns"
+    },
+    {
+      "passed": 101,
+      "scope": "final loan-fee/policy/evaluation/readout/share-distribution/objective/controller checks after the report-column change; overlaps the earlier run"
+    }
+  ],
+  "source_manifest_sha256": "ebccf40949c6ba719cd6b8244aa2ac0c98733ab30bf9c5620aaba6b123e04db7",
+  "pending": [
+    "fixed-contract reference and rate",
+    "accrued payable and payment/return settlement",
+    "pre-platform R$10 minimum",
+    "actual lending/corporate source admission",
+    "all remaining Stage B/C/D work"
+  ],
+  "source_sha256": {
+    "research/src/brazil_rv/execution/loan_fees.py": "b2d73ed27085de2e71f43e017e69fb18bc777ab3ed79f280a9434f92e5f7181e",
+    "research/src/brazil_rv/execution/stateful_ledger.py": "1cefaa1b55296f43671478011855b647a24ecda47e5b8e64ff320308fcf5ba3f",
+    "research/src/brazil_rv/execution/portfolio_policy.py": "424ec1e916f56b8de28fef1cfcdb6e20308c73291e9c72ad994840f7681a8817",
+    "research/src/brazil_rv/v2/evaluate.py": "bca24876a3932b62542c1dbdcc907d49affcbbb9f7cc99ee26bb7fe6fc08e9ae",
+    "research/src/brazil_rv/v2/execution_policy.py": "e729366b3b6c5f4aafc3e64ad551a330f055e7f4947286ac57c08376fa1c71c6",
+    "research/src/brazil_rv/v2/portfolio_readouts.py": "6feb04c0695bd28077b15a3dcce53c5cecd8a0bc8f079697410615f0517b2213",
+    "research/tests/test_loan_fees.py": "b503c535646383336b7e92dc154e5906d11ee1c8320756f7c7efff7a33c451d8"
+  }
+}

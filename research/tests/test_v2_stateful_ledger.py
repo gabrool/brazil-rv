@@ -8,7 +8,6 @@ from brazil_rv.execution.stateful_ledger import (
     LedgerConfig,
     StatefulLedgerResult,
     _scaled_group_bands,
-    equity_borrow_registration_fee,
     ledger_configurations,
     simulate_stateful_ledger,
 )
@@ -23,9 +22,7 @@ def _config(**changes: object) -> LedgerConfig:
             cost_bps_per_side=0.0,
             annual_borrow_rate=0.0,
             borrow_source="uniform",
-            borrow_registration_fee_fraction=0.0,
-            borrow_registration_fee_floor=0.0,
-            borrow_registration_fee_cap=0.0,
+            borrow_fee_multiplier=0.0,
             volatility_balanced_entries=False,
             beta_hedge=False,
             planned_absolute_net_cap=1.10,
@@ -299,9 +296,7 @@ def test_lending_borrow_charges_observed_rate_plus_registered_capped_fee() -> No
         scores,
         config=_config(
             annual_borrow_rate=0.02,
-            borrow_registration_fee_fraction=0.20,
-            borrow_registration_fee_floor=0.00025,
-            borrow_registration_fee_cap=0.007,
+            borrow_fee_multiplier=1.0,
         ),
         initial_reference_price=initial,
     )
@@ -311,9 +306,7 @@ def test_lending_borrow_charges_observed_rate_plus_registered_capped_fee() -> No
         config=_config(
             annual_borrow_rate=0.02,
             borrow_source="borrow_balance",
-            borrow_registration_fee_fraction=0.20,
-            borrow_registration_fee_floor=0.00025,
-            borrow_registration_fee_cap=0.007,
+            borrow_fee_multiplier=1.0,
         ),
         initial_reference_price=initial,
         annual_borrow_rate_by_name=np.full_like(close, 0.40),
@@ -325,21 +318,23 @@ def test_lending_borrow_charges_observed_rate_plus_registered_capped_fee() -> No
     assert charged.any()
     first_charged = int(np.flatnonzero(charged)[0])
     assert lending.borrow_bps[first_charged] == pytest.approx(
-        ((1.40 ** (1 / 252) - 1) + (1.007 ** (1 / 252) - 1)) * 10_000
+        (
+            (1.40 ** (1 / 252) - 1)
+            + (1.0007 ** (1 / 252) - 1)
+            + (1.0063 ** (1 / 252) - 1)
+        )
+        * 10_000
     )
     assert uniform.borrow_bps[first_charged] == pytest.approx(
-        ((1.02 ** (1 / 252) - 1) + (1.004 ** (1 / 252) - 1)) * 10_000
+        (
+            (1.02 ** (1 / 252) - 1)
+            + (1.0004 ** (1 / 252) - 1)
+            + (1.0036 ** (1 / 252) - 1)
+        )
+        * 10_000
     )
     np.testing.assert_allclose(
         lending.held_short_weighted_annual_borrow_rate[charged], 0.407
-    )
-
-
-def test_equity_borrow_registration_fee_schedule_floors_and_caps() -> None:
-    config = LedgerConfig()
-    np.testing.assert_array_equal(
-        equity_borrow_registration_fee(np.asarray([0.0001, 0.01, 0.10]), config=config),
-        np.asarray([0.00025, 0.002, 0.007]),
     )
 
 
@@ -2252,9 +2247,7 @@ def test_rev4_uniform_comparator_is_exact_legacy_ledger() -> None:
             cost_bps_per_side=0.0,
             annual_borrow_rate=0.0,
             borrow_source="uniform",
-            borrow_registration_fee_fraction=0.0,
-            borrow_registration_fee_floor=0.0,
-            borrow_registration_fee_cap=0.0,
+            borrow_fee_multiplier=0.0,
             volatility_balanced_entries=False,
             beta_hedge=False,
             planned_absolute_net_cap=1.10,

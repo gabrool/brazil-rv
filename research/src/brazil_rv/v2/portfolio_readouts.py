@@ -135,6 +135,12 @@ def book_summary(data, result, previous, start, first):
         "hedge_gross_bps": result.hedge_gross_pnl_bps[selection],
         "trading_cost_bps": result.cost_bps[selection],
         "borrow_bps": result.borrow_bps[selection],
+        "loan_rent_bps": (result.equity_borrow_raw_bps + result.hedge_borrow_raw_bps)[
+            selection
+        ],
+        "b3_loan_fee_bps": (result.equity_borrow_fee_bps + result.hedge_borrow_fee_bps)[
+            selection
+        ],
         "interest_bps": result.interest_bps[selection],
         "cdi_bps": result.cdi_benchmark_bps[selection],
         "free_cash_fraction": (result.free_cash / result.nav)[selection],

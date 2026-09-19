@@ -15,8 +15,8 @@ from numpy.typing import NDArray
 from brazil_rv.execution.stateful_ledger import (
     LedgerConfig,
     StatefulLedgerResult,
-    equity_borrow_registration_fee,
 )
+from brazil_rv.execution.loan_fees import loan_fee_rates
 from brazil_rv.modeling.metrics import average_ranks
 from brazil_rv.v2.corporate_actions import AlignedActionTerms
 from brazil_rv.v2.artifacts import inventory, sha256_file
@@ -258,12 +258,19 @@ def original_trade_attribution(
             if config.borrow_source == "uniform"
             else np.asarray(annual_borrow_rate_by_name[day], dtype=np.float64)
         )
-        fees = equity_borrow_registration_fee(rates, config=config)
+        fees = loan_fee_rates(
+            rates, result.dates[day], modality=config.borrow_fee_modality
+        )
         borrowed = np.nansum(
             short_value * np.expm1(np.log1p(rates) / config.annual_sessions), axis=1
         )
-        borrow_fee = np.nansum(
-            short_value * np.expm1(np.log1p(fees) / config.annual_sessions), axis=1
+        borrow_fee = (
+            np.nansum(
+                short_value
+                * np.expm1(np.log1p(fees) / config.annual_sessions).sum(axis=-1),
+                axis=1,
+            )
+            * config.borrow_fee_multiplier
         )
         cash = np.zeros(2)
         costs = np.zeros(2)

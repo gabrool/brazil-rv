@@ -5,7 +5,7 @@ import torch
 from brazil_rv.execution.portfolio_account import PortfolioAccount, tensor
 from brazil_rv.execution.stateful_ledger import (
     PortfolioTarget,
-    equity_borrow_registration_fee,
+    daily_borrow_cost,
 )
 from brazil_rv.v2.corporate_actions import AlignedActionTerms
 from test_portfolio_ledger import replay
@@ -44,9 +44,8 @@ def compare(
     account = PortfolioAccount.empty(np.full(names + 1, 100.0), config=config)
     records = []
     for day in range(days):
-        fee = equity_borrow_registration_fee(config.annual_borrow_rate, config=config)
-        borrow = np.expm1(np.log1p(config.annual_borrow_rate) / 252) + np.expm1(
-            np.log1p(fee) / 252
+        borrow = daily_borrow_cost(
+            config.annual_borrow_rate, exact.dates[day], config=config
         )
         record = account.step(
             tensor([*targets[day], 0.0]),

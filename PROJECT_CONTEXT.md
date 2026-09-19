@@ -26,9 +26,12 @@ against existing inventory in both accounts, preserving signed cash claims and
 releasing only the extinguished short portion's restricted proceeds. Sparse sourced
 multi-leg distributions can now retain signed, non-tradable baskets until separately
 dated custody delivery, with separate cash claims/payment. Allocation reserves their
-capacity and risk/readouts use the underlying exposures. Evaluation V21 binds these
+capacity and risk/readouts use the underlying exposures. Evaluation V22 binds these
 terms and reports undelivered and unpriced inventory separately on the full calendar.
-Historical event/source admission and fixed-contract lending remain open. This is an
+Both cost paths now use dated B3 loan components, with stock/hedge rent separated
+from exchange fees. Historical event/source admission, fixed-contract lending and
+the pre-platform monetary contract minimum remain open; see
+`docs/v2_LOAN_ACCOUNTING.md`. This is an
 implemented accounting repair, not completion of the contractual-event/source audit
 or acceptance of new historical results. Reproduce sealed books with their recorded
 source commits; use new roots for corrected replays.

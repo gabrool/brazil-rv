@@ -15,6 +15,7 @@ from .share_distributions import (
     basket_prices,
     basket_betas,
 )
+from .loan_fees import LoanModality, loan_fee_rates
 
 
 OrderSide = Literal["buy", "sell"]
@@ -83,9 +84,8 @@ class LedgerConfig:
     cost_bps_per_side: float = 4.0
     annual_borrow_rate: float = 0.02
     borrow_source: BorrowSource = "borrow_balance"
-    borrow_registration_fee_fraction: float = 0.20
-    borrow_registration_fee_floor: float = 0.00025
-    borrow_registration_fee_cap: float = 0.0070
+    borrow_fee_modality: LoanModality = "normal"
+    borrow_fee_multiplier: float = 1.0
     volatility_balanced_entries: bool = True
     volatility_group_count: int = 5
     small_stratum_scaling_threshold_multiple: int = 2
@@ -130,12 +130,12 @@ class LedgerConfig:
             "borrow_open",
         }:
             raise ValueError("borrow source is not a registered rev4b cell")
-        if (
-            self.borrow_registration_fee_fraction < 0.0
-            or self.borrow_registration_fee_floor < 0.0
-            or self.borrow_registration_fee_cap < self.borrow_registration_fee_floor
+        if self.borrow_fee_modality not in {"normal", "direct", "otc", "compulsory"}:
+            raise ValueError("unknown B3 loan modality")
+        if self.borrow_fee_multiplier < 0 or not np.isfinite(
+            self.borrow_fee_multiplier
         ):
-            raise ValueError("borrow registration fee schedule is invalid")
+            raise ValueError("borrow fee multiplier must be finite and non-negative")
         if self.volatility_group_count < 1:
             raise ValueError("volatility group count must be positive")
         if self.small_stratum_scaling_threshold_multiple < 2:
@@ -163,27 +163,12 @@ class LedgerConfig:
             raise ValueError("unpriced exposure bound must be positive")
 
 
-def equity_borrow_registration_fee(
-    annual_rate: NDArray[np.float64] | float,
-    *,
-    config: LedgerConfig,
-) -> NDArray[np.float64] | float:
-    """Return the registered B3 borrower fee for an annual lending rate."""
-
-    fee = np.clip(
-        np.asarray(annual_rate, dtype=np.float64)
-        * config.borrow_registration_fee_fraction,
-        config.borrow_registration_fee_floor,
-        config.borrow_registration_fee_cap,
-    )
-    return float(fee) if fee.ndim == 0 else fee
-
-
-def daily_borrow_cost(annual_rate, *, config: LedgerConfig):
-    """Daily rent plus B3 fee under the configured annual-rate convention."""
-    fee = equity_borrow_registration_fee(annual_rate, config=config)
-    return np.expm1(np.log1p(annual_rate) / config.annual_sessions) + np.expm1(
-        np.log1p(fee) / config.annual_sessions
+def daily_borrow_cost(annual_rate, dates, *, config: LedgerConfig):
+    """One-session rent/fee estimate; each exchange component compounds alone."""
+    fees = loan_fee_rates(annual_rate, dates, modality=config.borrow_fee_modality)
+    return np.expm1(np.log1p(annual_rate) / config.annual_sessions) + (
+        np.expm1(np.log1p(fees) / config.annual_sessions).sum(axis=-1)
+        * config.borrow_fee_multiplier
     )
 
 
@@ -465,6 +450,8 @@ class StatefulLedgerResult:
     hedge_turnover_fraction_nav: NDArray[np.float64]
     hedge_cost_bps: NDArray[np.float64]
     hedge_borrow_bps: NDArray[np.float64]
+    hedge_borrow_raw_bps: NDArray[np.float64]
+    hedge_borrow_fee_bps: NDArray[np.float64]
     ex_ante_beta_before_hedge: NDArray[np.float64]
     ex_ante_beta_after_hedge: NDArray[np.float64]
     gross_fraction_nav_including_hedge: NDArray[np.float64]
@@ -1543,6 +1530,8 @@ def simulate_stateful_ledger(
     hedge_turnover_rows: list[float] = []
     hedge_cost_rows: list[float] = []
     hedge_borrow_rows: list[float] = []
+    hedge_borrow_raw_rows: list[float] = []
+    hedge_borrow_fee_rows: list[float] = []
     ex_ante_beta_before_rows: list[float] = []
     ex_ante_beta_after_rows: list[float] = []
     gross_including_hedge_rows: list[float] = []
@@ -3110,22 +3099,28 @@ def simulate_stateful_ledger(
             raw_rates = inputs.annual_borrow_rate_by_name[day, short_at_open]
             if not np.isfinite(raw_rates).all():
                 raise RuntimeError("held archive-borrow short has no finite rate")
-            fee_rates = np.asarray(
-                equity_borrow_registration_fee(raw_rates, config=config),
-                dtype=np.float64,
+            fee_rates = loan_fee_rates(
+                raw_rates, inputs.dates[day], modality=config.borrow_fee_modality
             )
-            effective_rates = raw_rates + fee_rates
+            effective_rates = (
+                raw_rates + fee_rates.sum(axis=-1) * config.borrow_fee_multiplier
+            )
             equity_borrow_raw = float(
                 np.sum(
                     short_values
                     * np.expm1(np.log1p(raw_rates) / config.annual_sessions)
                 )
             )
-            equity_borrow_fee = float(
-                np.sum(
-                    short_values
-                    * np.expm1(np.log1p(fee_rates) / config.annual_sessions)
+            equity_borrow_fee = (
+                float(
+                    np.sum(
+                        short_values
+                        * np.expm1(np.log1p(fee_rates) / config.annual_sessions).sum(
+                            axis=-1
+                        )
+                    )
                 )
+                * config.borrow_fee_multiplier
             )
             borrow = equity_borrow_raw + equity_borrow_fee
             weighted_borrow_rate = float(
@@ -3142,32 +3137,44 @@ def simulate_stateful_ledger(
                 np.expm1(np.log1p(config.annual_borrow_rate) / config.annual_sessions)
                 * short_value_at_open
             )
-            uniform_fee_rate = float(
-                equity_borrow_registration_fee(
-                    config.annual_borrow_rate,
-                    config=config,
-                )
+            uniform_fee_rate = loan_fee_rates(
+                config.annual_borrow_rate,
+                inputs.dates[day],
+                modality=config.borrow_fee_modality,
             )
             equity_borrow_fee = (
-                np.expm1(np.log1p(uniform_fee_rate) / config.annual_sessions)
+                np.expm1(np.log1p(uniform_fee_rate) / config.annual_sessions).sum()
                 * short_value_at_open
+                * config.borrow_fee_multiplier
             )
             borrow = equity_borrow_raw + equity_borrow_fee
             weighted_borrow_rate = (
-                config.annual_borrow_rate + uniform_fee_rate
+                config.annual_borrow_rate
+                + uniform_fee_rate.sum() * config.borrow_fee_multiplier
                 if short_value_at_open > 0.0
                 else 0.0
             )
         hedge_borrow = 0.0
+        hedge_borrow_raw = 0.0
+        hedge_borrow_fee = 0.0
         if config.beta_hedge and hedge_shares < 0.0:
             hedge_rate = (
                 float(inputs.hedge_annual_borrow_rate[day])
                 if np.isfinite(inputs.hedge_annual_borrow_rate[day])
                 else config.hedge_annual_borrow_rate
             )
-            hedge_borrow = abs(hedge_shares * hedge_mark) * daily_borrow_cost(
-                hedge_rate, config=config
+            hedge_borrow_raw = abs(hedge_shares * hedge_mark) * np.expm1(
+                np.log1p(hedge_rate) / config.annual_sessions
             )
+            hedge_fees = loan_fee_rates(
+                hedge_rate, inputs.dates[day], modality=config.borrow_fee_modality
+            )
+            hedge_borrow_fee = (
+                abs(hedge_shares * hedge_mark)
+                * np.expm1(np.log1p(hedge_fees) / config.annual_sessions).sum()
+                * config.borrow_fee_multiplier
+            )
+            hedge_borrow = hedge_borrow_raw + hedge_borrow_fee
             borrow += hedge_borrow
         held_short_borrow_rate_rows.append(weighted_borrow_rate)
         held_short_notional_rows.append(short_value_at_open)
@@ -3633,6 +3640,8 @@ def simulate_stateful_ledger(
         hedge_turnover_rows.append(hedge_traded_notional / start_nav)
         hedge_cost_rows.append(10_000.0 * hedge_cost / start_nav)
         hedge_borrow_rows.append(10_000.0 * hedge_borrow / start_nav)
+        hedge_borrow_raw_rows.append(10_000.0 * hedge_borrow_raw / start_nav)
+        hedge_borrow_fee_rows.append(10_000.0 * hedge_borrow_fee / start_nav)
         ex_ante_beta_before_rows.append(ex_ante_before)
         ex_ante_beta_after_rows.append(ex_ante_after)
         unresolved_stale_fraction_rows.append(unresolved_stale_fraction)
@@ -4160,6 +4169,8 @@ def simulate_stateful_ledger(
         hedge_turnover_fraction_nav=np.asarray(hedge_turnover_rows, dtype=np.float64),
         hedge_cost_bps=np.asarray(hedge_cost_rows, dtype=np.float64),
         hedge_borrow_bps=np.asarray(hedge_borrow_rows, dtype=np.float64),
+        hedge_borrow_raw_bps=np.asarray(hedge_borrow_raw_rows, dtype=np.float64),
+        hedge_borrow_fee_bps=np.asarray(hedge_borrow_fee_rows, dtype=np.float64),
         ex_ante_beta_before_hedge=np.asarray(
             ex_ante_beta_before_rows, dtype=np.float64
         ),

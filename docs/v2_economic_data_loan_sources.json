@@ -38,5 +38,21 @@
     "retrieved_at_utc": "2026-09-19T13:25:36.513378+00:00",
     "sha256": "6e99fe4de868a0b2cac5cf886ed820b86ec6861a3f7500d65e413f0842d94b21",
     "url": "https://www.b3.com.br/data/files/7D/C6/1C/C5/4F7D5710700BFA57AC094EA8/CE%20049-2020-VPC%20Errata%20-%20F%C3%B3rmula%20Empr%C3%A9stimo%20Ativos_REVISADO_RR.pdf"
+  },
+  {
+    "bytes": 518894,
+    "id": "b3_loan_guide_2018",
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\primary_sources\\b3_loan_guide_2018.pdf",
+    "retrieved_at_utc": "2026-09-19T16:38:47.787274+00:00",
+    "sha256": "872b9e3907d869ed913c3198afde35e45865f338bc5be7f3a7569a5dbe9a1a52",
+    "url": "https://www.b3.com.br/lumis/portal/file/fileDownload.jsp?fileId=8AE490CA654577E401655D0EAD2746AC"
+  },
+  {
+    "bytes": 31230,
+    "id": "bvmf_historical_costs",
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\primary_sources\\bvmf_historical_costs.html",
+    "retrieved_at_utc": "2026-09-19T16:46:06.078115+00:00",
+    "sha256": "a00d62040adf07f0b781a1a46e22849333ef574407217951471487b3a855218e",
+    "url": "https://bvmf.bmfbovespa.com.br/pt-br/servicos/custos-e-tributos/custos-operacionais/acoes.aspx?idioma=pt-br"
   }
 ]

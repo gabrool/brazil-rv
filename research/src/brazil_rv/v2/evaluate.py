@@ -21,6 +21,7 @@ from brazil_rv.execution.stateful_ledger import (
 )
 from brazil_rv.modeling.metrics import average_ranks, moving_block_bootstrap
 from brazil_rv.execution.share_distributions import ShareDistribution
+from brazil_rv.execution.loan_fees import LOAN_FEE_CONVENTION
 
 from .artifacts import write_json_atomic
 from .config import FULL_PROTOCOL, ProtocolPreset
@@ -47,7 +48,7 @@ MIN_CROSS_SECTION = 20
 BOOTSTRAP_SEED = 20260903
 ECONOMICS_COSTS_BPS = (2.0, 4.0, 7.0)
 ECONOMICS_HEADLINE = (4.0, 0.02)
-EVALUATION_SCHEMA = "BRAZIL_RV_V2_EVALUATION_V21"
+EVALUATION_SCHEMA = "BRAZIL_RV_V2_EVALUATION_V22"
 PRIOR_EVALUATION_SCHEMA = "BRAZIL_RV_V2_EVALUATION_V15"
 PAIRED_COMPARISON_SCHEMA = "BRAZIL_RV_V2_PAIRED_COMPARISON_V3"
 
@@ -991,6 +992,8 @@ def _ledger_rows(
             ),
             "hedge_cost_bps": _finite_or_none(result.hedge_cost_bps[index]),
             "hedge_borrow_bps": _finite_or_none(result.hedge_borrow_bps[index]),
+            "hedge_borrow_raw_bps": _finite_or_none(result.hedge_borrow_raw_bps[index]),
+            "hedge_borrow_fee_bps": _finite_or_none(result.hedge_borrow_fee_bps[index]),
             "ex_ante_beta_before_hedge": _finite_or_none(
                 result.ex_ante_beta_before_hedge[index]
             ),
@@ -1801,7 +1804,15 @@ def _economics_contract(inputs: EvaluationInputs) -> dict[str, object]:
         "short_proceeds_remuneration": config.short_proceeds_remuneration,
         "costs_bps_per_side": list(ECONOMICS_COSTS_BPS),
         "cost_grid_borrow_cells": ["borrow_balance", "borrow_strict", "borrow_open"],
-        "borrow_daily_accrual": "expm1(log1p(annual_rate)/252); registration fee separately",
+        "borrow_daily_accrual": (
+            "current marked-notional proxy; rent and dated exchange components "
+            "compound separately; fixed-contract principal/payment still pending"
+        ),
+        "borrow_fee_convention": LOAN_FEE_CONVENTION,
+        "pre_platform_contract_minimum": (
+            "R$10 voluntary-contract minimum not yet integrated; "
+            "historical-account acceptance pending contract settlement"
+        ),
         "pending_entries_follow_retention": config.cancel_pending_outside_retention,
         "hedge_decision": "15:45; prior marks, prior BOVA11 close and prior NAV",
         "hedge_beta_manifest_sha256": inputs.hedge_beta_manifest_sha256,
@@ -1810,9 +1821,9 @@ def _economics_contract(inputs: EvaluationInputs) -> dict[str, object]:
             "annual_borrow_rate": ECONOMICS_HEADLINE[1],
             "borrow_source": config.borrow_source,
             "borrow_registration_fee": {
-                "fraction_of_contract_rate": (config.borrow_registration_fee_fraction),
-                "annual_floor": config.borrow_registration_fee_floor,
-                "annual_cap": config.borrow_registration_fee_cap,
+                "modality_assumption": config.borrow_fee_modality,
+                "multiplier": config.borrow_fee_multiplier,
+                "schedule": LOAN_FEE_CONVENTION,
             },
             "volatility_balanced_entries": config.volatility_balanced_entries,
             "beta_hedge": config.beta_hedge,
@@ -2210,11 +2221,9 @@ def _evaluate_economics(
                 "borrow_source": config.borrow_source,
                 "buffer_per_side": config.buffer_per_side,
                 "short_proceeds_remuneration": (config.short_proceeds_remuneration),
-                "borrow_registration_fee_fraction": (
-                    config.borrow_registration_fee_fraction
-                ),
-                "borrow_registration_fee_floor": (config.borrow_registration_fee_floor),
-                "borrow_registration_fee_cap": config.borrow_registration_fee_cap,
+                "borrow_fee_modality": config.borrow_fee_modality,
+                "borrow_fee_multiplier": config.borrow_fee_multiplier,
+                "borrow_fee_convention": LOAN_FEE_CONVENTION,
                 "missing_quote_convention": MISSING_QUOTE_CONVENTION,
                 "settlement_grace_sessions": config.settlement_grace_sessions,
                 "unpriced_haircut": config.unpriced_haircut,
