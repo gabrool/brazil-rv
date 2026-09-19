@@ -211,3 +211,14 @@ contains the verified local forecast archive and inventory for the original
 49d3c9a portfolio root. Resolve those paths (including any moved D location) and
 verify C6 prelude manifest hashes against the original decision-cache bindings
 before building residual fit examples. Do not use old round7 source defaults.
+
+### Residual prelude recovered (2026-09-19 05:54 UTC)
+
+Recovered only the C6 prelude members from the verified local portfolio forecast
+archive into ROOT/residual_sources (30 files, 25,659,630 bytes). All three score
+manifest hashes exactly match the original decision-cache parent_prelude bindings;
+every referenced score payload hash also matches. Receipts:
+`residual_source_recovery.json`, `residual_prelude_verified.json`. This avoids any
+in-sample replacement. Remaining before residual fitting: verify training cutoff,
+store/identity/date bindings and construct per-seed historical OOS anchors with
+original neutral F scores, then implement the registered ridge/tree comparison.
