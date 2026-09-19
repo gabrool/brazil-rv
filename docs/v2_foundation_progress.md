@@ -395,3 +395,17 @@ contractual-account integration. No model is deployment-ready. Remaining closeou
 consolidated metrics/report, complete branch/timing ledger, verify recoverable
 archive on D, canonical pointer/context and GitHub checks. Do not claim an exact
 corrected settlement backtest; this program has not produced one.
+
+### Consolidated metrics prepared (2026-09-19 09:06 UTC)
+
+`v2_foundation_combined_metrics.json` contains all thirteen screen ensembles with
+three currency-consistent Sharpes, absolute/CDI-excess win/loss rates, turnover,
+gross, drawdown and IC/net, plus fit counts/epoch totals/timings. Screen folds are
+noncontiguous and each account resets; their concatenated drawdown/compounding is
+NOT a continuous 2018-2024 path. C6 screen net is 0.657 bps/day and fresh TE_full
+0.400; do not compare these different dates to earlier full-history 4/6 bps figures.
+Earlier continuous neutral/flexible results must be shown separately in final report.
+Run artifacts total 12.43 GB across 9,753 files; D has 42.8 GB free. Recovery archive
+can include run evidence/checkpoints without duplicating the immutable source store.
+Final combined narrative, source snapshot, archive/hash/recovery check and canonical
+completion updates remain. No background model fits are needed or running.
