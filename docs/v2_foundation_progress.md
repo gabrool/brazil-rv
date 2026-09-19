@@ -195,3 +195,19 @@ boundary implications; produce combined report and verified D recovery archive.
 The residual specification was reread. Do not substitute the old unmodified
 round7_corrector implementation or use fitted training anchors. All relevant
 source evidence and provenance are described earlier in this progress document.
+
+### Conditional C6 capacity review (2026-09-19 05:39 UTC)
+
+Reviewed all 42 original neutral C6 histories with source hashes, recorded in
+`v2_foundation_c6_curves.json`. Mean completed epochs 22.36, selected epoch 17.48.
+Only F2/seed29 reaches 60 and selects 60; its last-six-epoch selection IC moves
+0.020829 to 0.021055 while fit probe moves 0.096949 to 0.097263. This isolated
+ceiling hit is a limitation, but does not establish a widespread width/depth
+bottleneck. Most fits stop by validation patience; no C6 capacity extension is
+triggered in this bounded program. This is not evidence that larger C6 cannot help.
+
+Residual prelude recovery pointer located: `docs/v2_portfolio_policy_recovery.json`
+contains the verified local forecast archive and inventory for the original
+49d3c9a portfolio root. Resolve those paths (including any moved D location) and
+verify C6 prelude manifest hashes against the original decision-cache bindings
+before building residual fit examples. Do not use old round7 source defaults.
