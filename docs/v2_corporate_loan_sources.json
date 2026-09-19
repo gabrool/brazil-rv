@@ -1,0 +1,125 @@
+{
+  "existing_source_receipts": {
+    "cielo_conversion_20240826": {
+      "bytes": 274096,
+      "mime": "text/html",
+      "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_foundation_d21a93a_20260918\\primary_sources\\cielo_conversion_20240826.pdf",
+      "resolved_url": "https://www.rad.cvm.gov.br/ENETWeb/frmDownloadDocumento.aspx?CodigoInstituicao=1&Tela=ext&descTipo=IPE&numProtocolo=1275808",
+      "retrieved_at": "2026-09-18T21:59:18.767718+00:00",
+      "sha256": "4135101e1ee2c9682b5257bb523a31569a7eb89cc02571e720ba9d8ec6ba8bf8",
+      "url": "https://www.rad.cvm.gov.br/ENETWeb/frmDownloadDocumento.aspx?CodigoInstituicao=1&Tela=ext&descTipo=IPE&numProtocolo=1275808",
+      "verified_document_date": "2024-08-26"
+    },
+    "cielo_redemption_20240923": {
+      "bytes": 252390,
+      "mime": "text/html",
+      "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_foundation_d21a93a_20260918\\primary_sources\\cielo_redemption_20240923.pdf",
+      "resolved_url": "https://www.rad.cvm.gov.br/ENETWeb/frmDownloadDocumento.aspx?Tela=ext&numProtocolo=1284473&descTipo=IPE&CodigoInstituicao=1",
+      "retrieved_at": "2026-09-18T22:01:33.021418+00:00",
+      "sha256": "f195bfd2c1d2ccfb445ebb0cf1b7fa988000b868e1eb2b6cc0c3d60161f5fc6d",
+      "url": "https://www.rad.cvm.gov.br/ENETWeb/frmDownloadDocumento.aspx?Tela=ext&numProtocolo=1284473&descTipo=IPE&CodigoInstituicao=1"
+    },
+    "copel_units_20231218": {
+      "bytes": 495035,
+      "mime": "application/pdf",
+      "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_foundation_d21a93a_20260918\\primary_sources\\copel_units_20231218.pdf",
+      "resolved_url": "https://api.mziq.com/mzfilemanager/v2/d/16a31b1b-5ecd-4214-a2e0-308a2393e330/a338bc96-aabd-f8e4-dc9d-3936484bff87",
+      "retrieved_at": "2026-09-18T21:59:19.452643+00:00",
+      "sha256": "4d172d4853ebd3ee6e375f4e8a26fac6b5e2e8d479c1d4c0d578ddc3e7fd2510",
+      "url": "https://api.mziq.com/mzfilemanager/v2/d/16a31b1b-5ecd-4214-a2e0-308a2393e330/a338bc96-aabd-f8e4-dc9d-3936484bff87"
+    },
+    "dommo_borrow_b3_20221220": {
+      "bytes": 119298,
+      "mime": "application/pdf",
+      "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_foundation_d21a93a_20260918\\primary_sources\\dommo_borrow_b3_20221220.pdf",
+      "resolved_url": "https://www.b3.com.br/data/files/C6/01/2D/98/58135810F534EB48AC094EA8/OC%20188-2022%20PRE%20%20DMMO%20%28PT%29.pdf",
+      "retrieved_at": "2026-09-18T22:28:52.580641+00:00",
+      "sha256": "c715e3bb9ad6480c44bdb85e3b47076c31ae68ba683eb220637f06a896dad062",
+      "url": "https://www.b3.com.br/data/files/C6/01/2D/98/58135810F534EB48AC094EA8/OC%20188-2022%20PRE%20%20DMMO%20%28PT%29.pdf"
+    }
+  },
+  "retrieved_utc": "2026-09-19T19:17:31.610002+00:00",
+  "scope": "Dated primary corporate loan rules; historical event prices and source-specific admission remain separate",
+  "sources": [
+    {
+      "bytes": 181595,
+      "id": "cielo_loan_b3_20240725",
+      "pages": 10,
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\primary_sources\\cielo_loan_b3_20240725.pdf",
+      "published_date": "2024-07-25",
+      "sha256": "bb75db08014cf5daf3e796078e258b0d4fa4d901422d5c3e3851a339c7c1c145",
+      "text_path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\primary_sources\\cielo_loan_b3_20240725.txt",
+      "text_sha256": "1df7244dd2c0506b39438e48d676c8b0513696803a1fc567678a451913486b04",
+      "url": "https://www.b3.com.br/data/files/09/D5/1E/78/68BE09105FE89209AC094EA8/OC%20011-2024-VNC%20Tratamento%20posi%C3%A7%C3%B5es%20e%20carteiras%20de%20%C3%ADndices%20em%20caso%20de%20convers%C3%A3o%20de%20registro%20de%20cia%20aberta%20e%20sa%C3%ADda%20do%20NM%20da%20Cielo%20_PT.pdf"
+    },
+    {
+      "bytes": 198038,
+      "id": "brmalls_loan_b3_20230103",
+      "pages": 15,
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\primary_sources\\brmalls_loan_b3_20230103.pdf",
+      "published_date": "2023-01-03",
+      "sha256": "0fb8ee7a12db103909541502d4b15ef2d3496e59ee3f9a302e25eb6311f61f2a",
+      "text_path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\primary_sources\\brmalls_loan_b3_20230103.txt",
+      "text_sha256": "1eea9f6c6903978e047d0e6775df8a57e3c4e2ffcee7ee7977e9490a8de151b3",
+      "url": "https://www.b3.com.br/data/files/69/11/4D/06/33975810F534EB48AC094EA8/OC%20001-2023-VNC%20Tratamento%20posi%C3%A7%C3%B5es%20incorpora%C3%A7%C3%A3o%20BRML%20ALSO.pdf"
+    },
+    {
+      "bytes": 416158,
+      "filed_time_source": "20:23 local via delivery index; next session earliest decision use",
+      "id": "cielo_opa_result_20240814",
+      "pages": 4,
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\primary_sources\\cielo_opa_result_20240814.pdf",
+      "published_date": "2024-08-14",
+      "sha256": "5fe1ae0d625fdfdbc8b4be70d0fe59e4c85f7bff57a8ccb44af99ce770a29ee2",
+      "text_path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\primary_sources\\cielo_opa_result_20240814.txt",
+      "text_sha256": "d9c4ffdbfad786bd79a1a3dea6c3c0228d91e59c1f4d2e9cac87c7f674146bfb",
+      "url": "https://www.rad.cvm.gov.br/ENETWeb/frmDownloadDocumento.aspx?Tela=ext&numProtocolo=1272035&descTipo=IPE&CodigoInstituicao=1"
+    },
+    {
+      "bytes": 320305,
+      "filed_time_source": "20:23 local via delivery index; next session earliest decision use",
+      "id": "cielo_remaining_shareholders_20240814",
+      "pages": 6,
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\primary_sources\\cielo_remaining_shareholders_20240814.pdf",
+      "published_date": "2024-08-14",
+      "sha256": "553a17ce7fe2614aa1720ba42d4c1cb858746e1a268aade982a1bbdf71182f8c",
+      "text_path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\primary_sources\\cielo_remaining_shareholders_20240814.txt",
+      "text_sha256": "3485b7c94f171f1c9e1056710e5fdfd396e91a2f5049b024d95eb57afe05a26f",
+      "url": "https://www.rad.cvm.gov.br/ENETWeb/frmDownloadDocumento.aspx?Tela=ext&numProtocolo=1272036&descTipo=IPE&CodigoInstituicao=1"
+    },
+    {
+      "bytes": 316417,
+      "id": "cielo_opa_notice_20240710",
+      "pages": 2,
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\primary_sources\\cielo_opa_notice_20240710.pdf",
+      "published_date": "2024-07-10",
+      "sha256": "6dba54bed0353dd465d903957557537e3aefab975cf47a2a356590291baa83ca",
+      "text_path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\primary_sources\\cielo_opa_notice_20240710.txt",
+      "text_sha256": "a304e6972ee5c07a96904f87849069299ce52ee0dd43ea5450f7b7e578f9c341",
+      "url": "https://www.rad.cvm.gov.br/ENETWeb/frmDownloadDocumento.aspx?Tela=ext&numProtocolo=1258856&descTipo=IPE&CodigoInstituicao=1"
+    },
+    {
+      "bytes": 575590,
+      "discovery": "embedded issuer Edital link in CVM protocol 1258856",
+      "id": "cielo_opa_edital_20240710",
+      "pages": 55,
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\primary_sources\\cielo_opa_edital_20240710.pdf",
+      "published_date": "2024-07-10",
+      "sha256": "c3d3d7f18b9a357a793409083abd6dcee068ddde5d5176eb41f2db3f715065fb",
+      "text_path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\primary_sources\\cielo_opa_edital_20240710.txt",
+      "text_sha256": "a7d8fd74448f5ae092939ca526d1aed589ba1383a9f7e7a6a8b406572bd4f892",
+      "url": "https://api.mziq.com/mzfilemanager/v2/d/4d1ebe73-b068-4443-992a-3d72d573238c/1a6fdceb-e635-cd3c-9765-4d21f457d0d8?origin=2"
+    },
+    {
+      "bytes": 1231,
+      "id": "selic_sgs11_20240816_20240926",
+      "metadata_url": "https://dadosabertos.bcb.gov.br/dataset/11-taxa-de-juros---selic",
+      "observations": 30,
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\primary_sources\\selic_sgs11_20240816_20240926.json",
+      "scope": "2024 corporate contractual price correction only; not model features",
+      "sha256": "a1932d598e668c6bc38598bb6fb333fa5df0dd3b18e0cb70ba2a263d31ac2fd0",
+      "unit": "percent per business day; divide by 100",
+      "url": "https://api.bcb.gov.br/dados/serie/bcdata.sgs.11/dados?formato=json&dataInicial=16/08/2024&dataFinal=26/09/2024"
+    }
+  ]
+}

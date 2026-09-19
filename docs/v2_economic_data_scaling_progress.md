@@ -601,3 +601,46 @@ The admission receipt SHA-256 is
 All archive members were read back and hash-verified; reference-panel axes and the
 development date boundary were checked from the archive itself. No immutable raw
 or accepted dataset was duplicated.
+
+## 2026-09-19: compulsory loan cash events and issuer-source recovery
+
+Cielo's B3 circular exposes a separate contractual path: remaining loans cash-settle
+on D+4 after last trading, whereas remaining shareholders receive the later approved
+redemption. Both accounts now implement this distinction, preserving original loan
+rent/fee references and liabilities through the loan payment date. Later physical
+returns are superseded without discarding their covering assets or changing external
+spot cash value dates. Principal cash is attributed separately from borrowing cost.
+The final payment price never rewrites prior intentions; a new-short prohibition
+survives flat-start slicing. Evaluation V25 binds the event terms. Static policy
+coordinates, all source stores, model labels/features and checkpoints are unchanged.
+
+Seven new primary-source receipts are archived: the Cielo and BR Malls B3 loan
+circulars; Cielo's auction result, shareholder procedure, notice and embedded offer
+document; and a bounded 30-observation BCB SELIC retrieval for August–September 2024.
+Four existing issuer/B3 receipts are hash-verified and referenced without copying.
+The Cielo offer explicitly distinguishes pre-auction CDI from subsequent SELIC.
+Source-derived continuous loan consideration on August 30 is R$5.842895570784521;
+this is not an obtained invoice quote. The September shareholder cash term is R$5.89,
+payable September 26, and must not be backdated into August. BR Malls' newly recovered
+terms distinguish January 9 economic succession, January 10 end-of-day loan
+conversion, January 11 custody and January 20 cash, preserving loan principal/rates.
+Details and remaining event-specific admission are in `docs/v2_CORPORATE_EVENTS.md`.
+
+Validation: 227 affected account/policy/evaluation/objective checks passed, then
+seven focused loan-cash checks passed after adding the real allocator/input-hash
+test (six overlap). The new oracles cover signed shareholder/loan asymmetry, cash
+conservation for superseded covers, future-price mutation, gradients, source clocks,
+borrow constraints and slicing without static-feature drift. Ruff passed. Two
+synthetic long-only and long/short books are bit-identical to commit 601b75a across
+NAV, holdings, marks, fills, intentions, cash/financing, turnover, liabilities,
+payments and original-entry charges. `docs/v2_loan_cash_acceptance.json` binds the
+receipt and reproducer. No redundant census, GPU fit or historical outcome was run.
+
+This is still intermediate A/B. Actual historical event-axis admission is not yet
+complete: the accepted CIEL store retains q=1/d=0 and unresolved coverage after
+August 26. Source-derived overrides must be applied explicitly in a new accounting
+contract, with any model-data effects separately handled in B. Remaining custody,
+multi-leg principal/fractions, maturity/renewal, calendar and source-family audits
+remain required before C/D. The superseded-return fixture proves cash/NAV arithmetic,
+not full failed-delivery/holding-basis metadata. Invoice cents remain a bounded
+research convention. The registration was reviewed; no stage or candidate is promoted.

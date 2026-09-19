@@ -235,3 +235,28 @@ eligible stock-days and every hedge session have prior references. No new loan m
 silently replace a missing reference. BOVA11 observed rates are aligned separately,
 with NaN explicitly delegating to the configured fallback, and do not contaminate
 the equity cross-sectional imputation universe. See `v2_lending_source_admission.json`.
+
+## Compulsory loan cash settlement
+
+Evaluation V25 admits a distinct source-bound loan cash event. It cash-settles all
+outstanding contract quantities on the declared date, including requested returns
+due that day or later, and retains the original principal/rate for rent and B3 fees
+through payment. This principal cash is not a borrowing expense or a shareholder
+redemption. Both accounts retain a covering asset when its planned physical return
+is superseded and preserve external spot cash value dates while releasing the
+extinguished loan's restricted proceeds. Prior intentions do not read the final
+settlement price; no new shorts are allowed from the declared effective date.
+
+The Cielo B3 circular supplies the concrete reason for this distinction. The source
+receipts and issuer timetable are described in `v2_CORPORATE_EVENTS.md`. Its offer
+document calls for SELIC correction after the auction, distinct from the pre-auction
+CDI adjustment. The recovered rates support a continuous calculation, with invoice
+rounding still bounded separately. Neither a later shareholder cash price nor an
+unverified current mark may substitute for the contractual loan closeout amount.
+
+Synthetic parity, source-clock, cash conservation, gradient, policy constraint and
+input-hash checks are bound by `v2_loan_cash_acceptance.json`; ordinary books preserve
+bit-identical paths against commit 601b75a. General physical custody, failed-delivery
+and restored holding-basis metadata are not established by the superseded-return
+cash/NAV fixture. Historical event-axis admission remains separate from these
+mechanics, and model-data changes require their own contract and matched refits.

@@ -12,6 +12,7 @@ from torch import nn
 from .allocation import AllocationConfig, allocate
 from .portfolio_account import PortfolioAccount, tensor
 from .share_distributions import slice_distributions, basket_betas, basket_prices
+from .loan_contracts import slice_loan_settlements
 from .stateful_ledger import (
     LedgerConfig,
     PortfolioTarget,
@@ -160,6 +161,7 @@ class PolicyData:
             successor=np.r_[inputs.action_successor_index[day], n],
             payment_session=np.r_[inputs.action_payment_session[day], -1],
             share_distributions=inputs.share_distributions,
+            loan_cash_settlements=inputs.loan_cash_settlements,
             entry_fill_allowed=None
             if inputs.entry_fill_allowed is None
             else np.r_[inputs.entry_fill_allowed[day], True],
@@ -313,6 +315,9 @@ def decide(
     upper = torch.minimum(previous.clamp_min(0), tensor(allocation.stock_cap))
     openings = torch.as_tensor(np.r_[allowed[names], True])
     shorts = torch.as_tensor(np.r_[data.shortable[day, names], True])
+    for event in data.inputs.loan_cash_settlements:
+        if event.effective_session <= day:
+            shorts[:-1] &= torch.as_tensor(names != event.security_index)
     lower = torch.where(openings & shorts, -allocation.stock_cap, lower)
     upper = torch.where(openings, allocation.stock_cap, upper)
     exits = torch.as_tensor(np.r_[required[names], False])
@@ -501,6 +506,9 @@ def ledger_arguments(data, start, stop):
     arguments["action_payment_session"] = payments
     arguments["share_distributions"] = slice_distributions(
         inputs.share_distributions, start, stop
+    )
+    arguments["loan_cash_settlements"] = slice_loan_settlements(
+        inputs.loan_cash_settlements, start, stop
     )
     arguments["initial_reference_price"] = data.references[start]
     arguments["initial_unresolved_action"] = data.prior_unresolved(start)

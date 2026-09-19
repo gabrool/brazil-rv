@@ -21,6 +21,7 @@ from brazil_rv.execution.stateful_ledger import (
 )
 from brazil_rv.modeling.metrics import average_ranks, moving_block_bootstrap
 from brazil_rv.execution.share_distributions import ShareDistribution
+from brazil_rv.execution.loan_contracts import LoanCashSettlement
 from brazil_rv.execution.loan_fees import LOAN_FEE_CONVENTION
 
 from .artifacts import write_json_atomic
@@ -48,7 +49,7 @@ MIN_CROSS_SECTION = 20
 BOOTSTRAP_SEED = 20260903
 ECONOMICS_COSTS_BPS = (2.0, 4.0, 7.0)
 ECONOMICS_HEADLINE = (4.0, 0.02)
-EVALUATION_SCHEMA = "BRAZIL_RV_V2_EVALUATION_V24"
+EVALUATION_SCHEMA = "BRAZIL_RV_V2_EVALUATION_V25"
 PRIOR_EVALUATION_SCHEMA = "BRAZIL_RV_V2_EVALUATION_V15"
 PAIRED_COMPARISON_SCHEMA = "BRAZIL_RV_V2_PAIRED_COMPARISON_V3"
 
@@ -148,6 +149,7 @@ class EvaluationInputs:
     execution_policy: ExecutionPolicy | None = None
     entry_fill_allowed: NDArray[np.bool_] | None = None
     share_distributions: tuple[ShareDistribution, ...] = ()
+    loan_cash_settlements: tuple[LoanCashSettlement, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -858,6 +860,7 @@ def _ledger_inputs(
         "action_terms": _aligned_action_terms(inputs),
         "action_payment_session": inputs.action_payment_session,
         "share_distributions": inputs.share_distributions,
+        "loan_cash_settlements": inputs.loan_cash_settlements,
         "cdi_returns": inputs.cdi_returns,
         "security_ids": inputs.security_ids,
         "initial_reference_price": inputs.initial_reference_price,
@@ -1325,6 +1328,12 @@ def _action_attribution(
         "share_distribution_terms": [
             asdict(event) for event in inputs.share_distributions
         ],
+        "loan_cash_settlement_terms": [
+            asdict(event) for event in inputs.loan_cash_settlements
+        ],
+        "loan_cash_payments": [
+            asdict(payment) for payment in result.loan_cash_payments
+        ],
         "daily": [
             {
                 "date": day_value.isoformat(),
@@ -1592,6 +1601,12 @@ def _declared_subperiod_readouts(
 
 def _input_hashes(inputs: EvaluationInputs) -> dict[str, str]:
     result = {
+        "loan_cash_settlements": hashlib.sha256(
+            json.dumps(
+                [asdict(event) for event in inputs.loan_cash_settlements],
+                sort_keys=True,
+            ).encode()
+        ).hexdigest(),
         "dates": _dates_sha256(inputs.dates),
         "share_distributions": hashlib.sha256(
             json.dumps(
@@ -1844,6 +1859,11 @@ def _economics_contract(inputs: EvaluationInputs) -> dict[str, object]:
         "loan_return_assumption": (
             "prearranged return on covering spot settlement: T+3 before 2019-05-27, "
             "T+2 thereafter; delivered custody offsets may return that session"
+        ),
+        "loan_cash_settlement": (
+            "source-bound compulsory loan cash payments are separate from shareholder "
+            "redemption; original rent and fees accrue through closeout, later physical "
+            "returns are superseded and principal cash is reported outside borrowing cost"
         ),
         "contractual_accounting_status": (
             "loan and dated spot cash mechanics implemented; historical "
@@ -3000,6 +3020,7 @@ _PAIRED_INPUT_KEYS = (
     "action_successor_index",
     "action_payment_session",
     "share_distributions",
+    "loan_cash_settlements",
     "security_ids",
     "target_scale_sigma",
     "cdi_returns",

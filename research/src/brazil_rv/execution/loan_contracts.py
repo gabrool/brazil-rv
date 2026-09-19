@@ -6,7 +6,8 @@ All arithmetic is vectorized on CPU; quantities retain gradients in training and
 have no autograd graph in NumPy replay. Rates and dates are historical constants.
 """
 
-from dataclasses import dataclass, field, fields
+from dataclasses import dataclass, field, fields, replace
+import math
 
 import numpy as np
 import torch
@@ -42,6 +43,47 @@ class LoanCharge:
     security_index: int
     rent: float
     fee: float
+
+
+@dataclass(frozen=True)
+class LoanCashSettlement:
+    """Sourced compulsory cash closeout of loans, not shareholder redemption."""
+
+    security_index: int
+    effective_session: int
+    available_session: int
+    cash_per_share: float
+    source: str
+
+    def __post_init__(self):
+        if self.available_session > self.effective_session:
+            raise ValueError("loan cash terms cannot be backdated")
+        if (
+            not self.source
+            or not math.isfinite(self.cash_per_share)
+            or self.cash_per_share <= 0
+        ):
+            raise ValueError("loan cash settlement requires a sourced positive price")
+
+
+@dataclass(frozen=True)
+class LoanCashPayment:
+    session: int
+    security_index: int
+    quantity: float
+    cash_paid: float
+
+
+def slice_loan_settlements(events, start, stop):
+    return tuple(
+        replace(
+            event,
+            effective_session=event.effective_session - start,
+            available_session=event.available_session - start,
+        )
+        for event in events
+        if event.effective_session < stop
+    )
 
 
 def spot_settlement_session(day, session_date):
@@ -302,6 +344,18 @@ class LoanContracts:
         self.root_fees = self.root_fees[live_roots]
         self.root = np.searchsorted(live_roots, self.root)
         return rent, fees
+
+    def cash_settle(self, name, day):
+        """Extinguish all outstanding shares, including later requested returns.
+
+        Rent/fees accrue through today before this call and pay via the ordinary
+        liability path. Principal cash is a separate issuer-specific payment.
+        A covering asset is retained if its planned physical return is superseded.
+        """
+        ids = self.name == name
+        quantity = self.quantity[ids].sum()
+        self.return_day[ids] = day
+        return quantity
 
     def _keep(self, keep):
         for key in (

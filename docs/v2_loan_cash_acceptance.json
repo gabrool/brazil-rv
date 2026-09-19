@@ -1,0 +1,101 @@
+{
+  "boundaries": [
+    "No historical source-event override or consumer profitability admitted",
+    "Full physical custody/failed delivery and restored holding-basis metadata remain open; Cielo regular T+2 final-day covers settle before D+4",
+    "Invoice rounding is bounded separately from continuous source-derived price",
+    "No model features, labels, masks, accepted stores or checkpoints changed",
+    "A/B remain incomplete; C/D have not started"
+  ],
+  "cielo_source_calculation": {
+    "continuous_shareholder_check": 5.886909802213979,
+    "correction": "SGS 11 daily SELIC, start inclusive/end exclusive",
+    "historical_event_applied": false,
+    "invoice_price_obtained": false,
+    "issuer_shareholder_cash_per_share": 5.89,
+    "loan_continuous_cash_per_share": 5.842895570784521,
+    "loan_date": "2024-08-30",
+    "offer_cash_per_share": 5.82,
+    "offer_settlement": "2024-08-16",
+    "redemption_date": "2024-09-23",
+    "sgs_observations_used_for_loan": 10,
+    "shareholder_payment_date": "2024-09-26"
+  },
+  "heldout_accessed": false,
+  "implementation_sha256_lf": {
+    "research/src/brazil_rv/execution/loan_contracts.py": "06c0372e9d94eee60c71abdef6ebc701c77acb6ebf29b5d48b9325fe960cb189",
+    "research/src/brazil_rv/execution/portfolio_account.py": "9c3ee39c3bd25e56cd1c1f73b47ef4b3e503ccada9453193a588490e39b659bb",
+    "research/src/brazil_rv/execution/portfolio_policy.py": "05162de14b6aa042e4ac212bbbf5cc11b154eca9f3676c20c31a8a1c4e7ac422",
+    "research/src/brazil_rv/execution/stateful_ledger.py": "2057e7f5f7da62774d7997b85cdbb76f771ad089b269010005e7f01fdb430be7",
+    "research/src/brazil_rv/v2/evaluate.py": "9d2c139e1a504cd948ad423d9054d1e8aedf0ddd51f78f581d41782ae49386d1",
+    "research/tests/test_loan_cash_settlement.py": "bbf44c11673d737c7f448f2f39718ad91cf7c7ad74c93565c331397a5b01fc19"
+  },
+  "reference_commit": "601b75ac1a3ff6e2a6217a43a03adf5236beec5f",
+  "reproducer": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\verify_loan_cash_acceptance.py",
+    "sha256": "34c8ca97c2c5c920d81a38a7ce032c8b2974d32c0174b86472bdfdfec428bfa1"
+  },
+  "scope": "Synthetic unaffected accounting paths; no consumer outcomes or neural fits",
+  "source_manifest_sha256": "0076c63306393870e2a68595935d581a6284b9ba37efcc33108105225a026b3a",
+  "test_runs": [
+    {
+      "passed": 227,
+      "scope": "affected accounts, loans, spot cash, policy, evaluation, claims, readout and objectives"
+    },
+    {
+      "passed": 7,
+      "scope": "final loan-cash oracles plus policy constraint, input hash and slicing; six overlap"
+    }
+  ],
+  "unaffected_bit_identical": {
+    "long_only": {
+      "all_cash_nav": true,
+      "borrow_bps": true,
+      "cost_bps": true,
+      "debit_financing_bps": true,
+      "fills": true,
+      "free_cash": true,
+      "free_cash_income_bps": true,
+      "gross_fraction_nav": true,
+      "intentions": true,
+      "loan_charges": true,
+      "loan_liability": true,
+      "loan_outstanding_principal": true,
+      "loan_payment": true,
+      "mark_price": true,
+      "nav": true,
+      "payables": true,
+      "receivables": true,
+      "restricted_cash": true,
+      "short_proceeds_interest_bps": true,
+      "signed_shares": true,
+      "turnover_fraction_nav": true,
+      "unsettled_cash": true
+    },
+    "long_short": {
+      "all_cash_nav": true,
+      "borrow_bps": true,
+      "cost_bps": true,
+      "debit_financing_bps": true,
+      "fills": true,
+      "free_cash": true,
+      "free_cash_income_bps": true,
+      "gross_fraction_nav": true,
+      "intentions": true,
+      "loan_charges": true,
+      "loan_liability": true,
+      "loan_outstanding_principal": true,
+      "loan_payment": true,
+      "mark_price": true,
+      "nav": true,
+      "payables": true,
+      "receivables": true,
+      "restricted_cash": true,
+      "short_proceeds_interest_bps": true,
+      "signed_shares": true,
+      "turnover_fraction_nav": true,
+      "unsettled_cash": true
+    }
+  },
+  "verified_existing_source_receipts": 4,
+  "verified_new_source_receipts": 7
+}

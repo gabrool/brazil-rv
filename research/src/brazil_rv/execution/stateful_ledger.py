@@ -18,6 +18,8 @@ from .share_distributions import (
 from .loan_fees import LoanModality, loan_fee_rates
 from .loan_contracts import (
     LoanCharge,
+    LoanCashSettlement,
+    LoanCashPayment,
     LoanContracts,
     LoanSession,
     spot_settlement_session,
@@ -307,6 +309,7 @@ class StatefulLedgerResult:
     loan_payment: NDArray[np.float64]
     loan_outstanding_principal: NDArray[np.float64]
     loan_charges: tuple[LoanCharge, ...]
+    loan_cash_payments: tuple[LoanCashPayment, ...]
     equity_borrow_raw_bps: NDArray[np.float64]
     equity_borrow_fee_bps: NDArray[np.float64]
     cdi_benchmark_bps: NDArray[np.float64]
@@ -1277,6 +1280,7 @@ def simulate_stateful_ledger(
     action_payment_session: NDArray[np.integer],
     cdi_returns: NDArray[np.floating],
     share_distributions: Sequence[ShareDistribution] = (),
+    loan_cash_settlements: Sequence[LoanCashSettlement] = (),
     config: LedgerConfig = LedgerConfig(),
     fill_fraction: NDArray[np.floating] | None = None,
     security_ids: Sequence[str] | None = None,
@@ -1340,6 +1344,25 @@ def simulate_stateful_ledger(
     if portfolio_policy is not None and config.volatility_balanced_entries:
         raise ValueError("portfolio allocation does not use fixed volatility slots")
     day_count, name_count = inputs.score.shape
+    if loan_cash_settlements:
+        shortable_mask = inputs.shortable.copy()
+        keys = set()
+        for event in loan_cash_settlements:
+            if not (
+                0 <= event.security_index < name_count
+                and event.effective_session < day_count
+            ):
+                raise ValueError(
+                    "loan settlement must align with replay sessions and names"
+                )
+            key = (event.effective_session, event.security_index)
+            if key in keys:
+                raise ValueError("duplicate loan cash settlement")
+            keys.add(key)
+            shortable_mask[max(0, event.effective_session) :, event.security_index] = (
+                False
+            )
+        inputs = replace(inputs, shortable=shortable_mask)
     distributions_by_day: dict[int, list[ShareDistribution]] = {}
     for event in share_distributions:
         if not (
@@ -1464,6 +1487,7 @@ def simulate_stateful_ledger(
     loan_payment_rows: list[float] = []
     loan_principal_rows: list[float] = []
     loan_charges: list[LoanCharge] = []
+    loan_cash_payments: list[LoanCashPayment] = []
     equity_borrow_raw_rows: list[float] = []
     equity_borrow_fee_rows: list[float] = []
     cdi_benchmark_rows: list[float] = []
@@ -3026,6 +3050,32 @@ def simulate_stateful_ledger(
         loan_rent, loan_fees = loans.accrue(
             day, inputs.dates[day], charges=loan_charges
         )
+        for event in loan_cash_settlements:
+            if event.effective_session != day:
+                continue
+            name = event.security_index
+            quantity = float(loans.cash_settle(name, day))
+            paid = quantity * event.cash_per_share
+            free_cash += restricted_by_name[name] - paid
+            restricted_by_name[name] = 0.0
+            for index, (due, free, pending_restricted) in enumerate(settlements):
+                remaining = pending_restricted.copy()
+                amount = remaining[name]
+                remaining[name] = 0
+                settlements[index] = (due, free + amount, remaining)
+            shares[name] += quantity
+            if shares[name] != 0 and not np.isfinite(marks[name]):
+                # A superseded cover can leave a long asset after net inventory
+                # was flat. Retain its causal mark, not the loan cash price.
+                marks[name] = last_observed[name]
+            if quantity:
+                loan_cash_payments.append(LoanCashPayment(day, name, quantity, paid))
+            if abs(shares[name]) < 1e-12:
+                shares[name] = 0.0
+                pending_exits.pop(name, None)
+                entry_session[name] = -1
+                entry_cost_basis[name] = submission_nav[name] = 0.0
+                ineligible_streak[name] = 0
         rates_today = (
             np.full(name_count, config.annual_borrow_rate)
             if config.borrow_source == "uniform"
@@ -3991,6 +4041,7 @@ def simulate_stateful_ledger(
         loan_payment=np.asarray(loan_payment_rows, dtype=np.float64),
         loan_outstanding_principal=np.asarray(loan_principal_rows, dtype=np.float64),
         loan_charges=tuple(loan_charges),
+        loan_cash_payments=tuple(loan_cash_payments),
         equity_borrow_raw_bps=np.asarray(equity_borrow_raw_rows, dtype=np.float64),
         equity_borrow_fee_bps=np.asarray(equity_borrow_fee_rows, dtype=np.float64),
         cdi_benchmark_bps=np.asarray(cdi_benchmark_rows, dtype=np.float64),

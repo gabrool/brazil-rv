@@ -21,6 +21,7 @@ def compare(
     fractions=None,
     config=None,
     share_distributions=(),
+    loan_cash_settlements=(),
 ):
     close = np.asarray(close, dtype=float)
     days, names = close.shape
@@ -39,6 +40,7 @@ def compare(
         fill_fraction=fractions,
         config=config,
         share_distributions=share_distributions,
+        loan_cash_settlements=loan_cash_settlements,
     )
     account = PortfolioAccount.empty(np.full(names + 1, 100.0), config=config)
     records = []
@@ -67,6 +69,7 @@ def compare(
             fill_fraction=None if fractions is None else np.r_[fractions[day], 1.0],
             terminal=day == days - 1,
             share_distributions=share_distributions,
+            loan_cash_settlements=loan_cash_settlements,
         )
         assert account.shares.numpy()[:-1] == pytest.approx(
             exact.signed_shares[day], abs=1e-12

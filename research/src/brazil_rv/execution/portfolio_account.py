@@ -354,6 +354,7 @@ class PortfolioAccount:
         successor=None,
         payment_session=None,
         share_distributions=(),
+        loan_cash_settlements=(),
         fill_fraction=None,
         entry_fill_allowed=None,
         terminal=False,
@@ -394,6 +395,39 @@ class PortfolioAccount:
         hedge_trade_notional = (target[-1] - before[-1]) * start_nav
         loan_rent, loan_fee = self.loans.accrue(day, session_date)
         borrow = loan_rent.sum() + loan_fee.sum()
+
+        cash_loan_payment = tensor(0.0)
+        for event in loan_cash_settlements:
+            name = event.security_index
+            if event.effective_session <= day:
+                entry_notional = entry_notional.clone()
+                entry_notional[name] = entry_notional[name].clone().clamp_min(0)
+            if event.effective_session != day:
+                continue
+            quantity = self.loans.cash_settle(name, day)
+            paid = quantity * event.cash_per_share
+            cash_loan_payment = cash_loan_payment + paid
+            self.trade_cash = self.trade_cash - paid + self.trade_restricted[name]
+            restricted = self.trade_restricted.clone()
+            restricted[name] = 0
+            self.trade_restricted = restricted
+            # The loan no longer restricts money, including a previously queued
+            # cover release. Preserve each external receipt/payment's value date.
+            settlements = []
+            for due, free, pending_restricted in self.settlements:
+                amount = pending_restricted[name]
+                remaining = pending_restricted.clone()
+                remaining[name] = 0
+                settlements.append((due, free + amount, remaining))
+            self.settlements = settlements
+            shares = self.shares.clone()
+            shares[name] = shares[name] + quantity
+            self.shares = shares
+            if abs(float(shares[name].detach())) < 1e-12:
+                self.cost_basis = self.cost_basis.clone()
+                self.cost_basis[name] = 0
+                self.entry_day[name] = -1
+                self.missing_sessions[name] = self.ineligible_sessions[name] = 0
 
         # Realizations begin here. Terms alter prior inventory and marks once;
         # a cash entitlement remains a claim until its explicit payment day.
@@ -602,6 +636,7 @@ class PortfolioAccount:
             "borrow": borrow,
             "borrow_paid": rent_paid.sum() + fees_paid.sum(),
             "borrow_liability": self.loans.liability,
+            "loan_cash_settlement_payment": cash_loan_payment,
             "unsettled_cash": self.unsettled_cash,
             "free_cash_income": self.funding_cash.clamp_min(0) * cdi,
             "debit_financing": -self.funding_cash.clamp_max(0)

@@ -26,7 +26,7 @@ against existing inventory in both accounts, preserving signed cash claims and
 releasing only the extinguished short portion's restricted proceeds. Sparse sourced
 multi-leg distributions can now retain signed, non-tradable baskets until separately
 dated custody delivery, with separate cash claims/payment. Allocation reserves their
-capacity and risk/readouts use the underlying exposures. Evaluation V24 binds these
+capacity and risk/readouts use the underlying exposures. Evaluation V25 binds these
 terms and reports undelivered and unpriced inventory separately on the full calendar.
 Both cost paths now use dated B3 loan components, with stock/hedge rent separated
 from exchange fees. Both accounts now retain fixed-principal/rate loan cohorts,
@@ -41,6 +41,15 @@ the whole account state, including pending settlements. See
 implemented accounting repair, not completion of the contractual-event/source audit
 or acceptance of new historical results. Reproduce sealed books with their recorded
 source commits; use new roots for corrected replays.
+
+Compulsory loan cash closeout is now a separate sourced accounting event from
+shareholder redemption: original rent/fees accrue through the loan date, later
+physical returns are superseded and principal cash is separately attributed.
+Static policy coordinates remain frozen and effective borrowing prohibitions also
+apply to later flat-start windows. See `docs/v2_CORPORATE_EVENTS.md` for Cielo's
+distinct dates and SELIC correction, and BR Malls' recovered custody/loan terms.
+Event-axis admission and the wider source audit still remain; no historical result
+is accepted by the synthetic mechanics evidence.
 
 The economic/data/scaling run pointer now binds a separately admitted archive of
 reconciled BDI lending observations and causal stock/BOVA11 loan-source panels.

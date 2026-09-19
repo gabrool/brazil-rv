@@ -57,6 +57,7 @@ def _run(
     entry_fill_allowed: np.ndarray | None = None,
     portfolio_policy=None,
     share_distributions=(),
+    loan_cash_settlements=(),
     loan_reference_prices=None,
 ) -> StatefulLedgerResult:
     days, names = close.shape
@@ -85,6 +86,7 @@ def _run(
         entry_fill_allowed=entry_fill_allowed,
         portfolio_policy=portfolio_policy,
         share_distributions=share_distributions,
+        loan_cash_settlements=loan_cash_settlements,
         action_terms=no_actions if actions is None else actions,
         action_payment_session=(
             np.full(close.shape, -1, dtype=np.int64)
