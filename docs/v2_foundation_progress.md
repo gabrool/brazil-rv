@@ -88,3 +88,18 @@ Next dispatch details:
    roster and the compact-readout contrast before the next dispatch. A later-wave
    implementation binding is needed for the pooling-only contrast; do not mutate
    the live original worktree or refit identical compatible controls needlessly.
+
+### Input training completion: 2026-09-19 00:08 UTC
+
+All nine P parents and 36 F fits completed successfully in the immutable d21a93a
+worker (about 2h20m including engineering checks and preparation). F2/F6/F10 CPU
+readouts completed. The full input readout and registered summary now run from
+75a5b75, reusing those accounts. Original neutral saved-average GPU inference runs
+with the verified historical 33086be package and the 75a5b75 driver; no new neural
+fit is running concurrently. Worker receipts and logs are under the resolved root:
+`readout_input_worker.json` and `averaging_inference_worker.json`.
+
+The registration and section 9 were reread after completion. No input deletion or
+EMA rule is admitted until the full four-fold summary is reviewed. Next: review
+`input_summary.json`, run average economic readouts after all 84 score outputs,
+and freeze the compact-readout contrast and its source binding before dispatch.
