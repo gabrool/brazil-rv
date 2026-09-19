@@ -318,3 +318,9 @@ added `policy: equal_rank` in 81ba9c9. The calendar attempt had not written book
 Current readout source is C:/quant/brazil-rv-foundation-residual-readouts-policy at
 81ba9c9, receipt readout_residual_policy_worker.json and policy logs. This is the
 source to resume. Earlier attempts and logs remain preserved; no fit changed.
+
+The failed first save left an incomplete output directory. Verified it contained
+no book.json and moved it within the run to residual_incomplete_readout_F2_11,
+preserving evidence. Retried unchanged 81ba9c9 source; current receipt/logs are
+readout_residual_retry_worker.json and readout_residual_retry.*.log. First book.json
+now exists; no error in retry log at check. Do not rerun the earlier failing logs.
