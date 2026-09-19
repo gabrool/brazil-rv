@@ -16,14 +16,27 @@ Resolve canonical pointers and bind hashes at each run, rather than borrowing a
 timestamped directory from memory. New accounting and data contracts require new
 artifacts; never silently rescore an old checkpoint on altered input coordinates.
 
-The intended account is initially retail-adjacent; assume zero brokerage as the
-user requested. Stock-borrow rent and B3 fees are separate. Broker-specific cash
-remuneration, collateral and borrowing commissions cannot be established from
-permission alone: distinguish user assumptions, verified historical exchange terms
-and unresolved scenarios. Do not invent fees or apply a current tariff to all years.
-Use normalized results where scale invariant; if historical fixed minimum charges
-require capital, report explicitly assumed R$1m with R$100k/R$10m sensitivities.
-These are research sizes, not a capacity or actual-account claim.
+Account amendment, 2026-09-19: the user replaces retail-adjacent assumptions with
+a well-capitalized corporate CNPJ low-touch account and explicitly requires interest
+on short-sale proceeds. The primary negotiated-account hypothesis is 100% of
+historical daily CDI on eligible settled short proceeds, zero execution brokerage
+and no unsupported retail loan-turnover surcharge. These are research assumptions,
+not an obtained broker quote. Separate loan rent, identifiable intermediation,
+dated B3 trading/clearing/loan/depository charges, cash income, debit financing and
+execution shortfall. Do not add B3 fees to a previously bundled execution cost,
+count interest twice or infer free funding of longs from remunerated restricted
+cash. See `docs/v2_CORPORATE_ACCOUNT.md` for evidence and bounded sensitivities.
+No-interest short proceeds is no longer a required primary or admission scenario;
+its sealed historical result remains available.
+
+Use historical exchange schedules for historical attribution. A separate prospective
+cost view can apply explicitly current terms to development-period trade paths,
+labelled as a counterfactual, without reading held-out market data. Do not apply a
+local-fund discount to an ordinary CNPJ or special volume discounts without actual
+qualifying turnover. Use R$10m as an explicit planning size, with R$1m/R$5m cost
+and capacity sensitivities; these are not actual-capital or broker-minimum claims.
+Preserve normalized results and every model-eligible name. Freeze costs before new
+comparison outcomes; use replay/attribution sensitivities instead of extra GPU fits.
 
 ## A. Accounting and borrow repair
 

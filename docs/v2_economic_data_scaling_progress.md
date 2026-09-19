@@ -139,3 +139,31 @@ implementation must handle multi-leg/delivery/netted succession and remove synth
 last-mark fills in both accounts, with meaningful conservation/causality tests and
 explicit source provenance. Finish the remaining family/label/tensor audit and
 causal source admission before C-D. The active heartbeat continues this program.
+
+### Corporate account amendment, 2026-09-19
+
+The user replaces the initial retail-adjacent account with a well-capitalized CNPJ
+low-touch setup and explicitly requires interest on short-sale proceeds. The
+registration and PROJECT_CONTEXT now bind `docs/v2_CORPORATE_ACCOUNT.md`: primary
+100% historical CDI on eligible settled proceeds, zero execution brokerage, no
+unsupported retail loan-turnover surcharge, and individually attributed B3,
+borrowing, financing and execution costs. R$10m is an explicit planning assumption
+with R$1m/R$5m sensitivities, not confirmed capital or admission minimums. Public
+provider capabilities and tariff evidence are separated from unquoted negotiation
+targets. No-interest proceeds is not a required new admission case.
+
+The existing accounts already remunerate proceeds at 100% CDI; the account choice
+does not automatically improve the old results. Their old 4 bp execution cost is
+bundled: do not add full B3 charges to it again. Current B3 cash-market discounts
+are progressive and differ from historical ordinary-CNPJ versus local-fund fees;
+current loan charges also depend on modality. Public standard XP borrowing costs
+include a 0.25% notional liquidation/renewal commission, not a 0.25% annual rate;
+that retail-style schedule is not imported as the negotiated low-touch default.
+
+Thirteen official-source retrieval receipts are recorded in
+`docs/v2_corporate_account_sources.json`; ten original snapshots were archived on D.
+Three direct downloads returned HTTP 403 although web-indexed text was available.
+No quote was obtained or outreach sent. Source/data consumers, sealed books and
+training defaults have not changed in this amendment. Complete the actual Stage A
+accounting and Stage B audit before interpreting corrected economics or starting
+the registered follow-up fits.

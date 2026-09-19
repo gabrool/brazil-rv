@@ -1,0 +1,147 @@
+{
+  "as_of": "2026-09-19",
+  "scope": "Public operating terms only; no 2025/2026 market observations admitted to research consumers.",
+  "sources": [
+    {
+      "bytes": 53710,
+      "final_url": "https://www.b3.com.br/en_us/products-and-services/fee-schedules/listed-equities-and-derivatives/equities/equities-and-investment-funds-fees/spot/",
+      "id": "b3_spot_current",
+      "mime_type": "text/html; charset=UTF-8",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\corporate_account_sources\\b3_spot_current.html",
+      "purpose": "Current prospective spot tariffs; not historical backfill",
+      "retrieved_at_utc": "2026-09-19T13:53:46.501738+00:00",
+      "sha256": "a05bfabcf5a2ffb76faabcc1cc2adcfb86cefd71950781a838b582730d35f3a8",
+      "status": "archived",
+      "url": "https://www.b3.com.br/en_us/products-and-services/fee-schedules/listed-equities-and-derivatives/equities/equities-and-investment-funds-fees/spot/"
+    },
+    {
+      "bytes": 54592,
+      "final_url": "https://www.b3.com.br/pt_br/produtos-e-servicos/tarifas/tarifas-de-emprestimo-de-ativos/",
+      "id": "b3_lending_current",
+      "mime_type": "text/html; charset=UTF-8",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\corporate_account_sources\\b3_lending_current.html",
+      "purpose": "Current loan tariff components; dated historical circulars remain separate",
+      "retrieved_at_utc": "2026-09-19T13:53:46.514087+00:00",
+      "sha256": "5a242c6f1cf9e78618af20bccd06fd23dbb16824c775b8ec3990a32ba57cae67",
+      "status": "archived",
+      "url": "https://www.b3.com.br/pt_br/produtos-e-servicos/tarifas/tarifas-de-emprestimo-de-ativos/"
+    },
+    {
+      "bytes": 45443,
+      "final_url": "https://www.b3.com.br/en_us/products-and-services/fee-schedules/central-depositary-services/custody-services-fees/",
+      "id": "b3_custody_current",
+      "mime_type": "text/html; charset=UTF-8",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\corporate_account_sources\\b3_custody_current.html",
+      "purpose": "Current custody schedule; investor-level pass-through requires agreement",
+      "retrieved_at_utc": "2026-09-19T13:53:46.501738+00:00",
+      "sha256": "539524ac97d552944cdeed932e1fc7a57ff9a918be0db95ef9c33f474c989a9d",
+      "status": "archived",
+      "url": "https://www.b3.com.br/en_us/products-and-services/fee-schedules/central-depositary-services/custody-services-fees/"
+    },
+    {
+      "bytes": 433257,
+      "final_url": "https://clientes.b3.com.br/w/nte-nova-tarifacao-de-equities",
+      "id": "b3_spot_transition",
+      "mime_type": "text/html;charset=UTF-8",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\corporate_account_sources\\b3_spot_transition.html",
+      "purpose": "Historical versus prospective tariff distinction; launch 2025-08-01",
+      "retrieved_at_utc": "2026-09-19T13:53:47.218631+00:00",
+      "sha256": "b0e491f3208807a857f01b8922bd44e9931b8c16b157598606287b25a4aede8e",
+      "status": "archived",
+      "url": "https://clientes.b3.com.br/w/nte-nova-tarifacao-de-equities"
+    },
+    {
+      "bytes": 48873,
+      "final_url": "https://www.b3.com.br/pt_br/produtos-e-servicos/emprestimo-de-ativos/informacoes.htm",
+      "id": "b3_loan_information",
+      "mime_type": "text/html; charset=UTF-8",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\corporate_account_sources\\b3_loan_information.html",
+      "purpose": "Separate loan-rate and intermediation contract fields; publication method",
+      "retrieved_at_utc": "2026-09-19T13:53:46.619220+00:00",
+      "sha256": "60ed44cb144e89fe454fd3ff41ee47776955a154267779ab4526aec1d5e271a1",
+      "status": "archived",
+      "url": "https://www.b3.com.br/pt_br/produtos-e-servicos/emprestimo-de-ativos/informacoes.htm"
+    },
+    {
+      "bytes": 58727,
+      "final_url": "https://www.b3.com.br/pt_br/produtos-e-servicos/compensacao-e-liquidacao/clearing/administracao-de-riscos/garantias/garantias-aceitas/",
+      "id": "b3_collateral_eligibility",
+      "mime_type": "text/html; charset=UTF-8",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\corporate_account_sources\\b3_collateral_eligibility.html",
+      "purpose": "Interest-bearing securities can serve as collateral; does not establish a broker cash rebate",
+      "retrieved_at_utc": "2026-09-19T13:53:46.619220+00:00",
+      "sha256": "dee1868fedbf1b9390007758d664894d858ef082a946863ca5fc2610b489cb32",
+      "status": "archived",
+      "url": "https://www.b3.com.br/pt_br/produtos-e-servicos/compensacao-e-liquidacao/clearing/administracao-de-riscos/garantias/garantias-aceitas/"
+    },
+    {
+      "error": "HTTP Error 403: Forbidden",
+      "id": "xp_institutional",
+      "purpose": "Institutional electronic execution and BTC capability, no quoted package",
+      "status": "retrieval_failed",
+      "url": "https://bancodeatacado.xpi.com.br/corretora-institucional/"
+    },
+    {
+      "error": "HTTP Error 403: Forbidden",
+      "id": "xp_published_costs",
+      "purpose": "Published standard fees and CNPJ exclusions; not negotiated institutional quote",
+      "status": "retrieval_failed",
+      "url": "https://www.xpi.com.br/custos-operacionais/"
+    },
+    {
+      "bytes": 551179,
+      "final_url": "https://api-site.idealctvm.com.br/uploads/Regras_e_Parametros_de_Atuacao_v_9_0_fev_2026_v_final_MARCAS_3fffecc6d5.pdf",
+      "id": "ideal_negotiated_fees",
+      "mime_type": "application/pdf",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\corporate_account_sources\\ideal_negotiated_fees.pdf",
+      "purpose": "Section 15 explicitly negotiates brokerage; no quoted rate",
+      "retrieved_at_utc": "2026-09-19T13:53:48.416989+00:00",
+      "sha256": "ca37468d32d6457f262eda802e161b71d2395b5372fb72e146de4c9b544dcaaa",
+      "status": "archived",
+      "url": "https://api-site.idealctvm.com.br/uploads/Regras_e_Parametros_de_Atuacao_v_9_0_fev_2026_v_final_MARCAS_3fffecc6d5.pdf"
+    },
+    {
+      "bytes": 485649,
+      "final_url": "https://static.btgpactual.com/media/regras-e-parametros-ctvm.pdf",
+      "id": "btg_dma_terms",
+      "mime_type": "application/pdf",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\corporate_account_sources\\btg_dma_terms.pdf",
+      "purpose": "DMA capability and separate commercial agreement, no quoted rebate",
+      "retrieved_at_utc": "2026-09-19T13:53:47.094252+00:00",
+      "sha256": "16f1c4b1d858139d96b8f863eed661b90e276c86cacda73ac9ff22ce0099a492",
+      "status": "archived",
+      "url": "https://static.btgpactual.com/media/regras-e-parametros-ctvm.pdf"
+    },
+    {
+      "bytes": 100545,
+      "final_url": "https://blog.inter.co/investimentos-para-empresas",
+      "id": "inter_corporate_cash",
+      "mime_type": "text/html",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\corporate_account_sources\\inter_corporate_cash.html",
+      "purpose": "Public corporate daily-liquidity 100% CDI CDB example, not short-proceeds or collateral agreement",
+      "retrieved_at_utc": "2026-09-19T13:53:47.572306+00:00",
+      "sha256": "f3cd9138868f2810c4edf4bfd1c2696c92be64c3fc5c1eaa2e0a6c790660ddae",
+      "status": "archived",
+      "url": "https://blog.inter.co/investimentos-para-empresas"
+    },
+    {
+      "error": "HTTP Error 403: Forbidden",
+      "id": "santander_corporate_repo",
+      "purpose": "Corporate cash instrument; negotiated term/rate; not short-proceeds agreement",
+      "status": "retrieval_failed",
+      "url": "https://www.santander.com.br/investimentos/compromissadas"
+    },
+    {
+      "bytes": 203159,
+      "final_url": "https://cms.santander.com.br/sites/WPS/documentos/arq-investimentos-pj-compromissadas-condicoes/21-07-21_204408_lamina_compromissada_port.pdf",
+      "id": "santander_repo_terms",
+      "mime_type": "application/pdf",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\corporate_account_sources\\santander_repo_terms.pdf",
+      "purpose": "Daily-liquidity debenture-backed repo and IOF treatment; illustrative 40% CDI is not a competitive quote",
+      "retrieved_at_utc": "2026-09-19T13:53:47.429016+00:00",
+      "sha256": "57810100903329b804e5de537c751e69cc8798eb817fec4d6f4ce641d83e3a24",
+      "status": "archived",
+      "url": "https://cms.santander.com.br/sites/WPS/documentos/arq-investimentos-pj-compromissadas-condicoes/21-07-21_204408_lamina_compromissada_port.pdf"
+    }
+  ]
+}

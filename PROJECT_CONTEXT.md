@@ -5,8 +5,14 @@ Last verified: 2026-09-19.
 The user now authorizes the [economic/data/scaling program](research/preregistrations/v2_economic_data_scaling.md):
 contractual accounting and stock-borrow investigation/repairs, a deep source-to-model
 data audit with additional historical B3 retrieval, and economic-primary replication
-plus bounded attention/GRU scaling experiments. Assume zero brokerage for a likely
-retail-adjacent account; keep unverified financing terms explicit. This permits new
+plus bounded attention/GRU scaling experiments. The user now specifies a corporate
+CNPJ low-touch account with remunerated short-sale proceeds, replacing the initial
+retail-adjacent assumption. Use 100% of historical CDI on eligible settled proceeds
+and zero execution brokerage as primary negotiated-account assumptions; separate
+dated B3 fees, loan rent/intermediation, financing and execution shortfall. Avoid
+punitive retail tariffs and double-counting bundled costs. The sourced
+[corporate account assessment](docs/v2_CORPORATE_ACCOUNT.md) distinguishes verified
+terms from negotiation targets and defines bounded sensitivities. This permits new
 evidenced derived-data contracts, not overwriting accepted inputs or old fit roots.
 Use the local GPU, all eligible names and full history; no forward capture, deployment
 or held-out consumers. Follow the registered stages and
