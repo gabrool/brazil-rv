@@ -258,3 +258,18 @@ Two residual invariant tests and Ruff pass. Next: fit-only feature encoding and
 chronological ridge/tree driver; do not mistake the completed anchor cache for
 completed residual experiments. Existing score helpers provide original masks and
 rank units, and registered common snapshots must be scaled once per date.
+
+### Residual feature encoding (2026-09-19 07:04 UTC)
+
+Added fit-only encoding using accepted Round7Preprocessing scalar semantics:
+continuous asinh median/IQR, passthrough bounded fields, separate value masks and
+bounded ages with explicit known-age flags. Common values are scaled once per
+date; the original three common diagnostics are included. Actual F2 smoke fits
+scalers on full F2 fit dates and encodes two evaluation dates: 274/274 eligible
+stock-days, 454 scalar columns, 44 common-value columns reserved for anchor
+interactions, all finite. No label or feature support eligibility filter.
+ROOT/residual/feature_smoke.json binds scaler coordinates and fit dates. Three
+residual invariant tests pass, including known-zero-age versus missing separation.
+Next: chronological per-head target/rank construction, fitting and prior-selection
+strength driver, source-bound saved predictions, then original-neutral economic
+readouts. No residual outcome has been computed yet.

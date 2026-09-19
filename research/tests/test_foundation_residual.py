@@ -1,6 +1,19 @@
 import numpy as np
 
-from brazil_rv.v2.foundation_residual import choose_strength, date_weights, fit_ridge
+from brazil_rv.v2.foundation_residual import (
+    age_channels,
+    choose_strength,
+    date_weights,
+    fit_ridge,
+)
+
+
+def test_known_zero_age_is_distinct_from_missing_and_old_data_is_retained():
+    encoded, known = age_channels(np.array([-1.0, 0.0, 252.0, 10000.0]))
+    np.testing.assert_array_equal(known, [0, 1, 1, 1])
+    assert encoded[0] == encoded[1] == 0
+    assert encoded[2] == 0.5
+    assert 0.5 < encoded[3] < 1
 
 
 def test_date_replication_does_not_change_ridge_fit():

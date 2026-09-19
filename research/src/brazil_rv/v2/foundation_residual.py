@@ -17,6 +17,76 @@ from .train import rank_average_ensemble
 STRENGTHS = (0.0, 0.1, 0.25, 0.5, 1.0)
 
 
+def fit_feature_scalers(store, fit_rows, cell):
+    """Reuse accepted scalar semantics, including one common sample per date."""
+    from types import SimpleNamespace
+
+    from .round7_preprocessing import Round7Preprocessing
+
+    return Round7Preprocessing.fit(
+        SimpleNamespace(
+            store=store, date_indices=fit_rows, enabled_sidecars=cell["families"]
+        ),
+        split_common=True,
+        excluded_fields=cell["excluded_fields"],
+    )
+
+
+def age_channels(ages):
+    known = ages >= 0
+    value = np.log1p(np.maximum(ages, 0))
+    value = value / (value + np.log1p(252.0))
+    return np.where(known, value, 0).astype(np.float32), known.astype(np.float32)
+
+
+def encode_features(store, rows, scalers):
+    """Flatten active names only; feature missingness never changes eligibility.
+
+    Returns rich scalar columns and common values for anchor interactions. Caller
+    supplies fit-only scalers and reuses these same columns for all seed anchors.
+    """
+    pieces, common_pieces, date_pieces, name_pieces = [], [], [], []
+    for start in range(0, len(rows), 64):
+        chunk = np.asarray(rows[start : start + 64])
+        active = store.read("active", chunk)
+        day, name = np.nonzero(active)
+        columns, common = [], []
+        for family, scaler in scalers.families.items():
+            prefix = "sidecar_" + family
+            ix = scalers.source_columns.get(family, tuple(range(len(scaler.center))))
+            values = store.read(prefix + "_values", chunk)[..., ix]
+            valid = store.read(prefix + "_valid", chunk)[..., ix]
+            ages = store.read(prefix + "_age_sessions", chunk)[..., ix]
+            encoded = scaler.transform(values, valid)
+            age, age_known = age_channels(ages[day, name])
+            columns.extend(
+                (
+                    encoded[day, name],
+                    valid[day, name].astype(np.float32),
+                    age,
+                    age_known,
+                )
+            )
+            if family == "cross_market":
+                common.append(encoded[day, name][:, scalers.common_columns])
+        diagnostic_valid = store.read("common_state_diagnostic_valid", chunk)
+        diagnostic = scalers.diagnostic.transform(
+            store.read("common_state_diagnostic_values", chunk), diagnostic_valid
+        )
+        columns.extend((diagnostic[day], diagnostic_valid[day].astype(np.float32)))
+        common.append(diagnostic[day])
+        pieces.append(np.concatenate(columns, axis=1))
+        common_pieces.append(np.concatenate(common, axis=1))
+        date_pieces.append(chunk[day])
+        name_pieces.append(name)
+    return (
+        np.concatenate(pieces),
+        np.concatenate(common_pieces),
+        np.concatenate(date_pieces),
+        np.concatenate(name_pieces),
+    )
+
+
 def build_anchors(root):
     """Assemble per-seed genuine OOS history; no fitted-score fallback."""
     from pathlib import Path
