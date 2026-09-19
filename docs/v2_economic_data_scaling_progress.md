@@ -996,3 +996,9 @@ Next: dated modality accrual/clearing and presettlement-disposal/recall bounds,
 remaining exposed cases, upstream units/vintages and full identity/wealth/label
 propagation. Corrected replay must keep frozen static coordinates and separate
 accounting, source rates/availability and changed-store/refit effects.
+
+Recovery: implementation `92c338a`; `loan_renewal_conditioning_92c338a.zip` SHA-256
+`fb2fdd7e5fccef9bac56adb9ac47bd8afb1278ee6435f88f3f123b10ac52e7d2`. All 264 members restored and hash-checked,
+including complete current research source, acceptance code hashes and audit
+artifacts. 19 original-source receipts verified. Immutable inputs and old fits
+were not duplicated. The run pointer binds the recovery receipt.
