@@ -1,7 +1,6 @@
 # Model foundation experiments: combined review
 
-2026-09-18. The user authorized all five workstreams. This report distinguishes
-completed diagnostics from the new matched experiments, which are still running.
+2026-09-19. All registered research screens and bounded confidence studies are complete.
 It is intended to be readable independently by an LLM reviewing the repository.
 
 ## Scope and experimental discipline
@@ -360,3 +359,4 @@ confirmation fits were run. Preserve the current reference models, full cleaned
 roster and raw selection. The most defensible positive findings are existing seed
 ensembling and forecast diversity; neither alone establishes a deployable advance.
 Recovery archiving and canonical completion verification are still in progress.
+
