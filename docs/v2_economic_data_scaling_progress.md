@@ -644,3 +644,12 @@ multi-leg principal/fractions, maturity/renewal, calendar and source-family audi
 remain required before C/D. The superseded-return fixture proves cash/NAV arithmetic,
 not full failed-delivery/holding-basis metadata. Invoice cents remain a bounded
 research convention. The registration was reviewed; no stage or candidate is promoted.
+
+Implementation commit: `a401665`. The 23-file D recovery archive is verified and
+bound through `loan_cash_recovery.json`; ZIP SHA-256 is
+`d3e73b3e4d39dce3e270f167c05bc5dbd2437f02d08eaf0feb069b3290beffc3`.
+Acceptance SHA-256 is
+`8b4dfe34f095db94a37431b30edf38296efcea914ecd96e85448a55c9bc8dad9`.
+All members were read back, and all eleven original source receipts were verified.
+The run pointer and its hash sidecar were refreshed together; no immutable dataset
+was copied into the archive. Main implementation was pushed to GitHub.
