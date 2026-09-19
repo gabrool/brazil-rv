@@ -8,6 +8,15 @@
     "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\brmalls_custody_recovery.json",
     "sha256": "dbbf7c4db7906d3a273b9c63a4cf6720c02e1b501efa96c241079df4dcf2e3c0"
   },
+  "cash_calendar": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\cash_calendar\\manifest.json",
+    "sha256": "687cd4d999bdb39867b5cd59c9972293a1b5748b811f264b66ae4e78905c862c",
+    "status": "cash_calendar_defect_quantified_corrected_explicit_amendment_not_yet_scored"
+  },
+  "cash_calendar_audit": {
+    "path": "docs\\v2_cash_calendar_audit.json",
+    "sha256": "687cd4d999bdb39867b5cd59c9972293a1b5748b811f264b66ae4e78905c862c"
+  },
   "copel_allocation_recovery": {
     "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\copel_allocation_recovery.json",
     "sha256": "0eb836ce0417748faf7d3227d49bda0c1b670a226767ba2b1b33669c4ca8dce7"
@@ -34,6 +43,15 @@
     "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\custody_acceptance\\result.json",
     "reproducer_sha256": "93b1616d1eac81ed5507f2432b7984430a2d71c703af5ec5b23056d34045ded8",
     "sha256": "788fce91bce7c1f0b7035e9b8ee1bd1b1e93047b4f68332f4f0c1fb19792de3d"
+  },
+  "dommo_election_acceptance": {
+    "path": "docs\\v2_dommo_election_acceptance.json",
+    "sha256": "f0fad28b48c5f4dd29290c71737db690a80fee394f00abfe98f26171ea964684"
+  },
+  "dommo_pnb_scenario": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\corporate_replay\\dommo_pnb_manifest.json",
+    "sha256": "384584ad5657e7f55322c634c35ebeb6bf6d46019d8282f2bda2c569655bad98",
+    "status": "dommo_legal_lender_election_endpoint_default_PNA_separate"
   },
   "dommo_source_terms": {
     "path": "docs\\v2_dommo_source_terms.json",
@@ -67,6 +85,14 @@
   "loan_contract_acceptance": {
     "path": "docs\\v2_loan_contract_acceptance.json",
     "sha256": "58db32e966dfe4108a1c6f5101eefe2158a5ba37cd9402ee5f74c4b29fc8a2cf"
+  },
+  "loan_election_acceptance": {
+    "path": "docs\\v2_loan_election_acceptance.json",
+    "sha256": "eb7065996382ed3a9892ec8a94c914e08480f04b9061125eadbe646d8ca7f387"
+  },
+  "loan_election_unchanged": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\loan_election_unchanged\\result.json",
+    "sha256": "8c64fbad4c0526d08203b79512717af7889da3a7880988c66793c4a668209639"
   },
   "loan_source_panels": {
     "bytes": 3553,

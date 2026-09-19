@@ -1,0 +1,112 @@
+{
+  "CDI_convention": "SGS12 monetary dates accrued across every interval, including equity closure Dec30; zero-funded oracles isolate loan arithmetic",
+  "accepted_store_mutated": false,
+  "elapsed_seconds": 0.5584571000072174,
+  "loan_panel_sha256": "0b3ea912bd5e798f7e7a4dbf1b4007fc97698f98bb6805411fdc899d6f2a7e94",
+  "model_predictions_and_labels_read": false,
+  "name_count": 933,
+  "outcomes": [
+    {
+      "actual_CDI_funding": false,
+      "actual_terminal_nav_brl": 999259.6228136998,
+      "capital_brl": 1000000,
+      "expected_terminal_nav_brl": 999259.6228136998,
+      "loan_quantity": 21390.374277006817,
+      "max_account_difference_brl": 0.0,
+      "original_principal_brl": 39572.19241246261,
+      "original_reference_brl": 1.85,
+      "redemption_brl": 40734.21777998081,
+      "redemption_paid_date": "2023-01-13",
+      "rent_brl": 6.159406319349256,
+      "rent_paid_date": "2022-12-28"
+    },
+    {
+      "actual_CDI_funding": true,
+      "actual_terminal_nav_brl": 1007681.3540818123,
+      "capital_brl": 1000000,
+      "expected_terminal_nav_brl": 1007681.3540818123,
+      "loan_quantity": 21390.374277006817,
+      "max_account_difference_brl": 0.0,
+      "original_principal_brl": 39572.19241246261,
+      "original_reference_brl": 1.85,
+      "redemption_brl": 40734.21777998081,
+      "redemption_paid_date": "2023-01-13",
+      "rent_brl": 6.159406319349256,
+      "rent_paid_date": "2022-12-28"
+    },
+    {
+      "actual_CDI_funding": false,
+      "actual_terminal_nav_brl": 4996298.1140685,
+      "capital_brl": 5000000,
+      "expected_terminal_nav_brl": 4996298.1140685,
+      "loan_quantity": 106951.87138503409,
+      "max_account_difference_brl": 0.0,
+      "original_principal_brl": 197860.96206231308,
+      "original_reference_brl": 1.85,
+      "redemption_brl": 203671.08889990405,
+      "redemption_paid_date": "2023-01-13",
+      "rent_brl": 30.797031596746287,
+      "rent_paid_date": "2022-12-28"
+    },
+    {
+      "actual_CDI_funding": true,
+      "actual_terminal_nav_brl": 5038406.770409064,
+      "capital_brl": 5000000,
+      "expected_terminal_nav_brl": 5038406.770409064,
+      "loan_quantity": 106951.87138503409,
+      "max_account_difference_brl": 0.0,
+      "original_principal_brl": 197860.96206231308,
+      "original_reference_brl": 1.85,
+      "redemption_brl": 203671.08889990405,
+      "redemption_paid_date": "2023-01-13",
+      "rent_brl": 30.797031596746287,
+      "rent_paid_date": "2022-12-28"
+    },
+    {
+      "actual_CDI_funding": false,
+      "actual_terminal_nav_brl": 9992596.228137,
+      "capital_brl": 10000000,
+      "expected_terminal_nav_brl": 9992596.228137,
+      "loan_quantity": 213903.74277006817,
+      "max_account_difference_brl": 0.0,
+      "original_principal_brl": 395721.92412462615,
+      "original_reference_brl": 1.85,
+      "redemption_brl": 407342.1777998081,
+      "redemption_paid_date": "2023-01-13",
+      "rent_brl": 61.59406319349257,
+      "rent_paid_date": "2022-12-28"
+    },
+    {
+      "actual_CDI_funding": true,
+      "actual_terminal_nav_brl": 10076813.540818129,
+      "capital_brl": 10000000,
+      "expected_terminal_nav_brl": 10076813.540818129,
+      "loan_quantity": 213903.74277006817,
+      "max_account_difference_brl": 0.0,
+      "original_principal_brl": 395721.92412462615,
+      "original_reference_brl": 1.85,
+      "redemption_brl": 407342.1777998081,
+      "redemption_paid_date": "2023-01-13",
+      "rent_brl": 61.59406319349257,
+      "rent_paid_date": "2022-12-28"
+    }
+  ],
+  "remaining": "default PNA loan fractions, actual lender participation, lifecycle and full clearing calendar remain; no corrected model profitability claimed",
+  "scenario": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\corporate_replay\\dommo_pnb_manifest.json",
+    "sha256": "384584ad5657e7f55322c634c35ebeb6bf6d46019d8282f2bda2c569655bad98",
+    "status": "dommo_legal_lender_election_endpoint_default_PNA_separate"
+  },
+  "source_array_hashes": {
+    "action_cash_per_prior_share": "d530ec6c93794b97980848cba40cafe39cf8e6cd2d1a48569d964e80e5aa72c2",
+    "action_has_action": "a08ab57918e9b5805537cb06b81a9994174e9de7588b702c972c65432ccdf1f6",
+    "action_payment_session": "8601338a3e65a9c9c0393e2f0821849ebe8601812f1d53cbfa41532950dc2753",
+    "action_session_resolved": "1d1f277649264bd63edbc54d88507b5257a690fcc053c8899e9e1018f461dace",
+    "action_shares_per_prior_share": "8554e23cec96561745ac7232ec87efe3e93a5f4ce8863b4fdc541c8aa799d3ea",
+    "action_successor_index": "cf0a8df8e100f2ab29b40221f51841dc1d46800a0458ddcb045b18a25208a65e",
+    "active": "1e7f0e3c10592bcb99942b37359534e37485bdfdb6eab26f117ebf846d21629e",
+    "raw_close": "d822a557e79452270d897c9c0df470efd56519754e56b44840243b5024fd0e16"
+  },
+  "static_policy_coordinates_preserved": true,
+  "status": "source_bound_Dommo_lender_election_endpoint_verified_default_PNA_incomplete"
+}

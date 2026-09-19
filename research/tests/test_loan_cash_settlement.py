@@ -6,6 +6,8 @@ import torch
 
 from brazil_rv.execution.loan_contracts import (
     LoanCashSettlement,
+    LoanCashValue,
+    LoanContracts,
     slice_loan_settlements,
 )
 from brazil_rv.execution.portfolio_account import PortfolioAccount, tensor
@@ -201,3 +203,112 @@ def test_policy_constraints_hashes_and_slicing_keep_static_coordinates_frozen():
     assert arguments["loan_cash_settlements"] == terms
     rebased = ledger_arguments(data, 2, 10)["loan_cash_settlements"]
     assert rebased[0].effective_session == -2
+
+
+def deferred_event():
+    return LoanCashSettlement(
+        0,
+        2,
+        1,
+        110,
+        "lender election fixture",
+        rent_payment_session=4,
+        payment_session=6,
+        valuations=(LoanCashValue(3, 110.1), LoanCashValue(5, 120)),
+        unreturned_only=True,
+        prohibit_new_borrow=False,
+    )
+
+
+def test_deferred_election_stops_rent_retains_proceeds_and_revalues_only_when_known():
+    close = np.array([[100.0], *[[np.nan]] * 7])
+    targets = np.array([[-0.4], *[[0]] * 7])
+    config = _config(annual_borrow_rate=0.04)
+    records = compare(
+        close, targets, config=config, loan_cash_settlements=(deferred_event(),)
+    )
+    book = replay(
+        close,
+        lambda state: PortfolioTarget(targets[state.day]),
+        config=config,
+        loan_cash_settlements=(deferred_event(),),
+    )
+    rent = 0.4 * (1.04 ** (2 / 252) - 1)
+    assert book.nav[2:5] == pytest.approx([0.96 - rent, 0.9596 - rent, 0.9596 - rent])
+    assert book.nav[5:] == pytest.approx([0.92 - rent] * 3)
+    assert book.loan_payment[4] == pytest.approx(rent)
+    assert book.loan_payment.sum() == pytest.approx(rent)
+    assert book.restricted_cash[2:6] == pytest.approx([0.4] * 4)
+    assert book.restricted_cash[6:].sum() == 0
+    assert book.signed_shares[2:, 0] == pytest.approx(np.zeros(6))
+    assert book.loan_cash_payments[0].session == 6
+    assert book.loan_cash_payments[0].cash_paid == pytest.approx(0.48)
+    assert float(records[5]["loan_redemption_liability"]) == pytest.approx(0.48)
+    altered = replace(
+        deferred_event(), valuations=(LoanCashValue(3, 110.1), LoanCashValue(5, 150))
+    )
+    other = replay(
+        close,
+        lambda state: PortfolioTarget(targets[state.day]),
+        config=config,
+        loan_cash_settlements=(altered,),
+    )
+    np.testing.assert_array_equal(book.nav[:5], other.nav[:5])
+    assert [x for x in book.intended_orders if x.decision_session <= 5] == [
+        x for x in other.intended_orders if x.decision_session <= 5
+    ]
+
+
+def test_election_whole_contract_eligibility_and_independent_state_copy():
+    loans = LoanContracts(1, fee_multiplier=0)
+    loans.open([30], [100], [0.04], 0, "2024-01-02")
+    loans.accrue(1, "2024-01-03")
+    loans.request_return([15], 4)
+    loans.open([20], [90], [0.05], 1, "2024-01-03")
+    loans.accrue(2, "2024-01-04")
+    loans.open([5], [95], [0.06], 2, "2024-01-04")
+    assert float(loans.cash_settle(deferred_event(), 2)) == 20
+    assert (
+        float(loans.active_quantity[0]) == 20
+    )  # 15 excluded-root + 5 newly registered
+    other = loans.detached_copy()
+    assert other.cash_claims is not loans.cash_claims
+    assert other.cash_claims[0][1].data_ptr() != loans.cash_claims[0][1].data_ptr()
+    other.settle_cash_claims(5)
+    assert float(other.cash_liability) == 2400
+    assert float(loans.cash_liability) == 2200
+    rebased = slice_loan_settlements((deferred_event(),), 1, 8)[0]
+    assert (rebased.effective_session, rebased.rent_day, rebased.cash_day) == (1, 3, 5)
+    assert [v.available_session for v in rebased.valuations] == [2, 4]
+
+
+def test_deferred_cash_gradient_and_payment_date_causality():
+    def run(weight, payment=6):
+        account = PortfolioAccount.empty(
+            [100, 100], config=_config(annual_borrow_rate=0.04)
+        )
+        history = []
+        for day in range(8):
+            account.step(
+                torch.stack([-weight, weight * 0]) if day == 0 else tensor([0, 0]),
+                day=day,
+                close=[100 if day == 0 else np.nan, 100],
+                cdi=0.001,
+                session_date="2024-01-02",
+                annual_borrow=[0.04, 0],
+                loan_reference=[100, 100],
+                loan_cash_settlements=(
+                    replace(deferred_event(), payment_session=payment),
+                ),
+            )
+            history.append(account.nav)
+        return torch.stack(history)
+
+    weight = tensor(0.4).requires_grad_()
+    result = run(weight)
+    result[-1].backward()
+    diff = (run(tensor(0.400001))[-1] - run(tensor(0.399999))[-1]) / 0.000002
+    assert float(weight.grad) == pytest.approx(float(diff), abs=1e-8)
+    torch.testing.assert_close(
+        result[:6].detach(), run(tensor(0.4), payment=7)[:6], rtol=0, atol=0
+    )

@@ -840,3 +840,57 @@ code hashes; 17 original source receipts were verified without duplicating
 immutable inputs. `copel_allocation_recovery.json` is bound by the run pointer.
 ZIP SHA-256: `d3d0a8d1a61ccb3c1ca32523b408e00232603ef636452e674a99acce49b9639d`.
 Loan-allocation acceptance SHA-256: `3245e35dafc8ed0e3d24b7f3367690ef47cc129d7c5d1e9b2de7b0755b72491d`.
+
+
+### 2026-09-19: Dommo lender-cash endpoint and cash-calendar source defect
+
+Implemented deferred loan redemption in both accounts: physical quantity ends at
+the source event, rent/fees stop then and pay on their own date, cash liability
+keeps dated causal marks until redemption, and proceeds stay restricted until
+payment. Existing all-contract cash closeouts preserve their behavior. Active-only
+lender election is after actual fills, excludes whole original contracts with
+pending returns and new D+1 registrations, and does not prohibit non-elected later
+loans. Payment releases proceeds and debits the known liability together before
+decisions. Independent SAM/TBPTT copies include claim quantities/marks. V28 hashes
+all terms and reports cash principal liabilities separately from borrowing expense.
+
+Actually admitted the source-bound Dommo PNB endpoint to a separate scenario
+manifest; the primary Cielo/BRML/Copel pointer is unchanged. Recovered Oct24 issuer
+approval and 58 daily BCB CDI observations; the compounded final value matches
+R$1.90432468607 to 6e-13. Dec26's R$1.891796083009226 uses elapsed CDI only; Jan9
+first recognizes Jan6's fixed final amount. Six actual-calendar, full-933-name
+oracles at R$1m/R$5m/R$10m with zero or sourced 100% CDI match both accounts and
+independent closed forms exactly (0.56 seconds). R$10m rent is R$61.5941 paid Dec28,
+redemption R$407342.1778 paid Jan13. No predictions/labels were read for these
+prescribed positions. This does not admit default PNA or claim model performance.
+
+Independently advanced Stage B by tracing cash sources through the actual consumer.
+The bound source preserves SGS12 dates/units, but same-date selection drops money-only
+dates and shifts changes in rates relative to close-to-close accrual. The new
+explicit cash-calendar panel changes 67 of 2,098 supported sessions and recovers
+23 omitted monetary dates; benchmark mean changes +0.030318289 bp/equity-session.
+All 58 independently retrieved overlapping observations match the bound vintage.
+No old input/store/cache was overwritten; `apply_cash_calendar` shallowly replaces
+only accounting CDI/provenance after frozen policy loading. Loan/spot clearing-day
+clocks and all remaining auxiliary families still require audit. No model gain is
+inferred from the higher benchmark or funding income.
+
+Validation: 183 affected tests passed in 8.37s before the final payment-order
+refinement; afterward 98 tests passed in 42.48s with one new cash-fixture failure
+(the fixture used global indices 100+ against a sliced 25-row calendar). Correcting
+that fixture passed both cash tests (1.81s). Ten loan-cash checks also passed after
+the ordering refinement. These batches overlap. Ruff passed. New tests protect
+whole-contract eligibility, rent/payment clocks, retained proceeds, future-value
+and payment-date causality, analytic/finite-difference gradients, independent claim
+state and static-policy reuse. The small unaffected comparison initially exposed
+only a 1e-10-BRL summation-order difference in outstanding-principal metadata;
+restoring the original summation order yields bit-identical ordinary long and mixed
+books in both accounts, all original arrays, fills, intentions and loan charges.
+No completed census or old stress benchmark was rerun.
+
+Registration reread. A/B remain incomplete; C/D have not started. Next: default
+Dommo PNA provisioned loan fractions, finite maturity/renewal/recall and the full
+loan/spot clearing-calendar clocks, presettlement disposal bounds, and every-family
+source-to-tensor audit plus full identity propagation. Then apply accounting, new
+cash calendar and source availability separately in corrected model replays. Keep
+old static coordinates; refit only under an explicit changed data contract.

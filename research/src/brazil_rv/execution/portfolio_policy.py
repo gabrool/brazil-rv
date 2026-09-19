@@ -316,7 +316,7 @@ def decide(
     openings = torch.as_tensor(np.r_[allowed[names], True])
     shorts = torch.as_tensor(np.r_[data.shortable[day, names], True])
     for event in data.inputs.loan_cash_settlements:
-        if event.effective_session <= day:
+        if event.prohibit_new_borrow and event.effective_session <= day:
             shorts[:-1] &= torch.as_tensor(names != event.security_index)
     lower = torch.where(openings & shorts, -allocation.stock_cap, lower)
     upper = torch.where(openings, allocation.stock_cap, upper)

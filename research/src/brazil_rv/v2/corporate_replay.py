@@ -6,7 +6,7 @@ from pathlib import Path
 
 import numpy as np
 
-from brazil_rv.execution.loan_contracts import LoanCashSettlement
+from brazil_rv.execution.loan_contracts import LoanCashSettlement, LoanCashValue
 from brazil_rv.execution.share_distributions import (
     FractionAuction,
     ShareDelivery,
@@ -160,6 +160,20 @@ def apply_corporate_replay(inputs, terms, calendar, manifest_sha256):
                     session(event["available_date"]),
                     event["cash_per_share"],
                     source,
+                    rent_payment_session=None
+                    if event.get("rent_payment_date") is None
+                    else session(event["rent_payment_date"]),
+                    payment_session=None
+                    if event.get("payment_date") is None
+                    else session(event["payment_date"]),
+                    valuations=tuple(
+                        LoanCashValue(
+                            session(value["available_date"]), value["cash_per_share"]
+                        )
+                        for value in event.get("valuations", ())
+                    ),
+                    unreturned_only=event.get("unreturned_only", False),
+                    prohibit_new_borrow=event.get("prohibit_new_borrow", True),
                 )
             )
     provenance["corporate_replay"] = manifest_sha256

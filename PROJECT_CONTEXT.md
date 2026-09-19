@@ -26,7 +26,7 @@ against existing inventory in both accounts, preserving signed cash claims and
 releasing only the extinguished short portion's restricted proceeds. Sparse sourced
 multi-leg distributions can now retain signed, non-tradable baskets until separately
 dated custody delivery, with separate cash claims/payment. Allocation reserves their
-capacity and risk/readouts use the underlying exposures. Evaluation V27 binds these
+capacity and risk/readouts use the underlying exposures. Evaluation V28 binds these
 terms and reports undelivered and unpriced inventory separately on the full calendar.
 Both cost paths now use dated B3 loan components, with stock/hedge rent separated
 from exchange fees. Both accounts now retain fixed-principal/rate loan cohorts,
@@ -46,8 +46,12 @@ source commits; use new roots for corrected replays.
 Compulsory loan cash closeout is now a separate sourced accounting event from
 shareholder redemption: original rent/fees accrue through the loan date, later
 physical returns are superseded and principal cash is separately attributed.
-Static policy coordinates remain frozen and effective borrowing prohibitions also
-apply to later flat-start windows. See `docs/v2_CORPORATE_EVENTS.md` for Cielo's
+Deferred lender elections now separate quantity extinction, stopped rent, rent
+payment and cash redemption. Cash liabilities revalue only from dated published
+terms and retain proceeds until payment; whole contracts with pending returns are
+excluded. Dommo's legally eligible PNB election endpoint is bound separately from
+its still-pending default PNA conversion. Static policy coordinates remain frozen
+and effective borrowing prohibitions also apply to later flat-start windows. See `docs/v2_CORPORATE_EVENTS.md` for Cielo's
 distinct dates and SELIC correction, and BR Malls' recovered custody/loan terms.
 
 The economic/data run pointer now binds Cielo, BR Malls and Copel accounting
@@ -67,8 +71,15 @@ without requiring an unchanged ticker. A bounded causal-universe audit recovers
 for the next derived store: full history/features/labels/auxiliary propagation and
 lending aliases remain unaccepted until Stage B verification. See
 `docs/v2_identity_source_admission.json`; no new fit or profitability is accepted.
-Event-axis admission and the wider source audit still remain; no historical result
-is accepted by the synthetic mechanics evidence.
+The cash-calendar audit identifies same-date CDI alignment as incompatible with
+close-to-close money accrual: 23 money-only dates were omitted across 2,098 compared
+sessions, and 67 sessions change under the corrected interval convention. The run
+pointer binds an explicit cash-calendar amendment using all monetary observations
+between prior and current equity closes. Apply it after frozen policy loading,
+consistently to the benchmark, cash income and debit financing; never silently
+replace old features/results. Full event admission, loan clearing-calendar treatment
+and the wider source-to-tensor audit remain open. No corrected model performance
+is established by prescribed accounting oracles.
 
 The economic/data/scaling run pointer now binds a separately admitted archive of
 reconciled BDI lending observations and causal stock/BOVA11 loan-source panels.

@@ -307,6 +307,7 @@ class StatefulLedgerResult:
     borrow_bps: NDArray[np.float64]
     unsettled_cash: NDArray[np.float64]
     loan_liability: NDArray[np.float64]
+    loan_redemption_liability: NDArray[np.float64]
     loan_payment: NDArray[np.float64]
     loan_outstanding_principal: NDArray[np.float64]
     loan_charges: tuple[LoanCharge, ...]
@@ -1364,9 +1365,10 @@ def simulate_stateful_ledger(
             if key in keys:
                 raise ValueError("duplicate loan cash settlement")
             keys.add(key)
-            shortable_mask[max(0, event.effective_session) :, event.security_index] = (
-                False
-            )
+            if event.prohibit_new_borrow:
+                shortable_mask[
+                    max(0, event.effective_session) :, event.security_index
+                ] = False
         inputs = replace(inputs, shortable=shortable_mask)
     distributions_by_day: dict[int, list[ShareDistribution]] = {}
     for event in share_distributions:
@@ -1490,6 +1492,7 @@ def simulate_stateful_ledger(
     cost_rows: list[float] = []
     borrow_rows: list[float] = []
     loan_liability_rows: list[float] = []
+    loan_redemption_rows: list[float] = []
     loan_payment_rows: list[float] = []
     loan_principal_rows: list[float] = []
     loan_charges: list[LoanCharge] = []
@@ -1931,6 +1934,11 @@ def simulate_stateful_ledger(
     for day in range(day_count):
         funding_cash, funding_restricted = _settled_balances(
             free_cash, np.r_[restricted_by_name, hedge_restricted_cash], settlements
+        )
+        free_cash -= float(
+            loans.settle_cash_claims(
+                day, payments=loan_cash_payments, pay_only=True
+            ).sum()
         )
         settlements = [item for item in settlements if item[0] is None or item[0] > day]
         cancelled_today = 0
@@ -3112,41 +3120,53 @@ def simulate_stateful_ledger(
         loan_rent, loan_fees = loans.accrue(
             day, inputs.dates[day], charges=loan_charges
         )
-        for event in loan_cash_settlements:
-            if event.effective_session != day:
-                continue
+
+        def convert_loan_cash(event):
+            nonlocal free_cash
             name = event.security_index
-            for due in np.unique(loans.return_day[loans.name == name]):
-                if due > day:
-                    restored = np.zeros(name_count + 1)
-                    restored[name] = float(
-                        loans.quantity[
-                            (loans.name == name) & (loans.return_day == due)
-                        ].sum()
-                    )
-                    custody.add(int(due), restored)
-            quantity = float(loans.cash_settle(name, day))
-            paid = quantity * event.cash_per_share
-            free_cash += restricted_by_name[name] - paid
-            restricted_by_name[name] = 0.0
-            for index, (due, free, pending_restricted) in enumerate(settlements):
-                remaining = pending_restricted.copy()
-                amount = remaining[name]
-                remaining[name] = 0
-                settlements[index] = (due, free + amount, remaining)
+            active = float(loans.active_quantity[name])
+            if not event.unreturned_only:
+                for due in np.unique(loans.return_day[loans.name == name]):
+                    if due > day:
+                        restored = np.zeros(name_count + 1)
+                        restored[name] = float(
+                            loans.quantity[
+                                (loans.name == name) & (loans.return_day == due)
+                            ].sum()
+                        )
+                        custody.add(int(due), restored)
+            quantity = float(loans.cash_settle(event, day))
+            fraction = (
+                min(1.0, quantity / max(active, 1e-30))
+                if event.unreturned_only
+                else 1.0
+            )
+            release = restricted_by_name[name] * fraction
+            free_cash += release
+            restricted_by_name[name] -= release
+            if not event.unreturned_only:
+                for index, (due, free, pending_restricted) in enumerate(settlements):
+                    remaining = pending_restricted.copy()
+                    amount = remaining[name]
+                    remaining[name] = 0
+                    settlements[index] = (due, free + amount, remaining)
+            if event.cash_day > day:
+                retained = np.zeros(name_count + 1)
+                retained[name] = -release
+                settlements.append((event.cash_day, release, retained))
             shares[name] += quantity
             if shares[name] != 0 and not np.isfinite(marks[name]):
-                # A superseded cover can leave a long asset after net inventory
-                # was flat. Retain its causal mark, not the loan cash price.
                 marks[name] = last_observed[name]
-            if quantity:
-                loan_cash_payments.append(LoanCashPayment(day, name, quantity, paid))
             if abs(shares[name]) < 1e-12:
                 shares[name] = 0.0
                 pending_exits.pop(name, None)
                 entry_session[name] = -1
                 entry_cost_basis[name] = submission_nav[name] = 0.0
                 ineligible_streak[name] = 0
+
+        for event in loan_cash_settlements:
+            if event.effective_session == day and not event.unreturned_only:
+                convert_loan_cash(event)
         rates_today = (
             np.full(name_count, config.annual_borrow_rate)
             if config.borrow_source == "uniform"
@@ -3650,13 +3670,20 @@ def simulate_stateful_ledger(
             spot_settlement_session(day, inputs.dates[day]),
         )
         loans.fill(loan_covers, loan_openings, loan_session)
+        for event in loan_cash_settlements:
+            if event.effective_session == day and event.unreturned_only:
+                convert_loan_cash(event)
+        free_cash -= float(
+            loans.settle_cash_claims(day, payments=loan_cash_payments).sum()
+        )
         rent_paid, fees_paid = loans.pay(day)
         loan_paid = float(rent_paid.sum() + fees_paid.sum())
         free_cash -= loan_paid
         loan_liability = float(loans.liability)
         loan_liability_rows.append(loan_liability)
+        loan_redemption_rows.append(float(loans.cash_liability))
         loan_payment_rows.append(loan_paid)
-        loan_principal_rows.append(float(loans.principal.sum()))
+        loan_principal_rows.append(float(loans.principal[loans.accrual_end < 0].sum()))
         held_now = shares != 0.0
         marked_holdings = float(np.sum(shares[held_now] * marks[held_now]))
         current_nav = (
@@ -4127,6 +4154,7 @@ def simulate_stateful_ledger(
         borrow_bps=np.asarray(borrow_rows, dtype=np.float64),
         unsettled_cash=np.asarray(unsettled_cash_rows, dtype=np.float64),
         loan_liability=np.asarray(loan_liability_rows, dtype=np.float64),
+        loan_redemption_liability=np.asarray(loan_redemption_rows, dtype=np.float64),
         loan_payment=np.asarray(loan_payment_rows, dtype=np.float64),
         loan_outstanding_principal=np.asarray(loan_principal_rows, dtype=np.float64),
         loan_charges=tuple(loan_charges),

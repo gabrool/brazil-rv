@@ -290,3 +290,29 @@ and intentions versus the previous source commit. Loan attribution now omits onl
 identically zero rent/fee rows for old paid roots; every nonzero original-entry
 charge and all money arithmetic remain unchanged. This avoids unnecessary output
 work in long replays with frequent trading.
+
+
+### Deferred loan redemption and cash-calendar amendment
+
+Evaluation V28 separates `loan_redemption_liability` from the total loan liability.
+Cash election removes physical quantity at its event, retains original accrued
+rent/fees until their own payment date, and carries the marked redemption liability
+until actual payment. No rent accrues after the source-bound extinction date.
+Dated value updates run after the current intention; SAM/TBPTT copies own independent
+claim tensors. An active-only lender election excludes entire original roots with
+pending returns and new same-day D+1 loans. This differs from an all-contract
+compulsory closeout, which supersedes late physical returns and preserves the
+covering assets. Dommo's PNB endpoint is admitted separately; its default PNA loan
+fractions are not converted into tradable fractional loans by this change.
+
+The deep cash-source audit traces `_fetch_cdi` through `load_daily_cdi_rates`, the
+V2 loader and actual accounting inputs. Raw SGS12 units/dates were preserved, but
+same-date equity alignment omitted 23 monetary dates and used the ending date's
+rate for a prior-close interval. The explicit new `cash_calendar` panel compounds
+source dates in [previous equity close, current equity close). It changes 67 of
+2,098 supported sessions; cash-benchmark mean rises 0.030318289 bp per equity
+session. This is not strategy alpha. Old fits/features/results remain frozen;
+corrected replay must explicitly apply the panel to all income/debit/benchmark
+paths. Early unsupported intervals remain NaN and fail requested replay; no
+fabricated rates. Loan day-count and actual clearing closures still need the
+separate lifecycle audit, and the other auxiliary families remain unaudited.

@@ -49,7 +49,7 @@ MIN_CROSS_SECTION = 20
 BOOTSTRAP_SEED = 20260903
 ECONOMICS_COSTS_BPS = (2.0, 4.0, 7.0)
 ECONOMICS_HEADLINE = (4.0, 0.02)
-EVALUATION_SCHEMA = "BRAZIL_RV_V2_EVALUATION_V27"
+EVALUATION_SCHEMA = "BRAZIL_RV_V2_EVALUATION_V28"
 PRIOR_EVALUATION_SCHEMA = "BRAZIL_RV_V2_EVALUATION_V15"
 PAIRED_COMPARISON_SCHEMA = "BRAZIL_RV_V2_PAIRED_COMPARISON_V3"
 
@@ -950,6 +950,9 @@ def _ledger_rows(
             "borrow_cost_bps": _finite_or_none(result.borrow_bps[index]),
             "unsettled_cash": _finite_or_none(result.unsettled_cash[index]),
             "loan_liability": _finite_or_none(result.loan_liability[index]),
+            "loan_redemption_liability": _finite_or_none(
+                result.loan_redemption_liability[index]
+            ),
             "loan_payment": _finite_or_none(result.loan_payment[index]),
             "loan_outstanding_principal": _finite_or_none(
                 result.loan_outstanding_principal[index]
@@ -1865,8 +1868,11 @@ def _economics_contract(inputs: EvaluationInputs) -> dict[str, object]:
         ),
         "loan_cash_settlement": (
             "source-bound compulsory loan cash payments are separate from shareholder "
-            "redemption; original rent and fees accrue through closeout, later physical "
-            "returns are superseded and principal cash is reported outside borrowing cost"
+            "redemption; quantity extinction, stopped rent and rent/cash payment clocks "
+            "are distinct. Later published amounts update only from their availability. "
+            "Whole-contract lender elections exclude roots with pending returns; "
+            "compulsory all-contract closeout supersedes later physical returns. "
+            "Principal cash and its liability are separate from borrowing expense"
         ),
         "contractual_accounting_status": (
             "loan and dated spot cash mechanics implemented; historical "

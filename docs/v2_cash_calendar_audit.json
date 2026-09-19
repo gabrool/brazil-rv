@@ -1,0 +1,526 @@
+{
+  "application": "load new panel and apply_cash_calendar after frozen policy loading; old neural/static features and old results remain bound to original sources; benchmark, money income and debits must all use one interval series",
+  "calendar": {
+    "path": "C:\\quant-data\\b3\\processed\\v2_data_store_2d59b9d_20260913T211700Z\\date_index.npy",
+    "sha256": "3fecbda9616f6d0360647ee3f2a790669cb518ab2804e74b728a47c3afa5bdc0"
+  },
+  "changed_sessions": 67,
+  "comparison_sessions": 2098,
+  "contract": "compound all sourced monetary returns on [previous equity close,current equity close), including money-only dates; neither current-date money rate nor future observation enters the ending interval",
+  "corrected_cash_growth": 0.9880880821532807,
+  "defect": "execution/inputs.py::load_daily_cdi_rates selects one same-date rate; v2/validate_pipeline.py::_load_development_cdi passes that into close-to-close accounting. Exact overlap with older experiments proved value preservation, not interval correctness",
+  "elapsed_seconds": 0.04966710000007879,
+  "evidence": "B3 Dommo contract starts CDI at approving AGE, and Oct24-inclusive/Jan13-exclusive SGS12 reproduces Jan6 issuer redemption 1.90432468607 to 6e-13",
+  "limitations": "source revision timestamps remain unavailable; first/pre-source intervals unresolved, later full loan/spot clearing-calendar treatment still separate; not model alpha or completion of deep audit",
+  "mean_return_change_bps_per_equity_session": 0.030318289011538564,
+  "old_cash_growth": 0.9754887408079667,
+  "omitted_monetary_date_count": 23,
+  "omitted_monetary_dates": [
+    "2016-12-30",
+    "2017-01-25",
+    "2017-11-20",
+    "2017-12-29",
+    "2018-01-25",
+    "2018-07-09",
+    "2018-11-20",
+    "2018-12-24",
+    "2018-12-31",
+    "2019-01-25",
+    "2019-07-09",
+    "2019-11-20",
+    "2019-12-24",
+    "2019-12-31",
+    "2020-12-24",
+    "2020-12-31",
+    "2021-01-25",
+    "2021-07-09",
+    "2021-12-24",
+    "2021-12-31",
+    "2022-12-30",
+    "2023-12-29",
+    "2024-12-24"
+  ],
+  "panel": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\cash_calendar\\returns.npz",
+    "sha256": "c9354eca6fec2af9ee1c4064b89ed1ae4b34ee449a6d99be59eaf1854bcf48b4"
+  },
+  "rows": [
+    {
+      "corrected_interval_return": 0.0005246100000000364,
+      "date": "2016-10-20",
+      "delta_bps": 0.08700000000036479,
+      "old_same_date_return": 0.00051591,
+      "previous_equity_close": "2016-10-19"
+    },
+    {
+      "corrected_interval_return": 0.0005159100000000638,
+      "date": "2016-12-01",
+      "delta_bps": 0.08730000000063838,
+      "old_same_date_return": 0.00050718,
+      "previous_equity_close": "2016-11-30"
+    },
+    {
+      "corrected_interval_return": 0.0010146172315526059,
+      "date": "2017-01-02",
+      "delta_bps": 5.074372315526059,
+      "old_same_date_return": 0.00050718,
+      "previous_equity_close": "2016-12-29"
+    },
+    {
+      "corrected_interval_return": 0.0005071800000000515,
+      "date": "2017-01-12",
+      "delta_bps": 0.26290000000051494,
+      "old_same_date_return": 0.00048089,
+      "previous_equity_close": "2017-01-11"
+    },
+    {
+      "corrected_interval_return": 0.000962011255192019,
+      "date": "2017-01-26",
+      "delta_bps": 4.811212551920191,
+      "old_same_date_return": 0.00048089,
+      "previous_equity_close": "2017-01-24"
+    },
+    {
+      "corrected_interval_return": 0.0004808899999999561,
+      "date": "2017-02-23",
+      "delta_bps": 0.26469999999956045,
+      "old_same_date_return": 0.00045442000000000003,
+      "previous_equity_close": "2017-02-22"
+    },
+    {
+      "corrected_interval_return": 0.00045442000000006644,
+      "date": "2017-04-13",
+      "delta_bps": 0.3556000000006643,
+      "old_same_date_return": 0.00041886,
+      "previous_equity_close": "2017-04-12"
+    },
+    {
+      "corrected_interval_return": 0.00041885999999990986,
+      "date": "2017-06-01",
+      "delta_bps": 0.35519999999909835,
+      "old_same_date_return": 0.00038334,
+      "previous_equity_close": "2017-05-31"
+    },
+    {
+      "corrected_interval_return": 0.00038333999999995427,
+      "date": "2017-07-27",
+      "delta_bps": 0.36209999999954257,
+      "old_same_date_return": 0.00034713,
+      "previous_equity_close": "2017-07-26"
+    },
+    {
+      "corrected_interval_return": 0.0003471299999999733,
+      "date": "2017-09-08",
+      "delta_bps": 0.3653999999997327,
+      "old_same_date_return": 0.00031059,
+      "previous_equity_close": "2017-09-06"
+    },
+    {
+      "corrected_interval_return": 0.0003105899999999995,
+      "date": "2017-10-26",
+      "delta_bps": 0.2762999999999946,
+      "old_same_date_return": 0.00028296,
+      "previous_equity_close": "2017-10-25"
+    },
+    {
+      "corrected_interval_return": 0.0005660000663616493,
+      "date": "2017-11-21",
+      "delta_bps": 2.8304006636164933,
+      "old_same_date_return": 0.00028296,
+      "previous_equity_close": "2017-11-17"
+    },
+    {
+      "corrected_interval_return": 0.0002829600000000543,
+      "date": "2017-12-07",
+      "delta_bps": 0.1852000000005427,
+      "old_same_date_return": 0.00026444,
+      "previous_equity_close": "2017-12-06"
+    },
+    {
+      "corrected_interval_return": 0.0005289499285137111,
+      "date": "2018-01-02",
+      "delta_bps": 2.6450992851371113,
+      "old_same_date_return": 0.00026444,
+      "previous_equity_close": "2017-12-28"
+    },
+    {
+      "corrected_interval_return": 0.0005289499285137111,
+      "date": "2018-01-26",
+      "delta_bps": 2.6450992851371113,
+      "old_same_date_return": 0.00026444,
+      "previous_equity_close": "2018-01-24"
+    },
+    {
+      "corrected_interval_return": 0.0002644400000000324,
+      "date": "2018-02-08",
+      "delta_bps": 0.09290000000032432,
+      "old_same_date_return": 0.00025515,
+      "previous_equity_close": "2018-02-07"
+    },
+    {
+      "corrected_interval_return": 0.0002551500000000928,
+      "date": "2018-03-22",
+      "delta_bps": 0.09320000000092807,
+      "old_same_date_return": 0.00024583,
+      "previous_equity_close": "2018-03-21"
+    },
+    {
+      "corrected_interval_return": 0.0004917204323886537,
+      "date": "2018-07-10",
+      "delta_bps": 2.458904323886537,
+      "old_same_date_return": 0.00024583,
+      "previous_equity_close": "2018-07-06"
+    },
+    {
+      "corrected_interval_return": 0.0002458299999998914,
+      "date": "2018-10-01",
+      "delta_bps": -0.003700000001086081,
+      "old_same_date_return": 0.0002462,
+      "previous_equity_close": "2018-09-28"
+    },
+    {
+      "corrected_interval_return": 0.0004924606144400823,
+      "date": "2018-11-21",
+      "delta_bps": 2.4626061444008225,
+      "old_same_date_return": 0.0002462,
+      "previous_equity_close": "2018-11-19"
+    },
+    {
+      "corrected_interval_return": 0.0004924606144400823,
+      "date": "2018-12-26",
+      "delta_bps": 2.4626061444008225,
+      "old_same_date_return": 0.0002462,
+      "previous_equity_close": "2018-12-21"
+    },
+    {
+      "corrected_interval_return": 0.0004924606144400823,
+      "date": "2019-01-02",
+      "delta_bps": 2.4626061444008225,
+      "old_same_date_return": 0.0002462,
+      "previous_equity_close": "2018-12-28"
+    },
+    {
+      "corrected_interval_return": 0.0004924606144400823,
+      "date": "2019-01-28",
+      "delta_bps": 2.4626061444008225,
+      "old_same_date_return": 0.0002462,
+      "previous_equity_close": "2019-01-24"
+    },
+    {
+      "corrected_interval_return": 0.0004924606144400823,
+      "date": "2019-07-10",
+      "delta_bps": 2.4626061444008225,
+      "old_same_date_return": 0.0002462,
+      "previous_equity_close": "2019-07-08"
+    },
+    {
+      "corrected_interval_return": 0.00024620000000008524,
+      "date": "2019-08-01",
+      "delta_bps": 0.18690000000085244,
+      "old_same_date_return": 0.00022751,
+      "previous_equity_close": "2019-07-31"
+    },
+    {
+      "corrected_interval_return": 0.00022750999999998633,
+      "date": "2019-09-19",
+      "delta_bps": 0.18789999999986312,
+      "old_same_date_return": 0.00020872000000000002,
+      "previous_equity_close": "2019-09-18"
+    },
+    {
+      "corrected_interval_return": 0.0002087200000000511,
+      "date": "2019-10-31",
+      "delta_bps": 0.18870000000051107,
+      "old_same_date_return": 0.00018984999999999998,
+      "previous_equity_close": "2019-10-30"
+    },
+    {
+      "corrected_interval_return": 0.00037973604302243835,
+      "date": "2019-11-21",
+      "delta_bps": 1.8988604302243837,
+      "old_same_date_return": 0.00018984999999999998,
+      "previous_equity_close": "2019-11-19"
+    },
+    {
+      "corrected_interval_return": 0.0001898499999999359,
+      "date": "2019-12-12",
+      "delta_bps": 0.18959999999935892,
+      "old_same_date_return": 0.00017089,
+      "previous_equity_close": "2019-12-11"
+    },
+    {
+      "corrected_interval_return": 0.00034180920339199616,
+      "date": "2019-12-26",
+      "delta_bps": 1.7091920339199616,
+      "old_same_date_return": 0.00017089,
+      "previous_equity_close": "2019-12-23"
+    },
+    {
+      "corrected_interval_return": 0.00034180920339199616,
+      "date": "2020-01-02",
+      "delta_bps": 1.7091920339199616,
+      "old_same_date_return": 0.00017089,
+      "previous_equity_close": "2019-12-30"
+    },
+    {
+      "corrected_interval_return": 0.0001708899999999236,
+      "date": "2020-02-06",
+      "delta_bps": 0.09519999999923622,
+      "old_same_date_return": 0.00016136999999999998,
+      "previous_equity_close": "2020-02-05"
+    },
+    {
+      "corrected_interval_return": 0.00016137000000004953,
+      "date": "2020-03-19",
+      "delta_bps": 0.19100000000049525,
+      "old_same_date_return": 0.00014227,
+      "previous_equity_close": "2020-03-18"
+    },
+    {
+      "corrected_interval_return": 0.0001422699999999999,
+      "date": "2020-05-07",
+      "delta_bps": 0.288199999999999,
+      "old_same_date_return": 0.00011344999999999999,
+      "previous_equity_close": "2020-05-06"
+    },
+    {
+      "corrected_interval_return": 0.00011344999999995942,
+      "date": "2020-06-18",
+      "delta_bps": 0.2902999999995942,
+      "old_same_date_return": 8.442e-05,
+      "previous_equity_close": "2020-06-17"
+    },
+    {
+      "corrected_interval_return": 8.442000000008498e-05,
+      "date": "2020-08-06",
+      "delta_bps": 0.09730000000084978,
+      "old_same_date_return": 7.469e-05,
+      "previous_equity_close": "2020-08-05"
+    },
+    {
+      "corrected_interval_return": 0.0001493855785958953,
+      "date": "2020-12-28",
+      "delta_bps": 0.746955785958953,
+      "old_same_date_return": 7.469e-05,
+      "previous_equity_close": "2020-12-23"
+    },
+    {
+      "corrected_interval_return": 0.0001493855785958953,
+      "date": "2021-01-04",
+      "delta_bps": 0.746955785958953,
+      "old_same_date_return": 7.469e-05,
+      "previous_equity_close": "2020-12-30"
+    },
+    {
+      "corrected_interval_return": 0.0001493855785958953,
+      "date": "2021-01-26",
+      "delta_bps": 0.746955785958953,
+      "old_same_date_return": 7.469e-05,
+      "previous_equity_close": "2021-01-22"
+    },
+    {
+      "corrected_interval_return": 7.468999999993287e-05,
+      "date": "2021-03-18",
+      "delta_bps": -0.2910000000006713,
+      "old_same_date_return": 0.00010379,
+      "previous_equity_close": "2021-03-17"
+    },
+    {
+      "corrected_interval_return": 0.00010379000000004801,
+      "date": "2021-05-06",
+      "delta_bps": -0.28899999999952,
+      "old_same_date_return": 0.00013269,
+      "previous_equity_close": "2021-05-05"
+    },
+    {
+      "corrected_interval_return": 0.00013269000000004638,
+      "date": "2021-06-17",
+      "delta_bps": -0.286799999999536,
+      "old_same_date_return": 0.00016136999999999998,
+      "previous_equity_close": "2021-06-16"
+    },
+    {
+      "corrected_interval_return": 0.0003227660402769228,
+      "date": "2021-07-12",
+      "delta_bps": 1.613960402769228,
+      "old_same_date_return": 0.00016136999999999998,
+      "previous_equity_close": "2021-07-08"
+    },
+    {
+      "corrected_interval_return": 0.00016137000000004953,
+      "date": "2021-08-05",
+      "delta_bps": -0.37929999999950464,
+      "old_same_date_return": 0.0001993,
+      "previous_equity_close": "2021-08-04"
+    },
+    {
+      "corrected_interval_return": 0.00019930000000001336,
+      "date": "2021-09-23",
+      "delta_bps": -0.3756999999998665,
+      "old_same_date_return": 0.00023687,
+      "previous_equity_close": "2021-09-22"
+    },
+    {
+      "corrected_interval_return": 0.00023686999999994462,
+      "date": "2021-10-28",
+      "delta_bps": -0.5569000000005541,
+      "old_same_date_return": 0.00029256000000000003,
+      "previous_equity_close": "2021-10-27"
+    },
+    {
+      "corrected_interval_return": 0.0002925600000001083,
+      "date": "2021-12-09",
+      "delta_bps": -0.5492999999989171,
+      "old_same_date_return": 0.00034749,
+      "previous_equity_close": "2021-12-08"
+    },
+    {
+      "corrected_interval_return": 0.000695100749300126,
+      "date": "2021-12-27",
+      "delta_bps": 3.47610749300126,
+      "old_same_date_return": 0.00034749,
+      "previous_equity_close": "2021-12-23"
+    },
+    {
+      "corrected_interval_return": 0.000695100749300126,
+      "date": "2022-01-03",
+      "delta_bps": 3.47610749300126,
+      "old_same_date_return": 0.00034749,
+      "previous_equity_close": "2021-12-30"
+    },
+    {
+      "corrected_interval_return": 0.00034749000000000585,
+      "date": "2022-02-03",
+      "delta_bps": -0.5418999999999417,
+      "old_same_date_return": 0.00040168,
+      "previous_equity_close": "2022-02-02"
+    },
+    {
+      "corrected_interval_return": 0.00040167999999995985,
+      "date": "2022-03-17",
+      "delta_bps": -0.35710000000040165,
+      "old_same_date_return": 0.00043739,
+      "previous_equity_close": "2022-03-16"
+    },
+    {
+      "corrected_interval_return": 0.000437390000000093,
+      "date": "2022-05-05",
+      "delta_bps": -0.3539999999990702,
+      "old_same_date_return": 0.00047279,
+      "previous_equity_close": "2022-05-04"
+    },
+    {
+      "corrected_interval_return": 0.0004727899999998897,
+      "date": "2022-06-17",
+      "delta_bps": -0.17580000000110269,
+      "old_same_date_return": 0.00049037,
+      "previous_equity_close": "2022-06-15"
+    },
+    {
+      "corrected_interval_return": 0.0004903700000000732,
+      "date": "2022-08-04",
+      "delta_bps": -0.17509999999926804,
+      "old_same_date_return": 0.00050788,
+      "previous_equity_close": "2022-08-03"
+    },
+    {
+      "corrected_interval_return": 0.0010160179420943827,
+      "date": "2023-01-02",
+      "delta_bps": 5.0813794209438266,
+      "old_same_date_return": 0.00050788,
+      "previous_equity_close": "2022-12-29"
+    },
+    {
+      "corrected_interval_return": 0.0005078800000000161,
+      "date": "2023-08-03",
+      "delta_bps": 0.1751000000001614,
+      "old_same_date_return": 0.00049037,
+      "previous_equity_close": "2023-08-02"
+    },
+    {
+      "corrected_interval_return": 0.0004903700000000732,
+      "date": "2023-09-21",
+      "delta_bps": 0.17580000000073243,
+      "old_same_date_return": 0.00047279,
+      "previous_equity_close": "2023-09-20"
+    },
+    {
+      "corrected_interval_return": 0.0004727899999998897,
+      "date": "2023-11-03",
+      "delta_bps": 0.176599999998897,
+      "old_same_date_return": 0.00045513,
+      "previous_equity_close": "2023-11-01"
+    },
+    {
+      "corrected_interval_return": 0.0004551299999999703,
+      "date": "2023-12-14",
+      "delta_bps": 0.17739999999970268,
+      "old_same_date_return": 0.00043739,
+      "previous_equity_close": "2023-12-13"
+    },
+    {
+      "corrected_interval_return": 0.0008749713100122403,
+      "date": "2024-01-02",
+      "delta_bps": 4.375813100122403,
+      "old_same_date_return": 0.00043739,
+      "previous_equity_close": "2023-12-28"
+    },
+    {
+      "corrected_interval_return": 0.000437390000000093,
+      "date": "2024-02-01",
+      "delta_bps": 0.1782000000009296,
+      "old_same_date_return": 0.00041957,
+      "previous_equity_close": "2024-01-31"
+    },
+    {
+      "corrected_interval_return": 0.00041957000000003575,
+      "date": "2024-03-21",
+      "delta_bps": 0.1789000000003573,
+      "old_same_date_return": 0.00040168,
+      "previous_equity_close": "2024-03-20"
+    },
+    {
+      "corrected_interval_return": 0.00040167999999995985,
+      "date": "2024-05-09",
+      "delta_bps": 0.08979999999959842,
+      "old_same_date_return": 0.0003927,
+      "previous_equity_close": "2024-05-08"
+    },
+    {
+      "corrected_interval_return": 0.00039269999999991256,
+      "date": "2024-09-19",
+      "delta_bps": -0.08980000000087453,
+      "old_same_date_return": 0.00040168,
+      "previous_equity_close": "2024-09-18"
+    },
+    {
+      "corrected_interval_return": 0.00040167999999995985,
+      "date": "2024-11-07",
+      "delta_bps": -0.17890000000040177,
+      "old_same_date_return": 0.00041957,
+      "previous_equity_close": "2024-11-06"
+    },
+    {
+      "corrected_interval_return": 0.00041957000000003575,
+      "date": "2024-12-12",
+      "delta_bps": -0.3555999999996424,
+      "old_same_date_return": 0.00045513,
+      "previous_equity_close": "2024-12-11"
+    },
+    {
+      "corrected_interval_return": 0.0009104671433168843,
+      "date": "2024-12-26",
+      "delta_bps": 4.553371433168843,
+      "old_same_date_return": 0.00045513,
+      "previous_equity_close": "2024-12-23"
+    }
+  ],
+  "source": {
+    "path": "C:\\quant-data\\b3\\interim\\external\\cdi_sgs12_checkpoint_development_20260909\\daily_cdi.parquet",
+    "sha256": "ee75978a727b4741660d58b5ab06ce39131a8ba3bbd0fadf12952302808a750e"
+  },
+  "source_rows": 2122,
+  "status": "cash_calendar_defect_quantified_corrected_explicit_amendment_not_yet_scored",
+  "upstream_builder": "execution/experiment52.py::_fetch_cdi retains raw monetary dates/percent-to-fraction units",
+  "verified_overlapping_new_source_rows": 58
+}

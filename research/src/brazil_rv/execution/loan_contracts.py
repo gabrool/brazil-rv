@@ -46,6 +46,12 @@ class LoanCharge:
 
 
 @dataclass(frozen=True)
+class LoanCashValue:
+    available_session: int
+    cash_per_share: float
+
+
+@dataclass(frozen=True)
 class LoanCashSettlement:
     """Sourced compulsory cash closeout of loans, not shareholder redemption."""
 
@@ -54,6 +60,11 @@ class LoanCashSettlement:
     available_session: int
     cash_per_share: float
     source: str
+    rent_payment_session: int | None = None
+    payment_session: int | None = None
+    valuations: tuple[LoanCashValue, ...] = ()
+    unreturned_only: bool = False
+    prohibit_new_borrow: bool = True
 
     def __post_init__(self):
         if self.available_session > self.effective_session:
@@ -64,6 +75,35 @@ class LoanCashSettlement:
             or self.cash_per_share <= 0
         ):
             raise ValueError("loan cash settlement requires a sourced positive price")
+        for date in (self.rent_payment_session, self.payment_session):
+            if date is not None and date < self.effective_session:
+                raise ValueError("loan payment cannot precede quantity extinction")
+        previous = self.effective_session
+        for value in self.valuations:
+            if (
+                value.available_session <= previous
+                or value.available_session >= self.cash_day
+                or not math.isfinite(value.cash_per_share)
+                or value.cash_per_share <= 0
+            ):
+                raise ValueError("loan cash valuations require ordered causal values")
+            previous = value.available_session
+
+    @property
+    def cash_day(self):
+        return (
+            self.effective_session
+            if self.payment_session is None
+            else self.payment_session
+        )
+
+    @property
+    def rent_day(self):
+        return (
+            self.effective_session
+            if self.rent_payment_session is None
+            else self.rent_payment_session
+        )
 
 
 @dataclass(frozen=True)
@@ -80,6 +120,16 @@ def slice_loan_settlements(events, start, stop):
             event,
             effective_session=event.effective_session - start,
             available_session=event.available_session - start,
+            rent_payment_session=None
+            if event.rent_payment_session is None
+            else event.rent_payment_session - start,
+            payment_session=None
+            if event.payment_session is None
+            else event.payment_session - start,
+            valuations=tuple(
+                replace(value, available_session=value.available_session - start)
+                for value in event.valuations
+            ),
         )
         for event in events
         if event.effective_session < stop
@@ -104,6 +154,7 @@ class LoanContracts:
     name: np.ndarray = field(default_factory=lambda: np.empty(0, dtype=np.int64))
     opened: np.ndarray = field(default_factory=lambda: np.empty(0, dtype=np.int64))
     return_day: np.ndarray = field(default_factory=lambda: np.empty(0, dtype=np.int64))
+    accrual_end: np.ndarray = field(default_factory=lambda: np.empty(0, dtype=np.int64))
     root: np.ndarray = field(default_factory=lambda: np.empty(0, dtype=np.int64))
     annual_rate: np.ndarray = field(default_factory=lambda: np.empty(0))
     fee_rate: np.ndarray = field(default_factory=lambda: np.empty((0, 2)))
@@ -122,6 +173,9 @@ class LoanContracts:
     minimum: np.ndarray = field(default_factory=lambda: np.empty(0))
     started: np.ndarray = field(default_factory=lambda: np.empty(0, dtype=bool))
     root_fees: torch.Tensor = field(default_factory=lambda: _tensor([]))
+    cash_claims: list[tuple[LoanCashSettlement, torch.Tensor, float]] = field(
+        default_factory=list
+    )
 
     def _by_name(self, values, names=None):
         return torch.zeros(self.names, dtype=torch.float64).index_add(
@@ -134,7 +188,18 @@ class LoanContracts:
 
     @property
     def liability(self):
-        return self.rent_due.sum() + self.fees_due.sum() + self.minimum_provision.sum()
+        return (
+            self.rent_due.sum()
+            + self.fees_due.sum()
+            + self.minimum_provision.sum()
+            + self.cash_liability
+        )
+
+    @property
+    def cash_liability(self):
+        return sum(
+            (quantity * value for _, quantity, value in self.cash_claims), _tensor(0.0)
+        )
 
     @property
     def active_quantity(self):
@@ -142,7 +207,7 @@ class LoanContracts:
 
     @property
     def outstanding_principal(self):
-        return self._by_name(self.principal)
+        return self._by_name(self.principal * _tensor(self.accrual_end < 0))
 
     def open(
         self,
@@ -170,6 +235,7 @@ class LoanContracts:
         self.name = np.r_[self.name, ids]
         self.opened = np.r_[self.opened, np.full(len(ids), day)]
         self.return_day = np.r_[self.return_day, np.full(len(ids), -1)]
+        self.accrual_end = np.r_[self.accrual_end, np.full(len(ids), -1)]
         self.root = np.r_[self.root, roots]
         self.annual_rate = np.r_[self.annual_rate, rate]
         fees = loan_fee_rates(rate, session_date, modality=self.modality)
@@ -223,7 +289,7 @@ class LoanContracts:
             raise ValueError("loans accrue once per subsequent business session")
         rent_log = np.log1p(self.annual_rate) / self.annual_sessions
         rent = self.principal * _tensor(
-            np.exp(rent_log * (age - 1)) * np.expm1(rent_log)
+            np.exp(rent_log * (age - 1)) * np.expm1(rent_log) * (self.accrual_end < 0)
         )
         # Tariff periods are charged separately; a new schedule must not
         # retrospectively reprice an earlier period's accrued fee.
@@ -237,7 +303,10 @@ class LoanContracts:
             )
         daily_fee = np.expm1(np.log1p(self.fee_rate) / self.annual_sessions)
         fees = self.principal[:, None] * _tensor(
-            self.fee_growth * daily_fee * self.fee_multiplier
+            self.fee_growth
+            * daily_fee
+            * self.fee_multiplier
+            * (self.accrual_end < 0)[:, None]
         )
         self.fee_growth *= 1 + daily_fee
         before = self.minimum_provision
@@ -296,6 +365,7 @@ class LoanContracts:
         for key in (
             "name",
             "opened",
+            "accrual_end",
             "root",
             "annual_rate",
             "fee_rate",
@@ -349,23 +419,66 @@ class LoanContracts:
         self.root = np.searchsorted(live_roots, self.root)
         return rent, fees
 
-    def cash_settle(self, name, day):
+    def cash_settle(self, event, day):
         """Extinguish all outstanding shares, including later requested returns.
 
         Rent/fees accrue through today before this call and pay via the ordinary
         liability path. Principal cash is a separate issuer-specific payment.
         A covering asset is retained if its planned physical return is superseded.
         """
-        ids = self.name == name
+        ids = self.name == event.security_index
+        if event.unreturned_only:
+            # Lender elections apply to whole eligible contracts. A pending
+            # partial return excludes that root, not just its returned fragment.
+            pending_roots = self.root[self.return_day >= 0]
+            ids &= ~np.isin(self.root, pending_roots) & (self.opened < day)
         quantity = self.quantity[ids].sum()
-        self.return_day[ids] = day
+        self.return_day[ids] = event.rent_day
+        self.accrual_end[ids] = day
+        if quantity.detach().item() > 0:
+            self.cash_claims.append((event, quantity, event.cash_per_share))
         return quantity
+
+    def settle_cash_claims(self, day, *, payments=None, pay_only=False):
+        """Realize only today's published values and today's actual cash arrival.
+
+        A future payment date is a realization, never used to discount the claim
+        or choose a prior trade. Rent has its own stopped accrual/payment clock.
+        """
+        paid = torch.zeros(self.names, dtype=torch.float64)
+        remaining = []
+        for event, quantity, value in self.cash_claims:
+            if pay_only and event.cash_day != day:
+                remaining.append((event, quantity, value))
+                continue
+            for update in event.valuations:
+                if update.available_session == day:
+                    value = update.cash_per_share
+            if event.cash_day == day:
+                amount = quantity * value
+                paid = paid.index_add(
+                    0, torch.tensor([event.security_index]), amount.reshape(1)
+                )
+                if payments is not None:
+                    payments.append(
+                        LoanCashPayment(
+                            day,
+                            event.security_index,
+                            float(quantity.detach()),
+                            float(amount.detach()),
+                        )
+                    )
+            else:
+                remaining.append((event, quantity, value))
+        self.cash_claims = remaining
+        return paid
 
     def _keep(self, keep):
         for key in (
             "name",
             "opened",
             "return_day",
+            "accrual_end",
             "root",
             "annual_rate",
             "fee_rate",
@@ -408,6 +521,7 @@ class LoanContracts:
         for key in (
             "opened",
             "return_day",
+            "accrual_end",
             "root",
             "annual_rate",
             "fee_rate",
@@ -423,6 +537,10 @@ class LoanContracts:
     def detach(self):
         for key in ("quantity", "principal", "rent_due", "fees_due", "root_fees"):
             setattr(self, key, getattr(self, key).detach())
+        self.cash_claims = [
+            (event, quantity.detach(), value)
+            for event, quantity, value in self.cash_claims
+        ]
 
     def detached_copy(self):
         values = {}
@@ -432,5 +550,10 @@ class LoanContracts:
                 value = value.detach().clone()
             elif isinstance(value, np.ndarray):
                 value = value.copy()
+            elif item.name == "cash_claims":
+                value = [
+                    (event, quantity.detach().clone(), mark)
+                    for event, quantity, mark in value
+                ]
             values[item.name] = value
         return LoanContracts(**values)

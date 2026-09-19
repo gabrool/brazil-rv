@@ -45,6 +45,7 @@ class PortfolioAccount:
     funding_day: int
     funding_cash: Tensor
     funding_restricted: Tensor
+    prepared_loan_cash_payment: Tensor
 
     @classmethod
     def empty(cls, reference, *, config=LedgerConfig()):
@@ -77,6 +78,7 @@ class PortfolioAccount:
             funding_day=-1,
             funding_cash=tensor(config.initial_capital_brl),
             funding_restricted=tensor(0.0),
+            prepared_loan_cash_payment=tensor(0.0),
         )
 
     def settled_balances(self):
@@ -138,6 +140,13 @@ class PortfolioAccount:
             self.funding_cash, restricted = self.settled_balances()
             self.funding_restricted = restricted.sum()
             self.funding_day = day
+            # A previously valued liability pays with the same known arrival
+            # that releases its proceeds; do not expose spendable proceeds to
+            # today's policy while hiding the simultaneous principal debit.
+            self.prepared_loan_cash_payment = self.loans.settle_cash_claims(
+                day, pay_only=True
+            ).sum()
+            self.trade_cash = self.trade_cash - self.prepared_loan_cash_payment
             self.custody.settle(day)
             # Value-date obligations settle within this session. Close-to-close
             # interest below belongs to balances carried from the previous close.
@@ -245,6 +254,7 @@ class PortfolioAccount:
             "pending_exit",
             "funding_cash",
             "funding_restricted",
+            "prepared_loan_cash_payment",
         ):
             setattr(self, name, getattr(self, name).detach())
         self.payments = [(day, amount.detach()) for day, amount in self.payments]
@@ -418,6 +428,51 @@ class PortfolioAccount:
         self.shares, self.marks = shares, marks
         return exit_fraction, entry_notional
 
+    def convert_loan_cash(self, event, day):
+        name = event.security_index
+        active = self.loans.active_quantity[name]
+        if not event.unreturned_only:
+            for due in np.unique(self.loans.return_day[self.loans.name == name]):
+                if due > day:
+                    restored = torch.zeros_like(self.shares)
+                    restored[name] = self.loans.quantity[
+                        (self.loans.name == name) & (self.loans.return_day == due)
+                    ].sum()
+                    self.custody.add(int(due), restored)
+        quantity = self.loans.cash_settle(event, day)
+        fraction = (
+            (quantity / active.clamp_min(1e-30)).clamp(max=1)
+            if event.unreturned_only
+            else tensor(1.0)
+        )
+        release = self.trade_restricted[name] * fraction
+        self.trade_cash = self.trade_cash + release
+        restricted = self.trade_restricted.clone()
+        restricted[name] = restricted[name] - release
+        self.trade_restricted = restricted
+        if not event.unreturned_only:
+            # Superseded returns retain their covering assets and original spot
+            # value dates; an active-only election never cancels those returns.
+            settlements = []
+            for due, free, pending_restricted in self.settlements:
+                amount = pending_restricted[name]
+                remaining = pending_restricted.clone()
+                remaining[name] = 0
+                settlements.append((due, free + amount, remaining))
+            self.settlements = settlements
+        if event.cash_day > day:
+            retained = torch.zeros_like(self.trade_restricted)
+            retained[name] = -release
+            self.settlements.append((event.cash_day, release, retained))
+        shares = self.shares.clone()
+        shares[name] = shares[name] + quantity
+        self.shares = shares
+        if abs(float(shares[name].detach())) < 1e-12:
+            self.cost_basis = self.cost_basis.clone()
+            self.cost_basis[name] = 0
+            self.entry_day[name] = -1
+            self.missing_sessions[name] = self.ineligible_sessions[name] = 0
+
     def step(
         self,
         target: Tensor,
@@ -476,45 +531,13 @@ class PortfolioAccount:
         loan_rent, loan_fee = self.loans.accrue(day, session_date)
         borrow = loan_rent.sum() + loan_fee.sum()
 
-        cash_loan_payment = tensor(0.0)
         for event in loan_cash_settlements:
-            name = event.security_index
-            if event.effective_session <= day:
+            if event.prohibit_new_borrow and event.effective_session <= day:
                 entry_notional = entry_notional.clone()
+                name = event.security_index
                 entry_notional[name] = entry_notional[name].clone().clamp_min(0)
-            if event.effective_session != day:
-                continue
-            for due in np.unique(self.loans.return_day[self.loans.name == name]):
-                if due > day:
-                    restored = torch.zeros_like(self.shares)
-                    restored[name] = self.loans.quantity[
-                        (self.loans.name == name) & (self.loans.return_day == due)
-                    ].sum()
-                    self.custody.add(int(due), restored)
-            quantity = self.loans.cash_settle(name, day)
-            paid = quantity * event.cash_per_share
-            cash_loan_payment = cash_loan_payment + paid
-            self.trade_cash = self.trade_cash - paid + self.trade_restricted[name]
-            restricted = self.trade_restricted.clone()
-            restricted[name] = 0
-            self.trade_restricted = restricted
-            # The loan no longer restricts money, including a previously queued
-            # cover release. Preserve each external receipt/payment's value date.
-            settlements = []
-            for due, free, pending_restricted in self.settlements:
-                amount = pending_restricted[name]
-                remaining = pending_restricted.clone()
-                remaining[name] = 0
-                settlements.append((due, free + amount, remaining))
-            self.settlements = settlements
-            shares = self.shares.clone()
-            shares[name] = shares[name] + quantity
-            self.shares = shares
-            if abs(float(shares[name].detach())) < 1e-12:
-                self.cost_basis = self.cost_basis.clone()
-                self.cost_basis[name] = 0
-                self.entry_day[name] = -1
-                self.missing_sessions[name] = self.ineligible_sessions[name] = 0
+            if event.effective_session == day and not event.unreturned_only:
+                self.convert_loan_cash(event, day)
 
         # Realizations begin here. Terms alter prior inventory and marks once;
         # a cash entitlement remains a claim until its explicit payment day.
@@ -683,6 +706,12 @@ class PortfolioAccount:
                 -self.shares[-1] if terminal else hedge_trade_notional / prices[-1]
             )
         costs = costs + self._fill(hedge_quantity, prices, cost_rate, loan_session)
+        for event in loan_cash_settlements:
+            if event.effective_session == day and event.unreturned_only:
+                self.convert_loan_cash(event, day)
+        cash_loan_payment = self.loans.settle_cash_claims(day).sum()
+        self.trade_cash = self.trade_cash - cash_loan_payment
+        cash_loan_payment = cash_loan_payment + self.prepared_loan_cash_payment
         rent_paid, fees_paid = self.loans.pay(day)
         self.trade_cash = self.trade_cash - rent_paid.sum() - fees_paid.sum()
         self.marks = torch.where(torch.as_tensor(printed), prices, self.marks)
@@ -729,6 +758,7 @@ class PortfolioAccount:
             "borrow": borrow,
             "borrow_paid": rent_paid.sum() + fees_paid.sum(),
             "borrow_liability": self.loans.liability,
+            "loan_redemption_liability": self.loans.cash_liability,
             "loan_cash_settlement_payment": cash_loan_payment,
             "unsettled_cash": self.unsettled_cash,
             "free_cash_income": self.funding_cash.clamp_min(0) * cdi,

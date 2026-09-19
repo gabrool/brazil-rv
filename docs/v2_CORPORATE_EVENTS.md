@@ -219,3 +219,32 @@ The CVM 2023 delivery index currently names this CNPJ PRIO FORTE. Source retriev
 therefore used CNPJ 08.926.302/0001-05 / CVM 23493 and the dated issuer document,
 not an assumed historical company name. This is a useful identity-audit boundary;
 the index's current name must not become a point-in-time model attribute.
+
+
+### Dommo lender-elected PNB endpoint admitted (2026-09-19)
+
+The run pointer now binds `dommo_pnb_scenario`, separate from the primary
+Cielo/BRML/Copel manifest. This freezes all legally eligible pre-existing lender
+contracts electing PNB on Dec26; it does not assert actual participation or let the
+borrower select a favorable future outcome. The event runs after actual Dec26
+fills, excludes whole roots with pending returns and same-day D+1 registrations,
+and permits later non-elected DMMO borrowing. Default PNA and its provisioned loan
+fractions remain required before any full model replay spanning this event.
+
+The Oct24 approval notice and 58 original SGS12 observations are archived. R$1.85
+compounded Oct24 inclusive/Jan13 exclusive equals R$1.9043246860694236, matching
+the Jan6 issuer figure R$1.90432468607. Dec26 closing liability uses only accrued
+CDI (R$1.891796083009226); later daily marks use only then-elapsed observations,
+including money-only Dec30. The fixed issuer amount first enters Jan9. Quantity
+extinguishes Dec26, original rent stops there and pays Dec28; redemption pays Jan13.
+Proceeds remain remunerated/restricted until that payment. Its exact date is used
+as a future realization, never to discount earlier marks or release cash early.
+Known principal payment and proceeds release occur together before that day's
+policy decision; interest continues to use prior-close settled balances.
+
+Six prescribed R$1m/R$5m/R$10m cases, with zero funding and with sourced 100% CDI,
+reconcile exactly across both accounts and independent cash/rent formulas. The
+R$10m 4% Dec23 short has original principal R$395721.92412462615, rent R$61.59406319349257
+and redemption R$407342.1777998081. These are accounting amounts, not model alpha.
+Actual lender election, finite maturity, partial-return exception handling and
+custodian restrictions remain assumptions to bound in actual books.

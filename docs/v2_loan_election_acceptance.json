@@ -1,0 +1,80 @@
+{
+  "cash_calendar": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\cash_calendar\\manifest.json",
+    "sha256": "687cd4d999bdb39867b5cd59c9972293a1b5748b811f264b66ae4e78905c862c",
+    "status": "cash_calendar_defect_quantified_corrected_explicit_amendment_not_yet_scored"
+  },
+  "code_sha256_lf": {
+    "ops/admit_dommo_election.py": "cc48fb36f4de0752d64b1044e00104628b86df150f7e50255a2653f346d3da5b",
+    "ops/audit_cash_calendar.py": "4fdab6e7b98a8b128a937ac6e9cd35b110bcece11d23e2fd436849eec8646551",
+    "ops/verify_dommo_election.py": "0077048e0d8bb01c60e0d7fd66762315caefef0a93282d59ae6ab32df8b2d2df",
+    "ops/verify_loan_election_unchanged.py": "b53280fb2399e5b8095af7f02b801953275dfd3485ff13f20cece291e9768cdc",
+    "research/src/brazil_rv/execution/loan_contracts.py": "5d7dee8e0485c32bc32aece99cd1086af1c8489f682ba4fff6cc4908f77a22f8",
+    "research/src/brazil_rv/execution/portfolio_account.py": "c56b08a029b095f83d62d3a70efb67269aa906c4cf2112f5b0fa31ecd355e905",
+    "research/src/brazil_rv/execution/portfolio_policy.py": "d27438a792c7507257d47f860f45d5a3686995b88ed216e92c2eb3f83bd5bfe4",
+    "research/src/brazil_rv/execution/stateful_ledger.py": "6e4ed6457b01a7c538fc307fb0826e16c91a19135b6d649b2bfbb3571e9e9211",
+    "research/src/brazil_rv/v2/cash_calendar.py": "4ff7a71a454fbbb3f74c2575a6418686b1dea8b0aeeef0da3038445973d0704b",
+    "research/src/brazil_rv/v2/corporate_replay.py": "4572c40fa8a451db6b997c8d9bd29fc804bbbdd232d694ce6d9a991250d04904",
+    "research/src/brazil_rv/v2/evaluate.py": "f6e0f29b05b889bd7c9cb300ff3bdbc8f641a49a3f1c937113261ab7a5f2f0ee",
+    "research/tests/test_cash_calendar.py": "1df19c3d2ab541feba60c1c1cfb738a96baf8be9471941a049f67881cbefb51b",
+    "research/tests/test_loan_cash_settlement.py": "4d4aedd46d07c3d20af8337f957528361c661f6f372d50ddad7998d2fed3012f"
+  },
+  "evaluation_schema": "BRAZIL_RV_V2_EVALUATION_V28",
+  "historical_oracles": {
+    "path": "docs\\v2_dommo_election_acceptance.json",
+    "sha256": "f0fad28b48c5f4dd29290c71737db690a80fee394f00abfe98f26171ea964684"
+  },
+  "new_sources": [
+    {
+      "bytes": 127886,
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\primary_sources\\dommo_approval_20221024.html",
+      "resolved_url": "https://mzgroup.com.br/fatosrelevantes/fato-relevante-aprovacao-da-incorporacao-de-acoes-2/",
+      "retrieved_utc": "2026-09-19T21:26:11.432865+00:00",
+      "sha256": "e56b0e45ad5d2db3ab55bfcd808a851062f7a1fb75c7e39f28e88d1f7bb8d188",
+      "url": "https://mzgroup.com.br/fatosrelevantes/fato-relevante-aprovacao-da-incorporacao-de-acoes-2/"
+    },
+    {
+      "bytes": 2379,
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\primary_sources\\cdi_sgs12_20221024_20230113.json",
+      "resolved_url": "https://api.bcb.gov.br/dados/serie/bcdata.sgs.12/dados?formato=json&dataInicial=24/10/2022&dataFinal=13/01/2023",
+      "retrieved_utc": "2026-09-19T21:26:12.058882+00:00",
+      "sha256": "d63387bb195ef3c854c5588b7ff29f48e8f4a5e98c27cfdac3c14bbfc8c00d75",
+      "url": "https://api.bcb.gov.br/dados/serie/bcdata.sgs.12/dados?formato=json&dataInicial=24/10/2022&dataFinal=13/01/2023"
+    }
+  ],
+  "previous_source_commit": "a66cd423b899d6d9c5d8afa2a175caa72f43f77d",
+  "remaining": "default PNA fraction provisions; full spot/loan clearing clock, finite lifecycle and presettlement bounds; all-family source-through-tensor audit; corrected replay/refits and conditional capacity experiments; no model profitability claim",
+  "ruff": "passed",
+  "scenario": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\corporate_replay\\dommo_pnb_manifest.json",
+    "sha256": "384584ad5657e7f55322c634c35ebeb6bf6d46019d8282f2bda2c569655bad98",
+    "status": "dommo_legal_lender_election_endpoint_default_PNA_separate"
+  },
+  "status": "deferred_lender_cash_and_source_bound_Dommo_PNB_endpoint_verified_default_PNA_pending",
+  "tests": [
+    {
+      "passed": 183,
+      "scope": "affected loan/accounts/ledger/policy/objective/action tests before final payment-order refinement",
+      "seconds": 8.37
+    },
+    {
+      "passed": 98,
+      "scope": "overlapping final accounts/objective/action/evaluation suite; new cash-calendar fixture failed because it supplied a local calendar with global indices, then corrected",
+      "seconds": 42.48
+    },
+    {
+      "passed": 10,
+      "scope": "loan cash clocks, gradients, whole-root eligibility, copies and causality after payment-order refinement",
+      "seconds": 2.19
+    },
+    {
+      "passed": 2,
+      "scope": "corrected cash-calendar source-timing and static-policy fixture",
+      "seconds": 1.81
+    }
+  ],
+  "unchanged_books": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\loan_election_unchanged\\result.json",
+    "sha256": "8c64fbad4c0526d08203b79512717af7889da3a7880988c66793c4a668209639"
+  }
+}
