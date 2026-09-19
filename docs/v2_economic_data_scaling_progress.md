@@ -773,3 +773,11 @@ events, finite maturity/renewal/recall and clearing-calendar terms, then complet
 the deep source-through-tensor audit and propagate accepted identity fixes. Do not
 repeat completed censuses or this passed mechanics work. No GPU fit or model
 profitability result has been produced in this milestone.
+
+Implementation: `fb1e0e5`. The 32-member D recovery archive was restored and every
+member checked, including the restored event manifest and acceptance receipt.
+Ten bound original source receipts were verified; immutable datasets were not
+duplicated. `brmalls_custody_recovery.json` is bound by the run pointer. ZIP SHA-256:
+`b6393f8f6d4747a84cfb7eb20e7553a8e41fc8b66899fb211530af2142ce4e3c`.
+Acceptance SHA-256:
+`e8ef32f90f97ed6f55d716c7bc706bed922d330106801d03c284c0315de498ff`.

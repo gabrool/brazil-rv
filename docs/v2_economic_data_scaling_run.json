@@ -4,6 +4,10 @@
     "sha256": "589c5d2011e8e1f1092bda6571c45dd172b2c58a3f88801d87f68edef42b27ff",
     "status": "recovered_not_admitted"
   },
+  "brmalls_custody_recovery": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\brmalls_custody_recovery.json",
+    "sha256": "dbbf7c4db7906d3a273b9c63a4cf6720c02e1b501efa96c241079df4dcf2e3c0"
+  },
   "corporate_loan_sources": {
     "path": "docs\\v2_corporate_loan_sources.json",
     "sha256": "0076c63306393870e2a68595935d581a6284b9ba37efcc33108105225a026b3a",
