@@ -44,8 +44,8 @@ class LoanCharge:
     fee: float
 
 
-def cover_return_session(day, session_date):
-    """Prearranged return upon the covering spot purchase's settlement.
+def spot_settlement_session(day, session_date):
+    """Dated spot value date on the supplied complete trading-session axis.
 
     Spot moved from T+3 to T+2 on 2019-05-27. Same-settlement loan return
     is an execution assumption; broker/cutoff delays require an explicit override.

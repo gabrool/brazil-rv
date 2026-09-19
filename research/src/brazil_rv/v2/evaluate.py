@@ -48,7 +48,7 @@ MIN_CROSS_SECTION = 20
 BOOTSTRAP_SEED = 20260903
 ECONOMICS_COSTS_BPS = (2.0, 4.0, 7.0)
 ECONOMICS_HEADLINE = (4.0, 0.02)
-EVALUATION_SCHEMA = "BRAZIL_RV_V2_EVALUATION_V23"
+EVALUATION_SCHEMA = "BRAZIL_RV_V2_EVALUATION_V24"
 PRIOR_EVALUATION_SCHEMA = "BRAZIL_RV_V2_EVALUATION_V15"
 PAIRED_COMPARISON_SCHEMA = "BRAZIL_RV_V2_PAIRED_COMPARISON_V3"
 
@@ -920,6 +920,8 @@ def _ledger_rows(
             ),
             "hedge_gross_pnl_bps": _finite_or_none(result.hedge_gross_pnl_bps[index]),
             "interest_bps": _finite_or_none(result.interest_bps[index]),
+            "free_cash_income_bps": _finite_or_none(result.free_cash_income_bps[index]),
+            "debit_financing_bps": _finite_or_none(result.debit_financing_bps[index]),
             "free_cash_interest_bps": _finite_or_none(
                 result.free_cash_interest_bps[index]
             ),
@@ -943,6 +945,7 @@ def _ledger_rows(
             ),
             "turnover_cost_bps": _finite_or_none(result.cost_bps[index]),
             "borrow_cost_bps": _finite_or_none(result.borrow_bps[index]),
+            "unsettled_cash": _finite_or_none(result.unsettled_cash[index]),
             "loan_liability": _finite_or_none(result.loan_liability[index]),
             "loan_payment": _finite_or_none(result.loan_payment[index]),
             "loan_outstanding_principal": _finite_or_none(
@@ -1818,6 +1821,15 @@ def _economics_contract(inputs: EvaluationInputs) -> dict[str, object]:
         ),
         "short_proceeds_remuneration": config.short_proceeds_remuneration,
         "initial_capital_brl": config.initial_capital_brl,
+        "cash_settlement_basis": (
+            "trade-date beneficial holdings; net cash obligations settle T+3 before "
+            "2019-05-27 and T+2 thereafter on the supplied session axis; terminal "
+            "obligations remain in NAV without fabricated cash payment"
+        ),
+        "interest_balance_basis": (
+            "prior-close settled free cash and segregated settled short proceeds; "
+            "dated cash arrivals affect the following close-to-close income interval"
+        ),
         "costs_bps_per_side": list(ECONOMICS_COSTS_BPS),
         "cost_grid_borrow_cells": ["borrow_balance", "borrow_strict", "borrow_open"],
         "borrow_daily_accrual": (
@@ -1834,8 +1846,9 @@ def _economics_contract(inputs: EvaluationInputs) -> dict[str, object]:
             "T+2 thereafter; delivered custody offsets may return that session"
         ),
         "contractual_accounting_status": (
-            "loan mechanics implemented; historical references/events/rates, renewal "
-            "terms and full spot/proceeds settlement still require admission"
+            "loan and dated spot cash mechanics implemented; historical "
+            "references/events/rates, custody/calendar boundaries and renewal "
+            "terms still require admission"
         ),
         "pending_entries_follow_retention": config.cancel_pending_outside_retention,
         "hedge_decision": "15:45; prior marks, prior BOVA11 close and prior NAV",

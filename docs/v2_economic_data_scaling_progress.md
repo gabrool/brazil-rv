@@ -462,3 +462,50 @@ comparisons and Stage D capacity waves remain unstarted, with no GPU worker acti
 This milestone does not constitute historical accounting or program acceptance.
 
 Loan-contract acceptance receipt SHA-256: `58db32e966dfe4108a1c6f5101eefe2158a5ba37cd9402ee5f74c4b29fc8a2cf`. The D-root recovery copy is byte-identical.
+
+## 2026-09-19: dated spot cash and settled-proceeds financing
+
+Both accounts now preserve trade-date beneficial holdings and NAV while separating
+actual settled cash from T+3/T+2 money obligations. Unsettled purchases do not create
+an actual debit yet; unreceived short-sale proceeds do not earn CDI yet. Short cash
+remains segregated through cover settlement. Same-value-date money nets, and ending
+the evaluation leaves outstanding claims rather than inventing a final cash transfer.
+Cash-only event proceeds remain restricted until the specified payment date. Known
+settlement dates inform decisions without future prices; SAM/TBPTT retain independent
+pending-settlement state. Evaluation V24 reports unsettled net cash and separates
+free-cash income, short-proceeds income and actual debit financing. Static forecast
+and policy feature coordinates, original stores and fit roots are unchanged.
+
+Validation batches passed 148 account/policy/claim checks, 75 evaluation/readout/loan
+checks, 43 expanded funding/account checks, then 151 final affected checks. Counts
+overlap. Eleven dedicated value-date tests include closed-form money/income oracles,
+an early cover before the short sale settles, debit financing, same-date netting,
+cash-only payments, transition-date netting, gradient finite differences and independent
+SAM copies. Two zero-CDI synthetic paths retain bit-identical NAV, fills, intentions,
+prices, positions, costs and exposure versus `0dc7c7b`; settled plus unsettled cash
+matches old total cash to less than R$2e-9 at R$10m. A 243-name/252-session replay
+takes 1.99 seconds versus 2.15 for the fixed-loan trade-cash baseline in the same
+measurement; 64-session account forward/backward takes .55 seconds. These are
+single local CPU observations, not a speedup claim or neural-fit ETA.
+
+The archived 2021 B3 clearing manual adds specific custody, netting, loan modality
+and renewal evidence. No recovered loan observation or historical corporate case
+has yet been admitted. The current queue tracks money, not a full physical custody
+inventory: corporate offsets against a not-yet-delivered purchase must be resolved
+before admission. Historical clearing-calendar boundaries, D+0/D+1 loan conventions,
+maturity/renewal/recall, issuer terms and actual source panels remain open. The
+supplied trading-session axis and prior-close funding are explicit assumptions,
+described in `v2_LOAN_ACCOUNTING.md`; no unsupported broker tariff was added.
+
+Receipt `docs/v2_spot_settlement_acceptance.json`, SHA-256
+`be8a7a157909c5fc8b0ced719efc0e5432bad7e466ad4bb65417bee02c3ec064`,
+is byte-identical to its D-root copy. The expanded nine-source manifest hash is
+`1c6a46252b66c726c0c1a503ff8fb729897673990f710bf2cb86700a17770397`.
+The registration was reread: this is still intermediate Stage A, not acceptance of
+historical economics. Continue loan/custody/event source admission, then the remaining
+deep Stage B audit and corrected Stage C/D experiments. No GPU/census worker started.
+
+Incidental diagnostic found for follow-up: the legacy `StatefulLedgerResult.summary()`
+gross-shortfall decomposition does not reconcile on an arbitrary target-policy book.
+Current learned-policy books use their dedicated `book_summary` instead; do not feed
+such books through the legacy fixed-slot decomposition or remove its invariant check.

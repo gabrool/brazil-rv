@@ -51,7 +51,9 @@ def test_separate_effective_delivery_and_payment_with_existing_positions(sign):
     assert not [fill for fill in result.fills if fill.fill_session == 1]
     assert result.signed_shares[1, 0] == pytest.approx(sign * 0.004)
     assert result.signed_shares[-1] == pytest.approx(np.zeros(3))
-    assert result.free_cash[-1] == pytest.approx(1)
+    assert (
+        result.free_cash[-1] + result.restricted_cash[-1] + result.unsettled_cash[-1]
+    ) == pytest.approx(1)
     assert result.unpriced_inventory_notional == pytest.approx(np.zeros(5))
     assert states[2].locked.tolist() == [True, False, False]
     # The delivered first leg is in the decision state before current prints.

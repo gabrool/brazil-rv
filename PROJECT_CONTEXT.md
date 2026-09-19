@@ -26,14 +26,17 @@ against existing inventory in both accounts, preserving signed cash claims and
 releasing only the extinguished short portion's restricted proceeds. Sparse sourced
 multi-leg distributions can now retain signed, non-tradable baskets until separately
 dated custody delivery, with separate cash claims/payment. Allocation reserves their
-capacity and risk/readouts use the underlying exposures. Evaluation V23 binds these
+capacity and risk/readouts use the underlying exposures. Evaluation V24 binds these
 terms and reports undelivered and unpriced inventory separately on the full calendar.
 Both cost paths now use dated B3 loan components, with stock/hedge rent separated
 from exchange fees. Both accounts now retain fixed-principal/rate loan cohorts,
 accrued liabilities through return, and the old contract minimum; loan references
-are a new explicitly bound input and cannot be invented from current marks. General
-spot/proceeds settlement, renewal/event-specific terms and historical source admission
-remain open. SAM restarts independently copy the whole account state. See
+are a new explicitly bound input and cannot be invented from current marks. Spot cash
+now settles on dated T+3/T+2 value dates; NAV retains unsettled obligations and income
+uses prior-close settled cash/proceeds. Readouts separate free-cash income, proceeds
+income and debit financing. Custody/calendar boundaries, renewal/event-specific
+terms and historical source admission remain open. SAM restarts independently copy
+the whole account state, including pending settlements. See
 `docs/v2_LOAN_ACCOUNTING.md`. This is an
 implemented accounting repair, not completion of the contractual-event/source audit
 or acceptance of new historical results. Reproduce sealed books with their recorded

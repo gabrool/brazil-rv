@@ -28,6 +28,11 @@ def clone_account(account):
             value = value.copy()
         elif field.name == "payments":
             value = [(day, amount.detach().clone()) for day, amount in value]
+        elif field.name == "settlements":
+            value = [
+                (day, free.detach().clone(), restricted.detach().clone())
+                for day, free, restricted in value
+            ]
         elif field.name == "loans":
             value = value.detached_copy()
         elif isinstance(value, (dict, set)):

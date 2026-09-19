@@ -75,6 +75,9 @@ def compare(
         assert account.restricted.sum().item() == pytest.approx(
             exact.restricted_cash[day], abs=1e-12
         )
+        assert account.unsettled_cash.item() == pytest.approx(
+            exact.unsettled_cash[day], abs=1e-12
+        )
         assert account.claims.sum().item() == pytest.approx(
             exact.receivables[day] - exact.payables[day], abs=1e-12
         )
@@ -201,7 +204,7 @@ def test_conversion_nets_existing_inventory_and_signed_exit_instructions(
     requested_exit = source * source_exit + destination * destination_exit
     remaining = net - net * np.clip(requested_exit / net, 0, 1) if net else 0
     assert exact.signed_shares[1] == pytest.approx([0, remaining / 50])
-    assert exact.restricted_cash[1] == pytest.approx(max(-remaining, 0))
+    assert exact.restricted_cash[1] == 0  # Neither T+2 sale has settled yet.
     assert exact.cost_bps == pytest.approx([0, 0, 0])
     assert exact.reconciliation_error == pytest.approx([0, 0, 0], abs=1e-12)
     assert all(
@@ -277,7 +280,9 @@ def test_netted_conversion_retains_signed_cash_until_payment(sign):
     assert signed_claim == pytest.approx(np.array([0, 0.04, 0.04, 0]) * sign)
     assert exact.signed_shares[1, 1] == pytest.approx(sign * (0.008 - 0.2 / 45))
     assert exact.signed_shares[2, 1] == pytest.approx(exact.signed_shares[1, 1] / 2)
-    assert exact.free_cash[-1] == pytest.approx(1)
+    assert (
+        exact.free_cash[-1] + exact.restricted_cash[-1] + exact.unsettled_cash[-1]
+    ) == pytest.approx(1)
     assert not [fill for fill in exact.fills if fill.fill_session == 1]
 
 

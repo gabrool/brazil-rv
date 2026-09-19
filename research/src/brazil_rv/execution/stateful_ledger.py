@@ -16,7 +16,12 @@ from .share_distributions import (
     basket_betas,
 )
 from .loan_fees import LoanModality, loan_fee_rates
-from .loan_contracts import LoanCharge, LoanContracts, LoanSession, cover_return_session
+from .loan_contracts import (
+    LoanCharge,
+    LoanContracts,
+    LoanSession,
+    spot_settlement_session,
+)
 
 
 OrderSide = Literal["buy", "sell"]
@@ -293,8 +298,11 @@ class StatefulLedgerResult:
     free_cash_interest_bps: NDArray[np.float64]
     short_proceeds_interest_bps: NDArray[np.float64]
     short_proceeds_interest_base: NDArray[np.float64]
+    free_cash_income_bps: NDArray[np.float64]
+    debit_financing_bps: NDArray[np.float64]
     cost_bps: NDArray[np.float64]
     borrow_bps: NDArray[np.float64]
+    unsettled_cash: NDArray[np.float64]
     loan_liability: NDArray[np.float64]
     loan_payment: NDArray[np.float64]
     loan_outstanding_principal: NDArray[np.float64]
@@ -589,6 +597,9 @@ class StatefulLedgerResult:
             "mean_turnover_fraction_nav": mean_turnover,
             "borrow_source": self.borrow_source,
             "borrow_weighting_basis": "outstanding fixed equity loan principal including pending returns",
+            "terminal_unsettled_cash": float(self.unsettled_cash[-1]),
+            "mean_free_cash_income_bps": float(self.free_cash_income_bps.mean()),
+            "mean_debit_financing_bps": float(self.debit_financing_bps.mean()),
             "terminal_loan_liability": float(self.loan_liability[-1]),
             "terminal_loan_outstanding_principal": float(
                 self.loan_outstanding_principal[-1]
@@ -1173,6 +1184,16 @@ def _scaled_group_bands(
     return quota, retention_buffer
 
 
+def _settled_balances(free_cash, restricted, settlements):
+    pending_free = sum(free for _, free, _ in settlements)
+    pending_restricted = sum((r for _, _, r in settlements), np.zeros_like(restricted))
+    funded_restricted = restricted - pending_restricted
+    # Never release an unsettled sale receipt as if it were deposited cash.
+    # Its negative earmark instead offsets the corresponding free-cash claim.
+    funded_free = free_cash - pending_free + np.minimum(funded_restricted, 0).sum()
+    return float(funded_free), np.maximum(funded_restricted, 0)
+
+
 def _book_fill(
     *,
     name: int,
@@ -1401,6 +1422,9 @@ def simulate_stateful_ledger(
     submission_nav = np.zeros(name_count, dtype=np.float64)
     scenario_seen = np.zeros(name_count, dtype=np.bool_)
     free_cash = config.initial_capital_brl
+    # Trade-date cash includes dated settlement claims. Funding and public cash
+    # balances below subtract those claims until their value date.
+    settlements: list[tuple[int | None, float, NDArray[np.float64]]] = []
     previous_nav = config.initial_capital_brl
     all_cash = config.initial_capital_brl
     pending_entries: dict[int, _PendingOrder] = {}
@@ -1432,6 +1456,8 @@ def simulate_stateful_ledger(
     free_cash_interest_rows: list[float] = []
     short_proceeds_interest_rows: list[float] = []
     short_proceeds_interest_base_rows: list[float] = []
+    free_cash_income_rows: list[float] = []
+    debit_financing_rows: list[float] = []
     cost_rows: list[float] = []
     borrow_rows: list[float] = []
     loan_liability_rows: list[float] = []
@@ -1458,6 +1484,7 @@ def simulate_stateful_ledger(
     position_rows: list[NDArray[np.int8]] = []
     share_rows: list[NDArray[np.float64]] = []
     mark_rows: list[NDArray[np.float64]] = []
+    unsettled_cash_rows: list[float] = []
     free_cash_rows: list[float] = []
     restricted_rows: list[float] = []
     hedge_restricted_rows: list[float] = []
@@ -1640,6 +1667,10 @@ def simulate_stateful_ledger(
     ):
         nonlocal free_cash, cancelled_today
         transferred_restricted = restricted_by_name[name] * allocation
+        for _, _, restricted_flow in settlements:
+            transferred_pending = restricted_flow[name] * allocation
+            restricted_flow[successor] += transferred_pending
+            restricted_flow[name] -= transferred_pending
         transferred_basis = entry_cost_basis[name] * allocation
         prior_destination = float(shares[successor])
         combined = prior_destination + float(new_shares)
@@ -1813,6 +1844,10 @@ def simulate_stateful_ledger(
                 del pending_distributions[name]
 
     for day in range(day_count):
+        funding_cash, funding_restricted = _settled_balances(
+            free_cash, np.r_[restricted_by_name, hedge_restricted_cash], settlements
+        )
+        settlements = [item for item in settlements if item[0] is None or item[0] > day]
         cancelled_today = 0
         deliver_due(day)
         locked = np.zeros(name_count, dtype=bool)
@@ -1903,17 +1938,17 @@ def simulate_stateful_ledger(
                 pending_entry_weights[name] = sign * pending.remaining_size / start_nav
             for name, pending in pending_exits.items():
                 pending_exit_fractions[name] = pending.remaining_size
+            decision_cash, decision_restricted = _settled_balances(
+                free_cash, np.r_[restricted_by_name, hedge_restricted_cash], settlements
+            )
             decision_state = PortfolioDecisionState(
                 day=day,
                 weights=weights.copy(),
                 hedge_weight=hedge_shares * hedge_mark / start_nav
                 if hedge_shares
                 else 0.0,
-                free_cash_fraction=free_cash / start_nav,
-                restricted_cash_fraction=(
-                    restricted_by_name.sum() + hedge_restricted_cash
-                )
-                / start_nav,
+                free_cash_fraction=decision_cash / start_nav,
+                restricted_cash_fraction=float(decision_restricted.sum()) / start_nav,
                 pending_entry_weights=pending_entry_weights,
                 pending_exit_fractions=pending_exit_fractions,
                 holding_sessions=np.where(held, day - entry_session, 0),
@@ -3006,7 +3041,7 @@ def simulate_stateful_ledger(
             inputs.dates[day],
             loan_references[day],
             np.r_[rates_today, hedge_rate_today],
-            cover_return_session(day, inputs.dates[day]),
+            spot_settlement_session(day, inputs.dates[day]),
             np.r_[inputs.borrow_rate_imputed[day], False],
             np.r_[
                 inputs.borrow_rate_placeholder[day],
@@ -3105,6 +3140,17 @@ def simulate_stateful_ledger(
                 unresolved_action[name] = True
                 explicit_unresolved_action[name] = True
             if q == 0.0 and restricted_by_name[name] != 0.0:
+                pay = int(inputs.action_payment_session[day, name])
+                if pay != day:
+                    release = np.zeros(name_count + 1)
+                    release[name] = -restricted_by_name[name]
+                    settlements.append(
+                        (
+                            pay if pay >= day else None,
+                            float(restricted_by_name[name]),
+                            release,
+                        )
+                    )
                 free_cash += restricted_by_name[name]
                 restricted_by_name[name] = 0.0
                 ineligible_streak[name] = 0
@@ -3159,12 +3205,10 @@ def simulate_stateful_ledger(
 
         cash_rate = float(inputs.cdi[day])
         debit_rate = cash_rate + config.annual_debit_spread / config.annual_sessions
-        free_cash_interest = (
-            max(free_cash, 0.0) * cash_rate + min(free_cash, 0.0) * debit_rate
-        )
-        short_proceeds_interest_base = float(
-            restricted_by_name.sum() + hedge_restricted_cash
-        )
+        free_cash_income = max(funding_cash, 0.0) * cash_rate
+        debit_financing = -min(funding_cash, 0.0) * debit_rate
+        free_cash_interest = free_cash_income - debit_financing
+        short_proceeds_interest_base = float(funding_restricted.sum())
         short_proceeds_interest = (
             short_proceeds_interest_base
             * cash_rate
@@ -3203,6 +3247,8 @@ def simulate_stateful_ledger(
             float(principal[loans.placeholder[equity_loans]].sum())
         )
         free_cash += interest
+        fill_cash_before = free_cash
+        fill_restricted_before = np.r_[restricted_by_name, hedge_restricted_cash]
 
         # Only now may current-session prints affect the result. This makes the
         # immutable intended-order set invariant to those later observations.
@@ -3455,6 +3501,15 @@ def simulate_stateful_ledger(
         # Every name has at most one new-entry fill after reductions; contract
         # terms are shared within this session. Apply those actual quantities in
         # one vector operation, avoiding a whole-cohort scan for every fill.
+        if traded_notional:
+            settlements.append(
+                (
+                    spot_settlement_session(day, inputs.dates[day]),
+                    free_cash - fill_cash_before,
+                    np.r_[restricted_by_name, hedge_restricted_cash]
+                    - fill_restricted_before,
+                )
+            )
         loans.fill(loan_covers, loan_openings, loan_session)
         rent_paid, fees_paid = loans.pay(day)
         loan_paid = float(rent_paid.sum() + fees_paid.sum())
@@ -3478,10 +3533,14 @@ def simulate_stateful_ledger(
             + (hedge_shares * hedge_mark if hedge_shares != 0.0 else 0.0)
             - loan_liability
         )
+        settled_cash, settled_restricted = _settled_balances(
+            free_cash, np.r_[restricted_by_name, hedge_restricted_cash], settlements
+        )
+        unsettled_cash = sum(free + float(r.sum()) for _, free, r in settlements)
         identity = (
-            free_cash
-            + restricted_by_name.sum()
-            + hedge_restricted_cash
+            settled_cash
+            + settled_restricted.sum()
+            + unsettled_cash
             + marked_holdings
             + (hedge_shares * hedge_mark if hedge_shares != 0.0 else 0.0)
             + receivable_by_name.sum()
@@ -3657,6 +3716,8 @@ def simulate_stateful_ledger(
             10_000.0 * short_proceeds_interest / start_nav
         )
         short_proceeds_interest_base_rows.append(short_proceeds_interest_base)
+        free_cash_income_rows.append(10_000.0 * free_cash_income / start_nav)
+        debit_financing_rows.append(10_000.0 * debit_financing / start_nav)
         cost_rows.append(10_000.0 * costs / start_nav)
         borrow_rows.append(10_000.0 * borrow / start_nav)
         equity_borrow_raw_rows.append(10_000.0 * equity_borrow_raw / start_nav)
@@ -3699,9 +3760,10 @@ def simulate_stateful_ledger(
         position_rows.append(signs)
         share_rows.append(shares.copy())
         mark_rows.append(marks.copy())
-        free_cash_rows.append(free_cash)
-        restricted_rows.append(float(restricted_by_name.sum()))
-        hedge_restricted_rows.append(hedge_restricted_cash)
+        unsettled_cash_rows.append(unsettled_cash)
+        free_cash_rows.append(settled_cash)
+        restricted_rows.append(float(settled_restricted[:-1].sum()))
+        hedge_restricted_rows.append(float(settled_restricted[-1]))
         receivable_rows.append(float(receivable_by_name.sum()))
         payable_rows.append(float(payable_by_name.sum()))
         holding_value_rows.append(marked_holdings)
@@ -3920,8 +3982,11 @@ def simulate_stateful_ledger(
         short_proceeds_interest_base=np.asarray(
             short_proceeds_interest_base_rows, dtype=np.float64
         ),
+        free_cash_income_bps=np.asarray(free_cash_income_rows, dtype=np.float64),
+        debit_financing_bps=np.asarray(debit_financing_rows, dtype=np.float64),
         cost_bps=np.asarray(cost_rows, dtype=np.float64),
         borrow_bps=np.asarray(borrow_rows, dtype=np.float64),
+        unsettled_cash=np.asarray(unsettled_cash_rows, dtype=np.float64),
         loan_liability=np.asarray(loan_liability_rows, dtype=np.float64),
         loan_payment=np.asarray(loan_payment_rows, dtype=np.float64),
         loan_outstanding_principal=np.asarray(loan_principal_rows, dtype=np.float64),

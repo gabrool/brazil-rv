@@ -92,7 +92,7 @@ Costs retain their original entry identifier through partial returns and success
 transfers. Liquidity attribution now uses actual cohort charges instead of
 recalculating current-rate costs. Borrow-quality shares use outstanding fixed equity
 loan principal, including pending returns, and retain opening-observation provenance.
-Evaluation V23 hashes loan references and binds them and annual rates in paired
+Evaluation V24 hashes loan references and binds them and annual rates in paired
 comparisons. Readouts expose loan liabilities, payments, outstanding principal and
 sparse original-entry charges. They are monetary values in the declared capital units.
 
@@ -112,9 +112,8 @@ not change the accepted fills, dates, eligible population or training budget.
    contain this new panel and must be explicitly enriched in a new bound replay
    artifact; they are not silently rescored. Preserve published averages even where
    turnover/quantity differs. Confirm source identity and exact units.
-2. Complete general spot cash/share settlement and remunerated **settled** proceeds,
-   rather than treating the implemented loan-return lag as completion of all cash
-   settlement. Freeze a renewal/maturity/recall convention and sensitivity using
+2. Admit actual custody and clearing-calendar boundaries alongside the implemented
+   dated spot cash/proceeds settlement below. Freeze a renewal/maturity/recall convention and sensitivity using
    source terms; the current subledger does not invent daily renewals, an unlimited
    legal loan maturity, or a broker renewal toll. The B3 contract permits at most
    two years, so unresolved long-lived inventory needs explicit treatment before
@@ -158,3 +157,59 @@ took 1.44 seconds for contractual replay versus 0.22 seconds for the former prox
 an account benchmark, not a neural training forecast or a statistical speed claim.
 It preserves every supplied name. Historical data, fits and profitability were not
 used to select the implementation. Source admission and all remaining stages stay open.
+
+## Spot cash value dates and settled-proceeds income
+
+The accounts now distinguish trade-date beneficial inventory from spendable settled
+cash. A fill records a dated free/restricted-cash obligation, using T+3 before
+2019-05-27 and T+2 thereafter. Actual fills and their costs enter economic NAV on
+trade date; the money is available on the value date. Same-value-date receipts and
+payments net. A final-window fill leaves its future obligation in NAV, rather than
+manufacturing a final cash transfer. This does not impose an additional delay on
+trading beneficially owned inventory or discard any names.
+
+Free-cash income, short-proceeds income and debit financing are reported separately.
+For the close-to-close interval ending on session t, funding uses settled balances
+carried from the previous close. A payment or receipt during t affects funding from
+the next interval. The initial account is treated as funded before the first session,
+matching the all-cash CDI benchmark. This is an explicit daily investment-cutoff
+convention; it neither grants income before receipt nor charges a prospective
+purchase payable as an already drawn debit. A restricted deposit earns the configured
+CDI fraction but cannot simultaneously finance long holdings. The primary remains
+100% CDI on eligible settled proceeds and zero execution brokerage.
+
+End-of-session conservation is:
+
+`NAV = settled free cash + settled restricted proceeds + unsettled net cash
+       + marked beneficial holdings + signed corporate cash claims - loan liability`.
+
+Original-sale restricted cash remains until the covering purchase settles, including
+a cover executed before the sale's own settlement. Releases cannot withdraw a
+receipt that has not arrived. Successor mechanics transfer pending proceeds along
+with their associated basis. A cash-only cancellation retains the short proceeds
+until the stated payment date, or indefinitely while payment remains unknown.
+Known due dates can affect the decision state; future marks, fills and payment
+realizations cannot rewrite earlier intentions. SAM copies and TBPTT truncations
+retain independent dated cash obligations and the interval's funding snapshot.
+
+The [2021 B3 clearing manual](https://www.b3.com.br/data/files/17/92/CA/18/2DE377108F39C077AC094EA8/Manual%20de%20Procedimentos%20Operacionais%20da%20Camara%20B3_20210126.pdf),
+archived and hashed in the source manifest, supports client-level multilateral money
+netting (p.160). It also distinguishes D+0 and D+1 loan accrual conventions (p.112),
+renewal approvals/reference repricing (pp.109–111), and actual custody authorization
+(pp.166–168). Those distinctions must be resolved for the admitted loan modality;
+the earlier fixed-loan mechanics receipt does not establish a complete broker contract.
+
+Remaining boundaries: the helper counts the supplied trading-session axis, so unusual
+clearing-calendar closures still need reconciliation. Ordinary fills assume timely
+delivery; the new queue tracks money, not a complete physical custody inventory.
+Corporate offsets against a recently purchased but not-yet-delivered holding must
+not be admitted as an immediate loan return without evidence or a custody extension.
+Event-specific principal allocation, pending share claims, loan maturity/renewal/recall
+terms and the source panels remain pending. A sourced settlement date does not itself
+establish a broker's investment sweep cutoff or an actual negotiated package.
+
+Forecasts, accepted stores, caches and fit roots are unchanged. Serialized static
+policy features are preserved. The current account's dynamic cash state changes
+as part of the accounting repair and must be labelled as such in an accounting replay;
+the evaluation schema is V24. The spot receipt binds synthetic correctness checks
+and timings, not historical profitability or completion of Stage A.

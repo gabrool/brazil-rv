@@ -157,7 +157,7 @@ def test_detached_sam_restart_is_independent_with_pending_returns():
 
 
 def test_spot_return_timing_transition_is_explicit():
-    from brazil_rv.execution.loan_contracts import cover_return_session
+    from brazil_rv.execution.loan_contracts import spot_settlement_session
 
-    assert cover_return_session(20, "2019-05-24") == 23
-    assert cover_return_session(21, "2019-05-27") == 23
+    assert spot_settlement_session(20, "2019-05-24") == 23
+    assert spot_settlement_session(21, "2019-05-27") == 23

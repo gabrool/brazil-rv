@@ -168,7 +168,8 @@ def test_boundary_hedge_closes_only_at_an_observed_print(terminal_price):
         assert result.hedge_signed_shares[-1] == result.hedge_signed_shares[-2]
         assert not fills
         assert result.terminal_unpriced_hedge_notional > 0
-        assert result.hedge_restricted_cash[-1] == result.hedge_restricted_cash[-2]
+        # The original sale settles today even though the terminal quote is absent.
+        assert result.hedge_restricted_cash == pytest.approx([0, 0, 0.5])
         assert result.economics_unresolved
 
 
@@ -735,6 +736,7 @@ def test_t18_raw_share_cash_claim_and_fill_path_reconciles() -> None:
         result.nav,
         result.free_cash
         + result.restricted_cash
+        + result.unsettled_cash
         + result.marked_signed_holdings
         + result.receivables
         - result.payables,
@@ -1097,7 +1099,8 @@ def test_terminal_missing_inventory_inside_grace_is_not_settled() -> None:
         fill.order_id == short_terminal_exit.order_id for fill in short_result.fills
     )
     assert short_result.signed_shares[-1, 1] == -0.01
-    assert short_result.free_cash[-1] == 1.0
+    assert short_result.free_cash[-1] == 0.0
+    assert short_result.unsettled_cash[-1] == 1.0  # Today's long sale is receivable.
     assert short_result.restricted_cash[-1] == 1.0
     assert short_result.nav[-1] == 1.0
     assert short_result.unpriced_haircut_scenario_nav[-1] == 0.7
@@ -1118,7 +1121,9 @@ def test_missing_long_cannot_release_cash_or_pay_fictitious_exit_costs():
     assert result.unpriced_inventory_notional[-1] == pytest.approx(1.0)
     paid = result.cost_bps * result.start_nav / 1e4
     assert paid.sum() == pytest.approx(sum(f.cost for f in result.fills))
-    assert result.free_cash[-1] == pytest.approx(result.nav[-1] - 1.0)
+    assert (
+        result.free_cash[-1] + result.restricted_cash[-1] + result.unsettled_cash[-1]
+    ) == pytest.approx(result.nav[-1] - 1.0)
 
 
 def test_missing_short_keeps_restricted_cash_and_continues_borrowing():

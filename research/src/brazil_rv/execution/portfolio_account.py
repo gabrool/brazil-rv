@@ -15,7 +15,7 @@ from torch import Tensor
 
 from .stateful_ledger import LedgerConfig
 from .share_distributions import basket_prices
-from .loan_contracts import LoanContracts, LoanSession, cover_return_session
+from .loan_contracts import LoanContracts, LoanSession, spot_settlement_session
 
 
 def tensor(values) -> Tensor:
@@ -26,9 +26,9 @@ def tensor(values) -> Tensor:
 class PortfolioAccount:
     shares: Tensor
     marks: Tensor
-    restricted: Tensor
+    trade_restricted: Tensor
     claims: Tensor
-    cash: Tensor
+    trade_cash: Tensor
     cost_basis: Tensor
     pending_exit: Tensor
     entry_day: np.ndarray
@@ -39,6 +39,10 @@ class PortfolioAccount:
     retired_sources: set[int]
     loans: LoanContracts
     config: LedgerConfig
+    settlements: list[tuple[int | None, Tensor, Tensor]]
+    funding_day: int
+    funding_cash: Tensor
+    funding_restricted: Tensor
 
     @classmethod
     def empty(cls, reference, *, config=LedgerConfig()):
@@ -48,9 +52,9 @@ class PortfolioAccount:
         return cls(
             shares=zero.clone(),
             marks=tensor(np.nan_to_num(reference, nan=0.0)),
-            restricted=zero.clone(),
+            trade_restricted=zero.clone(),
             claims=zero.clone(),
-            cash=tensor(config.initial_capital_brl),
+            trade_cash=tensor(config.initial_capital_brl),
             cost_basis=zero.clone(),
             pending_exit=zero.clone(),
             entry_day=np.full(n, -1, dtype=np.int64),
@@ -66,13 +70,40 @@ class PortfolioAccount:
                 config.annual_sessions,
             ),
             config=config,
+            settlements=[],
+            funding_day=-1,
+            funding_cash=tensor(config.initial_capital_brl),
+            funding_restricted=tensor(0.0),
         )
+
+    def settled_balances(self):
+        pending_free = sum((free for _, free, _ in self.settlements), tensor(0.0))
+        pending_restricted = sum(
+            (r for _, _, r in self.settlements), torch.zeros_like(self.trade_restricted)
+        )
+        restricted = self.trade_restricted - pending_restricted
+        # A release cannot withdraw proceeds that have not yet settled. A
+        # negative earmark reclassifies future cash; it is not an actual deposit.
+        free = self.trade_cash - pending_free + restricted.clamp_max(0).sum()
+        return free, restricted.clamp_min(0)
+
+    @property
+    def cash(self):
+        return self.settled_balances()[0]
+
+    @property
+    def restricted(self):
+        return self.settled_balances()[1]
+
+    @property
+    def unsettled_cash(self):
+        return sum((f + r.sum() for _, f, r in self.settlements), tensor(0.0))
 
     @property
     def nav(self):
         return (
-            self.cash
-            + self.restricted.sum()
+            self.trade_cash
+            + self.trade_restricted.sum()
             + self.claims.sum()
             + (self.shares * self.marks).sum()
             - self.loans.liability
@@ -99,7 +130,16 @@ class PortfolioAccount:
         return values / self.nav
 
     def prepare_day(self, day):
-        """Known custody deliveries occur before the decision, using prior marks."""
+        """Known settlement/delivery dates inform decisions, never current prices."""
+        if day != self.funding_day:
+            self.funding_cash, restricted = self.settled_balances()
+            self.funding_restricted = restricted.sum()
+            self.funding_day = day
+            # Value-date obligations settle within this session. Close-to-close
+            # interest below belongs to balances carried from the previous close.
+            self.settlements = [
+                item for item in self.settlements if item[0] is None or item[0] > day
+            ]
         for name, legs in tuple(self.distributions.items()):
             for leg in tuple(legs):
                 if leg.delivery_session != day:
@@ -137,15 +177,18 @@ class PortfolioAccount:
         for name in (
             "shares",
             "marks",
-            "restricted",
+            "trade_restricted",
             "claims",
-            "cash",
+            "trade_cash",
             "cost_basis",
             "pending_exit",
+            "funding_cash",
+            "funding_restricted",
         ):
             setattr(self, name, getattr(self, name).detach())
         self.payments = [(day, amount.detach()) for day, amount in self.payments]
         self.loans.detach()
+        self.settlements = [(d, f.detach(), r.detach()) for d, f, r in self.settlements]
 
     def eligibility(self, active_score, prior_unresolved):
         held = self.shares.detach().numpy() != 0
@@ -169,18 +212,25 @@ class PortfolioAccount:
         short_shares = (-self.shares).clamp_min(0)
         cover = torch.minimum(signed_quantity.clamp_min(0), short_shares)
         sell = torch.minimum((-signed_quantity).clamp_min(0), self.shares.clamp_min(0))
-        release = self.restricted * cover / short_shares.clamp_min(1e-30)
+        release = self.trade_restricted * cover / short_shares.clamp_min(1e-30)
         new_long = (signed_quantity - cover).clamp_min(0)
         new_short = (-signed_quantity - sell).clamp_min(0)
         self.loans.fill(cover, new_short, loan_session)
         notional = signed_quantity.abs() * price
         costs = (cost_rate * notional).sum()
-        self.cash = (
-            self.cash
-            + (release - cover * price + sell * price - new_long * price).sum()
-            - costs
+        cash_delta = (
+            release - cover * price + sell * price - new_long * price
+        ).sum() - costs
+        restricted_delta = -release + new_short * price
+        self.trade_cash = self.trade_cash + cash_delta
+        self.trade_restricted = self.trade_restricted + restricted_delta
+        self.settlements.append(
+            (
+                spot_settlement_session(loan_session.day, loan_session.date),
+                cash_delta,
+                restricted_delta,
+            )
         )
-        self.restricted = self.restricted - release + new_short * price
         self.shares = self.shares + signed_quantity
         return costs
 
@@ -198,7 +248,15 @@ class PortfolioAccount:
         day,
     ):
         shares, marks = self.shares.clone(), self.marks.clone()
-        transferred_restricted = self.restricted[name] * allocation
+        transferred_restricted = self.trade_restricted[name] * allocation
+        adjusted = []
+        for due, free, restricted in self.settlements:
+            r = restricted.clone()
+            amount = r[name] * allocation
+            r[destination] = r[destination] + amount
+            r[name] = r[name] - amount
+            adjusted.append((due, free, r))
+        self.settlements = adjusted
         transferred_basis = self.cost_basis[name] * allocation
         existing = self.shares[destination]
         combined = incoming + existing
@@ -218,18 +276,18 @@ class PortfolioAccount:
         )
         incoming_fraction = (incoming.abs() - offset) / incoming.abs().clamp_min(1e-30)
         existing_fraction = (existing.abs() - offset) / existing.abs().clamp_min(1e-30)
-        restricted = self.restricted.clone()
+        restricted = self.trade_restricted.clone()
         restricted[destination] = (
             transferred_restricted * incoming_fraction
-            + self.restricted[destination] * existing_fraction
+            + self.trade_restricted[destination] * existing_fraction
         )
-        self.cash = self.cash + (
+        self.trade_cash = self.trade_cash + (
             transferred_restricted
-            + self.restricted[destination]
+            + self.trade_restricted[destination]
             - restricted[destination]
         )
         restricted[name] = restricted[name] - transferred_restricted
-        self.restricted = restricted
+        self.trade_restricted = restricted
         basis = self.cost_basis.clone()
         basis[destination] = (
             transferred_basis * incoming_fraction
@@ -314,7 +372,7 @@ class PortfolioAccount:
             session_date,
             np.asarray(loan_reference),
             np.asarray(annual_borrow),
-            cover_return_session(day, session_date)
+            spot_settlement_session(day, session_date)
             if loan_return_session is None
             else loan_return_session,
         )
@@ -382,10 +440,18 @@ class PortfolioAccount:
                 self.loans.request_return(returns, int(payment_session[name]))
             marks[name] = (self.marks[name] - d[name]) / q[name] if q[name] > 0 else 0
             if q[name] == 0:
-                self.cash = self.cash + self.restricted[name]
-                restricted = self.restricted.clone()
+                release = self.trade_restricted[name]
+                release_vector = torch.zeros_like(self.trade_restricted)
+                release_vector[name] = -release
+                pay = int(payment_session[name]) if payment_session is not None else -1
+                if pay != day:
+                    self.settlements.append(
+                        (pay if pay >= day else None, release, release_vector)
+                    )
+                self.trade_cash = self.trade_cash + release
+                restricted = self.trade_restricted.clone()
                 restricted[name] = 0
-                self.restricted = restricted
+                self.trade_restricted = restricted
             destination = int(mapping[name])
             if destination != name:
                 exit_fraction, entry_notional = self._deliver_shares(
@@ -435,7 +501,7 @@ class PortfolioAccount:
         unpaid = []
         for pay, amount in self.payments:
             if pay == day:
-                self.cash = self.cash + amount.sum()
+                self.trade_cash = self.trade_cash + amount.sum()
                 self.claims = self.claims - amount
             else:
                 unpaid.append((pay, amount))
@@ -443,13 +509,13 @@ class PortfolioAccount:
 
         config = self.config
         interest = (
-            self.cash * cdi
-            + self.cash.clamp_max(0)
+            self.funding_cash * cdi
+            + self.funding_cash.clamp_max(0)
             * config.annual_debit_spread
             / config.annual_sessions
-            + self.restricted.sum() * cdi * config.short_proceeds_remuneration
+            + self.funding_restricted * cdi * config.short_proceeds_remuneration
         )
-        self.cash = self.cash + interest
+        self.trade_cash = self.trade_cash + interest
 
         close = np.asarray(close, dtype=float)
         printed = np.isfinite(close) & (close > 0)
@@ -491,7 +557,7 @@ class PortfolioAccount:
             )
         costs = costs + self._fill(hedge_quantity, prices, cost_rate, loan_session)
         rent_paid, fees_paid = self.loans.pay(day)
-        self.cash = self.cash - rent_paid.sum() - fees_paid.sum()
+        self.trade_cash = self.trade_cash - rent_paid.sum() - fees_paid.sum()
         self.marks = torch.where(torch.as_tensor(printed), prices, self.marks)
         valued = printed.copy()
         for name, legs in self.distributions.items():
@@ -536,6 +602,17 @@ class PortfolioAccount:
             "borrow": borrow,
             "borrow_paid": rent_paid.sum() + fees_paid.sum(),
             "borrow_liability": self.loans.liability,
+            "unsettled_cash": self.unsettled_cash,
+            "free_cash_income": self.funding_cash.clamp_min(0) * cdi,
+            "debit_financing": -self.funding_cash.clamp_max(0)
+            * (cdi + config.annual_debit_spread / config.annual_sessions),
+            "free_cash_interest": self.funding_cash * cdi
+            + self.funding_cash.clamp_max(0)
+            * config.annual_debit_spread
+            / config.annual_sessions,
+            "short_proceeds_interest": self.funding_restricted
+            * cdi
+            * config.short_proceeds_remuneration,
             "cost": costs,
             "unpriced_inventory_notional": unpriced_notional,
             "undelivered_share_notional": sum(

@@ -135,6 +135,7 @@ def book_summary(data, result, previous, start, first):
         "hedge_gross_bps": result.hedge_gross_pnl_bps[selection],
         "trading_cost_bps": result.cost_bps[selection],
         "borrow_bps": result.borrow_bps[selection],
+        "unsettled_cash": result.unsettled_cash[selection],
         "loan_liability": result.loan_liability[selection],
         "loan_payment": result.loan_payment[selection],
         "loan_outstanding_principal": result.loan_outstanding_principal[selection],
@@ -145,6 +146,9 @@ def book_summary(data, result, previous, start, first):
             selection
         ],
         "interest_bps": result.interest_bps[selection],
+        "free_cash_income_bps": result.free_cash_income_bps[selection],
+        "debit_financing_bps": result.debit_financing_bps[selection],
+        "short_proceeds_income_bps": result.short_proceeds_interest_bps[selection],
         "cdi_bps": result.cdi_benchmark_bps[selection],
         "free_cash_fraction": (result.free_cash / result.nav)[selection],
         "restricted_cash_fraction": (
@@ -212,6 +216,7 @@ def save_book(output, data, result, targets, previous, start, first, provenance)
         "free_cash",
         "restricted_cash",
         "hedge_restricted_cash",
+        "unsettled_cash",
         "receivables",
         "payables",
         "loan_liability",

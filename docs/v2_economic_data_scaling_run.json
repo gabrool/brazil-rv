@@ -6,5 +6,9 @@
   "loan_contract_acceptance": {
     "path": "docs\\v2_loan_contract_acceptance.json",
     "sha256": "58db32e966dfe4108a1c6f5101eefe2158a5ba37cd9402ee5f74c4b29fc8a2cf"
+  },
+  "spot_settlement_acceptance": {
+    "path": "docs\\v2_spot_settlement_acceptance.json",
+    "sha256": "be8a7a157909c5fc8b0ced719efc0e5432bad7e466ad4bb65417bee02c3ec064"
   }
 }

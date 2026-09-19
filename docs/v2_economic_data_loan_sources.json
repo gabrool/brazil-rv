@@ -62,5 +62,13 @@
     "retrieved_at_utc": "2026-09-19T17:36:43.915446+00:00",
     "sha256": "414bd144bad23d00cf65152d13c7baefca9a29e80b45b1acd3379e1dc3ff53b0",
     "url": "https://www.b3.com.br/pt_br/noticias/liquidacao.htm"
+  },
+  {
+    "bytes": 2118619,
+    "id": "b3_clearing_manual_20210126",
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\primary_sources\\b3_clearing_manual_20210126.pdf",
+    "retrieved_at_utc": "2026-09-19T18:20:53.482245+00:00",
+    "sha256": "43545a5e0e628d4b165bb65361bd28996ca483f32efc3a6ce44bb19260695623",
+    "url": "https://www.b3.com.br/data/files/17/92/CA/18/2DE377108F39C077AC094EA8/Manual%20de%20Procedimentos%20Operacionais%20da%20Camara%20B3_20210126.pdf"
   }
 ]

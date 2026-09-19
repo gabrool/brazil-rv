@@ -1,0 +1,91 @@
+{
+  "reference_commit": "0dc7c7b838d25829b8fd76e14929e67b4fc300cb",
+  "scope": "Synthetic mechanics/CPU timing only; no historical source admission or profitability",
+  "zero_cdi_unaffected_bit_identical": {
+    "long_only": {
+      "nav": true,
+      "signed_shares": true,
+      "mark_price": true,
+      "cost_bps": true,
+      "borrow_bps": true,
+      "turnover_fraction_nav": true,
+      "gross_fraction_nav": true,
+      "receivables": true,
+      "payables": true,
+      "all_cash_nav": true,
+      "fills": true,
+      "intentions": true,
+      "max_settled_plus_unsettled_cash_error_brl": 0.0
+    },
+    "zero_rate_fee_disabled_long_short": {
+      "nav": true,
+      "signed_shares": true,
+      "mark_price": true,
+      "cost_bps": true,
+      "borrow_bps": true,
+      "turnover_fraction_nav": true,
+      "gross_fraction_nav": true,
+      "receivables": true,
+      "payables": true,
+      "all_cash_nav": true,
+      "fills": true,
+      "intentions": true,
+      "max_settled_plus_unsettled_cash_error_brl": 1.862645149230957e-09
+    }
+  },
+  "benchmark": {
+    "days": 252,
+    "names": 243,
+    "capital_brl": 10000000,
+    "seconds": {
+      "trade_date_cash_baseline": 2.1532199999928707,
+      "settled_cash": 1.9873956999945221,
+      "64_session_243_name_forward_backward": 0.5542663999949582
+    },
+    "fills": 15528,
+    "charges": 220799,
+    "max_liability": 878775.4010995396,
+    "conservation_error_brl": -2.3283064365386963e-10
+  },
+  "heldout_accessed": false,
+  "test_runs": [
+    {
+      "passed": 148,
+      "scope": "accounts, policy, distributions, SAM objectives and stateful ledger"
+    },
+    {
+      "passed": 75,
+      "scope": "settlement oracles and evaluation/readout/loan consumers; overlapping"
+    },
+    {
+      "passed": 43,
+      "scope": "additional cash-only payment/income oracles and affected accounts/readout after separate financing fields; overlapping"
+    },
+    {
+      "passed": 151,
+      "scope": "final T+3/T+2, funding, gradients, clone/truncation, policy/claims/causality/ledger/objectives; overlapping"
+    }
+  ],
+  "source_manifest_sha256": "1c6a46252b66c726c0c1a503ff8fb729897673990f710bf2cb86700a17770397",
+  "implementation_sha256_lf": {
+    "research/src/brazil_rv/execution/loan_contracts.py": "f8491d18691bf476d01eac7b15464c0ea9b474e38cc027c3e6c811bf18efd451",
+    "research/src/brazil_rv/execution/portfolio_account.py": "7b365697a40ed41f5ac856eaffc93ef1672b0039ce06ebe8df90a2bacc9cbfd5",
+    "research/src/brazil_rv/execution/stateful_ledger.py": "529b17dac6bada65db0929ee4e5f775b5a1078ff5ef6ba9461c46dc236c48e7d",
+    "research/src/brazil_rv/v2/evaluate.py": "62bf701e42c0636c97c5d3e222104c84ea8f9a9a259857b1dd10fcfedb174dcf",
+    "research/src/brazil_rv/v2/portfolio_objective.py": "648e9a25e121e29c7b87e599c41305c155ef061d83658fb8f611964ef2b4549d",
+    "research/src/brazil_rv/v2/portfolio_readouts.py": "0745bcd0ff2e47b87f11700262eaad1ad4d60ac6bdb9f5f54dc761e9239755e2",
+    "research/tests/test_loan_contracts.py": "325f743f059da848b71d1958652e8a8a70f5f3a75ba3767b8ebd532d6d5acb18",
+    "research/tests/test_portfolio_account.py": "6f281696a260f76cc758685e7f789f950943d22b93f4db2a0ad9be6d71094c4d",
+    "research/tests/test_share_distributions.py": "86f73213f53915d8405266e8a63316df532d3423d89cb50f0375435c2c2b2523",
+    "research/tests/test_v2_stateful_ledger.py": "94a4c89f075a87bcb24f3f506f4d283de1113808b89087f4aafb0e4d33bfb57c",
+    "research/tests/test_spot_settlement.py": "a5e34d14cb3c5f38dfe9fc8f7df5b76056ccfe41d6d8a1c3b5e712c754407058",
+    "reproducer": "65cf4170e5abc1715459274f4ee7c7a7db9f3ae46e29c4786e25cd7bab0b3cc3"
+  },
+  "boundaries": [
+    "No historical sources admitted or consumer outcomes read",
+    "Loan modality, renewal, maturity, recall and corporate terms remain unresolved",
+    "Money value-date queue is not a full physical custody inventory; recent-purchase corporate offsets require resolution",
+    "Supplied session axis and overnight cash investment cutoffs require historical/broker admission",
+    "Fixed synthetic target controls; static feature caches remain unchanged; dynamic cash state follows repaired account"
+  ]
+}
