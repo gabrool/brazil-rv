@@ -3,6 +3,78 @@
 2026-09-19. All registered research screens and bounded confidence studies are complete.
 It is intended to be readable independently by an LLM reviewing the repository.
 
+## Interpretation and scope audit
+
+The five registered experimental workstreams were exercised. None produced a
+candidate satisfying every predeclared screen criterion, so the ten remaining
+confirmation folds were not triggered. This is completion of a bounded research
+program, not proof that all data/model/accounting problems are fixed. The original
+closeout also omitted the promised residual fit-versus-selection diagnostic and
+retained stale progress prose; the follow-up audit below corrects that reporting.
+
+The principal conclusions are:
+
+1. **Do not strip out families on the earlier preliminary evidence alone.** Fresh,
+   matched removal of microstructure costs .002301 IC and 1.112 net bps/day; joint
+   removal of oddlot/sector-alpha/rebalance costs .003061 IC and .344 net. These
+   results support keeping those groups in the current attention package. They do
+   not prove that every constituent feature helps, or that the same roster is best
+   for every architecture. Only the structurally empty option field was deleted.
+2. **Architectural changes were not uniformly economically bad.** Matched GRU plus
+   early peer attention improves average IC by .001348 and net by .669 bps/day,
+   but improves only two of four folds. Wider temporal attention improves net by
+   1.338 bps/day but reduces IC by .002271, outside the .001 noninferiority margin.
+   Its net gain occurs in three of four folds and all three seeds, but the nominal
+   95% economic interval still spans -.430 to +3.019 bps/day.
+   These are inconclusive candidates under different failure mechanisms, not
+   evidence of universal inferiority. Promoting either now would change the gates
+   after observing outcomes. A new economically primary validation question would
+   require an explicit new design and acknowledgement of this selection history.
+3. **Cross-stock interaction and readout capacity have conditional value.** Removing
+   early peer attention while preserving learned history pooling hurts IC and net.
+   Cutting the readout width materially hurts IC, despite slightly better net.
+   Thus the large readout cannot simply be dismissed as useless parameter bloat.
+   These one-component contrasts are stronger evidence than comparing the whole
+   C6 and attention packages, but do not identify a globally optimal architecture.
+4. **Forecast diversification is more promising than the tested weight smoothing.**
+   The existing three-seed attention ensemble adds .474 net bps/day over the mean
+   single seed; C6 has little economic ensemble gain. The fixed C6/attention blend
+   adds about .70 over either full-history fold-reset reference, but its economic
+   intervals cross zero. Neither the single tested EMA horizon nor trailing
+   checkpoint averaging improves enough to advance. More seeds or a smoothing
+   sweep do not follow automatically.
+5. **The residual probe does not identify a robust shortcut to unused rich-data
+   alpha.** Rich ridge's .784 net gain over C6 is concentrated in one fold; rich
+   trees improve their weaker score-only control but do not beat unchanged C6.
+   This closes the fixed current-state correction recipes. It does not evaluate
+   explicit release-aware histories, other fusion mechanisms or fresh training.
+6. **Economic assumptions remain a more material uncertainty than many model
+   deltas.** Removing assumed short-proceeds interest reduces both retained
+   controls by about 3.04 bps/day in the tested screen. That is a scenario, not a
+   finding about the actual broker account. Contractual settlement marks also
+   differ materially for some historical books. Resolve these before treating
+   headline backtest returns as reliable absolute trading returns.
+
+| Agreed workstream | Completed work | Scope that was not established |
+|---|---|---|
+| Data and feature selection | Field support/overlap audit, empty-field exclusion, two matched family-removal screens | No exhaustive 145-field search or proof that every retained feature is useful |
+| Component attribution and synthesis | Compact readout, matched GRU/attention, early-peer removal | No accepted synthesis; C6 comparison remains a package comparison, so the conditional five-head bridge was not run |
+| Variance reduction | All singles/pairs/three-seed diagnostics, fixed model blend, 84 checkpoint averages, true EMA | No new seed sweep or universally optimal averaging recipe |
+| Width/depth | Separate compact-readout, wider-encoder and shallower-trunk contrasts; review of 42 original C6 curves | No general scaling law; conditional new C6 capacity fits were not triggered by those curves |
+| Existing-rich-data probe | Ridge/tree, each with score-only control and unchanged C6 anchor; 48 cell/fold/seed fits | No admitted corrector and therefore no confirmation; no new data/history mechanism |
+| Confidence and delivery | Bounded primary-source event review, settlement-mark/financing sensitivities, metrics, GitHub publication and verified recovery | Full contractual settlement replay, dated identity repairs and actual broker financing remain unresolved |
+
+The broader research decision also defers a repaired-gradient controller retry,
+transfer-versus-fresh-training and explicit market/event histories. Those are
+outside these five completed foundation workstreams; they must not be described
+as experiments performed here. Reporting a completed screen does not settle those
+questions or erase outstanding accounting work.
+
+Completion was faster than the conservative estimate because new fits stopped
+under the registered selection patience, compatible controls were reused, CPU
+probes were small, and no candidate triggered a confirmation campaign. The
+60-session history, eligible names, three seeds and screening folds were retained.
+
 ## Scope and experimental discipline
 
 The question is whether input selection, variance reduction and a better allocation
@@ -118,14 +190,14 @@ books are in [the fixed-blend readout](v2_foundation_blend.json).
 
 All 84 original neutral F trajectories have hash-verified selected states and the
 preceding states required for the fixed trailing mean of up to three checkpoints.
-All 84 averages are prepared. They stop at the raw selected epoch; no late overfit
+All 84 averages were prepared and evaluated. They stop at the raw selected epoch; no late overfit
 tail, independent-seed weight averaging or economic continuation is substituted.
-Average inference and matched economic results are still pending. The stored
-selector IC identifies the original cutoff, not the averaged predictor's IC.
+Their completed inference and matched economic results are reported below. The
+stored selector IC identifies the original cutoff, not the averaged predictor's IC.
 All 84 averaged graph contracts also load strictly into their original model
 classes. `ops/score_foundation_averages.py` reuses a compiled graph across compatible
-seeds/folds in the historical inference worktree. It must wait for the fit worker;
-there is only one GPU worker at a time.
+seeds/folds in the historical inference worktree. It ran after the fit worker;
+there was only one GPU worker at a time.
 
 Six disposable full-population GPU checks passed: one complete P epoch and F2 epoch
 for each input cell. P padding is 160 names and F2 padding is 144, determined by
@@ -147,7 +219,7 @@ Sixteen targeted tests cover masks, permutation/padding invariance, date isolati
 finite gradients and compilation, including exact pooling after a peer bypass.
 Later waves can bind their own immutable implementation and list only genuinely
 new fit cells, reusing eligible controls without refitting them. This does not
-change the source of the input wave currently running.
+change the immutable source of the input wave.
 
 ## Accounting evidence acquired; corrections remain outstanding
 
@@ -251,6 +323,51 @@ flat (.02083 to .02106), with fit IC around .097. The remaining histories stoppe
 by patience. This did not trigger a C6 expansion. It does not prove C6 is optimally
 sized. [Curve evidence](v2_foundation_c6_curves.json).
 
+## Recovered training and selection diagnostics
+
+The post-closeout audit recovered the omitted diagnostics from saved models and
+histories, without fitting new weights or changing any selected checkpoint,
+correction strength, outcome forecast or gate. All 48 saved residual models
+reproduce their originally recorded selected IC to within 1e-9. Neural histories
+match their sealed manifest hashes; the original residual feature/preprocessing,
+store-access and training modules are unchanged from their fitted source commit.
+The saved scalers and genuine OOS anchors are reused. Only original fit and
+selection labels are read for this supplement.
+
+[Training diagnostics](v2_foundation_training_diagnostics.json) record all 120
+neural fits and 48 residual cells, selected epochs, peak allocated CUDA memory,
+fit time, residual strengths/iterations, source hashes and IC gaps. Neural fit IC
+is the original clean-fit probe, not a fresh full-training-set evaluation.
+
+| Neural cell, mean of twelve F fits | Fit-probe IC at selected epoch | Selection IC at selected epoch | Fit-probe IC at final epoch | Selection IC at final epoch |
+|---|---:|---:|---:|---:|
+| TE_full | .045707 | .042061 | .082212 | .022789 |
+| TE_compact | .050317 | .044182 | .077869 | .032644 |
+| GRU_early | .049511 | .034190 | .085667 | .021439 |
+| TE_wide | .074775 | .045223 | .115291 | .031026 |
+
+Later epochs continue improving the fit probe while selection performance falls.
+This supports the continued need for early selection and does not support a blanket
+increase in the epoch budget. The wider encoder has a larger selected fit gap,
+despite its better average evaluation economics. Selection IC is optimized on its
+own dates, so a small selected fit/selection gap is not proof of healthy independent
+generalization. Gaps also reflect different historical regimes, not only overfit.
+
+| Residual cell, mean of twelve fits | Fit IC at chosen strength | Selection IC at chosen strength | Fit minus selection |
+|---|---:|---:|---:|
+| Score-only ridge | .016085 | .028238 | -.012152 |
+| Rich ridge | .021981 | .027643 | -.005661 |
+| Score-only tree | .025501 | .030490 | -.004989 |
+| Rich tree | .033108 | .029857 | +.003251 |
+
+The corresponding unchanged anchors average .017235 on fit and .026057 on selection.
+Rich ridge chooses strengths 0/.1/.25/.5/1 in 1/4/1/2/4 fits respectively;
+score-only ridge chooses 0/.1/1 in 5/1/6 fits. Both tree cells choose strength 1
+in all twelve fits. Selected per-head tree iterations range from 1 to 232 for
+rich inputs and 1 to 494 for score-only inputs. These are descriptive selection
+results, not extra evaluation-based tuning. The modest residual fit gaps do not
+explain away the lack of robust incremental economic gains.
+
 ## Averaging and rich-data residual outcomes
 
 All 84 original-neutral trailing-weight averages were scored with compatible
@@ -346,6 +463,28 @@ Wall time spans successive registered waves; fit time is not total completion ti
 The matched GRU was slower than temporal attention on this RTX 2060 implementation.
 Full 60-session histories and all eligible names were preserved throughout.
 
+The saved F manifests also permit the promised resource/selection comparison
+without repeating GPU work. Each row contains the same four folds and three seeds;
+fit time includes that run's training work and is not a pure per-step benchmark.
+Peak memory is allocated CUDA tensor memory, not total device usage.
+
+| Cell | Mean selected F epoch | Mean F fit seconds | Maximum allocated GiB |
+|---|---:|---:|---:|
+| TE_full | 4.42 | 122.4 | 2.27 |
+| TE_no_micro | 6.42 | 132.4 | 2.26 |
+| TE_no_weak | 6.58 | 146.5 | 2.23 |
+| TE_compact | 9.50 | 144.6 | 2.23 |
+| GRU_early | 5.50 | 271.0 | 2.88 |
+| TE_no_peer | 5.58 | 83.8 | 1.79 |
+| TE_wide | 7.67 | 164.4 | 2.74 |
+| TE_shallow | 4.92 | 121.9 | 2.26 |
+
+Fewer parameters therefore did not automatically make a complete selected fit
+faster: compact readout trained longer on average. Omitting early peers was faster
+but lost forecasting/economic performance. These measurements are conditional on
+the present implementation, optimizer and selection rule, not universal complexity
+claims about GRUs or attention.
+
 Initial training source d21a93a stayed immutable. Later graphs used 3dbda71;
 base readouts used 75a5b75; residual fitting used 19872de; corrected residual
 readouts used 81ba9c9; financing used 9cda3ae. Exact artifact hashes and worker
@@ -359,5 +498,9 @@ confirmation fits were run. Preserve the current reference models, full cleaned
 roster and raw selection. The most defensible positive findings are existing seed
 ensembling and forecast diversity; neither alone establishes a deployable advance.
 Recovery verified: 9,755 files, 12.44 GB source content, 10.49 GB compressed on D. Every decompressed member matched its SHA-256 and size; immutable source datasets were not duplicated. The archive includes a verified Git bundle. See [recovery receipt](v2_foundation_recovery.json). The registered bounded program is complete; unresolved full contractual accounting is a stated limitation, not a completed repair.
+
+The subsequent reporting correction, saved-model diagnostics and scope assessment
+are preserved in the separate reporting addendum listed in that receipt. The
+original 9,755-member archive and experimental outcomes remain unchanged.
 
 

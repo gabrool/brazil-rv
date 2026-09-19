@@ -422,3 +422,24 @@ source data is referenced, not duplicated. Canonical receipt v2_foundation_recov
 Full contractual settlement replay remains an explicit limitation; the completed
 accounting scope is bounded source verification and quantified sensitivity.
 All research workers are finished. Recurring continuation may now be paused.
+
+### User-requested interpretation and scope audit (2026-09-19)
+
+Rechecked all five workstreams against the registration and section 9. Screens,
+bounded confidence work and conditional dispositions were completed; full
+contractual settlement replay, actual broker financing and dated identity repairs
+remain unresolved. No candidate or gate was changed. Wider attention's +1.338 net
+bps/day and the GRU's +.669 are inconclusive positive economic results, with IC
+noninferiority and fold consistency respectively preventing admission.
+
+The initial report retained stale pending-state prose and omitted the promised
+residual train/selection gap consolidation. Corrected the prose and added
+`ops/report_foundation_training.py` plus source-bound diagnostics for 120 neural
+fits and 48 residual cells. This was saved-model CPU inference only, with original
+scalers/strengths/iterations and no evaluation-label access or retraining. All 48
+recomputed residual selection ICs reproduce the originals within 1e-9. Neural
+history hashes match sealed manifests. Ruff format/check passed. The combined
+report now gives an explicit workstream completion/limitation ledger, interpretation,
+training gaps and per-cell memory/time/selection-epoch summaries. Original run
+artifacts and the verified primary recovery archive remain unchanged; the reporting
+addendum has a separate recovery receipt.

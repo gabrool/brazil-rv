@@ -1,13 +1,42 @@
 {
-  "verified": true,
   "archive": "D:\\quant-data\\b3\\processed\\model_runs\\v2_foundation_d21a93a_20260918\\archives\\foundation_recovery.tar.gz",
-  "sha256": "0807d71e6db23263a65933bb136183889787380e9922c589a362b14b34671515",
   "bytes": 10486533603,
-  "members": 9755,
+  "immutable_store_duplicated": false,
   "inventory": "D:\\quant-data\\b3\\processed\\model_runs\\v2_foundation_d21a93a_20260918\\archives\\inventory.json",
   "inventory_sha256": "e0e961df85f10bfa5a603fe3242d3750d39229011183f38d7111f9b65ee66fe5",
+  "members": 9755,
+  "reporting_addendum": {
+    "archive": "D:\\quant-data\\b3\\processed\\model_runs\\v2_foundation_d21a93a_20260918\\archives\\foundation_reporting_addendum.zip",
+    "bytes": 58769,
+    "members": {
+      "docs/v2_FOUNDATION.md": {
+        "bytes": 34389,
+        "sha256": "8f85d964c02434af81accc8c060bda9856bdc43bb09d9fa0c4306a36f29a64bf"
+      },
+      "docs/v2_foundation_progress.md": {
+        "bytes": 29649,
+        "sha256": "4905261fad1bf21c83522656207ec89b10c63df4086c817dffb7a5d5a7cecfaf"
+      },
+      "docs/v2_foundation_training_diagnostics.json": {
+        "bytes": 112822,
+        "sha256": "3da2c82e4478a1523e02308fbb18eb2b8d824d410c870a36030fdb64786cbc48"
+      },
+      "docs/v2_foundation_training_diagnostics.json.sha256": {
+        "bytes": 107,
+        "sha256": "b422dfccb85dc6e2c32519ec5e77cc1282dc99ea59ffdff3839f992d8f3e1b1e"
+      },
+      "ops/report_foundation_training.py": {
+        "bytes": 8589,
+        "sha256": "bd71a7c57730d29ff74b3058c4f0b38d8563fa1a4f9c9c2acd5c0b76b891c170"
+      }
+    },
+    "sha256": "21ccfba0279ff7a392a13a7e35e25462c1776332849ab923ab7aaab3ee84f87d",
+    "verification": "All decompressed members matched the source SHA-256 and size; no experimental artifact or primary archive changed.",
+    "verified": true
+  },
+  "sha256": "0807d71e6db23263a65933bb136183889787380e9922c589a362b14b34671515",
   "source": "C:\\quant-data\\b3\\processed\\model_runs\\v2_foundation_d21a93a_20260918",
   "source_bytes": 12444653504,
-  "immutable_store_duplicated": false,
-  "verification": "Every decompressed regular member byte count and SHA256 matched source inventory"
+  "verification": "Every decompressed regular member byte count and SHA256 matched source inventory",
+  "verified": true
 }
