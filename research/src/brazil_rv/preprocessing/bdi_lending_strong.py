@@ -43,7 +43,6 @@ REGISTERED_ROW = re.compile(
     rf"(?P<donor_max>{PERCENT})\s+(?P<taker_min>{PERCENT})\s+"
     rf"(?P<taker_avg>{PERCENT})\s+(?P<taker_max>{PERCENT})\s*$"
 )
-MIN_COMPLETE_TABLE_ROWS = 100
 ADV_OBSERVATIONS = 20
 CHANGE_OBSERVATIONS = 5
 FEATURES = (
@@ -118,17 +117,58 @@ def parse_registered_lines(
 ) -> list[RegisteredLoan]:
     rows = []
     for index, line in enumerate(lines):
-        # From late November 2024 the final year digit wraps onto the next
-        # physical PDF line. Recover that printed digit, never infer a date.
+        # A printed date can wrap independently of the other columns. Recover
+        # its printed final digit; the ticker and numerical row may be on
+        # either physical line (notably electronic trades in late 2024).
         wrapped_date = re.match(r"^(\s*\d{2}/\d{2}/20\d)(\s+.*)$", line)
         if wrapped_date is not None and index + 1 < len(lines):
-            continuation = re.match(r"^\s*(\d)(?:\s|$)", lines[index + 1])
-            if continuation is not None:
-                line = (
-                    wrapped_date.group(1)
-                    + continuation.group(1)
-                    + wrapped_date.group(2)
+            next_line = lines[index + 1]
+            ticker_start = re.match(r"\s*([A-Z0-9]{4,11})\s+", wrapped_date.group(2))
+            ticker_end = re.match(
+                r"^\s*\d\s+(\d{1,2})\s+[A-Z]{2}[A-Z0-9]{9}[0-9]\s+",
+                next_line,
+            )
+            if ticker_start is not None and ticker_end is not None:
+                a, b = ticker_end.span(1)
+                next_line = (
+                    next_line[:a]
+                    + ticker_start.group(1)
+                    + ticker_end.group(1)
+                    + next_line[b:]
                 )
+            # Occasionally the ISIN check digit wraps in its own column too.
+            # Join only a digit printed directly underneath that identifier.
+            partial_isin = re.search(r"\b[A-Z]{2}[A-Z0-9]{9}\b", line[:50])
+            if partial_isin is not None:
+                offset = partial_isin.start()
+                digit = re.match(r"(\d)(?:\s|$)", next_line[offset:])
+                if digit is not None:
+                    isin = partial_isin.group() + digit.group(1)
+                    line = line[:offset] + isin + line[partial_isin.end() :]
+                    next_line = next_line[:offset] + isin + next_line[offset + 1 :]
+                    wrapped_date = re.match(r"^(\s*\d{2}/\d{2}/20\d)(\s+.*)$", line)
+            continuation = re.match(r"^\s*(\d)(\s.*|$)", next_line)
+            if continuation is not None:
+                prefix = wrapped_date.group(1) + continuation.group(1)
+                line = prefix + wrapped_date.group(2)
+                if (
+                    re.match(
+                        r"^\s*\d{2}/\d{2}/20\d{2}\s*[A-Z0-9]{4,12}\s+"
+                        r"[A-Z]{2}[A-Z0-9]{9}[0-9]\s+",
+                        line,
+                    )
+                    is None
+                ):
+                    line = prefix + continuation.group(2)
+        # Large quantity and BRL columns can touch. Thousands-group boundaries
+        # make this split unambiguous; ungrouped ambiguous digits remain errors.
+        for thousands, decimal in ((",", r"\."), (r"\.", ",")):
+            grouped = rf"[0-9]{{1,3}}(?:{thousands}[0-9]{{3}})+"
+            line = re.sub(
+                rf"({grouped})({grouped}{decimal}[0-9]{{2}})(?=\s+{PERCENT})",
+                r"\1 \2",
+                line,
+            )
         match = REGISTERED_ROW.fullmatch(line)
         if match is None:
             continue
@@ -152,6 +192,13 @@ def parse_registered_lines(
                 taker_max=_decimal(match.group("taker_max")),
             )
         )
+    # Reconcile to printed numerical rows, not an arbitrary daily minimum.
+    # A silently omitted modality biases both rates and flow features.
+    printed_rows = sum(len(re.findall(PERCENT, line)) == 6 for line in lines)
+    if len(rows) != printed_rows:
+        raise ValueError(
+            f"Incomplete registered-loan extraction: {len(rows)}/{printed_rows} rows"
+        )
     return rows
 
 
@@ -166,8 +213,6 @@ def parse_registered_pdf(
         text = page.extract_text(extraction_mode="layout") or ""
         if "Taxa Doador" in text and "Taxa Tomador" in text:
             rows.extend(parse_registered_lines(text.splitlines(), report_date))
-    if rows and len(rows) < MIN_COMPLETE_TABLE_ROWS:
-        raise ValueError(f"Suspiciously small registered-loan table: {path}")
     return rows, len(reader.pages)
 
 

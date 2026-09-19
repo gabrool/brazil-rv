@@ -118,3 +118,69 @@ def test_lending_rate_wrapped_year_uses_printed_digit_and_keeps_zero_flow() -> N
     assert rows[0].taker_avg == 0.5
     assert rows[1].quantity == 1543
     assert rows[1].value_brl == 141199.93
+
+
+def test_lending_electronic_rows_can_follow_the_wrapped_date() -> None:
+    rows = parse_registered_lines(
+        [
+            "27/11/202                        ISHARES IBOVESPA   Neg. Elet",
+            "4 BOVA11 BRBOVACTF003 FUNDO DE INDICE rônica "
+            "601 1,913,212242,002,185.88 0.10% 1.01% 2.25% 0.10% 1.01% 2.25%",
+            "                                                   D+1",
+        ],
+        date(2024, 11, 27),
+    )
+    assert len(rows) == 1
+    assert (rows[0].quantity, rows[0].value_brl) == (1913212, 242002185.88)
+    assert rows[0].taker_avg == 1.01
+
+
+def test_lending_wrapped_isin_uses_its_own_printed_check_digit() -> None:
+    rows = parse_registered_lines(
+        [
+            f"{'27/11/202  BEWW39':24}BRBEWWBDR00         ISHARES Registro "
+            "0 0 0.00 8.00% 8.57% 10.00% 8.00% 8.57% 10.00%",
+            f"{'4':24}7                    ETF",
+            f"{'27/11/202':24}BRBEWWBDR00         ISHARES Neg. Elet",
+            f"{'4          BEWW39':24}7                   ETF rônica "
+            "2 30 2,216.40 8.57% 8.57% 8.57% 8.57% 8.57% 8.57%",
+        ],
+        date(2024, 11, 27),
+    )
+    assert [r.isin for r in rows] == ["BRBEWWBDR007", "BRBEWWBDR007"]
+    assert [r.quantity for r in rows] == [0, 30]
+
+
+def test_lending_wrapped_ticker_and_sparse_table_are_retained() -> None:
+    rows = parse_registered_lines(
+        [
+            "27/11/202 DEBBETF1      BTG PACTUAL TEVA ETF",
+            "4         1 BRDEBBCTF000 DEBENTURES DI FUNDO Renda "
+            "0 0 0.00 0.10% 0.10% 0.10% 0.10% 0.10% 0.10%",
+        ],
+        date(2024, 11, 27),
+    )
+    assert len(rows) == 1
+    assert rows[0].ticker == "DEBBETF11"
+
+
+def test_lending_incomplete_printed_rows_cannot_silently_bias_the_average() -> None:
+    import pytest
+
+    with pytest.raises(ValueError, match="Incomplete registered-loan extraction"):
+        parse_registered_lines(
+            [
+                "27/11/2024 PETR4 BROKEN_ID PETROBRAS Registro "
+                "1 100 1000.00 0.1% 0.2% 0.3% 0.1% 0.2% 0.3%"
+            ],
+            date(2024, 11, 27),
+        )
+    with pytest.raises(ValueError, match="row date differs"):
+        parse_registered_lines(
+            [
+                "27/11/202 PETR4 BRPETRACNPR6 PETROBRAS Registro "
+                "1 100 1000.00 0.1% 0.2% 0.3% 0.1% 0.2% 0.3%",
+                "3",
+            ],
+            date(2024, 11, 27),
+        )
