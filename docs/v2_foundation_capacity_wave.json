@@ -1,0 +1,96 @@
+{
+  "implementation": {
+    "tracked_worktree_clean": true,
+    "commit": "3dbda71131cfa3035e26c73cf2ab9d70e5443822"
+  },
+  "name": "capacity",
+  "fit_cells": [
+    "TE_wide",
+    "TE_shallow"
+  ],
+  "purpose": "Separate temporal width 64 to 96 and trunk depth 3 to 2 contrasts; no combined change",
+  "control": "TE_full",
+  "cells": {
+    "TE_shallow": {
+      "cell": "TE_shallow",
+      "excluded_fields": {
+        "options": [
+          "uncovered_call_share"
+        ]
+      },
+      "families": [
+        "cross_market",
+        "events",
+        "fundamentals",
+        "lending",
+        "magnitudes",
+        "microstructure",
+        "oddlot",
+        "options",
+        "rebalance",
+        "sector"
+      ],
+      "film": true,
+      "graph": "c1",
+      "inputs": "all",
+      "peer_timing": "early",
+      "temporal_encoder": "attention",
+      "model": {
+        "blocks": 2
+      }
+    },
+    "TE_wide": {
+      "cell": "TE_wide",
+      "excluded_fields": {
+        "options": [
+          "uncovered_call_share"
+        ]
+      },
+      "families": [
+        "cross_market",
+        "events",
+        "fundamentals",
+        "lending",
+        "magnitudes",
+        "microstructure",
+        "oddlot",
+        "options",
+        "rebalance",
+        "sector"
+      ],
+      "film": true,
+      "graph": "c1",
+      "inputs": "all",
+      "peer_timing": "early",
+      "temporal_encoder": "attention",
+      "model": {
+        "hidden_width": 96
+      }
+    },
+    "TE_full": {
+      "cell": "TE_full",
+      "excluded_fields": {
+        "options": [
+          "uncovered_call_share"
+        ]
+      },
+      "families": [
+        "cross_market",
+        "events",
+        "fundamentals",
+        "lending",
+        "magnitudes",
+        "microstructure",
+        "oddlot",
+        "options",
+        "rebalance",
+        "sector"
+      ],
+      "film": true,
+      "graph": "c1",
+      "inputs": "all",
+      "peer_timing": "early",
+      "temporal_encoder": "attention"
+    }
+  }
+}

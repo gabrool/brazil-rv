@@ -162,3 +162,16 @@ from TE_full using `peer_timing: pool`, preserving learned history pooling and a
 other components. Three P plus twelve F fits from immutable 3dbda71; reuse TE_full.
 Width/depth contrasts, residual probe, accounting work and final consolidation
 remain. Do not interpret this checkpoint as completion of the whole program.
+
+### Peer decision and capacity wave (2026-09-19 03:45 UTC)
+
+All 15 peer-removal fits and full readouts completed. Removing peer attention while
+preserving pooling changes IC by -0.003562 and net by -0.624800 bps/day; no gate
+passes. Retain TE_full. Results: `v2_foundation_peer_results.json`.
+
+The next registered stage is frozen in `v2_foundation_capacity_wave.json`: one
+candidate changes only temporal hidden width 64 to 96; the other changes only
+readout blocks three to two. They do not combine changes. Both retain full roster,
+early peer attention, 256-wide readout, three heads and recipes. Six fresh parents
+and 24 F fits, same clean 3dbda71 source; reuse existing full control. This respects
+the two-candidate cap. Review before any confirmation or synthesis decision.
