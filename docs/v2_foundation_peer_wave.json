@@ -1,0 +1,64 @@
+{
+  "implementation": {
+    "tracked_worktree_clean": true,
+    "commit": "3dbda71131cfa3035e26c73cf2ab9d70e5443822"
+  },
+  "name": "peer",
+  "cells": {
+    "TE_full": {
+      "cell": "TE_full",
+      "excluded_fields": {
+        "options": [
+          "uncovered_call_share"
+        ]
+      },
+      "families": [
+        "cross_market",
+        "events",
+        "fundamentals",
+        "lending",
+        "magnitudes",
+        "microstructure",
+        "oddlot",
+        "options",
+        "rebalance",
+        "sector"
+      ],
+      "film": true,
+      "graph": "c1",
+      "inputs": "all",
+      "peer_timing": "early",
+      "temporal_encoder": "attention"
+    },
+    "TE_no_peer": {
+      "cell": "TE_no_peer",
+      "excluded_fields": {
+        "options": [
+          "uncovered_call_share"
+        ]
+      },
+      "families": [
+        "cross_market",
+        "events",
+        "fundamentals",
+        "lending",
+        "magnitudes",
+        "microstructure",
+        "oddlot",
+        "options",
+        "rebalance",
+        "sector"
+      ],
+      "film": true,
+      "graph": "c1",
+      "inputs": "all",
+      "peer_timing": "pool",
+      "temporal_encoder": "attention"
+    }
+  },
+  "purpose": "Remove peer mixing only; preserve learned pooling and full attention encoder/readout",
+  "control": "TE_full",
+  "fit_cells": [
+    "TE_no_peer"
+  ]
+}

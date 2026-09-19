@@ -148,3 +148,17 @@ three heads and ASAM recipe. This is not the old C6 package. Three fresh P paren
 and twelve F fits; reuse TE_full control. Source remains clean immutable 3dbda71.
 After this wave, test the retained encoder with pooling but without peer attention;
 width/depth contrasts and the CPU residual/accounting work remain required.
+
+### Encoder decision and peer contrast (2026-09-19 03:11 UTC)
+
+The matched GRU has positive ensemble deltas: IC +0.001348 and net +0.668773
+bps/day. However both endpoints improve in only F2/F6, not F10/F14, so neither
+meets the registered three-of-four-fold requirement. It does not advance. This is
+mixed evidence, not proof attention is universally better. Keep TE_full under the
+frozen selection rule. Full results: `v2_foundation_encoder_results.json`.
+
+After rereading the plan, freeze `v2_foundation_peer_wave.json`: remove peer mixing
+from TE_full using `peer_timing: pool`, preserving learned history pooling and all
+other components. Three P plus twelve F fits from immutable 3dbda71; reuse TE_full.
+Width/depth contrasts, residual probe, accounting work and final consolidation
+remain. Do not interpret this checkpoint as completion of the whole program.
