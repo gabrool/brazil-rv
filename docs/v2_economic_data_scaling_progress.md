@@ -592,3 +592,12 @@ The registration was revisited: continue A and the remaining deep source-to-tens
 B audit, then corrected comparisons C and bounded capacity D. The receipt is
 `docs/v2_lending_source_admission.json`; its artifact bindings and recovery archive
 make this work resumable without repeating either census.
+
+Implementation commit: `38bc5ad`. The verified 24-file recovery archive is bound by
+`lending_source_recovery.json` through the run pointer; ZIP SHA-256 is
+`4a26d6ff5472cceda6d4edd942e1371eccf2cbb404603abae9131aca660b0917`.
+The admission receipt SHA-256 is
+`39031ab45e5984d989f13bd3e392d7c33fbab195934bdde6fa11542138f13640`.
+All archive members were read back and hash-verified; reference-panel axes and the
+development date boundary were checked from the archive itself. No immutable raw
+or accepted dataset was duplicated.

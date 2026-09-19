@@ -38,5 +38,9 @@
     "path": "docs\\v2_lending_source_admission.json",
     "sha256": "39031ab45e5984d989f13bd3e392d7c33fbab195934bdde6fa11542138f13640",
     "bytes": 7260
+  },
+  "lending_source_recovery": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\lending_source_recovery.json",
+    "sha256": "0c7a643b3840b43372111ebfcaf93dc8cc81f31f4d77108409e6ab8070a8bbbd"
   }
 }
