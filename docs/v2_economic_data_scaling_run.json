@@ -909,7 +909,11 @@
   },
   "surviving_rename_documentation": {
     "path": "C:\\quant\\b3-quant\\docs\\v2_SURVIVING_RENAME_PROPAGATION.md",
-    "sha256": "2917f3ebaa346aaf79d6042b44750885534bb5697651473627a3860acded7570"
+    "sha256": "884a2b9e68e31b06a31da24fea055fa2cd7ec59eb709adadd6d6bd4af255c36b"
+  },
+  "surviving_rename_lineage_recovery": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\surviving_rename_lineage_recovery.json",
+    "sha256": "fcbcb1ed4f5fec91df01f62e98b37cfbc01490b052036adcead01716fcf352b2"
   },
   "surviving_rename_progress": {
     "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\surviving_renames\\progress.json",

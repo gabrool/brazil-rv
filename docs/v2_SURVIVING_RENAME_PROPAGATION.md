@@ -47,7 +47,7 @@ They are the sealed Round7 BDI06/07/08 valuation/exit extension, which deliberat
 preserves original feature/universe coordinates; see [that contract](v2_ROUND7_IMPLEMENTATION.md).
 The two lists overlap completely. This resolves the reconstruction mismatch's
 provenance without reopening the continuation-source census or changing its
-admission scope. The exact read-only recipe and source bindings are retained in
+admission scope. The read-only method and source bindings are retained in
 `v2_surviving_source_lineage.json`.
 
 The final94checks cover83,150,470cells with zero mismatches. Daily amendments
