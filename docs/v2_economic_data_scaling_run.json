@@ -197,6 +197,14 @@
     "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\lending_denominator_audit\\report.json",
     "sha256": "638516adf383a61ffb1bfe02559206bbf3bc2bff6ffd6caf0f12e292919ef5cb"
   },
+  "lending_feature_acceptance": {
+    "path": "docs\\v2_lending_feature_acceptance.json",
+    "sha256": "4d3666f0e31105dba333443e739d1b5b5bcdde7a7dad3e9d8d3a3d5d6b48ffdb"
+  },
+  "lending_feature_propagation": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\lending_feature_propagation\\manifest.json",
+    "sha256": "864c8fe1dade2ceb9cda76814f12d559bfb39e4b8909f5b5c227d9dd504017ea"
+  },
   "lending_source_admission": {
     "bytes": 7260,
     "path": "docs\\v2_lending_source_admission.json",
@@ -276,6 +284,13 @@
     "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\auxiliary_tensor_audit\\oddlot.json",
     "sha256": "1952956f665fde2f211969d5d8571383af7fccb3dd654ea8b33106d8750f4ab5"
   },
+  "qualified_lending": {
+    "balances_sha256": "b50feb75dcde9168eaa1eb53916de67bde565e1c0164037f29e1adc87d45bc6e",
+    "manifest_sha256": "4f07b607e206eb90b95e184d966daeb4d0f89792621f09dac3fcc9ca1bca7c87",
+    "rates_sha256": "96c55a454973e44f9a1506d7e4d222913c42dcca0ede266d1cee6ac7f5004def",
+    "root": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\lending_feature_propagation\\economic_archive",
+    "source_label": "reconciled_feature_and_economic_sources"
+  },
   "recovered_lending": {
     "admission": {
       "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\recovered_lending\\admission.json",
@@ -320,6 +335,10 @@
   "rename_issuer_propagation": {
     "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\rename_issuer_propagation\\manifest.json",
     "sha256": "2b5a9322117c57d00d10472e43335ca35e6ff7af5e4922f949e07f27a2b5cd08"
+  },
+  "rename_m1_support_audit": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\rename_m1_support_audit.json",
+    "sha256": "4624fbcd368d21e00afdcfdbdc1772c59867a594f19e8a4888967e1befb5dcfc"
   },
   "rename_peer_propagation": {
     "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\rename_peer_history\\manifest.json",

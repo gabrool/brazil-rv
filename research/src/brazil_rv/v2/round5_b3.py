@@ -701,12 +701,30 @@ def lending_utilization_features(
         column = market["columns"].get(row["isin"])
         first = bisect_right(sessions, document["snapshot_date"])
         prefix = market["barrier_prefix"]
-        if (
-            column is None
-            or source_index is None
-            or first > source_index + 1
-            or prefix[source_index + 1, column] != prefix[first, column]
+        if column is None or source_index is None or first > source_index + 1:
+            audit["observed_unit_boundary"] += 1
+            continue
+        # A sourced same-class, unit/no-cash rename also carries uncertainty
+        # about old share units. A new ISIN must not erase a predecessor split
+        # between the float measurement and this loan's position date.
+        end, barriers = source_index + 1, 0
+        for link in sorted(
+            market.get("history_links", ()),
+            key=lambda r: r["effective_index"],
+            reverse=True,
         ):
+            boundary = link["effective_index"]
+            if (
+                link["successor_index"] != column
+                or max(link["known_index"], boundary) > index
+                or first >= boundary
+                or boundary > end
+            ):
+                continue
+            barriers += prefix[end, column] - prefix[boundary, column]
+            end, column = boundary, link["predecessor_index"]
+        barriers += prefix[end, column] - prefix[first, column]
+        if barriers:
             audit["observed_unit_boundary"] += 1
             continue
         quantity = row["lending_balance_quantity"]

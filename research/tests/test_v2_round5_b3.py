@@ -538,6 +538,70 @@ def test_lending_feature_uses_publication_date_and_preserves_reference_age():
     )
 
 
+def test_utilization_carries_source_bound_predecessor_unit_uncertainty():
+    days = [date(2024, 1, 1) + timedelta(days=i) for i in range(8)]
+    balances = pl.DataFrame(
+        {
+            "source_position_date": days[4:7],
+            "available_date": days[5:8],
+            "security_id": ["ISIN:NEW"] * 3,
+            "lending_balance_quantity": [10] * 3,
+        }
+    )
+    identity = pl.DataFrame(
+        {
+            "date": days[5:8],
+            "isin": ["NEW"] * 3,
+            "cnpj": ["12345678000100"] * 3,
+            "cvm_code": ["123"] * 3,
+            "class": ["ON"] * 3,
+            "identity_effective_start": [days[4]] * 3,
+        }
+    )
+    floats = pl.DataFrame(
+        {
+            "date": [days[1]],
+            "snapshot_date": [days[0]],
+            "reference": [days[0]],
+            "cnpj": ["12345678000100"],
+            "cvm_code": ["123"],
+            "class": ["ON"],
+            "free_float_shares": [100.0],
+            "document_id": ["1"],
+            "version": [1],
+        }
+    )
+    prefix = np.zeros((9, 2), dtype=np.int32)
+    prefix[3:, 0] = 1  # Predecessor split after the float snapshot.
+    market = {
+        "columns": {"OLD": 0, "NEW": 1},
+        "barrier_prefix": prefix,
+        "history_links": [
+            {
+                "predecessor_index": 0,
+                "successor_index": 1,
+                "effective_index": 4,
+                "known_index": 6,
+            }
+        ],
+    }
+    result, _ = lending_utilization_features(
+        balances, floats, identity, days, market, []
+    )
+    assert result["date"].to_list() == [days[5]]  # No future link at decision 5.
+    assert result["utilization_proxy"].to_list() == [0.1]
+    current = floats.with_columns(pl.lit(days[4]).alias("snapshot_date"))
+    result, _ = lending_utilization_features(
+        balances, current, identity, days, market, []
+    )
+    assert result["date"].to_list() == days[5:8]
+    prefix[7:, 1] = 1  # Successor uncertainty also invalidates that denominator.
+    result, _ = lending_utilization_features(
+        balances, current, identity, days, market, []
+    )
+    assert result["date"].to_list() == days[5:7]
+
+
 def test_utilization_uses_received_float_snapshot_and_known_unit_boundaries():
     days = [date(2024, 1, 1) + timedelta(days=i) for i in range(6)]
     balances = pl.DataFrame(

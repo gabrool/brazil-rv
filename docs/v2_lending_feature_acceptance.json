@@ -1,0 +1,75 @@
+{
+  "actual_archive_loader": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\lending_feature_propagation\\loader_acceptance.json",
+    "sha256": "ec504c3545f419ec765a1f72766b4fd4284820f2c76d32690cdc692f3a7fe4dd"
+  },
+  "feature_values_changed_shared": 46673,
+  "feature_values_gained": 76840,
+  "historical_artifact_resolutions": [
+    {
+      "original": {
+        "path": "C:\\Brazil-RV\\quant\\b3-quant\\ops\\qualify_lending_propagation.py",
+        "sha256": "ad2ee6fbe6cbf9782566c33fdaa392428a34a9dfa407fda0310c8d9451f27a8a"
+      },
+      "reason": "Exact executed qualification before formatting and byte-count inventory refinement; feature data unchanged",
+      "resolved": {
+        "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\lending_feature_propagation\\executed_qualification.py",
+        "sha256": "ad2ee6fbe6cbf9782566c33fdaa392428a34a9dfa407fda0310c8d9451f27a8a"
+      }
+    }
+  ],
+  "learned_feature_coordinates_changed_in_old_fits": false,
+  "m1_support_diagnostic": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\rename_m1_support_audit.json",
+    "sha256": "4624fbcd368d21e00afdcfdbdc1772c59867a594f19e8a4888967e1befb5dcfc"
+  },
+  "next": [
+    "Propagate native M1 predecessor history for two sourced renames; current-day streams and permanent indices already verified.",
+    "Finish remaining auxiliary histories, corporate wealth/labels and complete derived store/refit acceptance.",
+    "Complete registered adaptive-book execution/lifecycle sensitivities before A/C acceptance."
+  ],
+  "no_model_fits_started": true,
+  "parent_commit": "1e2f027cc5ec48a86c3f89b313092216e71eeb6f",
+  "production_account_code_changed": false,
+  "propagation": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\lending_feature_propagation\\manifest.json",
+    "sha256": "864c8fe1dade2ceb9cda76814f12d559bfb39e4b8909f5b5c227d9dd504017ea"
+  },
+  "schema": "LENDING_FEATURE_ACCEPTANCE_V1",
+  "source_code": {
+    "ops/audit_rename_m1_support.py": {
+      "path": "ops\\audit_rename_m1_support.py",
+      "sha256": "8b4bda10d1eab5ca0acfd11e5d848a2d0f4df5560b0a20d6b1cc35ff9be6f79d"
+    },
+    "ops/propagate_recovered_lending.py": {
+      "path": "ops\\propagate_recovered_lending.py",
+      "sha256": "8d7cd8a1b893b7a81b39732f3a4fb07afbef45cd68d23bcb49540b0f2cda47b9"
+    },
+    "ops/qualify_lending_propagation.py": {
+      "path": "ops\\qualify_lending_propagation.py",
+      "sha256": "d3a0f294ef1224e7e9bff52350c82c6f31e140e3ac16d447f5db97db72745468"
+    },
+    "research/src/brazil_rv/v2/round5_b3.py": {
+      "path": "research\\src\\brazil_rv\\v2\\round5_b3.py",
+      "sha256": "e5253fca6ee3b974877a2626acaf35876036e925e92d7afa42566bb9b966c736"
+    },
+    "research/tests/test_v2_round5_b3.py": {
+      "path": "research\\tests\\test_v2_round5_b3.py",
+      "sha256": "6bdd1990f620a2a28d6086cbb73e56aeb13aed02c6a185fceb2842bbcebab42a"
+    }
+  },
+  "stage_A_complete": false,
+  "stage_B_complete": false,
+  "stages_C_D_started": false,
+  "status": "accepted_intermediate_feature_and_economic_source_layer",
+  "utilization_support_lost_source_bound": 126,
+  "validation": {
+    "affected_b3_tests_passed": 9,
+    "counts_overlap": true,
+    "earlier_focused_tests_passed": 2,
+    "feature_loader_cells": 195930,
+    "m1_consumer_cells": 91080,
+    "mismatches": 0,
+    "ruff": "pass"
+  }
+}

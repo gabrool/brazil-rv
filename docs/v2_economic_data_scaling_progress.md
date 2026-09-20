@@ -1409,3 +1409,51 @@ resolutions. The188,533,587-byte `rename_dependencies_b8dfd19.zip` has SHA-256
 Recovery reused prior source/rename/FCA/financial receipts without another census;
 no immutable source dataset or old fit was copied. Canonical pointer updated.
 The heartbeat remains active until the complete A-D program is finished.
+
+## Recovered lending features and remaining M1 history (2026-09-20)
+
+- The new feature-source union retains all242,232 original balances exactly,
+  including13,501 absent from the recovered economics archive, and adds1,722
+  qualified rows:243,954 total. All47,836 old feature-rate keys occur in the
+  reconciled202,698-row rate archive;29,661 rate/flow keys change. No source
+  census or completed financial/FCA reconstruction was repeated.
+- Earlier July15 2020 monetary-unit uncertainty remains on267 mapped amounts;
+  quantities remain usable. The single October15 2020 GMAT source quantity/amount
+  remains unsupported. The recovered printed rows remain untouched; no decimal
+  rescaling or wholesale exclusion of securities/reports was invented.
+- Six-field control reproduces184,222 original active-date rows. Seven lending
+  fields gain76,840 usable values and change46,673 shared values versus priorFCA
+  features on renamed eligibility. The three balance fields gain38 observations
+  each from predecessor ADV history; other source effects are separately reported.
+  No loan alias, rate, renewal date or flow record is inferred from a spot rename.
+- New utilization checks retain predecessor capital-unit uncertainty with dated
+  links.126ALOS values lose support, explicitly enumerated: FRE127027 has
+  March21 2023 measurement/May19 knowledge and532,365,440 shares; predecessor
+  DISMES102to103 onMay2 lies inside that denominator interval. This is uncertainty,
+  not proof of a split or an erroneous printed count. Exact prior ratios remain
+  recoverable. No other feature loses valid support.
+- Qualified economic-source panels preserve all rates/imputation/placeholders,
+  strict/open availability, and every eligible balance-availability cell versus
+  the recovered economics view. The actual archive loader verifies all six arrays.
+  An initial generated manifest lacked byte counts; only its inventory was fixed.
+- Future-source deletion preserves the prefix throughDecember28 2023;195,930
+  actual family-loader cells match. Qualification took3.26s. Initial control
+  inactive-row/unknown-age comparisons, the too-strong no-loss assertion and a
+  restricted-calendar fixture failure are retained with executed bytes. No full
+  passed propagation was repeated for the final denominator qualification.
+- Nine affected B3 tests pass (two earlier focused tests overlap); Ruff passes.
+  This is a new intermediate feature contract, not old-policy scoring or finalB.
+  `v2_LENDING_FEATURE_PROPAGATION.md` and `v2_lending_feature_acceptance.json`
+  bind the results; acceptance SHA
+  `4d3666f0e31105dba333443e739d1b5b5bcdde7a7dad3e9d8d3a3d5d6b48ffdb`.
+- M1 diagnostic checks91,080 actual native-consumer cells on all88 restored
+  eligible dates, with exact permanent indices/current-day streams. Both new
+  ISINs lack scaled-return/range channels for their first20sessions; same-clock
+  volume supports only2ALOS/4ISAE4 dates in that interval. Source mappings and
+  exact producer paths are bound. This is a concrete remaining history repair,
+  not completion of M1 or permission to fill missing channels synthetically.
+- Resolve `lending_feature_propagation`, `qualified_lending`,
+  `rename_m1_support_audit` and `lending_feature_acceptance`. Next repair bounded
+  native M1 predecessor windows, remaining auxiliary histories, contractual
+  wealth/labels and full derived-store/refit tensors; StageA execution/lifecycle
+  bounds remain. A/B incomplete, C/D unstarted, no GPU fit or profitability result.
