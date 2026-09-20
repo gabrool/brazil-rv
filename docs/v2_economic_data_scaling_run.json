@@ -484,6 +484,10 @@
     "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\opening_claims\\qualified\\account_identity\\manifest.json",
     "sha256": "58df70c455d18fc18d97fff16eca0be88bf1b78da547503351ce37a623d5185c"
   },
+  "opening_claim_recovery": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\opening_claim_recovery.json",
+    "sha256": "f17859eb4596afd15c6b6a6f86fdbcce5b118cae82f163f565821fe7d360368d"
+  },
   "opening_claim_terms": {
     "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\opening_claims\\qualified\\terms.json",
     "sha256": "778f413e29346809450b53babaf25f4b49417c289a17ecd9c404580880a71c82"

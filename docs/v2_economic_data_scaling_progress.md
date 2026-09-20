@@ -1936,4 +1936,14 @@ Canonical corporate_replay stays unchanged; opening_claim_terms is explicit
 engineering scope. Next: same-ISIN Natura bonus custody/JCP withholding/payment,
 remaining loan/fraction/custody admission and ENAT originals, then remaining
 adaptive disposal/cost/clearing bounds. StageA/C/D remain incomplete; both accepted
-StageB stores stay sealed. New recovery is finalized in the following checkpoint.
+StageB stores stay sealed.
+
+Verified opening_claim_recovery for implementation
+e10fc66189cb42c07daceb4200be1fb80f551b1a:757unique/854logicalmembers,
+97deduplicated aliases and30completebooks/3378600accountarraycells restore/hashcheck.
+ZIP opening_claims_e10fc66.zip,7053749bytes,SHA
+fdfb7183bfbbe6701b88855f29b2097e599a22a91a79c1509c77c75d8511e608.
+Recovery1.0097s; complete research/patch, failed/qualified executed recipes,
+source-bound hypotheses and acceptance recover without immutable inputs/stores or
+old-fit copies. Prior source/lifecycle/economic-store recoveries remain dependencies.
+Acceptance SHAe0bc46d7acb25723b7e1e0d6365c6811492cbe3238f212123ee46c6149b908ba.
