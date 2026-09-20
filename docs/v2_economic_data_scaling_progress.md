@@ -2058,3 +2058,6 @@ Recovery verified: `historical_spot_2c79cec.zip`, SHA `9d222b264c8d498d1070d7ac8
 
 
 Recovery verified: `custody_fees_0194723.zip`, SHA `de066862feefe220722ee63359eaff46a1fd365d1658729e1329a189c5ec593d`, 19741243 bytes; 851 unique/1028 logical restored/hash-checked members, 177 aliases, 30 books/6770880 account cells and 4 original PDFs; 3.1209187s. Complete current research, implementation patch, frozen plan, failed/qualified executed recipes/tests and new sources recover without immutable input/store/old-fit duplication. Prior dated-spot/loan/account/source/store recoveries remain required. Final A/C/D remain open.
+
+
+2026-09-20 closeout trajectory: [Stage A closeout](v2_STAGE_A_CLOSEOUT.md) consolidates historical costs, corporate/calendar/source composition and integrated admission. Reuse all V31-V41 proofs; new runs require an untested interaction or actual exposure. A read-only inspection of all28 Aug30-covering books from the existing140-book foundation index checks30000 Cielo focus cells/761fills: no negative economic inventory August26-30, but no saved contractual loan cohorts, so no held-loan cent bound. Producer first-pass .9129214s; no replay/scoring/source/store/fit mutation. C/D remain unstarted.

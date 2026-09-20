@@ -53,6 +53,10 @@
     "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\cea_identity_admission\\completed\\manifest.json",
     "sha256": "55f7b0008b400c947fe5acc10b38f275a06eed0c7e359e67cc070fef2ce7c684"
   },
+  "cielo_foundation_exposure": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\cielo_foundation_exposure\\manifest.json",
+    "sha256": "8db1018db50583e51e90756581fd4178d6916921fcb6396eda1f109407ec022d"
+  },
   "cielo_saved_exposure": {
     "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\historical_spot\\cielo_saved_exposure.json",
     "sha256": "efb5b9621f803f281cc302c5ef733d7bdc33eb9329023fb10734166cfbe7e3d0"
@@ -777,6 +781,10 @@
   "spot_settlement_acceptance": {
     "path": "docs\\v2_spot_settlement_acceptance.json",
     "sha256": "be8a7a157909c5fc8b0ced719efc0e5432bad7e466ad4bb65417bee02c3ec064"
+  },
+  "stage_a_closeout_plan": {
+    "path": "C:\\quant\\b3-quant\\docs\\v2_STAGE_A_CLOSEOUT.md",
+    "sha256": "b3f39c441efa54b81d28b0257405e237bb6a32ca9ba374c6cf779a1841941892"
   },
   "status": "accounting_and_deep_data_audit",
   "to_close_clock": {
