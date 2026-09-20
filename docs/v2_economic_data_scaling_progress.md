@@ -1883,7 +1883,21 @@ gross endpoint changes remain separately sourced, not doubled. Old-parent transf
 is rejected before weights. InitialNaNreport serialization,18unchanged inactive
 scratch-sigma differences andFloat64-vs-Float32 product comparison are retained and
 explicitly qualified. No censuses, original retrieval or prior baseline assembly
-were repeated. New recovery is being finalized separately; A final economics and
+were repeated. New recovery is verified below; A final economics and
 C/D remain incomplete. Next: causal opening claims and distinct custody/loan/tax
 contracts for NATU/ALSC/SOMA, ENAT exposure-ranked original sources, then remaining
 adaptive disposal/rounding/grouping/cost and clearing sensitivities.
+
+Verified `natura_store_recovery` for implementation
+601d356d8e35cd9ed17b7a446d7454c9867be75d restores676unique/724logicalmembers,
+48deduplicated aliases. All21changed arrays reconstruct506333457cells to exact
+complete-store byte hashes;85unchanged arrays,46tables and2indices retain explicit
+previously verified parent dependencies. ZIP `natura_store_601d356.zip`,53523402bytes,
+SHA f8d188caacb50177321c4ec3229325d404d64912f35c2a8967be95415f3bd92f.
+Recovery7.5620s; complete current research, implementation patch, failed/qualified
+executed recipes, bounded raw reducer outputs, sparse amendments, contract and
+acceptance recover without immutable raw, accepted-array or old-fit duplication.
+The economic-store and held-event-source recovery receipts remain required.
+Natura acceptance SHA216f14221cac61d3441a1a8fed358e549f54131c5dd10f94d81a0c354d821220;
+complete store manifest93f65b11f31979c6eafee0ca7e68afe5bb591a303eb8b5e2148072828e8d04bf.
+No scoring, GPU fit, held-out observation read or model profitability is claimed.

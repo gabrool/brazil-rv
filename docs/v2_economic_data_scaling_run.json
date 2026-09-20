@@ -452,6 +452,10 @@
     "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\natura_store\\qualification\\manifest.json",
     "sha256": "649d246bf28add2e1360d27137430f1110b2cbe3b564e4c8369a3fe34fc19c89"
   },
+  "natura_store_recovery": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\natura_store_recovery.json",
+    "sha256": "3840780a073e6a214ad247530863bff55500114cc340a9953d7492ff927b21a6"
+  },
   "natura_wealth_amendment": {
     "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\natura_wealth\\manifest.json",
     "sha256": "02c5861adf2ea2f8e435fee08149d70cb09e9199c80d840472c42360a3e429c6"
