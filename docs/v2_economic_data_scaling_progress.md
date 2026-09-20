@@ -1901,3 +1901,39 @@ The economic-store and held-event-source recovery receipts remain required.
 Natura acceptance SHA216f14221cac61d3441a1a8fed358e549f54131c5dd10f94d81a0c354d821220;
 complete store manifest93f65b11f31979c6eafee0ca7e68afe5bb591a303eb8b5e2148072828e8d04bf.
 No scoring, GPU fit, held-out observation read or model profitability is claimed.
+
+## 2026-09-20: explicit opening claims and30bounded adaptive books
+
+V33 adds an opt-in single-leg predecessor-value continuity hypothesis in both
+accounts; first observed successor quotes replace only realized values, never
+earlier intentions. Loan references stay unchanged. Unquoted deliveries retain
+separate entry restrictions and independent SAM/TBPTT copies. Unknown ALSC custody
+remains unknown/locked. No accepted data, source observations or original fit changes.
+
+Resolve opening_claim_audit/identity/terms/acceptance and
+docs/v2_OPENING_CLAIM_VALUATION.md. Thirty30-session/all933-name adaptive engineering
+books cover focus-long/short NATU, ALSC and three SOMA fraction/precision cases at
+R$10m/R$1m/R$5m. Identical-intention NAV maxdifferenceR$1.1175870895385742e-8;
+independent900-day component identity maxR$3.725290298461914e-9. Independentadaptive
+path differences remain measured, max .0001117427/.1008967008/.0000675182bp at
+R$10m/R$1m/R$5m; oldV32uncertainty is also retained. These are synthetic preference/
+fixed-risk actual allocator books with the oldbundled4bp bridge, not model alpha or
+final corporate pricing. SOMA short continuous-loan versus fraction provision
+final-.0066375240/-.0490403284/-.0141229283bp, original quantities/principal retained
+under explicit alternative hypotheses. Auction precision path effects below.000001bp.
+
+All source post-effect fills absent, custody respected, scenario prefixes exact.
+Initial missing save_book scenario metadata repeated only the first new30-session
+book to recover absent detailed readouts; its original arrays remain. All30qualified
+books then completed before a Float32 oracle JSON failure. Saved-book resumption
+reused them all and computed three scalar divisions only. Executed opening_claim_value
+is a mislabeled effect-close value; canonical label corrected, opening oracle separate.
+17affected distribution tests plus two additional affected loader/causality cases
+pass; five overlapping focused reruns are not added. Ruff passes. Aggregate case
+29.6064s/qualification.2136s/independentidentity.0542s; total initial wall unknown.
+
+Canonical corporate_replay stays unchanged; opening_claim_terms is explicit
+engineering scope. Next: same-ISIN Natura bonus custody/JCP withholding/payment,
+remaining loan/fraction/custody admission and ENAT originals, then remaining
+adaptive disposal/cost/clearing bounds. StageA/C/D remain incomplete; both accepted
+StageB stores stay sealed. New recovery is finalized in the following checkpoint.

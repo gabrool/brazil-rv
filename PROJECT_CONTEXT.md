@@ -63,7 +63,15 @@ Its sole accepted M1 assignment begins in2025, so no2019 M1 stream or scalar rec
 is permitted. Existing activity/filing/unit-barrier inputs remain exact. Resolve the
 explicit Natura store contract for new P/F fits; do not repeat the baseline build.
 Original NATU/ALSC/SOMA conversions are now evidenced, but their account valuation,
-custody/loan/fraction admission is incomplete. This source milestone is not final
+custody/loan/fraction admission is incomplete. Opening valuation is now separately
+qualified by `docs/v2_OPENING_CLAIM_VALUATION.md`: V33 carries a single leg's last
+predecessor value locally until an observed successor mark, without inventing a
+quote, loan reference or custody date. Both actual accounts and independent training
+copies preserve that distinction. Thirty bounded adaptive engineering books cover
+NATU/ALSC/SOMA and stated SOMA fraction/precision hypotheses; unknown ALSC custody
+remains a locked claim. These separately selected terms do not replace the canonical
+corporate replay or resolve Natura bonus/JCP, event-specific loan terms or final
+corporate pricing. This source milestone is not final
 economic admission. Previously passed source audits and lifecycle books remain valid
 for their explicitly recorded contracts.
 

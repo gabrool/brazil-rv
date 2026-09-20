@@ -96,7 +96,9 @@ def apply_corporate_replay(inputs, terms, calendar, manifest_sha256):
                     ShareDelivery(
                         names[leg["successor_isin"]],
                         leg["shares_per_prior_share"],
-                        session(leg["delivery_date"]),
+                        None
+                        if leg["delivery_date"] is None
+                        else session(leg["delivery_date"]),
                         None
                         if auction is None
                         else FractionAuction(
@@ -120,6 +122,7 @@ def apply_corporate_replay(inputs, terms, calendar, manifest_sha256):
                     if event["payment_date"] is None
                     else session(event["payment_date"]),
                     source=source,
+                    carry_source_value=event.get("carry_source_value", False),
                 )
             )
 

@@ -128,6 +128,21 @@ without changing the information available to the earlier intention. The contrac
 252-day denominator and B3 session axis remain primary; unresolved older calendar
 closures are separate evidence gaps, not permission to add all monetary dates.
 
+Opening-claim valuation amendment, frozen 2026-09-20 before corrected model
+outcomes: for a sourced single-leg exchange with no positive prior successor
+mark, explicitly carry the last known predecessor value less sourced cash,
+divided by the exchange ratio. This is a continuity valuation hypothesis, not
+an observed price, execution or loan reference. Keep it local to the claim;
+the first observed successor close replaces it only after that day's intentions.
+Do not guess allocations for unpriced multi-leg baskets. Preserve unknown custody
+as an undelivered claim. NATU loan conversion at sourced shareholder custody is
+a labelled hypothesis retaining original principal/rate; SOMA's contract-fraction
+provision is a labelled hypothesis with continuous-loan-quantity and stated
+auction-price precision bounds. These are engineering contrasts, not sourced
+event-specific B3 instructions. ALSC custody and fraction liquidation remain
+unknown, without guessed dates or zero proceeds. Same-ISIN Natura bonus custody
+and JCP withholding/payment remain separate account work.
+
 ## B. Deep source-to-model data audit
 
 Revisit the actual sources and builders, not just finite-value/coverage summaries.

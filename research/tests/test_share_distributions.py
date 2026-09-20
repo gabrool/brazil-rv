@@ -15,6 +15,132 @@ from test_portfolio_ledger import replay
 from test_v2_stateful_ledger import _config
 
 
+@pytest.mark.parametrize("sign", [-1, 1])
+@pytest.mark.parametrize("delivery", [2, None])
+def test_unquoted_single_leg_carries_only_claim_value(sign, delivery):
+    from test_v2_stateful_ledger import _run
+
+    close = np.array(
+        [[100.0, np.nan], [np.nan, np.nan], [np.nan, np.nan], [np.nan, 55.0]]
+    )
+    event = ShareDistribution(
+        0,
+        1,
+        0,
+        (ShareDelivery(1, 2, delivery),),
+        "explicit continuity hypothesis",
+        carry_source_value=True,
+    )
+    states = []
+
+    def policy(state):
+        states.append(state)
+        return PortfolioTarget(
+            np.array([sign * 0.4, 0]) if state.day == 0 else np.zeros(2)
+        )
+
+    config = _config()
+    result = _run(
+        close,
+        np.ones_like(close),
+        initial_reference_price=np.array([100.0, np.nan]),
+        portfolio_policy=policy,
+        share_distributions=(event,),
+        config=config,
+    )
+    account = PortfolioAccount.empty([100.0, np.nan, 100.0], config=config)
+    for day in range(4):
+        target = tensor([sign * 0.4, 0.0, 0.0] if day == 0 else [0.0, 0.0, 0.0])
+        account.step(
+            target,
+            day=day,
+            close=np.r_[close[day], 100.0],
+            cdi=0,
+            session_date=result.dates[day],
+            annual_borrow=[0.0, 0.0, 0.0],
+            loan_reference=[100.0, np.nan, 100.0],
+            share_distributions=(event,),
+            terminal=day == 3,
+        )
+        assert account.nav.item() == pytest.approx(result.nav[day], abs=1e-12)
+        assert account.shares[:-1].numpy() == pytest.approx(result.signed_shares[day])
+        assert account.market_weights[:-1].numpy() == pytest.approx(
+            result.equity_market_weights[day]
+        )
+        if day == 1:
+            assert account.marks[1].item() == 0  # No public successor mark seeded.
+            assert account.distributions[0][0].opening_mark == 50
+        if day == 2 and delivery == 2:
+            from brazil_rv.v2.portfolio_objective import clone_account
+
+            allowed, _ = account.eligibility(np.ones(3, bool), np.zeros(3, bool))
+            assert not allowed[1]
+            copied = clone_account(account)
+            copied.unquoted_deliveries.clear()
+            assert account.unquoted_deliveries == {1}
+    assert result.nav[:3] == pytest.approx([1.0, 1.0, 1.0])
+    assert result.unpriced_inventory_notional[1:3] == pytest.approx([0.4, 0.4])
+    assert not states[2].entry_allowed[1]
+    assert not [f for f in result.fills if f.fill_session in (1, 2)]
+    if delivery is None:
+        assert result.signed_shares[-1, 0] != 0
+        assert result.economics_unresolved
+
+
+def test_opening_carry_requires_explicit_contract_and_never_uses_future_quote():
+    from brazil_rv.execution.share_distributions import (
+        recognize_distribution,
+        basket_prices,
+    )
+
+    event = ShareDistribution(0, 1, 0, (ShareDelivery(1, 0.5, None),), "fixture")
+    refs = np.array([80.0, np.nan])
+    with pytest.raises(ValueError, match="unpriced"):
+        recognize_distribution(event, refs)
+    legs = recognize_distribution(replace(event, carry_source_value=True), refs)
+    assert np.isnan(refs[1])
+    assert basket_prices(legs, refs).tolist() == [160.0]
+    assert basket_prices(legs, [80.0, 170.0]).tolist() == [170.0]
+    with pytest.raises(ValueError, match="one identifiable"):
+        replace(distribution(), carry_source_value=True)
+
+
+def test_first_successor_quote_cannot_change_current_intentions_or_opening_mark():
+    from test_v2_stateful_ledger import _run
+
+    event = ShareDistribution(
+        0,
+        1,
+        0,
+        (ShareDelivery(1, 2.0, 2),),
+        "continuity fixture",
+        carry_source_value=True,
+    )
+    books = []
+    for first in (50.0, 90.0):
+        close = np.array([[100.0, np.nan], [np.nan, first], [np.nan, first]])
+
+        def policy(state):
+            return PortfolioTarget(
+                np.array([0.4, 0.0]) if state.day == 0 else np.zeros(2)
+            )
+
+        books.append(
+            _run(
+                close,
+                np.ones_like(close),
+                portfolio_policy=policy,
+                initial_reference_price=np.array([100.0, np.nan]),
+                share_distributions=(event,),
+            )
+        )
+    assert [x for x in books[0].intended_orders if x.decision_session <= 1] == [
+        x for x in books[1].intended_orders if x.decision_session <= 1
+    ]
+    assert books[0].nav[0] == books[1].nav[0]
+    assert books[0].nav[1] != books[1].nav[1]
+
+
 def distribution(delivery=3):
     return ShareDistribution(
         source_index=0,

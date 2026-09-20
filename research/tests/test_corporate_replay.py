@@ -222,6 +222,14 @@ def test_distribution_admission_keeps_source_and_later_fraction_clocks_separate(
     assert rebased.effective_session == -1
     assert rebased.legs[0].fractional_auction.available_session == 3
     assert rebased.legs[0].fractional_auction.payment_session == 5
+    uncertain = terms["share_distributions"][0]
+    uncertain["carry_source_value"] = True
+    uncertain["legs"][0]["delivery_date"] = None
+    uncertain["legs"][0]["fractional_auction"] = None
+    pending = apply_corporate_replay(data.inputs, terms, calendar, "b" * 64)
+    assert pending.share_distributions[0].carry_source_value
+    assert pending.share_distributions[0].legs[0].delivery_session is None
+    assert pending.share_distributions[0].legs[0].opening_mark is None
     terms["share_distributions"][0]["available_date"] = str(calendar[3])
     with pytest.raises(ValueError, match="backdated"):
         apply_corporate_replay(data.inputs, terms, calendar, "a" * 64)

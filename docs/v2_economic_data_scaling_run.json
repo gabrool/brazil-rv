@@ -472,6 +472,22 @@
     "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\auxiliary_tensor_audit\\oddlot.json",
     "sha256": "1952956f665fde2f211969d5d8571383af7fccb3dd654ea8b33106d8750f4ab5"
   },
+  "opening_claim_acceptance": {
+    "path": "C:\\quant\\b3-quant\\docs\\v2_opening_claim_acceptance.json",
+    "sha256": "e0bc46d7acb25723b7e1e0d6365c6811492cbe3238f212123ee46c6149b908ba"
+  },
+  "opening_claim_audit": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\opening_claims\\qualified\\qualification\\manifest.json",
+    "sha256": "ed67d441654be0119ffa19850553cae973699f0322fa164f1641b95c9a1bb65d"
+  },
+  "opening_claim_identity": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\opening_claims\\qualified\\account_identity\\manifest.json",
+    "sha256": "58df70c455d18fc18d97fff16eca0be88bf1b78da547503351ce37a623d5185c"
+  },
+  "opening_claim_terms": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\opening_claims\\qualified\\terms.json",
+    "sha256": "778f413e29346809450b53babaf25f4b49417c289a17ecd9c404580880a71c82"
+  },
   "option_quantity_source_audit": {
     "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\option_quantity_sources\\manifest.json",
     "sha256": "856f44fed515b516c46fff6a15cf1ac49e39250f5ccd6c21851febd2cb2df6a5"

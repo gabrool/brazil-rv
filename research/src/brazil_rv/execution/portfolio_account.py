@@ -14,7 +14,7 @@ import torch
 from torch import Tensor
 
 from .stateful_ledger import LedgerConfig
-from .share_distributions import basket_prices
+from .share_distributions import basket_prices, recognize_distribution
 from .loan_contracts import LoanContracts, LoanSession, spot_settlement_session
 from .share_custody import ShareCustody
 
@@ -38,6 +38,7 @@ class PortfolioAccount:
     payments: list[tuple[int, Tensor]]
     distributions: dict
     retired_sources: set[int]
+    unquoted_deliveries: set[int]
     loans: LoanContracts
     custody: ShareCustody
     config: LedgerConfig
@@ -68,6 +69,7 @@ class PortfolioAccount:
             payments=[],
             distributions={},
             retired_sources=set(),
+            unquoted_deliveries=set(),
             loans=LoanContracts(
                 n,
                 config.borrow_fee_modality,
@@ -128,12 +130,11 @@ class PortfolioAccount:
         for name, legs in self.distributions.items():
             values = values.clone()
             values[name] = 0
-            for leg in legs:
+            prices = basket_prices(legs, self.marks.detach().numpy())
+            for leg, price in zip(legs, prices):
                 destination = leg.successor_index
                 values[destination] = values[destination] + (
-                    self.shares[name]
-                    * leg.shares_per_prior_share
-                    * self.marks[destination]
+                    self.shares[name] * leg.shares_per_prior_share * price
                 )
         return values / self.nav
 
@@ -237,12 +238,17 @@ class PortfolioAccount:
                     basis[name] = basis[name] - fraction_basis
                     self.cost_basis = basis
                     incoming = incoming.floor()
+                if (
+                    self.marks[leg.successor_index].detach().item() <= 0
+                    and leg.opening_mark is not None
+                ):
+                    self.unquoted_deliveries.add(leg.successor_index)
                 self.pending_exit, _ = self._deliver_shares(
                     name,
                     leg.successor_index,
                     incoming,
                     allocation,
-                    self.marks[leg.successor_index],
+                    tensor(prices[legs.index(leg)]),
                     self.pending_exit,
                     torch.zeros_like(self.shares),
                     final=len(legs) == 1,
@@ -266,9 +272,10 @@ class PortfolioAccount:
                     legs.remove(leg)
             if legs:
                 marks = self.marks.clone()
+                prices = basket_prices(legs, self.marks.detach().numpy())
                 marks[name] = sum(
-                    leg.shares_per_prior_share * self.marks[leg.successor_index]
-                    for leg in legs
+                    leg.shares_per_prior_share * price
+                    for leg, price in zip(legs, prices)
                 )
                 self.marks = marks
             else:
@@ -316,6 +323,8 @@ class PortfolioAccount:
         allowed = eligible & ~prior_unresolved & (self.marks.detach().numpy() > 0)
         if self.retired_sources:
             allowed[list(self.retired_sources)] = False
+        if self.unquoted_deliveries:
+            allowed[list(self.unquoted_deliveries)] = False
         required = (self.ineligible_sessions > self.config.ineligible_hold_sessions) | (
             self.missing_sessions >= self.config.settlement_grace_sessions
         )
@@ -691,12 +700,13 @@ class PortfolioAccount:
                 self.shares[name].detach().item() != 0
                 or (self.loans.name == name).any()
             ):
-                basket_prices(event.legs, self.marks.detach().numpy())
-                self.distributions[name] = list(event.legs)
+                legs = recognize_distribution(event, self.marks.detach().numpy())
+                self.distributions[name] = legs
+                prices = basket_prices(legs, self.marks.detach().numpy())
                 marks = self.marks.clone()
                 marks[name] = sum(
-                    leg.shares_per_prior_share * self.marks[leg.successor_index]
-                    for leg in event.legs
+                    leg.shares_per_prior_share * price
+                    for leg, price in zip(legs, prices)
                 )
                 self.marks = marks
         # Same-session delivery of a newly recognized claim is a realization;
@@ -723,6 +733,7 @@ class PortfolioAccount:
         printed = np.isfinite(close) & (close > 0)
         if self.retired_sources:
             printed[list(self.retired_sources)] = False
+        self.unquoted_deliveries.difference_update(np.flatnonzero(printed).tolist())
         prices = tensor(np.where(printed, close, 0.0))
         fractions = np.ones(n) if fill_fraction is None else np.asarray(fill_fraction)
         fractions = tensor(np.where(printed, fractions, 0.0))
@@ -778,9 +789,10 @@ class PortfolioAccount:
         valued = printed.copy()
         for name, legs in self.distributions.items():
             marks = self.marks.clone()
+            claim_prices = basket_prices(legs, self.marks.detach().numpy())
             marks[name] = sum(
-                leg.shares_per_prior_share * self.marks[leg.successor_index]
-                for leg in legs
+                leg.shares_per_prior_share * price
+                for leg, price in zip(legs, claim_prices)
             )
             self.marks = marks
             valued[name] = all(printed[leg.successor_index] for leg in legs)

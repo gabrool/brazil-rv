@@ -390,9 +390,13 @@ def decide(
             (known[:, None] == labels[None, :], np.zeros(len(known)))
         ).astype(float)
         for source, legs, sectors in baskets:
-            values = basket_prices(legs, data.references[day]) * [
-                leg.shares_per_prior_share for leg in legs
-            ]
+            # A single leg has unit sector weight even before its first quote.
+            values = (
+                np.ones(1)
+                if len(legs) == 1
+                else basket_prices(legs, data.references[day])
+                * [leg.shares_per_prior_share for leg in legs]
+            )
             groups[:, np.flatnonzero(names == source)[0]] = (
                 known[:, None] == sectors
             ) @ (values / values.sum())

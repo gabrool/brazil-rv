@@ -14,6 +14,7 @@ from .share_distributions import (
     ShareClaimPosition,
     basket_prices,
     basket_betas,
+    recognize_distribution,
 )
 from .loan_fees import LoanModality, loan_fee_rates
 from .share_custody import ShareCustody
@@ -1961,7 +1962,7 @@ def simulate_stateful_ledger(
                     destination,
                     incoming,
                     allocation,
-                    float(last_observed[destination]),
+                    float(prices[legs.index(leg)]),
                     float(last_observed[destination]),
                     final=len(legs) == 1,
                     ratio=leg.shares_per_prior_share,
@@ -2088,12 +2089,10 @@ def simulate_stateful_ledger(
             weights = signed_values / start_nav
             claim_exposure = np.zeros(name_count)
             for name, legs in pending_distributions.items():
-                for leg in legs:
+                prices = basket_prices(legs, last_observed)
+                for leg, price in zip(legs, prices):
                     claim_exposure[leg.successor_index] += (
-                        shares[name]
-                        * leg.shares_per_prior_share
-                        * last_observed[leg.successor_index]
-                        / start_nav
+                        shares[name] * leg.shares_per_prior_share * price / start_nav
                     )
             ineligible_streak[~held | eligible] = 0
             ineligible_streak[held & ~eligible] += 1
@@ -3422,11 +3421,12 @@ def simulate_stateful_ledger(
             if claim:
                 pending_claims.append(_PendingClaim(name, claim, event.payment_session))
             if shares[name] != 0 or (loans.name == name).any():
-                prices = basket_prices(event.legs, last_observed)
-                pending_distributions[name] = list(event.legs)
+                legs = recognize_distribution(event, last_observed)
+                prices = basket_prices(legs, last_observed)
+                pending_distributions[name] = legs
                 marks[name] = sum(
                     leg.shares_per_prior_share * price
-                    for leg, price in zip(event.legs, prices)
+                    for leg, price in zip(legs, prices)
                 )
                 unresolved_action[name] = False
                 explicit_unresolved_action[name] = False
@@ -3656,10 +3656,10 @@ def simulate_stateful_ledger(
                     name,
                     leg.successor_index,
                     float(shares[name]) * leg.shares_per_prior_share,
-                    float(last_observed[leg.successor_index]),
+                    float(price),
                     leg.delivery_session,
                 )
-                for leg in legs
+                for leg, price in zip(legs, prices)
             )
         undelivered_rows.append(
             sum(abs(shares[name] * marks[name]) for name in pending_distributions)

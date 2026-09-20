@@ -33,6 +33,7 @@ class ShareDelivery:
     delivery_session: int | None
     fractional_auction: FractionAuction | None = None
     loan_principal_fraction: float = 1.0
+    opening_mark: float | None = None
 
 
 @dataclass(frozen=True)
@@ -54,10 +55,13 @@ class ShareDistribution:
     source: str
     cash_per_prior_share: float = 0.0
     payment_session: int | None = None
+    carry_source_value: bool = False
 
     def __post_init__(self):
         if not self.legs or not self.source:
             raise ValueError("share distributions require legs and source evidence")
+        if self.carry_source_value and len(self.legs) != 1:
+            raise ValueError("source-value carry requires one identifiable share leg")
         if any(
             not math.isfinite(leg.loan_principal_fraction)
             or not 0 <= leg.loan_principal_fraction <= 1
@@ -139,14 +143,40 @@ def slice_distributions(distributions, start, stop):
     )
 
 
+def recognize_distribution(event, references):
+    """Freeze a single-leg continuity mark from the last pre-effect source mark.
+
+    This explicit valuation hypothesis preserves source value less sourced cash;
+    it supplies neither an observed quote nor a loan-opening/renewal reference.
+    A successor's own positive prior mark always takes precedence.
+    """
+    legs = list(event.legs)
+    if event.carry_source_value:
+        leg = legs[0]
+        price = references[leg.successor_index]
+        if not math.isfinite(price) or price <= 0:
+            value = float(references[event.source_index]) - event.cash_per_prior_share
+            if not math.isfinite(value) or value <= 0:
+                raise ValueError(
+                    "source-value carry requires a positive causal source mark"
+                )
+            legs[0] = replace(leg, opening_mark=value / leg.shares_per_prior_share)
+    basket_prices(legs, references)
+    return legs
+
+
 def basket_prices(legs, references):
     """Prices available before this realization; never search ahead for a quote.
 
-    Supported existing-listed-successor cases require causal references.
-    A newly listed/unpriced leg needs an evidenced valuation contract before replay;
-    guessing its share of the predecessor value would fabricate a price.
+    A missing successor quote can use only its separately recognized opening mark.
+    This local claim valuation never changes public prices or loan references.
     """
     prices = np.array([references[leg.successor_index] for leg in legs], dtype=float)
+    for i, leg in enumerate(legs):
+        if (
+            not np.isfinite(prices[i]) or prices[i] <= 0
+        ) and leg.opening_mark is not None:
+            prices[i] = leg.opening_mark
     if not np.all(np.isfinite(prices) & (prices > 0)):
         raise ValueError("unpriced distribution leg requires an evidenced valuation")
     return prices

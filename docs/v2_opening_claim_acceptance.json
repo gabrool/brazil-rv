@@ -1,0 +1,35 @@
+{
+  "evidence": {
+    "held_event_source_audit": {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\held_event_sources\\qualification\\manifest.json",
+      "sha256": "0bc84fcc1f2ec8065dab33c69c7dbc8680bcf230953eda0a292c3bc7204c91ff"
+    },
+    "held_event_source_qualification": {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\held_event_sources\\clock_qualification\\manifest.json",
+      "sha256": "e40a4200dea0ceb86a6766c790aa23c2f7d6fe9b58d9c49861aa15bb3f90ba7d"
+    },
+    "opening_claim_audit": {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\opening_claims\\qualified\\qualification\\manifest.json",
+      "sha256": "ed67d441654be0119ffa19850553cae973699f0322fa164f1641b95c9a1bb65d"
+    },
+    "opening_claim_identity": {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\opening_claims\\qualified\\account_identity\\manifest.json",
+      "sha256": "58df70c455d18fc18d97fff16eca0be88bf1b78da547503351ce37a623d5185c"
+    },
+    "opening_claim_terms": {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\opening_claims\\qualified\\terms.json",
+      "sha256": "778f413e29346809450b53babaf25f4b49417c289a17ecd9c404580880a71c82"
+    }
+  },
+  "no_final_corporate_replay_replacement": true,
+  "remaining": "NATU same-ISIN bonus custody/JCP withholding/payment; event-specific loan treatment and ALSC custody/auction; ENAT and remaining execution/cost/clearing bounds; registered C/D.",
+  "report": {
+    "path": "C:\\quant\\b3-quant\\docs\\v2_OPENING_CLAIM_VALUATION.md",
+    "sha256": "3291d987b80972bdfa024164b914423213bb3e47a0dc394170dbfe582445a863"
+  },
+  "schema": "BRAZIL_RV_V2_EVALUATION_V33",
+  "scope": "30x30-session all933-name actual adaptive engineering books; focus-long/short, three capital sizes, explicit SOMA fraction/price one-factor bounds. Synthetic preferences and fixed risks, bundled4bp execution bridge, no B3 spot addition.",
+  "status": "opening_claim_engineering_accepted_stage_A_incomplete",
+  "tests": "17 share-distribution tests passed; five of those reran after adding independent unquoted-delivery state; two new/affected first-quote and actual loader cases passed. Do not sum overlapping batches. Ruff passes.",
+  "unchanged": "All old stores, source observations, original fits,933names/fullhistory and previous V31/V32 obligations; no GPU/forward/scoring."
+}
