@@ -1228,3 +1228,15 @@ fca_identity_financial_recovery. Acceptance SHA-256:
   A still needs denied-renewal/recall, presettlement-disposal and adaptive-book
   source sensitivities. No old checkpoint was scored on changed coordinates;
   no new GPU fit, held-out consumer or deployment was launched.
+
+Recovery closeout for implementation `560c1a3`: `fca_issuer_peer_recovery.json`
+verifies all316 restored/hash-checked members, 67 source/prior-artifact receipts,
+all executed code bytes and all new family outputs. The 75,968,940-byte archive
+`fca_issuer_peers_560c1a3.zip` has SHA-256
+`73f08d9457156c61afab3fd8ff8bf71a5cec5f6eb6fca38206b8b1cb5086e54c`.
+It reuses the verified earlier recovery for the427-file extraction cache, without
+duplicating immutable sources or old fits. Acceptance SHA-256 is
+`faca30ee5915a164755bb13c4fda8277fdce24c7dcae13f1b8c09a754be404df`.
+The canonical pointer binds this recovery; earlier receipts remain valid for their
+recorded source commits. All CPU work is complete at this checkpoint; no worker
+or GPU job is active. The heartbeat remains active for the remaining A-D work.

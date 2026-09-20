@@ -137,6 +137,10 @@
     "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\fca_identity_admission\\issuer_exceptions\\source_receipts.json",
     "sha256": "e911a70f6460a28f1f3eef9c2c21d9216bac429c401b77ddc448338fbe8d97aa"
   },
+  "fca_issuer_peer_recovery": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\fca_issuer_peer_recovery.json",
+    "sha256": "ec2704b0da210d30c0327c68e010c95152bda8b722a93bc2e7498ebba9d44b5b"
+  },
   "fca_peer_propagation": {
     "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\fca_peer_propagation\\manifest.json",
     "sha256": "b99a5d17342a3d197a15311d11f3294f53af6d0dc5a2036b83362c80bdb0ff36"
