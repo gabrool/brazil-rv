@@ -142,13 +142,21 @@ def apply_corporate_replay(inputs, terms, calendar, manifest_sha256):
             raise ValueError("corporate replay is missing its contractual successor")
         name = names[event["isin"]]
         effective = session(event["effective_date"])
+        reopening = (
+            None
+            if event.get("source_reopens_date") is None
+            else session(event["source_reopens_date"])
+        )
         if effective < len(indices):
-            if inputs.action_has_action[max(0, effective) :, name].any():
+            coverage_end = None if reopening is None else max(0, reopening)
+            if inputs.action_has_action[max(0, effective) : coverage_end, name].any():
                 raise ValueError(
                     "distribution conflicts with an existing source action"
                 )
-            changed["action_session_resolved"][max(0, effective) :, name] = True
-            if effective < 0:
+            changed["action_session_resolved"][
+                max(0, effective) : coverage_end, name
+            ] = True
+            if effective < 0 and (reopening is None or reopening > 0):
                 initial[name] = False
             legs = []
             for leg in event["legs"]:
@@ -194,6 +202,7 @@ def apply_corporate_replay(inputs, terms, calendar, manifest_sha256):
                     else session(event["payment_date"]),
                     source=source,
                     carry_source_value=event.get("carry_source_value", False),
+                    source_reopens_session=reopening,
                 )
             )
 

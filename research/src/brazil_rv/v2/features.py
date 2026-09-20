@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 import math
-from typing import Callable, Sequence
+from typing import Callable, Mapping, Sequence
 
 import numpy as np
 from numpy.typing import NDArray
@@ -359,8 +359,13 @@ def monthly_cluster_labels(
                         sample[before, a],
                         sample_valid[before, a],
                     )
-                    prior_active[b] |= prior_active[a]
-                    prior_active[a] = False
+                    # A later separately sourced episode may reuse a retired
+                    # identifier. Its current membership is not the old
+                    # company's membership and cannot transfer to that successor.
+                    reopening = link.get("source_reopens_index")
+                    if reopening is None or day < reopening:
+                        prior_active[b] |= prior_active[a]
+                        prior_active[a] = False
             eligible = (sample_valid.sum(axis=0) >= minimum_observed) & prior_active
             slots = np.flatnonzero(eligible)
             if slots.size >= cluster_count:
@@ -637,6 +642,8 @@ def build_slow_features_into(
     cluster_labels: NDArray[np.integer] | None = None,
     ambiguous_action: NDArray[np.bool_] | None = None,
     history_links: Sequence[dict[str, int]] = (),
+    cross_section_returns: Mapping[int, tuple[NDArray[np.floating], NDArray[np.bool_]]]
+    | None = None,
 ) -> NDArray[np.int16]:
     """Compute one slow field at a time and immediately hand it to ``consume``.
 
@@ -645,7 +652,10 @@ def build_slow_features_into(
     dependency panels needed by later formulas remains live.  Cross-session
     price features consume the shareholder-wealth coordinate and its validity;
     same-session shape, activity, and linked observation age retain independent
-    raw-source masks.
+    raw-source masks. A reused identifier needs current-episode lookbacks for
+    its own features but the historical public episode in market/peer returns.
+    ``cross_section_returns`` supplies those dated1/5/21-session public panels;
+    all ordinary callers use the same retained returns for both purposes.
     """
 
     open_, high, low, close, volume, trade_count = tuple(
@@ -765,10 +775,16 @@ def build_slow_features_into(
     )
 
     market = np.full(close.shape[0], np.nan, dtype=np.float64)
+    public_returns = (
+        retained_returns if cross_section_returns is None else cross_section_returns
+    )
+    for horizon in (1, 5, 21):
+        if any(np.asarray(a).shape != close.shape for a in public_returns[horizon]):
+            raise ValueError("public cross-section returns are misaligned")
     for day in range(close.shape[0]):
-        mask = retained_returns[1][1][day] & membership[day]
+        mask = public_returns[1][1][day] & membership[day]
         if mask.any():
-            market[day] = float(np.median(retained_returns[1][0][day, mask]))
+            market[day] = float(np.median(public_returns[1][0][day, mask]))
     beta, idio, beta_valid = _rolling_market_regression(
         retained_returns[1][0], market, ambiguous
     )
@@ -848,8 +864,8 @@ def build_slow_features_into(
     assign(25, history_age, history_valid)
     assign(26, history_left_censored, history_valid)
 
-    daily_residual = retained_returns[1][0].copy()
-    residual_valid = retained_returns[1][1] & membership
+    daily_residual = public_returns[1][0].copy()
+    residual_valid = public_returns[1][1] & membership
     for day in range(close.shape[0]):
         mask = residual_valid[day] & membership[day]
         if mask.any():
@@ -869,10 +885,10 @@ def build_slow_features_into(
     if labels.shape != close.shape:
         raise ValueError("cluster_labels must have shape [date, name]")
     peer_values, peer_valid = _peer_features(
-        retained_returns[5][0],
-        retained_returns[5][1],
-        retained_returns[21][0],
-        retained_returns[21][1],
+        public_returns[5][0],
+        public_returns[5][1],
+        public_returns[21][0],
+        public_returns[21][1],
         labels,
         membership,
     )

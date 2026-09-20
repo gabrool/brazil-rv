@@ -13,6 +13,7 @@ from .allocation import AllocationConfig, allocate
 from .portfolio_account import PortfolioAccount, tensor
 from .action_settlement import slice_action_settlements
 from .share_distributions import (
+    retired_distribution_sources,
     slice_distributions,
     basket_betas,
     basket_prices,
@@ -123,10 +124,8 @@ class PolicyData:
         account = PortfolioAccount.empty(
             np.r_[self.references[start], hedge], config=config
         )
-        account.retired_sources.update(
-            event.source_index
-            for event in self.inputs.share_distributions
-            if event.effective_session < start
+        account.retired_sources = retired_distribution_sources(
+            self.inputs.share_distributions, start
         )
         return account
 
@@ -442,6 +441,9 @@ def decide(
 
 
 def account_decision(data, model, account, day, *, allocation=AllocationConfig()):
+    account.retired_sources = retired_distribution_sources(
+        data.inputs.share_distributions, day
+    )
     account.prepare_day(day)
     locked = np.zeros(len(data.inputs.security_ids), bool)
     if account.distributions:

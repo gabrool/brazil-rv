@@ -1,5 +1,6 @@
 """Frozen Stage C accounting/source contrasts on original forecast coordinates."""
 
+import argparse
 from copy import copy
 from dataclasses import asdict, replace
 import json
@@ -12,6 +13,7 @@ import polars as pl
 import torch
 
 from brazil_rv.execution.custody_fees import CustodyAssessment
+from brazil_rv.execution.loan_contracts import LoanRecall
 from brazil_rv.execution.portfolio_policy import CalibratedPolicy, exact_replay
 from brazil_rv.execution.spot_costs import MonthlySpotTariff
 from brazil_rv.execution.stateful_ledger import LedgerConfig
@@ -29,13 +31,54 @@ from brazil_rv.v2.portfolio_training import load_data, windows
 PROJECT = Path(__file__).resolve().parents[1]
 
 
+def phase_data(data, phase):
+    """Change only explicit delivery/fraction hypotheses on frozen PolicyData."""
+    delays = phase.get("delivery_delays", {})
+    provisioned = phase.get("loan_fraction_conventions", {})
+    if not delays and not provisioned:
+        return data
+    amended = copy(data)
+    events = []
+    for event in data.inputs.share_distributions:
+        name = data.inputs.security_ids[event.source_index]
+        if name in delays or name in provisioned:
+            legs = []
+            for leg in event.legs:
+                if name in delays:
+                    assert leg.delivery_session is not None
+                    leg = replace(
+                        leg, delivery_session=leg.delivery_session + delays[name]
+                    )
+                if name in provisioned:
+                    assert leg.fractional_auction is not None
+                    leg = replace(
+                        leg,
+                        fractional_auction=replace(
+                            leg.fractional_auction,
+                            provision_loan_fractions=provisioned[name],
+                        ),
+                    )
+                legs.append(leg)
+            event = replace(event, legs=tuple(legs))
+        events.append(event)
+    amended.inputs = replace(data.inputs, share_distributions=tuple(events))
+    return amended
+
+
 def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--plan", type=Path)
+    args = parser.parse_args()
     torch.set_num_threads(1)
     pointer = PROJECT / "docs/v2_economic_data_scaling_run.json"
     run = json.loads(pointer.read_text())
-    root = Path(run["stage_c_root"])
-    plan = bound_json(run["stage_c_plan"])
-    assert bound_json(binding(root / "baseline_control/manifest.json"))["passed"]
+    stage_root = Path(run["stage_c_root"])
+    plan_binding = run["stage_c_plan"] if args.plan is None else binding(args.plan)
+    plan = bound_json(plan_binding)
+    root = Path(plan.get("output_root", stage_root))
+    root.mkdir(exist_ok=True)
+    (root / "replay_attempts").mkdir(exist_ok=True)
+    assert bound_json(binding(stage_root / "baseline_control/manifest.json"))["passed"]
     attempt = (
         root
         / "replay_attempts"
@@ -58,8 +101,9 @@ def main():
         CustodyAssessment(**x) for x in cfg["custody_assessments"]
     )
     primary = LedgerConfig(**cfg)
+    corporate_terms = plan.get("corporate_terms", account["corporate_terms"])
     terms, dates = load_corporate_replay(
-        account["corporate_terms"]["path"], account["corporate_terms"]["sha256"]
+        corporate_terms["path"], corporate_terms["sha256"]
     )
     prior, foundation = Path(plan["prior_root"]), Path(plan["foundation_root"])
     frozen, cache = load_data(prior, "C6")
@@ -97,7 +141,7 @@ def main():
         replace(frozen.inputs, loan_reference_prices=references),
         terms,
         dates,
-        account["corporate_terms"]["sha256"],
+        corporate_terms["sha256"],
     )
     # The frozen cache includes pre-source warmup outside every requested book.
     # Preserve that unused prefix; every actual replay requires corrected coverage.
@@ -155,6 +199,7 @@ def main():
         else []
     )
     done = {c["key"] for c in completed}
+    phase_views = {}
     for fold in plan["folds"]:
         rows = windows(prior, frozen, fold)["evaluation"]
         assert covered[rows].all(), "requested book lacks corrected cash coverage"
@@ -175,10 +220,33 @@ def main():
             mapping = calibration(mappings["arms"]["C6" if arm == "C6" else "TE_all"])
             for phase in plan["phases"]:
                 members = plan["members"] if phase["members"] == "all" else ["ensemble"]
-                data = accounting if phase["name"] == "accounting" else sourced
-                config = replace(primary, initial_capital_brl=phase["capital"])
+                base_data = accounting if phase["name"] == "accounting" else sourced
+                if phase["name"] not in phase_views:
+                    phase_views[phase["name"]] = phase_data(base_data, phase)
+                data = phase_views[phase["name"]]
+                config_values = phase.get("config", {}).copy()
+                if "custody_assessments" in config_values:
+                    config_values["custody_assessments"] = tuple(
+                        CustodyAssessment(**x)
+                        for x in config_values["custody_assessments"]
+                    )
+                if "recall_deadline" in phase:
+                    config_values["loan_recalls"] = tuple(
+                        LoanRecall(
+                            i,
+                            start + 50,
+                            start + 50 + phase["recall_deadline"],
+                            "registered universal recall at local session50; analyst hypothesis",
+                        )
+                        for i in range(934)
+                    )
+                config = replace(
+                    primary, initial_capital_brl=phase["capital"], **config_values
+                )
                 for member in members:
                     key = f"{phase['name']}/{phase['capital']}/{arm}/{fold}/{member}"
+                    if "included_keys" in plan and key not in plan["included_keys"]:
+                        continue
                     if key in done:
                         record = next(c for c in completed if c["key"] == key)
                         bound_json(record["book"])
@@ -193,9 +261,11 @@ def main():
                         scenario="base",
                         policy="equal_rank",
                         phase=phase["name"],
+                        phase_hypothesis=phase,
                         config=asdict(config),
-                        stage_c_plan=run["stage_c_plan"],
+                        stage_c_plan=plan_binding,
                         economic_account=plan["economic_account"],
+                        corporate_terms=corporate_terms,
                         forecast_sources=sources,
                         old_policy_cache=cache,
                         mapping=binding(prior / "phase3/mappings" / f"{fold}.json"),
@@ -272,7 +342,7 @@ def main():
                             status="complete"
                             if len(completed) == plan["planned_new_books"]
                             else "running",
-                            plan=run["stage_c_plan"],
+                            plan=plan_binding,
                             completed=completed,
                             planned=plan["planned_new_books"],
                         ),

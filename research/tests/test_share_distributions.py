@@ -16,6 +16,174 @@ from test_v2_stateful_ledger import _config
 
 
 @pytest.mark.parametrize("sign", [-1, 1])
+def test_reused_source_reopens_after_conversion_without_old_inventory(sign):
+    event = ShareDistribution(
+        0,
+        1,
+        0,
+        (ShareDelivery(1, 1, 1),),
+        "dated holding/logistics fixture",
+        source_reopens_session=3,
+    )
+    close = np.array(
+        [
+            [100, 100],
+            [np.nan, 100],
+            [999, 100],
+            [10, 100],
+            [11, 100],
+            [12, 100],
+            [12, 100],
+        ],
+        dtype=float,
+    )
+    targets = [
+        [sign * 0.4, 0],
+        [0, sign * 0.4],
+        [0, sign * 0.4],
+        [0, sign * 0.4],
+        [sign * 0.2, sign * 0.2],
+        [sign * 0.2, sign * 0.2],
+        [0, 0],
+    ]
+    config = _config(initial_capital_brl=1000)
+    exact = replay(
+        close,
+        lambda state: PortfolioTarget(np.asarray(targets[state.day])),
+        share_distributions=(event,),
+        config=config,
+    )
+    account = PortfolioAccount.empty([100, 100, 100], config=config)
+    for day, target in enumerate(targets):
+        account.step(
+            tensor([*target, 0]),
+            day=day,
+            close=np.r_[close[day], 100],
+            cdi=0,
+            session_date=exact.dates[day],
+            annual_borrow=[0, 0, 0],
+            loan_reference=[100, 100, 100],
+            share_distributions=(event,),
+            terminal=day == len(targets) - 1,
+        )
+        assert account.nav.item() == pytest.approx(exact.nav[day], abs=1e-9)
+        np.testing.assert_allclose(
+            account.shares.numpy()[:2], exact.signed_shares[day], atol=1e-12
+        )
+    assert np.all(exact.signed_shares[1:4, 0] == 0)
+    assert exact.signed_shares[4, 0] * sign > 0
+    assert 0 not in account.retired_sources
+    assert not [
+        f for f in exact.fills if f.security_index == 0 and f.fill_session in (1, 2, 3)
+    ]
+    sliced = slice_distributions((event,), 4, 7)[0]
+    assert sliced.source_reopens_session == -1
+    from brazil_rv.execution.share_distributions import retired_distribution_sources
+
+    assert retired_distribution_sources((sliced,), 0) == set()
+    from brazil_rv.v2.portfolio_objective import clone_account
+
+    copied = clone_account(account)
+    copied.retired_sources.add(0)
+    assert not account.retired_sources
+    copied.detach()
+
+
+def test_reused_identity_rejects_overlapping_old_share_claim():
+    with pytest.raises(ValueError, match="prior complete"):
+        ShareDistribution(
+            0, 1, 0, (ShareDelivery(1, 1, None),), "fixture", source_reopens_session=3
+        )
+
+
+def test_pending_fraction_follows_sourced_unit_rename_without_new_quote():
+    from brazil_rv.execution.share_distributions import FractionAuction
+    from brazil_rv.v2.corporate_actions import AlignedActionTerms
+    from test_v2_stateful_ledger import _run
+
+    close = np.array(
+        [
+            [100, 50, np.nan],
+            [np.nan, 50, np.nan],
+            [np.nan, 50, np.nan],
+            [np.nan, np.nan, 70],
+            [np.nan, np.nan, 70],
+        ],
+        float,
+    )
+    q = np.ones_like(close)
+    successor = np.broadcast_to(np.arange(3), close.shape).copy()
+    successor[3, 1] = 2
+    flags = np.zeros(close.shape, bool)
+    flags[3, 1] = True
+    actions = AlignedActionTerms(
+        q, np.zeros_like(close), np.ones(close.shape, bool), flags, successor
+    )
+    event = ShareDistribution(
+        0,
+        1,
+        0,
+        (ShareDelivery(1, 0.3, 2, FractionAuction(None, None, None)),),
+        "fixture",
+    )
+    targets = [[0.4, 0, 0]] + [[0, 0, 0]] * 4
+    config = _config(initial_capital_brl=1000)
+    result = _run(
+        close,
+        np.ones_like(close),
+        actions=actions,
+        initial_reference_price=np.array([100, 50, np.nan]),
+        portfolio_policy=lambda s: PortfolioTarget(np.asarray(targets[s.day])),
+        share_distributions=(event,),
+        config=config,
+    )
+    future_close = close.copy()
+    future_close[3:, 2] = 700
+    future = _run(
+        future_close,
+        np.ones_like(close),
+        actions=actions,
+        initial_reference_price=np.array([100, 50, np.nan]),
+        portfolio_policy=lambda s: PortfolioTarget(np.asarray(targets[s.day])),
+        share_distributions=(event,),
+        config=config,
+    )
+    np.testing.assert_array_equal(result.nav[:3], future.nav[:3])
+    assert [o for o in result.intended_orders if o.decision_session <= 3] == [
+        o for o in future.intended_orders if o.decision_session <= 3
+    ]
+    account = PortfolioAccount.empty([100, 50, np.nan, 100], config=config)
+    for day in range(len(close)):
+        account.step(
+            tensor([*targets[day], 0]),
+            day=day,
+            close=np.r_[close[day], 100],
+            cdi=0,
+            session_date=result.dates[day],
+            annual_borrow=[0] * 4,
+            loan_reference=[100, 50, np.nan, 100],
+            action_q=np.r_[q[day], 1],
+            successor=np.r_[successor[day], 3],
+            share_distributions=(event,),
+            terminal=day == 4,
+        )
+        assert account.nav.item() == pytest.approx(result.nav[day], abs=1e-9)
+        if day == 2:
+            from brazil_rv.v2.portfolio_objective import clone_account
+
+            copied = clone_account(account)
+            copied.distributions[0][0] = replace(
+                copied.distributions[0][0], successor_index=2
+            )
+            copied.detach()
+            assert account.distributions[0][0].successor_index == 1
+    assert account.distributions[0][0].successor_index == 2
+    assert result.undelivered_share_notional[-1] == pytest.approx(14)
+    assert account.shares[0].item() == pytest.approx(0.2 / 0.3)
+    assert not any(f.security_index == 2 and f.side == "buy" for f in result.fills)
+
+
+@pytest.mark.parametrize("sign", [-1, 1])
 @pytest.mark.parametrize("delivery", [2, None])
 def test_unquoted_single_leg_carries_only_claim_value(sign, delivery):
     from test_v2_stateful_ledger import _run

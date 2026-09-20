@@ -18,6 +18,7 @@ from .share_distributions import (
     basket_prices,
     claim_delivery_session,
     recognize_distribution,
+    retired_distribution_sources,
 )
 from .loan_contracts import LoanContracts, LoanSession, spot_settlement_session
 from .share_custody import ShareCustody
@@ -673,11 +674,7 @@ class PortfolioAccount:
         terminal=False,
         loan_return_session=None,
     ):
-        self.retired_sources.update(
-            event.source_index
-            for event in share_distributions
-            if event.effective_session < day
-        )
+        self.retired_sources = retired_distribution_sources(share_distributions, day)
         self.prepare_day(day)
         n = len(self.shares)
         start_nav = self.nav
@@ -752,14 +749,31 @@ class PortfolioAccount:
         lender_compensation = tensor(0.0)
         for name in np.flatnonzero(changed):
             name = int(name)
-            if name in self.distributions or any(
-                name == leg.successor_index
-                for legs in self.distributions.values()
-                for leg in legs
-            ):
+            if name in self.distributions:
                 raise ValueError(
                     "an action on an outstanding basket needs explicit claim terms"
                 )
+            for legs in self.distributions.values():
+                for i, leg in enumerate(legs):
+                    if leg.successor_index != name:
+                        continue
+                    if (
+                        not resolved[name]
+                        or q[name] != 1
+                        or d[name] != 0
+                        or mapping[name] == name
+                    ):
+                        raise ValueError(
+                            "an action on an outstanding basket needs explicit claim terms"
+                        )
+                    reference = self.marks[name].detach().item()
+                    legs[i] = replace(
+                        leg,
+                        successor_index=int(mapping[name]),
+                        opening_mark=reference
+                        if np.isfinite(reference) and reference > 0
+                        else leg.opening_mark,
+                    )
             amount = torch.zeros(n, dtype=torch.float64)
             event = settlements_today.get(name)
             bonus_delivery = None if event is None else event.bonus_delivery_session

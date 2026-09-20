@@ -69,12 +69,25 @@ class ShareDistribution:
     cash_per_prior_share: float = 0.0
     payment_session: int | None = None
     carry_source_value: bool = False
+    source_reopens_session: int | None = None
 
     def __post_init__(self):
         if not self.legs or not self.source:
             raise ValueError("share distributions require legs and source evidence")
         if self.carry_source_value and len(self.legs) != 1:
             raise ValueError("source-value carry requires one identifiable share leg")
+        if self.source_reopens_session is not None and (
+            self.source_reopens_session <= self.effective_session
+            or any(
+                leg.delivery_session is None
+                or leg.delivery_session >= self.source_reopens_session
+                or leg.fractional_auction is not None
+                for leg in self.legs
+            )
+        ):
+            raise ValueError(
+                "reused source identity requires prior complete share delivery"
+            )
         if any(
             not math.isfinite(leg.loan_principal_fraction)
             or not 0 <= leg.loan_principal_fraction <= 1
@@ -150,6 +163,9 @@ def slice_distributions(distributions, start, stop):
             event,
             effective_session=event.effective_session - start,
             available_session=event.available_session - start,
+            source_reopens_session=None
+            if event.source_reopens_session is None
+            else event.source_reopens_session - start,
             payment_session=None
             if event.payment_session is None
             else event.payment_session - start,
@@ -183,6 +199,20 @@ def slice_distributions(distributions, start, stop):
         for event in distributions
         if event.effective_session < stop
     )
+
+
+def retired_distribution_sources(distributions, day):
+    """Prior cancellations end only at an explicitly sourced identity reopening.
+
+    Effect-day retirement still occurs after that day's intentions. A reopened
+    source must acquire its own observed price; its former mark is not restored.
+    """
+    return {
+        event.source_index
+        for event in distributions
+        if event.effective_session < day
+        and (event.source_reopens_session is None or day < event.source_reopens_session)
+    }
 
 
 def claim_delivery_session(leg, *, borrowed):

@@ -346,3 +346,67 @@ def test_distribution_admission_keeps_source_and_later_fraction_clocks_separate(
     terms["share_distributions"][0]["available_date"] = str(calendar[3])
     with pytest.raises(ValueError, match="backdated"):
         apply_corporate_replay(data.inputs, terms, calendar, "a" * 64)
+
+
+def test_reused_identity_resolves_only_retirement_interval_and_removes_false_split():
+    data, terms, calendar = fixture()
+    terms["cash_cancellations"] = []
+    terms["loan_cash_settlements"] = []
+    name = data.inputs.security_ids[0]
+    flags = data.inputs.action_has_action.copy()
+    q = data.inputs.action_shares_per_prior_share.copy()
+    flags[6, 0], q[6, 0] = True, 3.058
+    data.inputs = replace(
+        data.inputs, action_has_action=flags, action_shares_per_prior_share=q
+    )
+    terms["share_distributions"] = [
+        dict(
+            isin=name,
+            effective_date=str(calendar[2]),
+            available_date=str(calendar[1]),
+            source_reopens_date=str(calendar[6]),
+            cash_per_prior_share=0,
+            payment_date=None,
+            legs=[
+                dict(
+                    successor_isin=data.inputs.security_ids[1],
+                    shares_per_prior_share=1,
+                    delivery_date=str(calendar[2]),
+                    loan_principal_fraction=1,
+                )
+            ],
+        )
+    ]
+    terms["scalar_actions"] = [
+        dict(
+            isin=name,
+            effective_date=str(calendar[6]),
+            available_date=str(calendar[5]),
+            shares_per_prior_share=1,
+            gross_cash_per_prior_share=0,
+            payment_date=None,
+        )
+    ]
+    amended = apply_corporate_replay(data.inputs, terms, calendar, "b" * 64)
+    assert amended.action_session_resolved[2:7, 0].all()
+    assert not amended.action_session_resolved[7:, 0].any()
+    assert amended.action_shares_per_prior_share[6, 0] == 1
+    assert amended.share_distributions[0].source_reopens_session == 6
+    assert data.inputs.action_shares_per_prior_share[6, 0] == pytest.approx(3.058)
+    from dataclasses import fields
+
+    original = data.inputs
+    sliced = replace(
+        original,
+        **{
+            field.name: getattr(original, field.name)[7:]
+            for field in fields(original)
+            if isinstance(getattr(original, field.name), np.ndarray)
+            and getattr(original, field.name).shape[:1] == (len(calendar),)
+        },
+        dates=original.dates[7:],
+    )
+    after = apply_corporate_replay(sliced, terms, calendar, "c" * 64)
+    np.testing.assert_array_equal(
+        after.action_session_resolved, sliced.action_session_resolved
+    )

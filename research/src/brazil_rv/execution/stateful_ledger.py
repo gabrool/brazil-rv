@@ -17,6 +17,7 @@ from .share_distributions import (
     basket_betas,
     claim_delivery_session,
     recognize_distribution,
+    retired_distribution_sources,
 )
 from .loan_fees import LoanModality, loan_fee_rates
 from .share_custody import ShareCustody
@@ -1607,11 +1608,7 @@ def simulate_stateful_ledger(
             inputs.action_q[d, n], inputs.action_d[d, n], inputs.action_successor[d, n]
         )
     share_claim_positions = []
-    retired_sources = {
-        event.source_index
-        for event in share_distributions
-        if event.effective_session < 0
-    }
+    retired_sources = retired_distribution_sources(share_distributions, 0)
     if retired_sources:
         last_observed[list(retired_sources)] = np.nan
     undelivered_rows = []
@@ -2166,6 +2163,7 @@ def simulate_stateful_ledger(
         pending_claims = unpaid
 
     for day in range(day_count):
+        retired_sources = retired_distribution_sources(share_distributions, day)
         funding_cash, funding_restricted = _settled_balances(
             free_cash, np.r_[restricted_by_name, hedge_restricted_cash], settlements
         )
@@ -3471,15 +3469,37 @@ def simulate_stateful_ledger(
         withholding_accrual = 0.0
         lender_compensation = 0.0
         for name in np.flatnonzero(inputs.has_action[day]):
-            if name in pending_distributions or any(
-                int(name) == leg.successor_index
-                for legs in pending_distributions.values()
-                for leg in legs
-            ):
+            if name in pending_distributions:
                 raise ValueError(
                     "an action on an outstanding basket needs explicit claim terms"
                 )
             successor = int(inputs.action_successor[day, name])
+            q = float(inputs.action_q[day, name])
+            d = float(inputs.action_d[day, name])
+            for legs in pending_distributions.values():
+                for i, leg in enumerate(legs):
+                    if leg.successor_index != name:
+                        continue
+                    if (
+                        not inputs.action_resolved[day, name]
+                        or q != 1
+                        or d != 0
+                        or successor == name
+                    ):
+                        raise ValueError(
+                            "an action on an outstanding basket needs explicit claim terms"
+                        )
+                    # A sourced unit/no-cash rename changes the underlying of an
+                    # existing right, never its quantity, custody or auction terms.
+                    # The old own mark stays local until a new own print arrives.
+                    reference = float(last_observed[name])
+                    legs[i] = replace(
+                        leg,
+                        successor_index=successor,
+                        opening_mark=reference
+                        if np.isfinite(reference) and reference > 0
+                        else leg.opening_mark,
+                    )
             if not inputs.action_resolved[day, name]:
                 if (
                     shares[name] != 0.0
@@ -3488,8 +3508,6 @@ def simulate_stateful_ledger(
                 ):
                     unresolved_action[name] = True
                 continue
-            q = float(inputs.action_q[day, name])
-            d = float(inputs.action_d[day, name])
             old_shares = float(shares[name])
             event = settlement_by_day_name.get((day, int(name)))
             delivery = None if event is None else event.bonus_delivery_session

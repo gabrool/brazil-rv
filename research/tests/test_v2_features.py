@@ -15,6 +15,97 @@ from brazil_rv.v2.features import (
 from brazil_rv.v2.universe import build_daily_universe
 
 
+def test_reopened_identifier_does_not_retire_or_promote_another_current_issuer():
+    from brazil_rv.v2.features import monthly_cluster_labels
+
+    dates = np.arange(np.datetime64("2024-01-01"), np.datetime64("2024-05-01"))
+    t = np.arange(len(dates))[:, None]
+    values = np.sin(t * 0.2 + np.arange(5)[None, :] * 0.1)
+    links = [
+        dict(
+            predecessor_index=0,
+            successor_index=1,
+            effective_index=40,
+            known_index=39,
+            source_reopens_index=70,
+        ),
+        dict(
+            predecessor_index=2, successor_index=0, effective_index=70, known_index=69
+        ),
+    ]
+    for successor_still_active in (False, True):
+        active = np.ones_like(values, bool)
+        active[:40, 1] = False
+        active[40:70, 0] = False
+        active[70:, 2] = False
+        active[75:, 1] = successor_still_active
+        labels = monthly_cluster_labels(
+            dates,
+            values,
+            np.ones_like(active),
+            active,
+            lookback=20,
+            minimum_observed=15,
+            cluster_count=1,
+            history_links=links,
+        )
+        # April's snapshot must preserve new logistics membership, and may not
+        # use it to qualify the old holding's successor if that issuer is inactive.
+        assert labels[-1, 0] == 0
+        assert labels[-1, 1] == (0 if successor_still_active else -1)
+        assert labels[-1, 2] == -1
+
+
+def test_public_cross_section_returns_preserve_historical_market_and_peer_inputs():
+    from brazil_rv.v2.features import build_slow_features_into
+
+    days, names = 100, 5
+    t, n = np.arange(days)[:, None], np.arange(names)[None, :]
+    public = 100 * np.exp(np.cumsum(0.003 * np.sin(t * 0.2 + n * 0.1), axis=0))
+    private = public.copy()
+    private[:50, 0] *= np.exp(np.arange(50) * 0.004)
+    known = np.ones_like(public, bool)
+    returns = {
+        h: exact_log_return(public, h, shareholder_wealth_valid=known)
+        for h in (1, 5, 21)
+    }
+
+    def build(values, overrides=None):
+        result = {}
+        build_slow_features_into(
+            values * 0.999,
+            values * 1.01,
+            values * 0.99,
+            values,
+            np.full_like(values, 3e6),
+            np.full_like(values, 1000),
+            known,
+            known,
+            np.arange(days),
+            raw_high=values * 1.01,
+            raw_low=values * 0.99,
+            raw_close=values,
+            price_observed=known,
+            history_observed=known,
+            activity_valid=known,
+            cluster_labels=np.zeros_like(values, np.int16),
+            cross_section_returns=overrides,
+            consume=lambda k, v, m: result.update({k: (v.copy(), m.copy())}),
+        )
+        return result
+
+    base, amended = build(public), build(private, returns)
+    for field in (15, 16, 27, 28, 29, 30, 31):
+        for before, after in zip(base[field], amended[field], strict=True):
+            np.testing.assert_array_equal(before[:, 1:], after[:, 1:])
+    assert not np.array_equal(base[15][0][60:80, 0], amended[15][0][60:80, 0])
+    private[81:, 0] *= 2
+    future = build(private, returns)
+    for field in (0, 8, 15, 16, 27, 28, 29, 30, 31):
+        for before, after in zip(amended[field], future[field], strict=True):
+            np.testing.assert_array_equal(before[:81], after[:81])
+
+
 def test_bounded_market_regression_keeps_full_window_and_future_isolation() -> None:
     market = np.sin(np.arange(100) * 0.13) / 100
     returns = market[:, None] * np.array([2.0, -0.5]) + np.array([0.001, 0.002])
