@@ -77,6 +77,10 @@
     "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\clearing_calendar_sources.json",
     "sha256": "5b0057bdb106e26ec2e9ca1fd709786428953a9252e5e978cf57e3fcb25b7bfe"
   },
+  "closeout_calendar_sources": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\closeout_calendar_sources\\qualification.json",
+    "sha256": "ca450ed93ac8736983fbde9be5fce04b4bddc17b6813d67443253fe999552770"
+  },
   "conditioned_tensor_audit": {
     "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\fit_conditioning_audit\\tensors.json",
     "sha256": "d01f0711c0f11d08067e6aa67ce062079f213425f0cba05016e399fd8381aca2"
@@ -822,13 +826,33 @@
     "sha256": "32a07e988924d3ad47287c84f971aeefbc8ae240076e4f45982fe2f12a596e2a"
   },
   "source_bindings_sha256": "4e86c957fb1b1052285a3410765204b8fb13b0903c83d5bdc5e3a3c879048092",
+  "spot_invoice_acceptance": {
+    "path": "C:\\quant\\b3-quant\\docs\\v2_spot_invoice_acceptance.json",
+    "sha256": "02deb94c7fc70d69d69ba26ff4d2b455e97a0865e40ce8715756c320015c8868"
+  },
+  "spot_invoice_attempts": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\spot_invoice\\attempts.json",
+    "sha256": "caf1f5c3c18e85ca52c0605d6bca6a1f61262fac78b7650f64f4135c18a5048b"
+  },
+  "spot_invoice_audit": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\spot_invoice\\manifest.json",
+    "sha256": "f0026c7566d1c27a1d8c17e9b2cb79c770e9524679f89d43b212d5cd2078380d"
+  },
+  "spot_invoice_qualification": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\spot_invoice\\qualification\\report.json",
+    "sha256": "bcfef16e563f46ae37c722b10898f7826161e171edcaa1916cf6569e0fd881cb"
+  },
+  "spot_invoice_runtime": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\spot_invoice\\runtime_identity.json",
+    "sha256": "a308446eae63fb9c986953ed7943820cb26ce161ea75c5bfbe5e09e055390ffd"
+  },
   "spot_settlement_acceptance": {
     "path": "docs\\v2_spot_settlement_acceptance.json",
     "sha256": "be8a7a157909c5fc8b0ced719efc0e5432bad7e466ad4bb65417bee02c3ec064"
   },
   "stage_a_closeout_plan": {
     "path": "C:\\quant\\b3-quant\\docs\\v2_STAGE_A_CLOSEOUT.md",
-    "sha256": "a588f0eab9e13845e4047295de76637254eff487e09e63f9554e4db1ad153905"
+    "sha256": "cb03d7532f1b360571b9edafa54ac4ba620b9b90800efdd2f01244e6e8151ede"
   },
   "status": "accounting_and_deep_data_audit",
   "to_close_clock": {

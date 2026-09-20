@@ -459,3 +459,17 @@ localday*.07+head*.2), beta1/idio.0004/market.0001, original calibration; shallo
 OLDPolicyData, correctedCDI/qualifiedloans/strictpriorrefs and V40 regular spot
 components replacing4bp. These are synthetic accounting contrasts, not model
 profit or final StageA admission. Reuse prior completed books unchanged.
+
+Spot invoice closeout amendment, recorded after qualification on 2026-09-20:
+the pre-outcome contract is the separately preserved spot_invoice/plan.json,
+resolved_plan.json and executed producer, not a retroactively dated paragraph.
+Unrounded fractional research costs remain primary. One security-day 6dp fee /
+account-category cent-truncation hypothesis changes only trading/clearing invoices;
+notional half-up precision, fractional applicability, stock/ETF cash grouping and
+pre017/2023 backcast remain explicit assumptions. Charges settle on original
+spot value dates after current intentions, preserving prior-close funding. Only
+six variants (2016-10-24 through2017-02-07 and long-focus2024-07-24 through09-30,
+R10m/1m/5m) ran against six reused saved controls; no repeat parent campaign.
+Existing opposite-direction guard remains pending actual exposure. This closes
+the bounded historical-cost block; two calendar dates, event/data composition
+and integrated StageA admission still precede C/D. Reuse every prior proof.

@@ -1892,6 +1892,8 @@ def _economics_contract(inputs: EvaluationInputs) -> dict[str, object]:
         "loan_invoice_convention": config.loan_invoice_convention,
         "spot_cost_model": config.spot_cost_model,
         "spot_execution_phase": config.spot_execution_phase,
+        "spot_invoice_convention": config.spot_invoice_convention,
+        "spot_invoice_contract": "Separate account-day trading/clearing invoice-minus-unrounded adjustment, recognized after fills with original spot settlement. execution_charges/cost include it; fill.cost and hedge_cost_bps remain unrounded diagnostics. One phase/normal cash market; fractional-unit precision and earlier-date backcast are hypotheses, not client invoices.",
         "monthly_spot_tariffs": [asdict(t) for t in config.monthly_spot_tariffs],
         "unrecovered_spot_trading_bps": config.unrecovered_spot_trading_bps,
         "execution_brokerage_bps": config.execution_brokerage_bps,

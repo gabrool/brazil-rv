@@ -1,6 +1,7 @@
-"""Dated ordinary-CNPJ spot attribution; amounts remain unrounded research costs."""
+"""Dated ordinary-CNPJ spot costs and explicit research invoice precision."""
 
 import numpy as np
+import torch
 from dataclasses import dataclass
 
 
@@ -11,6 +12,27 @@ EXECUTION_COMPONENTS = (
     "brokerage",
     "shortfall",
 )
+
+
+def spot_invoice_adjustment(notional, component_bps, convention):
+    """Account-day trading/clearing adjustment for same-direction ISIN groups.
+
+    One account/phase/normal cash market. 017/2023 supplies six-decimal group
+    fees and final cent truncation. Half-up notional precision and extension to
+    fractional research units/earlier dates are explicit hypotheses. Integer
+    micro-BRL avoids a second binary summation crossing an exact cent boundary.
+    Floor derivatives are zero locally; subtraction cancels the unrounded fee's
+    derivative. No straight-through estimate or change to execution quantities.
+    """
+    notional = torch.as_tensor(notional, dtype=torch.float64)
+    if convention == "unrounded":
+        return torch.zeros(2, dtype=torch.float64)
+    rates = torch.as_tensor(component_bps, dtype=torch.float64)[:, 1:3]
+    rates = torch.cat((rates[0].expand(len(notional) - 1, -1), rates[1:]))
+    amounts_micro = torch.floor(notional * 1e6 + 0.5)
+    fee_micro = torch.floor(amounts_micro[:, None] * rates / 1e4 + 0.5)
+    invoiced = torch.floor(fee_micro.sum(0) / 10000) / 100
+    return invoiced - (notional[:, None] * rates / 1e4).sum(0)
 
 
 @dataclass(frozen=True)

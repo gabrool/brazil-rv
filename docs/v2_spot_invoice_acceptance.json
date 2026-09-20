@@ -1,0 +1,199 @@
+{
+  "account_array_cells": 1722762,
+  "adaptive_max_bps": {
+    "1000000": 1.11842411570251e-06,
+    "10000000": 4.692971706390381e-07,
+    "5000000": 3.680754452943802e-07
+  },
+  "books": 6,
+  "closeout": {
+    "path": "C:\\quant\\b3-quant\\docs\\v2_STAGE_A_CLOSEOUT.md",
+    "sha256": "cb03d7532f1b360571b9edafa54ac4ba620b9b90800efdd2f01244e6e8151ede"
+  },
+  "contracts": [
+    "Unrounded fractional research costs primary; security_day_6dp_cent is a separate one-factor hypothesis. Original source017/2023pp17-19 reused. Integer quantity applicability, notional half-up and prior-era backcast are not observed invoices.",
+    "Invoice-minus-unrounded adjustment belongs to originalT3/T2 spot settlement. execution_charges and cost already include it; Fill.cost and hedge diagnostic remain unrounded. Funding/intentions precede recognition, no double charge.",
+    "Normal one-account/phase cash market, all4287historicalgroupssinglefill/same-direction. Opposing same-day guard retained; actual future exposure needs specific daytrade admission. Multi-fill arithmetic fixture-only.",
+    "All933names/frozenOLDcoordinates/fullhistory/originalcalibration. Synthetic adaptive paths, no neuralforward/scoring/fit/modelprofits. Oldstores/fits unchanged."
+  ],
+  "contrasts": [
+    {
+      "book": "2016-10-24_primary_10000000",
+      "capital": 10000000,
+      "direct_invoice_adjustment": [
+        -0.3767872883702047,
+        -0.36353532492834884
+      ],
+      "final_contrast_bps": 0.000731838759034872,
+      "max_contrast_bps": 0.000731838759034872
+    },
+    {
+      "book": "2016-10-24_primary_1000000",
+      "capital": 1000000,
+      "direct_invoice_adjustment": [
+        -0.3309299715923368,
+        -0.3742241092204627
+      ],
+      "final_contrast_bps": 0.006978274279972538,
+      "max_contrast_bps": 0.006978274279972538
+    },
+    {
+      "book": "2016-10-24_primary_5000000",
+      "capital": 5000000,
+      "direct_invoice_adjustment": [
+        -0.34972150169208904,
+        -0.4063469790906081
+      ],
+      "final_contrast_bps": 0.0014946359060704708,
+      "max_contrast_bps": 0.0014946359060704708
+    },
+    {
+      "book": "2024-07-24_1_primary_10000000",
+      "capital": 10000000,
+      "direct_invoice_adjustment": [
+        -0.2690405602688848,
+        -0.2452028013450714
+      ],
+      "final_contrast_bps": 0.0005261520575731992,
+      "max_contrast_bps": 0.0005261520575731992
+    },
+    {
+      "book": "2024-07-24_1_primary_1000000",
+      "capital": 1000000,
+      "direct_invoice_adjustment": [
+        -0.27022757181308354,
+        -0.27113785906534654
+      ],
+      "final_contrast_bps": 0.005563991891685873,
+      "max_contrast_bps": 0.005563991891685873
+    },
+    {
+      "book": "2024-07-24_1_primary_5000000",
+      "capital": 5000000,
+      "direct_invoice_adjustment": [
+        -0.2594037354526887,
+        -0.2370186772636272
+      ],
+      "final_contrast_bps": 0.0010177878420799971,
+      "max_contrast_bps": 0.0010177878420799971
+    }
+  ],
+  "engineering_seconds": 10.613339799980167,
+  "errors": {
+    "cost_components": 1.8189894035458565e-12,
+    "decimal_adjustment": 6.768396607070848e-13,
+    "decimal_all_components": 9.094947017729282e-13,
+    "decimal_b3_invoice": 9.094947017729282e-13,
+    "fill_cost_plus_adjustment": 1.3642420526593924e-12,
+    "income": 5.4569682106375694e-12,
+    "independent_account_adjustment": 1.5916157281026244e-12,
+    "independent_account_components": 9.094947017729282e-13,
+    "independent_spot_unsettled": 5.471520125865936e-09,
+    "prior_funding": 5.122274160385132e-09,
+    "saved_nav": 3.725290298461914e-09
+  },
+  "evidence": {
+    "closeout_calendar_sources": {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\closeout_calendar_sources\\qualification.json",
+      "sha256": "ca450ed93ac8736983fbde9be5fce04b4bddc17b6813d67443253fe999552770"
+    },
+    "spot_invoice_attempts": {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\spot_invoice\\attempts.json",
+      "sha256": "caf1f5c3c18e85ca52c0605d6bca6a1f61262fac78b7650f64f4135c18a5048b"
+    },
+    "spot_invoice_audit": {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\spot_invoice\\manifest.json",
+      "sha256": "f0026c7566d1c27a1d8c17e9b2cb79c770e9524679f89d43b212d5cd2078380d"
+    },
+    "spot_invoice_qualification": {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\spot_invoice\\qualification\\report.json",
+      "sha256": "bcfef16e563f46ae37c722b10898f7826161e171edcaa1916cf6569e0fd881cb"
+    },
+    "spot_invoice_runtime": {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\spot_invoice\\runtime_identity.json",
+      "sha256": "a308446eae63fb9c986953ed7943820cb26ce161ea75c5bfbe5e09e055390ffd"
+    }
+  },
+  "fills": 4287,
+  "immutable_contracts": {
+    "corporate_replay": {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\corporate_replay\\dommo_manifest.json",
+      "sha256": "b4dcc7467a5eaafe70c2d57b55217deaafe6fb6dc3e711d7fce91ffc13f91ff9",
+      "status": "default_dommo_pna_admitted_with_explicit_fraction_and_custody_bounds"
+    },
+    "economic_refit_inputs": {
+      "path": "C:\\quant\\b3-quant\\docs\\v2_natura_data_inputs.json",
+      "sha256": "216f14221cac61d3441a1a8fed358e549f54131c5dd10f94d81a0c354d821220"
+    }
+  },
+  "open_items": [
+    "Two older clearing dates require sourced disposition or separate bounded hypotheses; new source search establishes no numerical bound.",
+    "Primary event/source composition and separately attributed succession-data implications.",
+    "Cielo cent variant only if actual loan cash redemption; none of six new paths exposed.",
+    "Integrated StageA acceptance followed by registered C and conditional D."
+  ],
+  "prior_recovery_dependencies": {
+    "bova_loan_reference_audit": {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\bova_loan_reference_audit\\manifest.json",
+      "sha256": "589c5d2011e8e1f1092bda6571c45dd172b2c58a3f88801d87f68edef42b27ff",
+      "status": "recovered_not_admitted"
+    },
+    "cash_calendar": {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\cash_calendar\\manifest.json",
+      "sha256": "687cd4d999bdb39867b5cd59c9972293a1b5748b811f264b66ae4e78905c862c",
+      "status": "cash_calendar_defect_quantified_corrected_explicit_amendment_not_yet_scored"
+    },
+    "cielo_foundation_exposure_recovery": {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\cielo_foundation_exposure_recovery.json",
+      "sha256": "415b68d806b698b0ce8ac9798fe259a55c40050188bb930bbeba583137569fbf"
+    },
+    "clearing_calendar_resolution": {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\tariff_coverage\\calendar_resolution.json",
+      "sha256": "8e6ee8bab890a8326183587eaf1772e48c151d58fbef8ef81eb853c3ad61adf2"
+    },
+    "enat_settlement_terms": {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\enat_settlement\\terms.json",
+      "sha256": "34e5b9a06e0ab604f6e87dc4e8f1602c2ff3d68035176d0832d05d8f0279073b"
+    },
+    "historical_cost_acceptance": {
+      "path": "C:\\quant\\b3-quant\\docs\\v2_historical_cost_coverage_acceptance.json",
+      "sha256": "a8f21494aad6a070106f9b39e876349f3a334c5f6247d0abca0bef8ffd6f3c5a"
+    },
+    "historical_cost_recovery": {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\historical_cost_recovery.json",
+      "sha256": "d76475d01e4177b5946de23148e6b456413eb26c25f901a573db1d33ef166d50"
+    },
+    "historical_cost_sources": {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\tariff_coverage\\qualification.json",
+      "sha256": "b26b08523b56bd81847b812c1a93baa74beea9a59c402c341f29d0083eb8ac0e"
+    },
+    "historical_tariff_sources": {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\historical_tariff_sources\\qualification.json",
+      "sha256": "f8c47d64e56db0395e98030f0f62c17103ae3408cff3ed532d168f63ea7452c6"
+    },
+    "lending_feature_recovery": {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\lending_feature_recovery.json",
+      "sha256": "95b255ca651f4dce93767d4e06a4088e4610a9ede879ac6491d6c0cd5cc5f8bb"
+    },
+    "loan_source_panels": {
+      "bytes": 3553,
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\loan_source_panels\\manifest.json",
+      "sha256": "a6741a98d505a049c543cb0c8ed45934b5eadfd6fd2e344fbc916db8ff46cf02",
+      "status": "source_panels_bound_event_overrides_pending"
+    },
+    "natura_store_recovery": {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\natura_store_recovery.json",
+      "sha256": "3840780a073e6a214ad247530863bff55500114cc340a9953d7492ff927b21a6"
+    }
+  },
+  "qualification_seconds": 0.12088040000526235,
+  "report": {
+    "path": "C:\\quant\\b3-quant\\docs\\v2_SPOT_INVOICE_CLOSEOUT.md",
+    "sha256": "a376f0bdde6886c6aeb88968d76513f859589030bc190243db4354b068601c69"
+  },
+  "retained_prior_uncertainty": "All larger V31-V41 and historical corporate fixed-fee adaptive uncertainty retained; new small discrepancies do not replace them.",
+  "reused_parent_books": 6,
+  "sessions": 366,
+  "status": "historical_cost_block_complete_for_bounded_contract_not_stage_a_admission",
+  "summed_case_seconds": 9.546701299987035
+}

@@ -22,7 +22,7 @@ from .share_distributions import (
 from .loan_contracts import LoanContracts, LoanSession, spot_settlement_session
 from .share_custody import ShareCustody
 from .custody_fees import CustodyFees
-from .spot_costs import execution_bps
+from .spot_costs import execution_bps, spot_invoice_adjustment
 
 
 def tensor(values) -> Tensor:
@@ -954,6 +954,23 @@ class PortfolioAccount:
             traded_by_name[:-1].sum() * tensor(component_bps[0])
             + traded_by_name[-1] * tensor(component_bps[1])
         ) / 1e4
+        invoice_adjustment = spot_invoice_adjustment(
+            traded_by_name, component_bps, config.spot_invoice_convention
+        )
+        if config.spot_invoice_convention != "unrounded":
+            adjustment = invoice_adjustment.sum()
+            costs = costs + adjustment
+            execution_charges = execution_charges + torch.cat(
+                (tensor([0]), invoice_adjustment, tensor([0, 0]))
+            )
+            self.trade_cash = self.trade_cash - adjustment
+            self.settlements.append(
+                (
+                    spot_settlement_session(day, session_date),
+                    -adjustment,
+                    torch.zeros_like(self.trade_restricted),
+                )
+            )
         for event in loan_cash_settlements:
             if event.effective_session == day and event.unreturned_only:
                 self.convert_loan_cash(event, day)
@@ -1060,6 +1077,7 @@ class PortfolioAccount:
             * config.short_proceeds_remuneration,
             "cost": costs,
             "execution_charges": execution_charges,
+            "spot_invoice_adjustment": invoice_adjustment,
             "custody_base": custody_base,
             "custody_fee": custody_fee,
             "custody_maintenance": custody_maintenance,

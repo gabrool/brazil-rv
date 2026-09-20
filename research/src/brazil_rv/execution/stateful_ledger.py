@@ -21,7 +21,7 @@ from .share_distributions import (
 from .loan_fees import LoanModality, loan_fee_rates
 from .share_custody import ShareCustody
 from .custody_fees import CustodyAssessment, CustodyFees
-from .spot_costs import MonthlySpotTariff, execution_bps
+from .spot_costs import MonthlySpotTariff, execution_bps, spot_invoice_adjustment
 from .loan_contracts import (
     LoanCharge,
     LoanRenewal,
@@ -103,6 +103,7 @@ class LedgerConfig:
     cost_bps_per_side: float = 4.0
     spot_cost_model: str = "bundled"
     spot_execution_phase: str = "regular"
+    spot_invoice_convention: str = "unrounded"
     monthly_spot_tariffs: tuple[MonthlySpotTariff, ...] = ()
     unrecovered_spot_trading_bps: float | None = None
     execution_brokerage_bps: float = 0.0
@@ -140,6 +141,13 @@ class LedgerConfig:
     annual_sessions: int = 252
 
     def __post_init__(self) -> None:
+        if self.spot_invoice_convention not in {"unrounded", "security_day_6dp_cent"}:
+            raise ValueError("unknown spot invoice convention")
+        if (
+            self.spot_invoice_convention != "unrounded"
+            and self.spot_cost_model == "bundled"
+        ):
+            raise ValueError("spot invoice grouping requires separated dated B3 costs")
         if self.custody_base not in {"physical", "economic_long"}:
             raise ValueError("unknown custody base hypothesis")
         if self.custody_claim_fraction not in (0, 1):
@@ -377,6 +385,7 @@ class StatefulLedgerResult:
     debit_financing_bps: NDArray[np.float64]
     cost_bps: NDArray[np.float64]
     execution_charges: NDArray[np.float64]
+    spot_invoice_adjustment: NDArray[np.float64]
     custody_base: NDArray[np.float64]
     custody_fee: NDArray[np.float64]
     custody_maintenance: NDArray[np.float64]
@@ -1613,6 +1622,7 @@ def simulate_stateful_ledger(
     debit_financing_rows: list[float] = []
     cost_rows: list[float] = []
     execution_rows: list[NDArray[np.float64]] = []
+    invoice_adjustment_rows: list[NDArray[np.float64]] = []
     custody_rows = []
     physical_custody_rows = []
     borrow_rows: list[float] = []
@@ -3689,6 +3699,7 @@ def simulate_stateful_ledger(
         long_sales = np.zeros(name_count + 1)
         long_before_fill = np.maximum(np.r_[shares, hedge_shares], 0)
         traded_notional = 0.0
+        traded_by_name = np.zeros(name_count + 1)
         costs = 0.0
         entry_fill_short_today = 0
         exit_fill_long_today = 0
@@ -3807,6 +3818,7 @@ def simulate_stateful_ledger(
                     )
                 )
                 traded_notional += notional
+                traded_by_name[name] += notional
                 costs += fill_cost
                 remaining = remaining_before_fill - used_size
                 pending.remaining_size = (
@@ -3969,6 +3981,15 @@ def simulate_stateful_ledger(
         # Every name has at most one new-entry fill after reductions; contract
         # terms are shared within this session. Apply those actual quantities in
         # one vector operation, avoiding a whole-cohort scan for every fill.
+        traded_by_name[-1] = hedge_traded_notional
+        invoice_adjustment = spot_invoice_adjustment(
+            traded_by_name, component_bps, config.spot_invoice_convention
+        ).numpy()
+        if config.spot_invoice_convention != "unrounded":
+            adjustment = float(invoice_adjustment.sum())
+            costs += adjustment
+            free_cash -= adjustment
+        invoice_adjustment_rows.append(invoice_adjustment)
         spot_day = spot_settlement_session(day, inputs.dates[day])
         for name, due in loans.bonus_return_floors.items():
             if name < name_count and due > spot_day and release_today[name] > 0:
@@ -4300,6 +4321,7 @@ def simulate_stateful_ledger(
             )
             / 10_000.0
         )
+        execution_rows[-1][1:3] += invoice_adjustment
         borrow_rows.append(10_000.0 * borrow / start_nav)
         equity_borrow_raw_rows.append(10_000.0 * equity_borrow_raw / start_nav)
         equity_borrow_fee_rows.append(10_000.0 * equity_borrow_fee / start_nav)
@@ -4569,6 +4591,7 @@ def simulate_stateful_ledger(
         debit_financing_bps=np.asarray(debit_financing_rows, dtype=np.float64),
         cost_bps=np.asarray(cost_rows, dtype=np.float64),
         execution_charges=np.asarray(execution_rows, dtype=np.float64),
+        spot_invoice_adjustment=np.asarray(invoice_adjustment_rows, dtype=np.float64),
         custody_base=np.asarray(custody_rows)[:, 0],
         custody_fee=np.asarray(custody_rows)[:, 1],
         custody_maintenance=np.asarray(custody_rows)[:, 4],

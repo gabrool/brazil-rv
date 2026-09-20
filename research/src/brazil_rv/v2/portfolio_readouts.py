@@ -134,6 +134,7 @@ def book_summary(data, result, previous, start, first):
         "equity_gross_bps": result.equity_gross_pnl_bps[selection],
         "hedge_gross_bps": result.hedge_gross_pnl_bps[selection],
         "trading_cost_bps": result.cost_bps[selection],
+        "spot_invoice_adjustment": result.spot_invoice_adjustment[selection],
         "custody_bps": result.custody_fee[selection]
         / result.start_nav[selection]
         * 1e4,
@@ -245,6 +246,7 @@ def save_book(output, data, result, targets, previous, start, first, provenance)
         "signed_shares",
         "loan_invoice_adjustment",
         "execution_charges",
+        "spot_invoice_adjustment",
         "custody_base",
         "custody_fee",
         "custody_maintenance",
