@@ -36,6 +36,10 @@
     "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\bvbg_source_numbers\\qualification.json",
     "sha256": "899d0c7ffd288d6e588c4fc56fcc70db0537c119ab9a5ceb26731fcb3df4b954"
   },
+  "bvbg_target_recovery": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\bvbg_target_recovery.json",
+    "sha256": "c93958790a4df741bbafec4ae62bf30dcbfded3d875db8d5ae08bf6f9cc6e064"
+  },
   "cash_calendar": {
     "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\cash_calendar\\manifest.json",
     "sha256": "687cd4d999bdb39867b5cd59c9972293a1b5748b811f264b66ae4e78905c862c",

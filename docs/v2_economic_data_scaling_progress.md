@@ -1678,3 +1678,13 @@ corporate_target_propagation/input_audit/neutral_attribution and
 docs/v2_BVBG_CORPORATE_TARGET_AUDIT.md. Complete combined store/final tensors/
 refit contract, remaining corporate wealth and Stage A adaptive-book execution
 bounds remain. A/B incomplete, C/D unstarted.
+
+Recovery for40c9660 verifies2988 unique/2990 logical restored members,2 aliases,
+2564 original XML and15 original option ZIP source receipts. Archive
+bvbg_targets_40c9660.zip is5,086,724bytes,
+SHA1467ae048b3c8dba3108f5ac887952035c6116c6e9e05a07f6ec092209ac3d09.
+Restored sparse amendments reconstruct120242760 actual target-view/row cells
+exactly; code, patches, source indices and all executed failed/qualified recipes
+recover without immutable inputs or old fits. Source bytes were not rehashed
+during recovery. Acceptance SHA88558de8fde377eac4e00e943406a1b8cbc95214477c3cfd657138cf3360c4ee.
+Prior source/history/feature recovery dependencies remain required and valid.
