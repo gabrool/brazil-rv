@@ -41,6 +41,15 @@ recalculated in5.358068seconds. Exact failed/qualified code, reports and qualifi
 stdout remain available. The canonical producer contains the source-contract
 correction. No accepted data or research runtime was changed.
 
+A bounded saved-mask check identifies all22,660source-mask rows and the same
+22,660activity rows as already tagged `continuation_quote_mask` observations.
+They are the sealed Round7 BDI06/07/08 valuation/exit extension, which deliberately
+preserves original feature/universe coordinates; see [that contract](v2_ROUND7_IMPLEMENTATION.md).
+The two lists overlap completely. This resolves the reconstruction mismatch's
+provenance without reopening the continuation-source census or changing its
+admission scope. The exact read-only recipe and source bindings are retained in
+`v2_surviving_source_lineage.json`.
+
 The final94checks cover83,150,470cells with zero mismatches. Daily amendments
 change705,221slow values and6,103ages, adding5,176valid field cells and removing682.
 All losses are enumerated:62are retired predecessor cells;620remain eligible but

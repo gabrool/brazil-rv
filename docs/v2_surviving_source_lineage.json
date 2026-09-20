@@ -1,0 +1,38 @@
+{
+  "activity_resolution": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\surviving_renames\\daily\\admitted\\activity_resolution.json",
+    "sha256": "652138a33a0e666f27497d32e0b0bac5f37f767cb8e604718ecbbaf19e6a9431"
+  },
+  "activity_rows": 22660,
+  "activity_rows_tagged_continuation": 22660,
+  "continuation_mask": {
+    "bytes": 3468089,
+    "dtype": "|b1",
+    "path": "continuation_quote_mask.npy",
+    "sha256": "0f546bdd35998e45768c916ce190f8fee611f12b1570309add459c931a13b7f0",
+    "shape": [
+      3717,
+      933
+    ]
+  },
+  "distinct_rows": 22660,
+  "interpretation": "Sealed Round7 BDI06/07/08 valuation/exit-only extension preserves original feature/universe coordinates. These are not missing original price sources or permission to backfill original feature OHLC/activity from later account/valuation rows.",
+  "method": "Read each saved row list, map date with np.searchsorted against accepted date_index and ISIN with accepted isin_index, select continuation_quote_mask[t,n], sum True. Both lists yielded22660/22660. Read-only result recorded after the tool check; no source or reducer replay.",
+  "no_changed_store_or_fit": true,
+  "no_raw_source_census": true,
+  "parent": {
+    "manifest_sha256": "93f65b11f31979c6eafee0ca7e68afe5bb591a303eb8b5e2148072828e8d04bf",
+    "root": "C:\\quant-data\\b3\\processed\\v2_economic_natura_store_20260920"
+  },
+  "prior_contract": {
+    "path": "C:\\quant\\b3-quant\\docs\\v2_ROUND7_IMPLEMENTATION.md",
+    "sha256": "1c3d2ad0e35b6cb0cb4d90d6a92b5d9ac7478df12ac7a55c15f7ebd7c4b9072e"
+  },
+  "source_mask_resolution": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\surviving_renames\\daily\\qualified\\source_mask_resolution.json",
+    "sha256": "67fe640592ab5b4bbc71028249607905aaf0d1396cf7b73b0b12011cabb1a629"
+  },
+  "source_rows": 22660,
+  "source_rows_tagged_continuation": 22660,
+  "status": "all_saved_gap_rows_are_sealed_round7_continuations"
+}
