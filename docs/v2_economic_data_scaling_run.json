@@ -350,6 +350,10 @@
     "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\loan_return_notices\\readout_qualification\\manifest.json",
     "sha256": "7573d03b98e9f83effd73741ff69ea79b509dc1d46c24e71a7de92e66d116531"
   },
+  "loan_return_notice_recovery": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\loan_return_notice_recovery.json",
+    "sha256": "f066a79d0bea44a44baa6cd3c6fd07dd801202cac974c4486ab4dc5319438546"
+  },
   "loan_return_notice_runtime_qualification": {
     "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\loan_return_notices\\runtime_qualification\\manifest.json",
     "sha256": "71a03f1f8552dd49804e1686e3db8b73ac2d7c300625d54708a0930c74adee02"

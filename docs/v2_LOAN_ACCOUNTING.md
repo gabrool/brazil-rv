@@ -4,6 +4,13 @@
 This document distinguishes the implemented tariff and contract mechanics from
 remaining settlement terms and historical source admission. It is not a new performance readout.
 
+2026-09-20 follow-up: [V32 loan return notices](v2_LOAN_RETURN_NOTICES.md)
+implements denied-renewal/ordinary-recall stress, preserves overdue obligations,
+and qualifies full-return numerical corrections on adaptive engineering books.
+Its acceptance/recovery supersedes older statements that these mechanisms are
+unimplemented. Final economic admission and the remaining execution/source bounds
+are still open; the V31 mechanics and evidence below remain valid.
+
 ## Implemented dated exchange-rate schedule
 
 The old code applied one modern normal-electronic fee formula to every date,

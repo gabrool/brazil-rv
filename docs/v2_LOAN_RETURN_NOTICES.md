@@ -132,3 +132,18 @@ BRML/DMMO Jan9-Jan10 and Copel Dec26-Dec27 pre-custody disposal, allocation/timi
 sweep/fraction/invoice/grouping/old-minimum bounds, three older equity-clearing-date
 ambiguities, actual model matched economic replay and then registered refits/capacity.
 No accepted dataset correction follows from this accounting checkpoint.
+
+## Recovery
+
+Implementation `ceec715bcfadd19173eb46d3b7dcd2582c188201` is recoverable through
+`loan_return_notice_recovery`. The archive `loan_return_notices_ceec715.zip` is
+25,271,773 bytes, SHA256
+`b4805ecc37485cebfd723b1e331574b9943d7bed2820eeec282a6c4b1d9496d9`.
+Recovery restored and hash-checked 823 logical members from 769 unique members
+with 54 deduplicated aliases. All 24 completed account books / 11,532,288 array
+cells were read from recovery, including the new overdue-principal field.
+Verification took 2.26s. Complete current research source, implementation patch,
+recorded executed versions, all failed/qualified artifact attempts, frozen plan and
+acceptance are included. The earlier allocation version is resolved from the prior
+commit. Existing source/store recovery dependencies are retained by receipts;
+immutable inputs, old fits and accepted stores were not copied or reconstructed.

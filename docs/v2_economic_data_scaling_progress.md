@@ -1783,3 +1783,13 @@ loan_return_notice_runtime_qualification and loan_return_notice_acceptance. Full
 report `docs/v2_LOAN_RETURN_NOTICES.md`. Stage A still needs exposure-ranked events,
 pre-custody disposal, allocation/timing/sweep/fraction/invoice/grouping/minimum and
 older clearing-calendar bounds before matched C economics/refits and conditional D.
+
+Verified loan_return_notice_recovery for implementation ceec715bcfadd19173eb46d3b7dcd2582c188201:
+769unique/823logical members,54aliases,24completebooks/11532288 recovered account
+cells. ZIP loan_return_notices_ceec715.zip,25271773bytes,
+SHA b4805ecc37485cebfd723b1e331574b9943d7bed2820eeec282a6c4b1d9496d9.
+Recovery2.26s. Complete research, source patch, recorded initial/qualified executed
+recipes and evidence recover; prior dependencies reused without raw/store/fit copies.
+Acceptance SHA c265a296b86a31632c31f7412c24bb6f0e6ce95d0ad8accb889259e93bcbdd18.
+All workers finished. This completes the lifecycle engineering checkpoint, not A
+economic admission or the program.
