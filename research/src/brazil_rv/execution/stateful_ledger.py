@@ -20,6 +20,7 @@ from .share_distributions import (
 )
 from .loan_fees import LoanModality, loan_fee_rates
 from .share_custody import ShareCustody
+from .spot_costs import execution_bps
 from .loan_contracts import (
     LoanCharge,
     LoanRenewal,
@@ -99,6 +100,10 @@ class LedgerConfig:
     planned_absolute_beta_cap: float = 0.05
     planned_name_weight_cap: float = 0.05
     cost_bps_per_side: float = 4.0
+    spot_cost_model: str = "bundled"
+    spot_execution_phase: str = "regular"
+    execution_brokerage_bps: float = 0.0
+    execution_shortfall_bps: float = 1.0
     annual_borrow_rate: float = 0.02
     borrow_source: BorrowSource = "borrow_balance"
     borrow_fee_modality: LoanModality = "normal"
@@ -129,6 +134,19 @@ class LedgerConfig:
     annual_sessions: int = 252
 
     def __post_init__(self) -> None:
+        if self.spot_cost_model not in {"bundled", "b3_spot_2021"}:
+            raise ValueError("unknown spot cost contract")
+        if self.spot_execution_phase not in {"regular", "auction"}:
+            raise ValueError("unknown spot execution phase hypothesis")
+        if not all(
+            np.isfinite(x) and x >= 0
+            for x in (self.execution_brokerage_bps, self.execution_shortfall_bps)
+        ):
+            raise ValueError("execution components must be nonnegative")
+        if self.spot_cost_model != "bundled" and (
+            self.cost_bps_per_side != 0 or self.hedge_cost_bps_per_side != 0
+        ):
+            raise ValueError("dated spot components replace both bundled costs")
         if self.loan_invoice_convention not in {
             "none",
             "contract_nearest",
@@ -332,6 +350,7 @@ class StatefulLedgerResult:
     free_cash_income_bps: NDArray[np.float64]
     debit_financing_bps: NDArray[np.float64]
     cost_bps: NDArray[np.float64]
+    execution_charges: NDArray[np.float64]
     borrow_bps: NDArray[np.float64]
     unsettled_cash: NDArray[np.float64]
     loan_liability: NDArray[np.float64]
@@ -1558,6 +1577,7 @@ def simulate_stateful_ledger(
     free_cash_income_rows: list[float] = []
     debit_financing_rows: list[float] = []
     cost_rows: list[float] = []
+    execution_rows: list[NDArray[np.float64]] = []
     borrow_rows: list[float] = []
     loan_liability_rows: list[float] = []
     loan_overdue_rows: list[float] = []
@@ -3614,7 +3634,9 @@ def simulate_stateful_ledger(
         entry_fill_short_today = 0
         exit_fill_long_today = 0
         exit_fill_short_today = 0
-        cost_rate = config.cost_bps_per_side / 10_000.0
+        component_bps = execution_bps(config, inputs.dates[day])
+        cost_rate = float(component_bps[0].sum()) / 10_000.0
+        fill_directions = {}
         for pending_map in (pending_exits, pending_entries):
             entries = pending_map is pending_entries
             for name, pending in tuple(pending_map.items()):
@@ -3651,6 +3673,12 @@ def simulate_stateful_ledger(
                     used_size = quantity / abs(shares[name])
                 if quantity <= 0.0:
                     continue
+                if config.spot_cost_model != "bundled":
+                    old_side = fill_directions.setdefault(name, pending.order.side)
+                    if old_side != pending.order.side:
+                        raise ValueError(
+                            "opposite same-security/day fills require day-trade tariff admission"
+                        )
                 before = float(shares[name])
                 held_proceeds = sum(value[name] for _, value in bonus_proceeds)
                 if pending.order.side == "buy" and before < 0:
@@ -3813,7 +3841,7 @@ def simulate_stateful_ledger(
         hedge_traded_notional = 0.0
         hedge_cost = 0.0
         hedge_gross_pnl = 0.0
-        hedge_cost_rate = config.hedge_cost_bps_per_side / 10_000.0
+        hedge_cost_rate = float(component_bps[1].sum()) / 10_000.0
         bova_printed = config.beta_hedge and np.isfinite(inputs.hedge_close[day])
         if bova_printed:
             current_hedge_close = float(inputs.hedge_close[day])
@@ -4146,6 +4174,13 @@ def simulate_stateful_ledger(
         free_cash_income_rows.append(10_000.0 * free_cash_income / start_nav)
         debit_financing_rows.append(10_000.0 * debit_financing / start_nav)
         cost_rows.append(10_000.0 * costs / start_nav)
+        execution_rows.append(
+            (
+                (traded_notional - hedge_traded_notional) * component_bps[0]
+                + hedge_traded_notional * component_bps[1]
+            )
+            / 10_000.0
+        )
         borrow_rows.append(10_000.0 * borrow / start_nav)
         equity_borrow_raw_rows.append(10_000.0 * equity_borrow_raw / start_nav)
         equity_borrow_fee_rows.append(10_000.0 * equity_borrow_fee / start_nav)
@@ -4414,6 +4449,7 @@ def simulate_stateful_ledger(
         free_cash_income_bps=np.asarray(free_cash_income_rows, dtype=np.float64),
         debit_financing_bps=np.asarray(debit_financing_rows, dtype=np.float64),
         cost_bps=np.asarray(cost_rows, dtype=np.float64),
+        execution_charges=np.asarray(execution_rows, dtype=np.float64),
         borrow_bps=np.asarray(borrow_rows, dtype=np.float64),
         unsettled_cash=np.asarray(unsettled_cash_rows, dtype=np.float64),
         loan_liability=np.asarray(loan_liability_rows, dtype=np.float64),

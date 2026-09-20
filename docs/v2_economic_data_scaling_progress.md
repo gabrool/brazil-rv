@@ -2042,3 +2042,10 @@ Independentadaptive maxpath .010282502409070731/.00000816549058072269/.000022326
 
 
 Recovery verified: `loan_invoice_5e1c5b0.zip`, SHA `07dcd80eb46025c661fa790a342b885543aa7a87f3b6c09991dc01b201a51d1c`, 15741455 bytes. 820 unique/1006 logical restored/hash-checked members, 186 aliases; 36 complete books/8660736 account cells, 1.655622s. Complete current research, implementation patch, frozen plan, failed/qualified executed recipes and new books recover without immutable-input/store/old-fit duplication. Prior payment/Copel/precredit/ENAT/Natura/lifecycle/lending/economic/Natura-store recoveries remain required. All workers finished; final A/C/D remain open.
+
+
+## 2026-09-20 — Dated spot component checkpoint
+
+The [dated spot checkpoint](docs/v2_HISTORICAL_SPOT_COSTS.md) qualifies V40 ordinary-CNPJ 2021-2024 spot component separation in BOTH actual accounts and30full933 adaptive books/960NAVs. Primary3bp B3+1bp provisional shortfall+zero brokerage exactly reproduces the old4bp bridge; bounded auction/brokerage/shortfall/proceeds contrasts are qualified. No adaptive debit exposure; funded debit is separately fixture-verified. Three dated B3 originals distinguish activated monthly custody from proposed daily custody. Final custody/earlier tariffs/spot invoices/daytrade/source admission/Cielo held-loan bounds and C/D remain open; preserve all earlier checkpoints and adaptive uncertainty.
+
+All30books first-pass, seven new and32existing tests pass. 960NAVs/3613440cells, independent9888fill Decimal charges, funding and prefix checks pass. Engineering30.9497025s/qualification.5765957s; no source/store/oldbook repeat or GPU. Recovery follows below.

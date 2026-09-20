@@ -53,6 +53,10 @@
     "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\cea_identity_admission\\completed\\manifest.json",
     "sha256": "55f7b0008b400c947fe5acc10b38f275a06eed0c7e359e67cc070fef2ce7c684"
   },
+  "cielo_saved_exposure": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\historical_spot\\cielo_saved_exposure.json",
+    "sha256": "efb5b9621f803f281cc302c5ef733d7bdc33eb9329023fb10734166cfbe7e3d0"
+  },
   "clearing_calendar_audit": {
     "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\clearing_calendar_audit.json",
     "sha256": "4bfd969c94551764038f233bbf1364efb65313d3d384b238b09b3e09c21b52cb"
@@ -304,6 +308,26 @@
   "held_event_source_recovery": {
     "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\held_event_source_recovery.json",
     "sha256": "48ee32e02ba647b3e59e966c07c3e35f78b61fb85adc500ec54bc2a23dc62409"
+  },
+  "historical_spot_acceptance": {
+    "path": "C:\\Brazil-RV\\quant\\b3-quant\\docs\\v2_historical_spot_acceptance.json",
+    "sha256": "06c8445b2e62f247745b9e339d9ce2adce05e9792ac618fb61cb9d4976600e60"
+  },
+  "historical_spot_audit": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\historical_spot\\manifest.json",
+    "sha256": "506f640aa2b8650e198829f5013e802694b44dbff6aac9ac49835fd68a00808b"
+  },
+  "historical_spot_qualification": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\historical_spot\\qualification\\report.json",
+    "sha256": "d026cea99f25a4dca993c53695fafe8d37ae8be206a69918f91566876de0a158"
+  },
+  "historical_spot_runtime_identity": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\historical_spot\\runtime_identity.json",
+    "sha256": "b3d169db68b641577aca236827e5326f10d1cebd8af13851f5b4a32657462957"
+  },
+  "historical_tariff_sources": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\historical_tariff_sources\\qualification.json",
+    "sha256": "f8c47d64e56db0395e98030f0f62c17103ae3408cff3ed532d168f63ea7452c6"
   },
   "identity_source_admission": {
     "path": "docs\\v2_identity_source_admission.json",

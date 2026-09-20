@@ -235,6 +235,7 @@ def save_book(output, data, result, targets, previous, start, first, provenance)
         "loan_outstanding_principal",
         "signed_shares",
         "loan_invoice_adjustment",
+        "execution_charges",
         "loan_minimum_credit",
         "mark_price",
         "hedge_signed_shares",

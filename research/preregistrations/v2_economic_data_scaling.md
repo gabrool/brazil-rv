@@ -292,6 +292,18 @@ cent/credit Decimal oracles, prior-close funding and full saved NAV identities.
 Do not repeat prior event books or infer model profits. Actual-held-Cielo cents,
 historical spot/custody separation and final Stage A/data admission remain separate.
 
+Dated spot engineering qualification, 2026-09-20: the saved historical_spot plan
+froze30 June3-July16 2024 all933 adaptive books before outcomes. Explicit ordinary
+CNPJ mode admits February2 2021-December30 2024 rates .5bp trading/2.5bp clearing,
+with .7bp auction trading separately hypothesized. It replaces BOTH bundled costs;
+primary brokerage0/shortfall1 reproduces4bp. Retain frozen optimizer cost estimate.
+Compare one-factor auction, shortfall0/2, brokerage.5/1, proceeds95%CDI and actual
+funded debit+50/+100annualbp at10m/1m/5m. Unrounded fractional research units;
+reject opposing same-name/day fills pending daytrade admission. Source invoice
+rounding and monthly physical custody/older tariff regimes remain separate. These
+books have no debit exposure; do not claim their zero contrasts bound funded books.
+All earlier synthetic engineering and adaptive fixed-minimum uncertainty remain.
+
 ## B. Deep source-to-model data audit
 
 Revisit the actual sources and builders, not just finite-value/coverage summaries.

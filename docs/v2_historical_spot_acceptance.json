@@ -1,0 +1,44 @@
+{
+  "account_array_cells": 3613440,
+  "audit": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\historical_spot\\manifest.json",
+    "sha256": "506f640aa2b8650e198829f5013e802694b44dbff6aac9ac49835fd68a00808b"
+  },
+  "books": 30,
+  "boundaries": "Primary exact bridge equality; no debit exposure in new adaptive books, funded debit separately exercised by deterministic both-account fixture; preserve larger V32-V39 adaptive fixed-fee uncertainty.",
+  "cielo_exposure": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\historical_spot\\cielo_saved_exposure.json",
+    "sha256": "efb5b9621f803f281cc302c5ef733d7bdc33eb9329023fb10734166cfbe7e3d0"
+  },
+  "execution_charges_columns": [
+    "bundled",
+    "b3_trading",
+    "b3_clearing",
+    "brokerage",
+    "shortfall"
+  ],
+  "qualification": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\historical_spot\\qualification\\report.json",
+    "sha256": "d026cea99f25a4dca993c53695fafe8d37ae8be206a69918f91566876de0a158"
+  },
+  "remaining": [
+    "Final historical custody and pre2021 spot fees, sourced spot invoice rounding/daytrade admission",
+    "Three older clearing ambiguities, held Cielo redemption-loan cent bound",
+    "Source/custody/fraction and separately attributed succession data admission",
+    "Final StageA, matchedC and conditionalD; no model profitability or fit"
+  ],
+  "runtime_identity": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\historical_spot\\runtime_identity.json",
+    "sha256": "b3d169db68b641577aca236827e5326f10d1cebd8af13851f5b4a32657462957"
+  },
+  "sessions": 960,
+  "source_qualification": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\historical_tariff_sources\\qualification.json",
+    "sha256": "f8c47d64e56db0395e98030f0f62c17103ae3408cff3ed532d168f63ea7452c6"
+  },
+  "status": "accepted_bounded_V40_spot_engineering_not_final_Stage_A",
+  "tests": {
+    "affected_existing": 32,
+    "distinct_new": 7
+  }
+}

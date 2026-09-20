@@ -21,6 +21,7 @@ from .share_distributions import (
 )
 from .loan_contracts import LoanContracts, LoanSession, spot_settlement_session
 from .share_custody import ShareCustody
+from .spot_costs import execution_bps
 
 
 def tensor(values) -> Tensor:
@@ -867,16 +868,18 @@ class PortfolioAccount:
         fractions = np.ones(n) if fill_fraction is None else np.asarray(fill_fraction)
         fractions = tensor(np.where(printed, fractions, 0.0))
         fractions[-1] = 0  # The hedge has one separate notional order below.
+        component_bps = execution_bps(config, session_date)
         cost_rate = torch.full(
-            (n,), config.cost_bps_per_side / 1e4, dtype=torch.float64
+            (n,), float(component_bps[0].sum()) / 1e4, dtype=torch.float64
         )
-        cost_rate[-1] = config.hedge_cost_bps_per_side / 1e4
+        cost_rate[-1] = float(component_bps[1].sum()) / 1e4
         shares_before_fill = self.shares
         available = (self.shares.abs() - self.bonus_shares.abs()).clamp_min(0)
         used = torch.minimum(
             exit_fraction * fractions, available / self.shares.abs().clamp_min(1e-30)
         )
-        costs = self._fill(-self.shares * used, prices, cost_rate, loan_session)
+        exit_quantity = -self.shares * used
+        costs = self._fill(exit_quantity, prices, cost_rate, loan_session)
         self.cost_basis = self.cost_basis * (1 - used)
         remaining_exit = (exit_fraction - used) / (1 - used).clamp_min(1e-30)
         remaining_exit = torch.where(self.shares.abs() > 1e-12, remaining_exit, 0.0)
@@ -890,6 +893,12 @@ class PortfolioAccount:
             * fractions
             * torch.as_tensor(opening_allowed)
         )
+        if config.spot_cost_model != "bundled" and bool(
+            ((exit_quantity * quantity).detach() < 0).any()
+        ):
+            raise ValueError(
+                "opposite same-security/day fills require day-trade tariff admission"
+            )
         costs = costs + self._fill(quantity, prices, cost_rate, loan_session)
         self.cost_basis = self.cost_basis + quantity.abs() * prices
 
@@ -901,6 +910,13 @@ class PortfolioAccount:
                 -self.shares[-1] if terminal else hedge_trade_notional / prices[-1]
             )
         costs = costs + self._fill(hedge_quantity, prices, cost_rate, loan_session)
+        traded_by_name = (
+            exit_quantity.abs() + quantity.abs() + hedge_quantity.abs()
+        ) * prices
+        execution_charges = (
+            traded_by_name[:-1].sum() * tensor(component_bps[0])
+            + traded_by_name[-1] * tensor(component_bps[1])
+        ) / 1e4
         for event in loan_cash_settlements:
             if event.effective_session == day and event.unreturned_only:
                 self.convert_loan_cash(event, day)
@@ -981,6 +997,7 @@ class PortfolioAccount:
             * cdi
             * config.short_proceeds_remuneration,
             "cost": costs,
+            "execution_charges": execution_charges,
             "unpriced_inventory_notional": unpriced_notional,
             "undelivered_share_notional": sum(
                 (self.shares[name] * self.marks[name]).abs()
