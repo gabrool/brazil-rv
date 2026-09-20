@@ -1631,3 +1631,50 @@ exactly. Current research source, source patch, qualified families, original
 executed recipes and failed audit attempts recover without immutable input/old-fit
 duplication. Acceptance SHA a2524456b3659adb4648eb9c5c846f51fe297d3db01eae6c700c32f6cc78f545.
 The earlier history/M1/lending/target recovery chain remains required and valid.
+
+### Original option/cash numbers and corporate basket targets, 2026-09-20
+
+All1283 original IN/PR publication jobs pass6334727 field comparisons:
+210071 OI aggregates,555511 cash rows,41371764 listed series and18676933
+observed OI series. Exact creation-version selection, underlying IDs, dated
+listing limits, BRL monetary units and missing/complete OI reconcile without
+production parser reuse. Retained malformed/moved report exceptions remain
+explicit. Four manifest-relative path errors were qualified without changing
+hashes or repeating passed jobs. Eight workers completed the final invocation
+in1273.50s, reusing six earlier passes; aggregate worker time10138.18s.
+
+Independent fixed-width option slices reconcile9052797 printed records from
+15 original2010-2024 ZIPs into261904 rows/785712 comparisons. The separate
+auxiliary cash axis reproduces1173583 rows/5867915 fields from the already
+audited equity normalization. The original quote census was not repeated.
+All15 option scans were reused while correcting the cash harness's _brl field
+names and redundant quote-factor division. Final cash resumption6.19s; initial
+raw option wall time was not separately recorded. Single-vintage revisions
+and exact first internet-publication times remain unknown. No production data
+changed in these source audits.
+
+Sourced BRML/DMMO/CPLE target baskets preserve all legs and cash receivables.
+The 33-date/all933 old control matches1693560 cells after replacing the
+audit's stored float32 terms with original float64 verified terms; the initial
+79 disturbed rank cells and executed recipe remain. Closed forms verify21
+new horizon outcomes per conversion,63 total/no losses; all precede fraction
+auction recognition. Custody is distinct from economic effect, missing exact
+leg endpoints fail, and no basket OHLC is invented. The physical rank changes
+8243 cells; the actual virtual neutral target gains63 and changes8186 shared
+valid values (8248 total numeric changes), holding repaired risk inputs fixed.
+
+The first consumer view omitted sigma and therefore did not expose the virtual
+target; corrected views pass33 full933/full60 samples/4310460 packed cells
+and33 revoked endpoint windows. Independent SVD projection verifies the actual
+neutral-target arithmetic.16 targeted tests and Ruff pass. Producer.71s and
+consumer12.76s are not fit ETAs. No forward/scoring/GPU fit.
+
+Six post-effect liquidity-eligibility cells remain on each converted source,
+18 total; their quote masks are missing. Preserve these cells pending explicit
+claim-close and feature/eligibility treatment. An erroneous zero-eligibility
+sentence was corrected from already accurate case counts without array reruns.
+Resolve bvbg_source_number_audit/qualification, option_quantity_source_audit,
+corporate_target_propagation/input_audit/neutral_attribution and
+docs/v2_BVBG_CORPORATE_TARGET_AUDIT.md. Complete combined store/final tensors/
+refit contract, remaining corporate wealth and Stage A adaptive-book execution
+bounds remain. A/B incomplete, C/D unstarted.

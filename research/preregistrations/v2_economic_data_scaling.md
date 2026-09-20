@@ -120,6 +120,20 @@ arrays, future-mutation/causality, label boundaries, fit-only transformations an
 consumer paths. Keep conditioning hypotheses without a correctness basis separate
 from repairs and evaluate them as experiments, not automatic improvements.
 
+Basket-target amendment, 2026-09-20, before corrected model outcomes: gross
+shareholder labels carry every sourced successor leg and cash receivable from the
+economic effect. Require an observed exact endpoint for each nonzero share leg;
+custody delay is not a missing economic entitlement or an executable sale. Keep
+cash unremunerated and unreinvested in these gross labels, as in the existing
+target contract. Use continuous entitlement units before auction recognition;
+lot-dependent post-auction outcomes require an explicit quantity contract and
+remain unsupported by this unit-label builder. The three admitted conversions'
+actual ten-session crossing endpoints all precede their auctions. Do not invent
+basket OHLC by summing separately timed leg extremes. Preserve the existing six
+liquidity-eligibility sessions per converted source while their final wealth/feature
+treatment is resolved. Primary neutral targets remain the store's on-demand
+registered characteristic projection; no new loss or neutralization hypothesis.
+
 ## C. Reassess existing leads under corrected economics
 
 Replay matched full-input attention, wider attention, GRU with early peers and C6

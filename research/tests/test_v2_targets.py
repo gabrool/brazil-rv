@@ -1,5 +1,10 @@
 import numpy as np
 
+from brazil_rv.execution.share_distributions import (
+    FractionAuction,
+    ShareDelivery,
+    ShareDistribution,
+)
 from brazil_rv.v2.corporate_actions import AlignedActionTerms
 from brazil_rv.v2.targets import (
     build_economic_multi_day_targets,
@@ -21,6 +26,115 @@ def _actions(
         session_resolved=np.asarray(known, dtype=np.bool_),
         has_action=(np.asarray(q) != 1.0) | (np.asarray(cash) != 0.0),
     )
+
+
+def test_basket_targets_keep_both_legs_cash_and_later_actions():
+    close = np.array([[50.0, 10.0, 5.0], [np.nan, np.nan, np.nan], [np.nan, 6.0, 9.0]])
+    observed = np.isfinite(close)
+    q = np.ones_like(close)
+    q[2, 1] = 2
+    d = np.zeros_like(close)
+    d[2, 2] = 0.5
+    resolved = np.ones_like(close, dtype=bool)
+    resolved[1:, 0] = False
+    event = ShareDistribution(
+        0,
+        1,
+        0,
+        (
+            ShareDelivery(1, 1, 2, loan_principal_fraction=0.2),
+            ShareDelivery(2, 4, 2, loan_principal_fraction=0.8),
+        ),
+        "fixture",
+        2,
+        2,
+    )
+    result = build_economic_multi_day_targets(
+        close,
+        observed,
+        np.ones_like(observed),
+        np.full_like(close, 0.02),
+        _actions(q, d, resolved),
+        share_distributions=(event,),
+        horizons=(2,),
+        minimum_rank_names=1,
+    )
+    # 2*6 + 4*9 equity; initial 2 cash plus 4*.5 receivable, no reinvestment.
+    assert result.shareholder_valid[0, 0, 0]
+    np.testing.assert_allclose(result.terminal_wealth[0, 0, 0], 52 / 50)
+    np.testing.assert_allclose(result.price_simple_return[0, 0, 0], 48 / 50 - 1)
+    # Unknown endpoint on even one nonzero leg cannot become a stale-price label.
+    observed[2, 2] = False
+    missing = build_economic_multi_day_targets(
+        close,
+        observed,
+        np.ones_like(observed),
+        np.full_like(close, 0.02),
+        _actions(q, d, resolved),
+        share_distributions=(event,),
+        horizons=(2,),
+        minimum_rank_names=1,
+    )
+    assert not missing.shareholder_valid[0, 0, 0]
+
+
+def test_basket_targets_ignore_delivery_timing_and_future_mutations():
+    from dataclasses import replace
+
+    close = np.full((5, 3), 10.0)
+    observed = np.ones_like(close, dtype=bool)
+    event = ShareDistribution(0, 2, 1, (ShareDelivery(1, 0.5, 4),), "fixture", 5, 4)
+    args = (
+        close,
+        observed,
+        observed,
+        np.full_like(close, 0.02),
+        _actions(np.ones_like(close)),
+    )
+    control = build_economic_multi_day_targets(
+        *args, share_distributions=(event,), horizons=(1, 2), minimum_rank_names=1
+    )
+    event = replace(
+        event, legs=(replace(event.legs[0], delivery_session=3),), payment_session=3
+    )
+    close[4] = 9999
+    later = build_economic_multi_day_targets(
+        *args, share_distributions=(event,), horizons=(1, 2), minimum_rank_names=1
+    )
+    np.testing.assert_array_equal(
+        control.terminal_wealth[:2], later.terminal_wealth[:2]
+    )
+    np.testing.assert_array_equal(control.primary[:2], later.primary[:2])
+    # Before the effect, even earlier public knowledge grants no entitlement.
+    assert control.terminal_wealth[0, 0, 0] == 1
+
+
+def test_basket_targets_do_not_apply_lot_dependent_auction_rounding():
+    close = np.full((5, 2), 10.0)
+    observed = np.ones_like(close, dtype=bool)
+    event = ShareDistribution(
+        0,
+        1,
+        0,
+        (ShareDelivery(1, 0.0375, 2, FractionAuction(3, 31.94, 4)),),
+        "fixture",
+        0.4625,
+        2,
+    )
+    result = build_economic_multi_day_targets(
+        close,
+        observed,
+        observed,
+        np.full_like(close, 0.02),
+        _actions(np.ones_like(close)),
+        share_distributions=(event,),
+        horizons=(2, 3),
+        minimum_rank_names=1,
+    )
+    np.testing.assert_allclose(
+        result.terminal_wealth[0, 0, 0], (0.0375 * 10 + 0.4625) / 10
+    )
+    assert not result.shareholder_valid[0, 0, 1]
 
 
 def test_economic_targets_distinguish_price_and_shareholder_returns() -> None:

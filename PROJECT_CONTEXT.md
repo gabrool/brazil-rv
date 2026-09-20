@@ -60,7 +60,13 @@ histories and index-preview composition identities now propagate under those
 same dated links. They add 778 valid auxiliary cells and retire 16 predecessor
 cells, with no loss on still-eligible names; 90 full-population CPU consumer
 samples and all 44 original index portfolios reconcile. See
-`docs/v2_REMAINING_AUXILIARY_HISTORY.md`. These are
+`docs/v2_REMAINING_AUXILIARY_HISTORY.md`. Original IN/PR option/cash numbers and
+annual COTAHIST option quantities now reconcile independently. Sourced BRML,
+Dommo and Copel baskets add 63 gross horizon outcomes; the actual virtual
+neutral-target consumer is verified against independent projection arithmetic.
+Keep all successor legs separate and preserve the 18 post-effect source
+eligibility cells pending their wealth/feature disposition. See
+`docs/v2_BVBG_CORPORATE_TARGET_AUDIT.md`. These are
 intermediate derived observations, not a replacement model store or permission to attach changed
 coordinates to old fits. Original filing clocks and capital units reconcile
 separately in `docs/v2_CVM_SOURCE_AUDIT.md`.

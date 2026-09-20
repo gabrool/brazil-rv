@@ -24,6 +24,18 @@
     "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\brmalls_custody_recovery.json",
     "sha256": "dbbf7c4db7906d3a273b9c63a4cf6720c02e1b501efa96c241079df4dcf2e3c0"
   },
+  "bvbg_corporate_target_acceptance": {
+    "path": "C:\\Brazil-RV\\quant\\b3-quant\\docs\\v2_bvbg_corporate_target_acceptance.json",
+    "sha256": "88558de8fde377eac4e00e943406a1b8cbc95214477c3cfd657138cf3360c4ee"
+  },
+  "bvbg_source_number_audit": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\bvbg_source_numbers\\manifest.json",
+    "sha256": "8ae66f48af59f060eb6d37632b2c8b54c5e485d23b5f93d4faf2940483c8f0f6"
+  },
+  "bvbg_source_number_qualification": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\bvbg_source_numbers\\qualification.json",
+    "sha256": "899d0c7ffd288d6e588c4fc56fcc70db0537c119ab9a5ceb26731fcb3df4b954"
+  },
   "cash_calendar": {
     "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\cash_calendar\\manifest.json",
     "sha256": "687cd4d999bdb39867b5cd59c9972293a1b5748b811f264b66ae4e78905c862c",
@@ -70,6 +82,18 @@
   "corporate_replay_acceptance": {
     "path": "docs\\v2_corporate_replay_acceptance.json",
     "sha256": "93b5c1f0d2e8764e33c8337d8a04c3dd294254529b39cc939785e99d492edf9a"
+  },
+  "corporate_target_input_audit": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\corporate_targets\\qualified\\consumer\\qualified\\manifest.json",
+    "sha256": "5403b55a340820088a943aea08d66f612b17855dc9197b2d83a6d9ea3483b619"
+  },
+  "corporate_target_neutral_attribution": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\corporate_targets\\qualified\\neutral_attribution.json",
+    "sha256": "df895a10519d266a9892ee1b160eb3551ce15cf5eaf3b96c584f688fe15d7c25"
+  },
+  "corporate_target_propagation": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\corporate_targets\\qualified\\manifest.json",
+    "sha256": "59237c2ff7ef0c0d2471fe47ea1265baf37e33f90195e0e8c6eb2f280e71bff0"
   },
   "custody_runtime_acceptance": {
     "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\custody_acceptance\\result.json",
@@ -319,6 +343,10 @@
   "oddlot_tensor_audit": {
     "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\auxiliary_tensor_audit\\oddlot.json",
     "sha256": "1952956f665fde2f211969d5d8571383af7fccb3dd654ea8b33106d8750f4ab5"
+  },
+  "option_quantity_source_audit": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\option_quantity_sources\\manifest.json",
+    "sha256": "856f44fed515b516c46fff6a15cf1ac49e39250f5ccd6c21851febd2cb2df6a5"
   },
   "qualified_lending": {
     "balances_sha256": "b50feb75dcde9168eaa1eb53916de67bde565e1c0164037f29e1adc87d45bc6e",

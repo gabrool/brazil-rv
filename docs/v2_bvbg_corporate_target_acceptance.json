@@ -1,0 +1,75 @@
+{
+  "accepted_store_or_old_fits_changed": false,
+  "artifacts": {
+    "bvbg_source_number_audit": {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\bvbg_source_numbers\\manifest.json",
+      "sha256": "8ae66f48af59f060eb6d37632b2c8b54c5e485d23b5f93d4faf2940483c8f0f6"
+    },
+    "bvbg_source_number_qualification": {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\bvbg_source_numbers\\qualification.json",
+      "sha256": "899d0c7ffd288d6e588c4fc56fcc70db0537c119ab9a5ceb26731fcb3df4b954"
+    },
+    "corporate_target_input_audit": {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\corporate_targets\\qualified\\consumer\\qualified\\manifest.json",
+      "sha256": "5403b55a340820088a943aea08d66f612b17855dc9197b2d83a6d9ea3483b619"
+    },
+    "corporate_target_neutral_attribution": {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\corporate_targets\\qualified\\neutral_attribution.json",
+      "sha256": "df895a10519d266a9892ee1b160eb3551ce15cf5eaf3b96c584f688fe15d7c25"
+    },
+    "corporate_target_propagation": {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\corporate_targets\\qualified\\manifest.json",
+      "sha256": "59237c2ff7ef0c0d2471fe47ea1265baf37e33f90195e0e8c6eb2f280e71bff0"
+    },
+    "option_quantity_source_audit": {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\option_quantity_sources\\manifest.json",
+      "sha256": "856f44fed515b516c46fff6a15cf1ac49e39250f5ccd6c21851febd2cb2df6a5"
+    }
+  },
+  "executed_recipe_qualification": "Exact original code is retained for passed reports; later canonical edits are formatting, removing one unused import and correcting a scope narrative. No source/target audit rerun.",
+  "held_out_or_model_forward_or_fit": false,
+  "history": 60,
+  "names": 933,
+  "remaining": [
+    "18 converted-source eligibility cells: claim-close valuation and explicit feature treatment",
+    "complete combined store/final neural tensors/refit contract",
+    "remaining source-clock qualifications and actually held corporate events",
+    "A adaptive-book sensitivities; C/D unstarted"
+  ],
+  "report": {
+    "path": "C:\\Brazil-RV\\quant\\b3-quant\\docs\\v2_BVBG_CORPORATE_TARGET_AUDIT.md",
+    "sha256": "696299231a522079df4d78a944a9e461cc28426ea3188ba9e713047783bb1b00"
+  },
+  "source_code": {
+    "ops/audit_bvbg_source_numbers.py": {
+      "path": "C:\\Brazil-RV\\quant\\b3-quant\\ops\\audit_bvbg_source_numbers.py",
+      "sha256": "6c3044d0a0e93a8e22963ad76f3ea4bd1afdee2394495fc94ddb09cd1c246e89"
+    },
+    "ops/audit_corporate_target_inputs.py": {
+      "path": "C:\\Brazil-RV\\quant\\b3-quant\\ops\\audit_corporate_target_inputs.py",
+      "sha256": "283c209f8055efb797341056d3e28c031b4e9cc5c78a5380c25bf0178f49a490"
+    },
+    "ops/audit_option_quantity_sources.py": {
+      "path": "C:\\Brazil-RV\\quant\\b3-quant\\ops\\audit_option_quantity_sources.py",
+      "sha256": "b32563af73bd5d0e5aff6db7f92437173414bf229ca225e8e130971252ac7674"
+    },
+    "ops/propagate_corporate_targets.py": {
+      "path": "C:\\Brazil-RV\\quant\\b3-quant\\ops\\propagate_corporate_targets.py",
+      "sha256": "39ea0f3c82feb71547fe0e6a2bacf5091f69235ee5a08f213ed61d52dfb899b5"
+    },
+    "research/src/brazil_rv/v2/targets.py": {
+      "path": "C:\\Brazil-RV\\quant\\b3-quant\\research\\src\\brazil_rv\\v2\\targets.py",
+      "sha256": "3ad38869811f18ea1a49088da4121e0b48dea772587ae93e2919f869096a74ab"
+    },
+    "research/tests/test_v2_targets.py": {
+      "path": "C:\\Brazil-RV\\quant\\b3-quant\\research\\tests\\test_v2_targets.py",
+      "sha256": "04f7c5f11e7d75a1c118bec650420b708aed86e92323a728cee2e853422ce0b0"
+    }
+  },
+  "status": "original_option_cash_numbers_and_bounded_corporate_targets_verified_full_program_incomplete",
+  "tests": {
+    "ruff": "passed",
+    "seconds": 0.38,
+    "target_tests_passed": 16
+  }
+}

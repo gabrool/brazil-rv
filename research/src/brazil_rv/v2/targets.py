@@ -5,6 +5,8 @@ from dataclasses import dataclass
 import numpy as np
 from numpy.typing import NDArray
 
+from brazil_rv.execution.share_distributions import ShareDistribution
+
 from .corporate_actions import AlignedActionTerms, apply_contractual_action
 from .contract import HORIZONS
 from .normalization import midrank_unit_interval
@@ -48,6 +50,52 @@ def _rank_row(
     return output
 
 
+def _basket_endpoint(
+    day, end, name, close, observed, q, d, resolved, successor, events
+):
+    """Gross claim value; unpaid cash is a receivable, never a reinvestment.
+
+    Integer custody fractions depend on the investor's lot size. Before auction
+    recognition their continuous entitlement has the same successor mark. This
+    unit-return contract cannot manufacture a lot-specific auction allocation.
+    Missing intermediate prints do not prevent an exact observed endpoint.
+    """
+    holdings, cash = {name: 1.0}, 0.0
+    for session in range(day + 1, end + 1):
+        after = {}
+        for claim, quantity in holdings.items():
+            event = events.get((session, claim))
+            if event is not None:
+                if any(
+                    leg.fractional_auction is not None
+                    and leg.fractional_auction.available_session <= end
+                    for leg in event.legs
+                ):
+                    return None
+                cash += quantity * event.cash_per_prior_share
+                for leg in event.legs:
+                    target = leg.successor_index
+                    after[target] = (
+                        after.get(target, 0.0) + quantity * leg.shares_per_prior_share
+                    )
+            else:
+                if not resolved[session, claim]:
+                    return None
+                cash += quantity * d[session, claim]
+                target = int(successor[session, claim])
+                remaining = quantity * q[session, claim]
+                if remaining:
+                    after[target] = after.get(target, 0.0) + remaining
+        holdings = after
+    price = 0.0
+    for claim, quantity in holdings.items():
+        mark = close[end, claim]
+        if not observed[end, claim] or not np.isfinite(mark) or mark <= 0:
+            return None
+        price += quantity * mark
+    return price, cash
+
+
 def build_economic_multi_day_targets(
     raw_close: NDArray[np.floating],
     close_observed: NDArray[np.bool_],
@@ -55,6 +103,7 @@ def build_economic_multi_day_targets(
     sigma_asof: NDArray[np.floating],
     actions: AlignedActionTerms,
     *,
+    share_distributions: tuple[ShareDistribution, ...] = (),
     source_rows: NDArray[np.integer] | None = None,
     horizons: tuple[int, ...] = HORIZONS,
     winsor_limit: float = 5.0,
@@ -96,6 +145,7 @@ def build_economic_multi_day_targets(
         active,
         sigma_asof,
         actions,
+        share_distributions=share_distributions,
         primary=primary,
         primary_valid=primary_valid,
         normalized_residual=normalized,
@@ -142,6 +192,7 @@ def build_economic_multi_day_targets_into(
     sigma_asof: NDArray[np.floating],
     actions: AlignedActionTerms,
     *,
+    share_distributions: tuple[ShareDistribution, ...] = (),
     primary: NDArray[np.float32],
     primary_valid: NDArray[np.bool_],
     normalized_residual: NDArray[np.float32],
@@ -169,6 +220,8 @@ def build_economic_multi_day_targets_into(
     Only entry and exit quotes are required, so a missing intermediate print
     does not erase an otherwise exact endpoint outcome.  ``sigma_asof[t]`` is
     consumed directly because the canonical risk input is already lagged.
+    Sourced baskets use all successor endpoints from economic effect, independent
+    of later custody delivery. No execution, funding or loan cost enters labels.
     """
 
     close = np.asarray(raw_close, dtype=np.float64)
@@ -190,6 +243,19 @@ def build_economic_multi_day_targets_into(
         raise ValueError("economic-target inputs must align [date, name]")
     if (successor < 0).any() or (successor >= close.shape[1]).any():
         raise ValueError("action successor indices are invalid")
+    events = {
+        (event.effective_session, event.source_index): event
+        for event in share_distributions
+    }
+    if len(events) != len(share_distributions):
+        raise ValueError("conflicting share distributions at a target boundary")
+    by_session = {}
+    for event in share_distributions:
+        if not 0 <= event.source_index < close.shape[1] or any(
+            not 0 <= leg.successor_index < close.shape[1] for leg in event.legs
+        ):
+            raise ValueError("target distribution lies outside the security axis")
+        by_session.setdefault(event.effective_session, []).append(event)
     if (
         not horizons
         or any(value <= 0 for value in horizons)
@@ -283,7 +349,14 @@ def build_economic_multi_day_targets_into(
             cash = np.zeros(close.shape[1], dtype=np.float64)
             claim = np.arange(close.shape[1], dtype=np.int64)
             chain_resolved = entry_valid.copy()
+            basket_roots = set()
             for event_day in range(day + 1, end + 1):
+                for event in by_session.get(event_day, ()):
+                    basket_roots.update(
+                        np.flatnonzero(
+                            entry_valid & (claim == event.source_index)
+                        ).tolist()
+                    )
                 event_q = q[event_day, claim]
                 event_d = d[event_day, claim]
                 event_resolved = (
@@ -316,6 +389,16 @@ def build_economic_multi_day_targets_into(
             exit_price = np.where(exit_observed, close[end, claim], 0.0)
             terminal_price_per_entry_share = shares * exit_price
             terminal_value_per_entry_share = terminal_price_per_entry_share + cash
+            for root in basket_roots:
+                outcome = _basket_endpoint(
+                    day, end, root, close, observed, q, d, resolved, successor, events
+                )
+                economic_valid[root] = outcome is not None
+                chain_resolved[root] = outcome is not None
+                endpoint_known[root] = outcome is not None
+                if outcome is not None:
+                    terminal_price_per_entry_share[root] = outcome[0]
+                    terminal_value_per_entry_share[root] = sum(outcome)
             wealth = np.full(close.shape[1], np.nan, dtype=np.float64)
             wealth[economic_valid] = (
                 terminal_value_per_entry_share[economic_valid]
