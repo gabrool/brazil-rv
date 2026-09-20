@@ -1,0 +1,475 @@
+{
+  "account_array_cells": 9645408,
+  "adaptive_target_max": 4.103448918071212e-08,
+  "attempts": "Initial newly-known/paid fraction fixture exposed an already-due restricted-proceeds queue in BOTH accounts; fixed only that branch before historical books, V38. Historical harness stopped after saving46 fully computed books because first Cielo negative-focus book had no position. All46 were reused; only remaining8 frozen books ran after qualifying the guard. No historical numerical/account failure or repeated book. Saved runtime qualifier initially demanded all Cielo targets zero; a later positive intention after sign reversal was unfilled without a quote. Narrow no-negative-target/no-position qualification passed; saved NAV proof/books reused.",
+  "audit": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\payment_bounds\\manifest.json",
+    "sha256": "a06f31c992ac3f9e4efab5b6a448f69783661c7b16dc548e5cb9165efc95c73f"
+  },
+  "books": 54,
+  "cielo_disposition": "Nine long books hold source shares, all18 have no Cielo loan. Nine negative-focus books have no negative targets or actual Cielo positions; later positive intentions can remain unfilled. All Cielo scenario account fields are exact. The cent loan bound is UNQUALIFIED for actually held loans; this zero is not evidence of immaterial invoice precision. No preferences, rates, borrowing availability or source quotes were changed to manufacture exposure.",
+  "contrasts": [
+    {
+      "all_fields_equal": false,
+      "capital": 10000000,
+      "event": "BRML",
+      "exact_prefix": 19,
+      "final_bps": 2.4283779785037043e-05,
+      "max_path_bps": 2.4283779785037043e-05,
+      "scenario": "early",
+      "sign": 1
+    },
+    {
+      "all_fields_equal": false,
+      "capital": 1000000,
+      "event": "BRML",
+      "exact_prefix": 19,
+      "final_bps": 0.000164474006742239,
+      "max_path_bps": 0.000164474006742239,
+      "scenario": "early",
+      "sign": 1
+    },
+    {
+      "all_fields_equal": false,
+      "capital": 5000000,
+      "event": "BRML",
+      "exact_prefix": 19,
+      "final_bps": 7.106570154428482e-05,
+      "max_path_bps": 7.106570154428482e-05,
+      "scenario": "early",
+      "sign": 1
+    },
+    {
+      "all_fields_equal": true,
+      "capital": 10000000,
+      "event": "BRML",
+      "exact_prefix": 19,
+      "final_bps": 0.0,
+      "max_path_bps": 0.0,
+      "scenario": "early",
+      "sign": -1
+    },
+    {
+      "all_fields_equal": true,
+      "capital": 1000000,
+      "event": "BRML",
+      "exact_prefix": 19,
+      "final_bps": 0.0,
+      "max_path_bps": 0.0,
+      "scenario": "early",
+      "sign": -1
+    },
+    {
+      "all_fields_equal": true,
+      "capital": 5000000,
+      "event": "BRML",
+      "exact_prefix": 19,
+      "final_bps": 0.0,
+      "max_path_bps": 0.0,
+      "scenario": "early",
+      "sign": -1
+    },
+    {
+      "all_fields_equal": false,
+      "capital": 10000000,
+      "event": "DMMO",
+      "exact_prefix": 63,
+      "final_bps": 4.968959465622902e-05,
+      "max_path_bps": 5.070290341973305e-05,
+      "scenario": "early",
+      "sign": 1
+    },
+    {
+      "all_fields_equal": false,
+      "capital": 1000000,
+      "event": "DMMO",
+      "exact_prefix": 63,
+      "final_bps": 0.0003707213350571692,
+      "max_path_bps": 0.0003754311939701438,
+      "scenario": "early",
+      "sign": 1
+    },
+    {
+      "all_fields_equal": false,
+      "capital": 5000000,
+      "event": "DMMO",
+      "exact_prefix": 63,
+      "final_bps": 0.00011245725490152835,
+      "max_path_bps": 0.00011587280593812466,
+      "scenario": "early",
+      "sign": 1
+    },
+    {
+      "all_fields_equal": false,
+      "capital": 10000000,
+      "event": "DMMO",
+      "exact_prefix": 63,
+      "final_bps": 2.0836368203163147e-06,
+      "max_path_bps": 2.9594618827104567e-06,
+      "scenario": "precision",
+      "sign": 1
+    },
+    {
+      "all_fields_equal": false,
+      "capital": 1000000,
+      "event": "DMMO",
+      "exact_prefix": 63,
+      "final_bps": -1.0084650712087751e-05,
+      "max_path_bps": 1.438943319953978e-05,
+      "scenario": "precision",
+      "sign": 1
+    },
+    {
+      "all_fields_equal": false,
+      "capital": 5000000,
+      "event": "DMMO",
+      "exact_prefix": 63,
+      "final_bps": 3.7463195621967314e-07,
+      "max_path_bps": 5.819033831357956e-07,
+      "scenario": "precision",
+      "sign": 1
+    },
+    {
+      "all_fields_equal": true,
+      "capital": 10000000,
+      "event": "DMMO",
+      "exact_prefix": 8,
+      "final_bps": 0.0,
+      "max_path_bps": 0.0,
+      "scenario": "tiny_rent",
+      "sign": 1
+    },
+    {
+      "all_fields_equal": true,
+      "capital": 1000000,
+      "event": "DMMO",
+      "exact_prefix": 8,
+      "final_bps": 0.0,
+      "max_path_bps": 0.0,
+      "scenario": "tiny_rent",
+      "sign": 1
+    },
+    {
+      "all_fields_equal": true,
+      "capital": 5000000,
+      "event": "DMMO",
+      "exact_prefix": 8,
+      "final_bps": 0.0,
+      "max_path_bps": 0.0,
+      "scenario": "tiny_rent",
+      "sign": 1
+    },
+    {
+      "all_fields_equal": false,
+      "capital": 10000000,
+      "event": "DMMO",
+      "exact_prefix": 63,
+      "final_bps": -0.00012575406022369862,
+      "max_path_bps": 0.00013131335005164146,
+      "scenario": "early",
+      "sign": -1
+    },
+    {
+      "all_fields_equal": false,
+      "capital": 1000000,
+      "event": "DMMO",
+      "exact_prefix": 63,
+      "final_bps": -0.001522651108680293,
+      "max_path_bps": 0.0015616096346639096,
+      "scenario": "early",
+      "sign": -1
+    },
+    {
+      "all_fields_equal": false,
+      "capital": 5000000,
+      "event": "DMMO",
+      "exact_prefix": 63,
+      "final_bps": -0.00025077594816684724,
+      "max_path_bps": 0.0002614506389945745,
+      "scenario": "early",
+      "sign": -1
+    },
+    {
+      "all_fields_equal": false,
+      "capital": 10000000,
+      "event": "DMMO",
+      "exact_prefix": 63,
+      "final_bps": 3.286540508270264e-06,
+      "max_path_bps": 3.286540508270264e-06,
+      "scenario": "precision",
+      "sign": -1
+    },
+    {
+      "all_fields_equal": false,
+      "capital": 1000000,
+      "event": "DMMO",
+      "exact_prefix": 63,
+      "final_bps": 3.603092627599835e-06,
+      "max_path_bps": 6.37604622170329e-06,
+      "scenario": "precision",
+      "sign": -1
+    },
+    {
+      "all_fields_equal": false,
+      "capital": 5000000,
+      "event": "DMMO",
+      "exact_prefix": 63,
+      "final_bps": 1.4987729489803315e-05,
+      "max_path_bps": 1.4987729489803315e-05,
+      "scenario": "precision",
+      "sign": -1
+    },
+    {
+      "all_fields_equal": false,
+      "capital": 10000000,
+      "event": "DMMO",
+      "exact_prefix": 8,
+      "final_bps": -2.81869824975729e-05,
+      "max_path_bps": 3.150760382413864e-05,
+      "scenario": "tiny_rent",
+      "sign": -1
+    },
+    {
+      "all_fields_equal": false,
+      "capital": 1000000,
+      "event": "DMMO",
+      "exact_prefix": 8,
+      "final_bps": -1.808872213587165e-05,
+      "max_path_bps": 1.8494308460503816e-05,
+      "scenario": "tiny_rent",
+      "sign": -1
+    },
+    {
+      "all_fields_equal": false,
+      "capital": 5000000,
+      "event": "DMMO",
+      "exact_prefix": 8,
+      "final_bps": -3.852216526865959e-05,
+      "max_path_bps": 3.852216526865959e-05,
+      "scenario": "tiny_rent",
+      "sign": -1
+    },
+    {
+      "all_fields_equal": true,
+      "capital": 10000000,
+      "event": "CIEL",
+      "exact_prefix": 6,
+      "final_bps": 0.0,
+      "max_path_bps": 0.0,
+      "scenario": "cent_low",
+      "sign": 1
+    },
+    {
+      "all_fields_equal": true,
+      "capital": 1000000,
+      "event": "CIEL",
+      "exact_prefix": 6,
+      "final_bps": 0.0,
+      "max_path_bps": 0.0,
+      "scenario": "cent_low",
+      "sign": 1
+    },
+    {
+      "all_fields_equal": true,
+      "capital": 5000000,
+      "event": "CIEL",
+      "exact_prefix": 6,
+      "final_bps": 0.0,
+      "max_path_bps": 0.0,
+      "scenario": "cent_low",
+      "sign": 1
+    },
+    {
+      "all_fields_equal": true,
+      "capital": 10000000,
+      "event": "CIEL",
+      "exact_prefix": 6,
+      "final_bps": 0.0,
+      "max_path_bps": 0.0,
+      "scenario": "cent_high",
+      "sign": 1
+    },
+    {
+      "all_fields_equal": true,
+      "capital": 1000000,
+      "event": "CIEL",
+      "exact_prefix": 6,
+      "final_bps": 0.0,
+      "max_path_bps": 0.0,
+      "scenario": "cent_high",
+      "sign": 1
+    },
+    {
+      "all_fields_equal": true,
+      "capital": 5000000,
+      "event": "CIEL",
+      "exact_prefix": 6,
+      "final_bps": 0.0,
+      "max_path_bps": 0.0,
+      "scenario": "cent_high",
+      "sign": 1
+    },
+    {
+      "all_fields_equal": false,
+      "capital": 10000000,
+      "event": "CIEL",
+      "exact_prefix": 6,
+      "final_bps": 0.0,
+      "max_path_bps": 0.0,
+      "scenario": "cent_low",
+      "sign": -1
+    },
+    {
+      "all_fields_equal": false,
+      "capital": 1000000,
+      "event": "CIEL",
+      "exact_prefix": 6,
+      "final_bps": 0.0,
+      "max_path_bps": 0.0,
+      "scenario": "cent_low",
+      "sign": -1
+    },
+    {
+      "all_fields_equal": false,
+      "capital": 5000000,
+      "event": "CIEL",
+      "exact_prefix": 6,
+      "final_bps": 0.0,
+      "max_path_bps": 0.0,
+      "scenario": "cent_low",
+      "sign": -1
+    },
+    {
+      "all_fields_equal": false,
+      "capital": 10000000,
+      "event": "CIEL",
+      "exact_prefix": 6,
+      "final_bps": 0.0,
+      "max_path_bps": 0.0,
+      "scenario": "cent_high",
+      "sign": -1
+    },
+    {
+      "all_fields_equal": false,
+      "capital": 1000000,
+      "event": "CIEL",
+      "exact_prefix": 6,
+      "final_bps": 0.0,
+      "max_path_bps": 0.0,
+      "scenario": "cent_high",
+      "sign": -1
+    },
+    {
+      "all_fields_equal": false,
+      "capital": 5000000,
+      "event": "CIEL",
+      "exact_prefix": 6,
+      "final_bps": 0.0,
+      "max_path_bps": 0.0,
+      "scenario": "cent_high",
+      "sign": -1
+    }
+  ],
+  "costs": "Old bundled4bp bridge has no additional B3 spot. Not final corporate pricing or model alpha. All synthetic/fixed-risk OLD PolicyData coordinates preserved by shallow copy.",
+  "decimal_cash_max_error": "1.3671450000936877E-10",
+  "decimal_fraction_max_error": "4.280062499999805E-12",
+  "identical_intention_max_brl": 1.30385160446167e-08,
+  "independent_adaptive_max_path_bps": {
+    "1000000": 2.0039338851347564e-05,
+    "10000000": 1.9353771582245828e-05,
+    "5000000": 2.6215877383947375e-05
+  },
+  "independent_nav_identity_max_brl": 3.725290298461914e-09,
+  "independent_prior_funding_max_brl": 7e-09,
+  "prior_scope": "Sixteen distinct previous term contracts never enter the corrected provisioned-fraction same-day payment branch. No previous V31-V37 book, source audit or accepted store was repeated.",
+  "qualification": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\payment_bounds\\qualification\\manifest.json",
+    "sha256": "ac2773788c00c8b3b95e145f538644e91fd5d62cfe34c3afa2a55bea7192c8fa"
+  },
+  "remaining": "Actual-exposure Cielo cent bound; invoice cents, security-day grouping and older R10 final-partial minimum payment allocation; dated B3 spot/custody separation and other negotiated-account components; three older clearing dates; held-source and succession data admission; final A then C/D. ALSC physical credit/exact net receipts and ENAT auction remain unknown. No completed program or corrected model profit.",
+  "runtime": {
+    "execution/portfolio_account.py": {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\payment_bounds\\executed_execution_portfolio_account.py",
+      "sha256": "55e595f6d1f342b383705d9600981db7ba16739449be5f6a1c21636e0e9714bf"
+    },
+    "execution/stateful_ledger.py": {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\payment_bounds\\executed_execution_stateful_ledger.py",
+      "sha256": "52900f51e48249cdf096765f3dbab9a4c95f2688b0e1b90c551b3996165495cc"
+    },
+    "v2/evaluate.py": {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\payment_bounds\\executed_v2_evaluate.py",
+      "sha256": "bbc9581b981fd443ebb2dfbd0d2c16160eb5c4ad5657a31bbb9d482c1489f4ab"
+    }
+  },
+  "runtime_qualification": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\payment_bounds\\runtime_qualification.json",
+    "sha256": "e0d450a916c79173c5d463041bef5ddcb9266abfe4fa895f65fefbae9e764dc3"
+  },
+  "sessions": 2568,
+  "status": "fraction_sweep_precision_engineering_accepted_Cielo_held_loan_bound_and_final_A_pending",
+  "terms": {
+    "terms_BRML_early": {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\payment_bounds\\terms_BRML_early.json",
+      "sha256": "a440958bb4eab9ab2c7e8f7091f5cf0948b5f336f69eb6007f2665b306f916bf"
+    },
+    "terms_BRML_primary": {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\payment_bounds\\terms_BRML_primary.json",
+      "sha256": "c38466ca10e6e589ca3cdabfca49c46a01ceba857a6a5ce26ecc651468afb6c1"
+    },
+    "terms_CIEL_cent_high": {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\payment_bounds\\terms_CIEL_cent_high.json",
+      "sha256": "58536d6ad8f671549ed766e583543fa8afc0510d9e037d007591d462eefd27ff"
+    },
+    "terms_CIEL_cent_low": {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\payment_bounds\\terms_CIEL_cent_low.json",
+      "sha256": "bcc354fbc402461e102e68e39a53b5f3d5eb054301f62c29b718a8f4cae48760"
+    },
+    "terms_CIEL_primary": {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\payment_bounds\\terms_CIEL_primary.json",
+      "sha256": "c38466ca10e6e589ca3cdabfca49c46a01ceba857a6a5ce26ecc651468afb6c1"
+    },
+    "terms_DMMO_early": {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\payment_bounds\\terms_DMMO_early.json",
+      "sha256": "ece9b7538cfcdf02111f1567e21f710149eea306d0cfc5baf5f042976cf39cb3"
+    },
+    "terms_DMMO_precision": {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\payment_bounds\\terms_DMMO_precision.json",
+      "sha256": "6d6dd40c5041ba8c3c0763ea79df23b812d15a02a9194dc0fa56444e34286d59"
+    },
+    "terms_DMMO_primary": {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\payment_bounds\\terms_DMMO_primary.json",
+      "sha256": "c38466ca10e6e589ca3cdabfca49c46a01ceba857a6a5ce26ecc651468afb6c1"
+    },
+    "terms_DMMO_tiny_rent": {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\payment_bounds\\terms_DMMO_tiny_rent.json",
+      "sha256": "31d4109f803895749196846ecca575f0338e315dec73a572aadf9d5218c066e6"
+    }
+  },
+  "timings": {
+    "final_resumption_seconds": 8.83130830002483,
+    "initial_invocation_wall_seconds": null,
+    "saved_qualification_seconds": 0.7209526000078768,
+    "summed_case_seconds": 89.28308639995521
+  },
+  "tiny_loan_checks": [
+    {
+      "actual_additional_rent": "0.02864014216061",
+      "capital": 10000000,
+      "decimal_additional_rent": "0.02864014215948284727569385306",
+      "original_tiny_loans": 1
+    },
+    {
+      "actual_additional_rent": "0.002864014216005",
+      "capital": 1000000,
+      "decimal_additional_rent": "0.002864014215939978381684619884",
+      "original_tiny_loans": 1
+    },
+    {
+      "actual_additional_rent": "0.01432007108030",
+      "capital": 5000000,
+      "decimal_additional_rent": "0.01432007107974142363784692653",
+      "original_tiny_loans": 1
+    }
+  ],
+  "validation": "Six distinct new tests pass, including both signed same-day payments, continuous/provisioned fractions, finite-difference gradients and independent SAM/TBPTT copies. Initial four-case batch overlaps final six. Ruff passes."
+}

@@ -233,6 +233,34 @@ remain frozen. Verify original-cohort principal/quantity/rate/fee conservation a
 independent daily rent arithmetic, cash NAV and saved book prefixes. No model
 outcomes, store amendment, new alias, or repetition of completed V36 books.
 
+Fraction sweep/precision amendment, frozen 2026-09-20 before new books:
+use existing account mechanics and separate one-factor term variants. BRML fraction
+cash settles January26 (earliest known auction result) versus February2 deadline;
+DMMO fraction cash settles March31 versus April6 deadline. These signed settlement
+hypotheses are not observed cash receipts; preserve original result knowledge,
+physical credit and January20/January17 ordinary cash legs. Separately compare
+DMMO printed31.94031 with565024/17690, without claiming invoice precision. Its
+zero-whole original-loan rent stops at delivery primarily; compare continuation
+through the known April6 payment only. Cielo loan settlement uses sourced continuous
+5.842895570784521 and separate +/-R.01 per-share bounds; shareholder5.89 is unchanged.
+Freeze54 all933 adaptive synthetic books: BRML2, DMMO4, Cielo3 variants, both sides
+and R10m/R1m/R5m. Begin six sessions before January9/August30; end February6,
+April12 and October2 respectively. Source preference +/-4 before effect, opposite
+afterward, successor opposite from effect; other sinusoidal scores, fixed risks,
+original calibration, frozen OLD PolicyData and old bundled4bp bridge are unchanged.
+No model scores, new source recovery or old engineering book reruns. Independently
+check saved signed claims, actual loan cohorts, cash/proceeds payment dates and
+prior-close funding, full NAV arithmetic and pre-realization prefixes. Invoice cents,
+security-day grouping and older minimum payment allocation remain distinct bounds.
+
+Same-day sweep fixture qualification before historical books: if a provisioned
+fraction is first recognized and paid in the current session, both accounts must
+release its proceeds at that close without adding an already-due pending transfer.
+Previous-close funding remains frozen; the release cannot change that day's earlier
+intentions or interest. Later-dated transfer queues are unchanged. The initial
+fixture and executed pre-fix code are retained; prior delayed-payment books are
+outside this corrected branch and are reused without historical reruns.
+
 ## B. Deep source-to-model data audit
 
 Revisit the actual sources and builders, not just finite-value/coverage summaries.

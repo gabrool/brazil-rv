@@ -560,6 +560,22 @@
     "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\option_quantity_sources\\manifest.json",
     "sha256": "856f44fed515b516c46fff6a15cf1ac49e39250f5ccd6c21851febd2cb2df6a5"
   },
+  "payment_bounds_acceptance": {
+    "path": "C:\\quant\\b3-quant\\docs\\v2_payment_bounds_acceptance.json",
+    "sha256": "aea3d8b96cea1cc0d54d4c9ccc8110dec20bcf14f41bb10be0877fb351547e33"
+  },
+  "payment_bounds_audit": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\payment_bounds\\manifest.json",
+    "sha256": "a06f31c992ac3f9e4efab5b6a448f69783661c7b16dc548e5cb9165efc95c73f"
+  },
+  "payment_bounds_qualification": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\payment_bounds\\qualification\\manifest.json",
+    "sha256": "ac2773788c00c8b3b95e145f538644e91fd5d62cfe34c3afa2a55bea7192c8fa"
+  },
+  "payment_bounds_runtime_qualification": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\payment_bounds\\runtime_qualification.json",
+    "sha256": "e0d450a916c79173c5d463041bef5ddcb9266abfe4fa895f65fefbae9e764dc3"
+  },
   "precredit_disposal_acceptance": {
     "path": "C:\\quant\\b3-quant\\docs\\v2_precredit_disposal_acceptance.json",
     "sha256": "bf4d4ecf980a16c5dfbf3521b77bc2c70f77a2795c4ff9fda971fac8203917a6"

@@ -210,7 +210,8 @@ class PortfolioAccount:
                         release = self.trade_restricted[name]
                         r = torch.zeros_like(self.trade_restricted)
                         r[name] = -release
-                        self.settlements.append((auction.payment_session, release, r))
+                        if auction.payment_session > day:
+                            self.settlements.append((auction.payment_session, release, r))
                         self.trade_cash = self.trade_cash + release
                         self.trade_restricted = self.trade_restricted + r
                     for field in ("shares", "marks", "cost_basis", "pending_exit"):

@@ -1939,7 +1939,8 @@ def simulate_stateful_ledger(
                         release = restricted_by_name[name]
                         flow = np.zeros(name_count + 1)
                         flow[name] = -release
-                        settlements.append((auction.payment_session, release, flow))
+                        if auction.payment_session > day:
+                            settlements.append((auction.payment_session, release, flow))
                         restricted_by_name[name] = 0.0
                         # The financial release below has a matching value-date
                         # queue: proceeds stay remunerated until auction payment.

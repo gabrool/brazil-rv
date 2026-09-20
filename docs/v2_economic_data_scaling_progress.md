@@ -2020,3 +2020,10 @@ V37 separates net-borrowed conversion from sourced positive custody, preserving 
 
 
 Verified recovery: implementatione423e462a185d240a026c38bfdecb07b46f30c63; archive copel_loan_bounds_e423e46.zip, SHA24739f9b1089618a017104cbe41f26a8badc489555cc2cc61977bc9a3416fd2a, 5598321bytes. 724unique/1024logical restored/hashchecked members, 300aliases;30completebooks/3380400accountcells. Recovery1.142679s. Current research/patch/frozen plan/five term variants/executed recipes/failed-qualified tests/newbooks recover without immutable inputs/stores/oldfit duplication. Prior precredit/ENAT/Natura/lifecycle/economic-store dependencies remain required. AcceptanceSHA049f9b06a502b38de1e9a1ebe68d9c16f6db827fc27ce9c090d3964fdc8fb263; final A/C/D remain open.
+
+
+## 2026-09-20 — Payment sweep and precision qualification
+
+The [payment checkpoint](docs/v2_PAYMENT_BOUNDS.md) qualifies V38 same-day newly-known fraction proceeds settlement in both accounts and54 frozen full933 adaptive books. BRML/Dommo sweep/precision/tiny-loan variants have held exposure; Cielo cent variants have no held loans and remain unqualified for that exposure. Independent2568NAVs, prior-close funding and Decimal cash/cohort checks pass. All earlier books/terms and accepted stores remain sealed; no model profitability. Invoice/security-day/old-minimum costs, actual-exposure Cielo and final A/C/D remain open.
+
+54books/2568dailyNAVs/9645408accountcells; independentNAVmaxR3.725290298461914e-09, fundingR7e-09, sixnewtests/Ruff. Initial same-day release queue defect fixed before books;46saved books reused after Cielo exposure assertion, only remaining8 ran. Runtime target assertion narrowed to no negative targets; later positive unfilled intention retained. No oldbook/source/store rerun. Adaptive discrepancy~.00002bp exceeds the precision contrasts; earlier uncertainty retained. Sumcase89.283086s/resumption8.831308s/qualification.720953s, initialwallunknown. Canonicalcorporate replay unchanged.
