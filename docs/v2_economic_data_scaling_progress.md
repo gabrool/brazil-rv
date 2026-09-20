@@ -2061,3 +2061,6 @@ Recovery verified: `custody_fees_0194723.zip`, SHA `de066862feefe220722ee63359ea
 
 
 2026-09-20 closeout trajectory: [Stage A closeout](v2_STAGE_A_CLOSEOUT.md) consolidates historical costs, corporate/calendar/source composition and integrated admission. Reuse all V31-V41 proofs; new runs require an untested interaction or actual exposure. A read-only inspection of all28 Aug30-covering books from the existing140-book foundation index checks30000 Cielo focus cells/761fills: no negative economic inventory August26-30, but no saved contractual loan cohorts, so no held-loan cent bound. Producer first-pass .9129214s; no replay/scoring/source/store/fit mutation. C/D remain unstarted.
+
+
+Closeout/exposure recovery verified: `cielo_closeout_b2a973f.zip`, SHA `e905860d185c97cb1a02b90f2143810d3c0d17a5f336ba9a55ff276fc3d5815a`, 244886 bytes, 18 restored/hash-checked members, 30000 focus cells from 28 saved books; 0.0997858s. Current closeout plan, producer, source bindings, selected focus evidence and implementation patch recover with V41 and original-book dependencies; no immutable source/store/old-fit duplication.

@@ -57,6 +57,10 @@
     "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\cielo_foundation_exposure\\manifest.json",
     "sha256": "8db1018db50583e51e90756581fd4178d6916921fcb6396eda1f109407ec022d"
   },
+  "cielo_foundation_exposure_recovery": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\cielo_foundation_exposure_recovery.json",
+    "sha256": "415b68d806b698b0ce8ac9798fe259a55c40050188bb930bbeba583137569fbf"
+  },
   "cielo_saved_exposure": {
     "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\historical_spot\\cielo_saved_exposure.json",
     "sha256": "efb5b9621f803f281cc302c5ef733d7bdc33eb9329023fb10734166cfbe7e3d0"
