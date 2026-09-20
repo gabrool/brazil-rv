@@ -1726,3 +1726,14 @@ Store manifest2e16c8d6dfbba8c8eb65330635507b1eac473e9790c573d3329d889692e9b3f2.
 No old accepted pointer/input or checkpoint changed; no model forward/scoring/GPU.
 A's adaptive-book lifecycle/disposal/rounding/calendar/exposed-event bounds remain
 before C matched economics and D conditional capacity. Program stays active.
+
+Recovery for implementation 523992938f362416caa25f59cd3dd5edc17907a8 verifies 620
+hashed members and reconstructs all 106 arrays /
+2839063185 cells plus 46 tables
+and both indices to exact sealed byte hashes. ZIP economic_store_5239929.zip
+is 18039750 bytes, SHA 273d92e7bbe9b17bff1bca4f58ef8c33c81dc73226e829c210ffde0146579a60. Runtime
+46.71s. Sparse amendments reuse recorded parent/history dependencies;
+no immutable raw archives or old fits are copied. Exact source, executed recipes,
+contract, acceptance, new claim rows and complete store recovery instructions are
+recoverable. Resolve economic_store_recovery; earlier recovery receipts remain
+valid for their source commits. No GPU/source worker active at this checkpoint.

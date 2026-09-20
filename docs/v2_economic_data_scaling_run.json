@@ -169,6 +169,10 @@
     "path": "docs\\v2_dommo_source_terms.json",
     "sha256": "feb7483d455f9c77093814c1fdfc52725acabfbaa6c8f9d6e6c183777932ae50"
   },
+  "economic_store_recovery": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\economic_store_recovery.json",
+    "sha256": "fa010f13f262d20126fc1f3d54fa104b03891b825fc18d3eaa82322eb62cbf39"
+  },
   "ewz_decision_audit": {
     "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\ewz_decision_audit.json",
     "sha256": "92ebff9b4fb27d939d803ebcf43b14ac3946709482c997c65424589bf15d188d"
