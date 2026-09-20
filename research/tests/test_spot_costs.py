@@ -6,7 +6,7 @@ import pytest
 import torch
 
 from brazil_rv.execution.portfolio_account import PortfolioAccount, tensor
-from brazil_rv.execution.spot_costs import execution_bps
+from brazil_rv.execution.spot_costs import MonthlySpotTariff, execution_bps
 from brazil_rv.execution.stateful_ledger import LedgerConfig, PortfolioTarget
 from brazil_rv.v2.portfolio_objective import clone_account
 from test_portfolio_account import compare
@@ -16,7 +16,7 @@ from test_v2_stateful_ledger import _config
 
 def corporate(**changes):
     return _config(
-        spot_cost_model="b3_spot_2021",
+        spot_cost_model="b3_spot_dated",
         hedge_cost_bps_per_side=0,
         initial_capital_brl=1000,
         **changes,
@@ -27,11 +27,100 @@ def test_effective_date_and_no_bundled_or_fund_discount():
     cfg = corporate()
     for date in ["2021-02-02", "2023-10-05", "2024-12-30"]:
         assert execution_bps(cfg, date).tolist() == [[0, 0.5, 2.5, 0, 1]] * 2
-    for date in ["2021-02-01", "2025-01-02"]:
+    for date in ["2016-07-15", "2025-01-02"]:
         with pytest.raises(ValueError, match="admitted only"):
             execution_bps(cfg, date)
     with pytest.raises(ValueError, match="replace both"):
-        LedgerConfig(spot_cost_model="b3_spot_2021")
+        LedgerConfig(spot_cost_model="b3_spot_dated")
+
+
+def test_monthly_global_rate_validity_knowledge_and_missing_bound():
+    late = MonthlySpotTariff("2017-01-03", "2017-02-01", "2017-01-16", 0.5, "fixture")
+    january = MonthlySpotTariff(
+        "2020-01-03", "2020-02-03", "2020-01-02", 0.366, "fixture"
+    )
+    cfg = corporate(monthly_spot_tariffs=(late, january))
+    with pytest.raises(ValueError, match="explicit sourced bound"):
+        execution_bps(cfg, "2017-01-13")
+    for bound in (0.2, 0.5):
+        bounded = replace(cfg, unrecovered_spot_trading_bps=bound)
+        assert execution_bps(bounded, "2017-01-13")[0, 1:3].tolist() == [bound, 2.75]
+        assert execution_bps(bounded, "2017-01-16")[0, 1:3].tolist() == [0.5, 2.75]
+        assert execution_bps(bounded, "2020-02-03")[0, 1:3].tolist() == [0.366, 2.75]
+        assert execution_bps(bounded, "2020-02-04")[0, 1:3].tolist() == [bound, 2.75]
+        assert execution_bps(bounded, "2021-02-02")[0, 1:3].tolist() == [0.5, 2.5]
+        # Future-rate mutation cannot affect any earlier interval or missing bound.
+        changed = replace(
+            bounded, monthly_spot_tariffs=(late, replace(january, trading_bps=0.4))
+        )
+        assert np.array_equal(
+            execution_bps(changed, "2017-01-13"), execution_bps(bounded, "2017-01-13")
+        )
+        assert execution_bps(
+            replace(bounded, spot_execution_phase="auction"), "2020-02-03"
+        )[0, 1:3].tolist() == [0.7, 2.75]
+    with pytest.raises(ValueError, match="overlapping"):
+        replace(cfg, monthly_spot_tariffs=(late, late))
+    with pytest.raises(ValueError, match="sourced"):
+        replace(cfg, unrecovered_spot_trading_bps=0.1)
+
+
+def test_historical_spot_and_custody_compose_in_both_accounts():
+    from brazil_rv.execution.custody_fees import CustodyAssessment
+
+    dates = np.array(
+        [
+            "2020-01-27",
+            "2020-01-28",
+            "2020-01-29",
+            "2020-01-30",
+            "2020-01-31",
+            "2020-02-03",
+            "2020-02-04",
+            "2020-02-05",
+        ]
+    )
+    cfg = corporate(
+        monthly_spot_tariffs=(
+            MonthlySpotTariff(
+                "2020-01-03", "2020-02-03", "2020-01-02", 0.366, "fixture"
+            ),
+        ),
+        unrecovered_spot_trading_bps=0.5,
+        custody_assessments=(CustodyAssessment("2020-01-31", "2020-02-05"),),
+    )
+    close = np.full((8, 1), 100.0)
+    targets = [[0.4]] * 3 + [[0.2]] * 3 + [[0], [0]]
+    rows = compare(close, targets, dates=dates, config=cfg)
+    result = replay(
+        close,
+        lambda s: PortfolioTarget(np.asarray(targets[s.day])),
+        dates=dates,
+        config=cfg,
+    )
+    for day, row in enumerate(rows):
+        amount = sum(
+            Decimal(str(f.gross_notional))
+            for f in result.fills
+            if f.fill_session == day
+        )
+        rate = Decimal(".366") if day < 6 else Decimal(".5")
+        expected = [
+            0,
+            float(amount * rate / 10000),
+            float(amount * Decimal("2.75") / 10000),
+            0,
+            float(amount / 10000),
+        ]
+        assert row["execution_charges"].numpy() == pytest.approx(
+            expected, rel=0, abs=1e-12
+        )
+        assert result.execution_charges[day] == pytest.approx(
+            expected, rel=0, abs=1e-12
+        )
+    assert result.custody_fee.sum() == result.custody_maintenance.sum() == 8.78
+    assert result.custody_liability[4] == 8.78
+    assert result.custody_payment[7] == 8.78
 
 
 @pytest.mark.parametrize(
@@ -144,7 +233,7 @@ def test_actual_account_rejects_out_of_admission_date():
             day=0,
             close=[100, 100],
             cdi=0,
-            session_date="2021-02-01",
+            session_date="2016-07-15",
             annual_borrow=[0, 0],
             loan_reference=[100, 100],
         )

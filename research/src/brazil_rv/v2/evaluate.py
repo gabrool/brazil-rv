@@ -1892,12 +1892,15 @@ def _economics_contract(inputs: EvaluationInputs) -> dict[str, object]:
         "loan_invoice_convention": config.loan_invoice_convention,
         "spot_cost_model": config.spot_cost_model,
         "spot_execution_phase": config.spot_execution_phase,
+        "monthly_spot_tariffs": [asdict(t) for t in config.monthly_spot_tariffs],
+        "unrecovered_spot_trading_bps": config.unrecovered_spot_trading_bps,
         "execution_brokerage_bps": config.execution_brokerage_bps,
         "execution_shortfall_bps": config.execution_shortfall_bps,
         "execution_charges_columns": list(EXECUTION_COMPONENTS),
         "custody_assessments": [asdict(a) for a in config.custody_assessments],
         "custody_base": config.custody_base,
-        "custody_contract": "ordinary physical stock; explicit monthly assessment and client close-payment hypotheses; corporate physical transitions require separate admission",
+        "custody_claim_fraction": config.custody_claim_fraction,
+        "custody_contract": "dated 2016-2024 physical stock plus separately valued positive undelivered rights under explicit inclusion0/1 hypothesis; local admitted opening marks may value delivered unquoted stock, never quotes or loan references; maintenance is part of total custody_fee; monthly assessment and client close-payment remain hypotheses; live unconverted share loans at cash cancellation require explicit loan terms",
         "loan_return_assumption": (
             "prearranged return on covering spot settlement: T+3 before 2019-05-27, "
             "T+2 thereafter; corporate offsets wait for actual purchase custody, "

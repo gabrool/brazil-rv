@@ -1,4 +1,4 @@
-"""Frozen ordinary physical-custody base and monthly payment bounds."""
+"""Frozen historical tariff coverage and cost-composition interaction books."""
 
 from copy import copy
 from dataclasses import asdict, replace
@@ -12,6 +12,7 @@ import polars as pl
 import torch
 
 from brazil_rv.execution.custody_fees import custody_schedule
+from brazil_rv.execution.spot_costs import MonthlySpotTariff
 from brazil_rv.execution.portfolio_policy import (
     CalibratedPolicy,
     PolicyData,
@@ -36,7 +37,8 @@ def main():
     torch.set_num_threads(1)
     pointer = PROJECT / "docs/v2_economic_data_scaling_run.json"
     run = json.loads(pointer.read_text(encoding="utf8"))
-    root = Path(run["root"]) / "custody_fees"
+    root = Path(run["root"]) / "tariff_coverage/books"
+    root.parent.mkdir(exist_ok=True)
     root.mkdir(exist_ok=True)
     assert not (root / "plan.json").exists()
     shutil.copyfile(__file__, root / "executed.py")
@@ -47,28 +49,35 @@ def main():
     for folder in ("execution", "v2"):
         for path in (PROJECT / "research/src/brazil_rv" / folder).glob("*.py"):
             shutil.copyfile(path, root / f"executed_{folder}_{path.name}")
+    tariff_binding = binding(root.parent / "qualification.json")
+    qualified = bound_json(tariff_binding)
+    tariffs = tuple(MonthlySpotTariff(**x) for x in qualified["tariffs"])
     corporate = dict(
-        spot_cost_model="b3_spot_dated", cost_bps_per_side=0, hedge_cost_bps_per_side=0
+        spot_cost_model="b3_spot_dated",
+        cost_bps_per_side=0,
+        hedge_cost_bps_per_side=0,
+        monthly_spot_tariffs=tariffs,
+        unrecovered_spot_trading_bps=0.5,
     )
     variants = {
-        "no_custody": {},
-        "primary": {"payment_lag": 0},
-        "payment_3": {"payment_lag": 3},
-        "payment_10": {"payment_lag": 10},
-        "economic_long": {"payment_lag": 0, "custody_base": "economic_long"},
+        "old_bundle": {
+            "custody": False,
+            "spot_cost_model": "bundled",
+            "cost_bps_per_side": 4,
+            "hedge_cost_bps_per_side": 4,
+        },
+        "primary": {"custody": True},
+        "missing_lower": {"custody": True, "unrecovered_spot_trading_bps": 0.2},
     }
     plan = dict(
-        starts=["2023-05-02", "2024-05-02"],
-        sessions=48,
+        windows={"2016-10-24": "2017-02-07", "2021-01-25": "2021-02-08"},
         capital=[10000000, 1000000, 5000000],
         variants=variants,
+        source_qualification=tariff_binding,
         preferences="sin(axis*.31+localday*.07+head*.2), all933; no model scores",
         risks="beta1/idio.0004/market.0001, original .002/.001/.0005 calibration",
-        contract="Ordinary physical stock equals economic signed stock plus all outstanding contract loan quantities minus unsettled signed spot purchases/sales and undelivered new-loan receipts. No loan renewal delivery; partial and delayed returns remain physical until actual return. Immediate unit splits transform pending quantities. Corporate share claims/delayed bonus/loan redemption require separate custody admission and fail on actual exposure; no names deleted.",
-        costs="V41: monthly progressive annual brackets divided by12, 2023 exemption23084.39/2024 24164.73, active resident maintenance exempt. Last-session monthly calendar explicit from full accepted dates; not window terminal. One own-account CNPJ with one custodian, no fund/DR discount. Own observed close/last available own close valuation hypothesis, not a quote or loan reference. Unrounded fractional research units. Primary assessment-close debit versus +3/+10 equity sessions are client-payment HYPOTHESES, not observed receipts. Economic-long base is a separate one-factor diagnostic; all variants keep primary regular .5+2.5bp B3 and zero brokerage/1bp shortfall, replacing4bp. All remuneration/allocator estimates frozen.",
-        source_receipts=binding(
-            Path(run["root"]) / "custody_tariff_sources/qualification.json"
-        ),
+        contract="Two previously untested interactions: missing/late-created monthly tariffs plus 2016/2017 maintenance and T3/D0 flows; January2021 old regime crossing February2 fixed tariff and active-maintenance exemption. Full accepted equity calendar and all933 axes. No broad completed V31-V41 matrix rerun. Ordinary custody retains corporate-exposure guard; no name removed. Source selected from fee dates, never favorable PnL.",
+        costs="Primary recovered monthly normal rate when known+valid, otherwise .5bp upper source-bound; 2.75bp old clearing until Feb2 2021 then .5+2.5bp. Zero brokerage+1bp shortfall. All dated B3 replaces old bundled4bp; original allocator4bp estimate frozen. Monthly progressive custody plus separately printed active-account maintenance, payment at assessment close hypothesis. missing_lower changes ONLY unrecovered/not-yet-known trading rate to .2bp limiting bound, not an observed finite-ADTV quote. old_bundle is a combined historical cost control (4bp and no custody), not a one-factor estimate. No pure direct-charge interpretation of adaptive path contrasts. Both primary accounts retain100%CDI and original qualified loan mechanics.",
         dependencies={
             k: run[k]
             for k in (
@@ -112,9 +121,11 @@ def main():
     hmap = dict(zip(hedge["trade_date"], hedge["close_brl"]))
     hedge_close = np.array([hmap.get(d, np.nan) for d in dates.astype(object)])
     reports = []
-    for start in plan["starts"]:
+    for start, stop in plan["windows"].items():
         first = int(np.searchsorted(dates, np.datetime64(start)))
-        rows = np.arange(first, first + plan["sessions"])
+        rows = np.arange(
+            first, np.searchsorted(dates, np.datetime64(stop), side="right")
+        )
         inputs = inputs_on_axes(store, dates, names, rows)
         scores = np.sin(
             names[None, :, None] * 0.31
@@ -162,17 +173,14 @@ def main():
                 started = perf_counter()
                 selected = dict(changes)
                 schedule = (
-                    ()
-                    if scenario == "no_custody"
-                    else custody_schedule(
-                        dates, start, str(dates[rows[-1]]), selected.pop("payment_lag")
-                    )
+                    custody_schedule(dates, start, stop)
+                    if selected.pop("custody")
+                    else ()
                 )
                 config = replace(
                     policy_ledger_config(initial_capital_brl=capital),
-                    **corporate,
+                    **(corporate | selected),
                     custody_assessments=schedule,
-                    **selected,
                 )
                 book = f"{start}_{scenario}_{capital}"
                 result, targets, previous = exact_replay(
@@ -187,7 +195,7 @@ def main():
                     0,
                     0,
                     dict(
-                        policy="synthetic_custody_bounds_optimizer",
+                        policy="synthetic_historical_tariff_optimizer",
                         scenario="base",
                         config=asdict(config),
                     ),
@@ -232,6 +240,7 @@ def main():
                                 interest=float(row["interest"]),
                                 custody_base=float(row["custody_base"]),
                                 custody_fee=float(row["custody_fee"]),
+                                custody_maintenance=float(row["custody_maintenance"]),
                                 custody_paid=float(row["custody_payment"]),
                                 custody_liability=float(row["custody_liability"]),
                                 physical_error=float(
@@ -267,6 +276,7 @@ def main():
                     adaptive_target_difference=decision_error,
                     execution_components=result.execution_charges.sum(0).tolist(),
                     custody_fee=float(result.custody_fee.sum()),
+                    custody_maintenance=float(result.custody_maintenance.sum()),
                     custody_payment=float(result.custody_payment.sum()),
                     terminal_custody_liability=float(result.custody_liability[-1]),
                     debit_sessions=sum(d["funding_cash"] < 0 for d in details),

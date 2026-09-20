@@ -482,7 +482,15 @@ class PortfolioAccount:
     ):
         shares, marks = self.shares.clone(), self.marks.clone()
         if self.config.custody_assessments:
-            self.custody_fees.require_ordinary(name, self.shares[name], self.loans)
+            self.custody_fees.deliver(
+                name,
+                destination,
+                ratio,
+                incoming,
+                day,
+                final=final,
+                receipt_day=receipt_day,
+            )
         transferred_restricted = self.trade_restricted[name] * allocation
         adjusted = []
         for due, free, restricted in self.settlements:
@@ -591,8 +599,6 @@ class PortfolioAccount:
 
     def convert_loan_cash(self, event, day):
         name = event.security_index
-        if self.config.custody_assessments:
-            self.custody_fees.require_ordinary(name, self.shares[name], self.loans)
         active = self.loans.active_quantity[name]
         if not event.unreturned_only:
             for due in np.unique(self.loans.return_day[self.loans.name == name]):
@@ -790,11 +796,14 @@ class PortfolioAccount:
             shares[name] = self.shares[name] * q[name]
             if q[name] > 0 and mapping[name] == name:
                 if self.config.custody_assessments:
-                    if bonus_delivery is not None:
-                        self.custody_fees.require_ordinary(
-                            name, self.shares[name], self.loans
-                        )
-                    self.custody_fees.split(name, q[name])
+                    self.custody_fees.split(
+                        name,
+                        q[name],
+                        day=day,
+                        delivery=bonus_delivery,
+                        shares=self.shares,
+                        loans=self.loans,
+                    )
                 self.loans.split(name, q[name], bonus_delivery=bonus_delivery)
                 self.custody.split(name, q[name], bonus_delivery=bonus_delivery)
             elif (
@@ -810,9 +819,7 @@ class PortfolioAccount:
             marks[name] = (self.marks[name] - d[name]) / q[name] if q[name] > 0 else 0
             if q[name] == 0:
                 if self.config.custody_assessments:
-                    self.custody_fees.require_ordinary(
-                        name, self.shares[name], self.loans
-                    )
+                    self.custody_fees.cash_cancel(name, self.loans)
                 self.custody.split(name, 0.0)
                 release = self.trade_restricted[name]
                 release_vector = torch.zeros_like(self.trade_restricted)
@@ -998,20 +1005,28 @@ class PortfolioAccount:
         self.ineligible_sessions[~held_after] = 0
         self.missing_sessions[~held_after] = 0
         custody_base, custody_fee, custody_paid = tensor(0.0), tensor(0.0), tensor(0.0)
+        custody_maintenance = tensor(0.0)
+        custody_physical_base, custody_claim_base = tensor(0.0), tensor(0.0)
         physical_custody = torch.zeros_like(self.shares)
         if config.custody_assessments:
-            for name in self.distributions:
-                self.custody_fees.require_ordinary(name, self.shares[name], self.loans)
-            custody_base, custody_fee, custody_paid, physical_custody = (
-                self.custody_fees.close(
-                    day,
-                    session_date,
-                    self.shares,
-                    self.loans,
-                    self.marks,
-                    config.custody_assessments,
-                    economic=config.custody_base == "economic_long",
-                )
+            (
+                custody_base,
+                custody_fee,
+                custody_paid,
+                physical_custody,
+                custody_maintenance,
+                custody_physical_base,
+                custody_claim_base,
+            ) = self.custody_fees.close(
+                day,
+                session_date,
+                self.shares,
+                self.loans,
+                self.marks,
+                config.custody_assessments,
+                economic=config.custody_base == "economic_long",
+                claim_names=tuple(self.distributions),
+                claim_fraction=config.custody_claim_fraction,
             )
             self.trade_cash = self.trade_cash - custody_paid
         nav = self.nav
@@ -1047,8 +1062,11 @@ class PortfolioAccount:
             "execution_charges": execution_charges,
             "custody_base": custody_base,
             "custody_fee": custody_fee,
+            "custody_maintenance": custody_maintenance,
             "custody_payment": custody_paid,
             "custody_liability": self.custody_fees.liability,
+            "custody_physical_base": custody_physical_base,
+            "custody_claim_base": custody_claim_base,
             "physical_custody": physical_custody,
             "unpriced_inventory_notional": unpriced_notional,
             "undelivered_share_notional": sum(

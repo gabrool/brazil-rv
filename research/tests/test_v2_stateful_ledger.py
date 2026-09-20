@@ -60,9 +60,14 @@ def _run(
     share_distributions=(),
     loan_cash_settlements=(),
     loan_reference_prices=None,
+    dates=None,
 ) -> StatefulLedgerResult:
     days, names = close.shape
-    dates = tuple(date(2024, 1, 2) + timedelta(days=index) for index in range(days))
+    dates = (
+        tuple(date(2024, 1, 2) + timedelta(days=index) for index in range(days))
+        if dates is None
+        else dates
+    )
     mask = np.ones((days, names), dtype=np.bool_)
     no_actions = AlignedActionTerms(
         shares_per_prior_share=np.ones_like(close),

@@ -69,6 +69,10 @@
     "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\clearing_calendar_audit.json",
     "sha256": "4bfd969c94551764038f233bbf1364efb65313d3d384b238b09b3e09c21b52cb"
   },
+  "clearing_calendar_resolution": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\tariff_coverage\\calendar_resolution.json",
+    "sha256": "8e6ee8bab890a8326183587eaf1772e48c151d58fbef8ef81eb853c3ad61adf2"
+  },
   "clearing_calendar_sources": {
     "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\clearing_calendar_sources.json",
     "sha256": "5b0057bdb106e26ec2e9ca1fd709786428953a9252e5e978cf57e3fcb25b7bfe"
@@ -104,6 +108,14 @@
   "corporate_claim_rows": {
     "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\corporate_claim_rows\\manifest.json",
     "sha256": "b7cdb750a21132dcf33e3bb091c61e18ff9fd6dea88c536ec78304a74d35d89d"
+  },
+  "corporate_custody_audit": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\tariff_coverage\\corporate_books\\manifest.json",
+    "sha256": "e2fc7701c5801bd880b7afe042bd036b94d54ccdd25557d5642f6f423bd44380"
+  },
+  "corporate_custody_qualification": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\tariff_coverage\\corporate_books\\saved_qualification\\report.json",
+    "sha256": "4800c616d32fa0ab073e277f54a91bc13ddaadf923765566b1e00eddbd8c18e7"
   },
   "corporate_loan_sources": {
     "path": "docs\\v2_corporate_loan_sources.json",
@@ -340,6 +352,30 @@
   "held_event_source_recovery": {
     "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\held_event_source_recovery.json",
     "sha256": "48ee32e02ba647b3e59e966c07c3e35f78b61fb85adc500ec54bc2a23dc62409"
+  },
+  "historical_cost_acceptance": {
+    "path": "C:\\quant\\b3-quant\\docs\\v2_historical_cost_coverage_acceptance.json",
+    "sha256": "a8f21494aad6a070106f9b39e876349f3a334c5f6247d0abca0bef8ffd6f3c5a"
+  },
+  "historical_cost_attempts": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\tariff_coverage\\attempts.json",
+    "sha256": "f24faec3c34bf322a0f8583092eb18c960e83ee82ac9de39a9bad9a158485045"
+  },
+  "historical_cost_audit": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\tariff_coverage\\books\\manifest.json",
+    "sha256": "352bdccc607811604ee0eaef31561a42242d96d6d478eaee6d2fea225052e043"
+  },
+  "historical_cost_qualification": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\tariff_coverage\\runtime_qualification\\ordinary_report.json",
+    "sha256": "1e7117976210e53850767b5ba73c2f284548488f044dc92eee9d472a14c94d5c"
+  },
+  "historical_cost_runtime": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\tariff_coverage\\runtime_qualification\\report.json",
+    "sha256": "7c18ef6f8a2194cfbfa70fca2c2335eb5e07fc82bd40e82473014eac55d210d6"
+  },
+  "historical_cost_sources": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\tariff_coverage\\qualification.json",
+    "sha256": "b26b08523b56bd81847b812c1a93baa74beea9a59c402c341f29d0083eb8ac0e"
   },
   "historical_spot_acceptance": {
     "path": "C:\\Brazil-RV\\quant\\b3-quant\\docs\\v2_historical_spot_acceptance.json",
@@ -788,7 +824,7 @@
   },
   "stage_a_closeout_plan": {
     "path": "C:\\quant\\b3-quant\\docs\\v2_STAGE_A_CLOSEOUT.md",
-    "sha256": "b3f39c441efa54b81d28b0257405e237bb6a32ca9ba374c6cf779a1841941892"
+    "sha256": "a588f0eab9e13845e4047295de76637254eff487e09e63f9554e4db1ad153905"
   },
   "status": "accounting_and_deep_data_audit",
   "to_close_clock": {

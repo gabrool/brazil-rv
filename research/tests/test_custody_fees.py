@@ -9,6 +9,7 @@ from brazil_rv.execution.custody_fees import (
     CustodyAssessment,
     custody_schedule,
     monthly_custody_fee,
+    monthly_custody_maintenance,
 )
 from brazil_rv.execution.portfolio_account import PortfolioAccount, tensor
 from brazil_rv.execution.stateful_ledger import PortfolioTarget
@@ -46,8 +47,66 @@ def test_progressive_fee_and_dated_exemption_no_fund_discount():
         assert float(monthly_custody_fee(10000000, f"{year}-12-30")) == pytest.approx(
             float(expected), abs=1e-13
         )
-    with pytest.raises(ValueError, match="2023-2024"):
-        CustodyAssessment("2022-12-30", "2023-01-02")
+    with pytest.raises(ValueError, match="2016-07-18"):
+        CustodyAssessment("2016-07-15", "2016-07-18")
+
+
+def test_historical_custody_original_brackets_and_maintenance_precision():
+    # The independent printed 082/2009 example: annual 130 + 648 + 187.68.
+    expected = Decimal("965.68") / 12
+    assert float(monthly_custody_fee(15865000, "2018-12-28")) == pytest.approx(
+        float(expected), rel=0, abs=2e-14
+    )
+    assert float(monthly_custody_fee(300000, "2018-12-28")) == 0
+    assert float(monthly_custody_fee(300000, "2019-01-31")) == 3.25
+    assert float(monthly_custody_fee(299999, "2021-02-01")) == 0
+    assert float(monthly_custody_fee(20000, "2021-02-02")) == pytest.approx(10 / 12)
+    for day, low, high in (
+        ("2016-12-29", 7.59, 8.02),
+        ("2017-01-31", 8.18, 8.65),
+        ("2018-01-31", 8.40, 8.88),
+        ("2019-01-31", 8.78, 9.28),
+        ("2021-02-01", 8.78, 9.28),
+        ("2021-02-02", 0, 0),
+    ):
+        values = monthly_custody_maintenance(torch.tensor([0, 5000, 5001]), day)
+        assert values.dtype == torch.float64
+        assert values.tolist() == [low, low, high]
+
+
+def test_historical_maintenance_payment_is_one_component_of_total_expense():
+    dates = np.array(
+        [
+            "2018-01-25",
+            "2018-01-26",
+            "2018-01-29",
+            "2018-01-30",
+            "2018-01-31",
+            "2018-02-01",
+            "2018-02-02",
+            "2018-02-05",
+        ]
+    )
+    cfg = _config(
+        initial_capital_brl=1000,
+        custody_assessments=(CustodyAssessment("2018-01-31", "2018-02-05"),),
+    )
+    close = np.full((8, 1), 100.0)
+    targets = [[0.4]] * 6 + [[0], [0]]
+    rows = compare(close, targets, dates=dates, config=cfg)
+    control = compare(
+        close, targets, dates=dates, config=replace(cfg, custody_assessments=())
+    )
+    assert sum(float(r["custody_maintenance"]) for r in rows) == 8.4
+    assert sum(float(r["custody_fee"]) for r in rows) == 8.4
+    assert float(rows[4]["custody_payment"]) == 0
+    assert float(rows[4]["custody_liability"]) == 8.4
+    assert float(rows[7]["custody_payment"]) == 8.4
+    assert float(rows[7]["custody_liability"]) == 0
+    for day in range(8):
+        assert float(rows[day]["nav"] - control[day]["nav"]) == pytest.approx(
+            -8.4 if day >= 4 else 0, abs=1e-12
+        )
 
 
 def test_calendar_uses_full_known_axis_and_preserves_unpaid_terminal_invoice():
@@ -156,11 +215,19 @@ def test_custody_gradient_prior_funding_and_independent_sam_tbptt_copies():
     assert float(weight.grad) == pytest.approx(float(fd), abs=1e-5)
 
 
-def test_corporate_custody_is_not_silently_treated_as_ordinary():
+def test_cash_cancellation_requires_explicit_live_loan_terms():
     account = PortfolioAccount.empty([100.0, 100.0], config=config())
-    account.shares[0] = 10
-    with pytest.raises(ValueError, match="separate admission"):
-        account.custody_fees.require_ordinary(0, account.shares[0], account.loans)
+    account.step(
+        tensor([-0.4, 0]),
+        day=0,
+        close=[100, 100],
+        cdi=0,
+        session_date="2024-01-02",
+        annual_borrow=[0, 0],
+        loan_reference=[100, 100],
+    )
+    with pytest.raises(ValueError, match="explicit loan terms"):
+        account.custody_fees.cash_cancel(0, account.loans)
 
 
 def test_immediate_split_pending_stock_and_missing_month_end_price():

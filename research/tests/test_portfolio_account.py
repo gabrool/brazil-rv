@@ -23,6 +23,7 @@ def compare(
     action_settlements=(),
     share_distributions=(),
     loan_cash_settlements=(),
+    dates=None,
 ):
     close = np.asarray(close, dtype=float)
     days, names = close.shape
@@ -43,6 +44,7 @@ def compare(
         action_settlements=action_settlements,
         share_distributions=share_distributions,
         loan_cash_settlements=loan_cash_settlements,
+        dates=dates,
     )
     account = PortfolioAccount.empty(np.full(names + 1, 100.0), config=config)
     records = []

@@ -1,0 +1,229 @@
+{
+  "account_array_cells": 12396181,
+  "actual_fills": 50253,
+  "book_counts": {
+    "corporate": 34,
+    "historical": 18
+  },
+  "books": 52,
+  "closeout": {
+    "path": "C:\\quant\\b3-quant\\docs\\v2_STAGE_A_CLOSEOUT.md",
+    "sha256": "a588f0eab9e13845e4047295de76637254eff487e09e63f9554e4db1ad153905"
+  },
+  "contracts": [
+    "b3_spot_dated replaces both stock/hedge bundled execution costs for2016-07-18 through2024-12-30. Previous-month global-market rates plus dated clearing; source-supported0.2/0.5bp trading bounds only on109 unrecovered/not-yet-known dates. Zero primary brokerage,1bp shortfall; no fund or account-capital ADTV discount.",
+    "Dated progressive monthly value custody plus explicit one-open-active-CNPJ/custodian maintenance. Total custody_fee already includes separately reported maintenance. Own available mark and positive corporate rights inclusion/exclusion are hypotheses, not invoices.",
+    "Pending spot/new-loan flows, delayed bonus, successor deliveries, old loan principals/charges and cash closeout remain separate. Unknown physical credit stays locked. No new alias, locate, quote or fabricated receipt.",
+    "Frozen synthetic full933 adaptive books, shallow-copied old coordinates, correctedCDI/qualified loans/strict prior references. No model forward/scoring/fit. Total path contrasts retain all prior adaptive uncertainty."
+  ],
+  "corporate_adaptive_max_bps": {
+    "1000000": 0.20105589352315292,
+    "10000000": 0.038782816126942635,
+    "5000000": 0.02092779098637402
+  },
+  "corporate_errors": {
+    "base_composition": 1.862645149230957e-09,
+    "custody_liability": 0.0,
+    "custody_payment": 1.4210854715202004e-14,
+    "custody_rollforward": 0.0,
+    "decimal_custody_fee": 1.4210854715202004e-14,
+    "decimal_execution": 1.3642420526593924e-12,
+    "decimal_long_delivery_plus_fills": 0.0,
+    "decimal_maintenance": 0.0,
+    "decimal_original_entitlements": 1.8189894035458565e-12,
+    "decimal_physical_base": 1.862645149230957e-09,
+    "decimal_right_base": 7.185137499767721e-11,
+    "identical_intention_physical": 1.1095835361629725e-10,
+    "income": 5.4569682106375694e-12,
+    "independent_ordinary_physical_flow": 7.611333785462193e-11,
+    "ordinary_share_flow": 0.0,
+    "physical_current_print": 0.0,
+    "prior_funding": 7.450580596923828e-09,
+    "saved_corporate_component_identity": 1.8920331967819948e-10,
+    "saved_nav_identity": 5.587935447692871e-09,
+    "successor_right_valuation": 1.4551915228366852e-11,
+    "unknown_custody_original_units_retained": 0.0
+  },
+  "coverage": {
+    "177_2020_fixed": 976,
+    "saved_monthly": 1014,
+    "unrecovered_or_not_yet_known_bound": 109
+  },
+  "engineering_seconds": {
+    "corporate": 72.91595890000463,
+    "historical": 20.974488800013205
+  },
+  "evidence": {
+    "clearing_calendar_resolution": {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\tariff_coverage\\calendar_resolution.json",
+      "sha256": "8e6ee8bab890a8326183587eaf1772e48c151d58fbef8ef81eb853c3ad61adf2"
+    },
+    "corporate_custody_audit": {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\tariff_coverage\\corporate_books\\manifest.json",
+      "sha256": "e2fc7701c5801bd880b7afe042bd036b94d54ccdd25557d5642f6f423bd44380"
+    },
+    "corporate_custody_qualification": {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\tariff_coverage\\corporate_books\\saved_qualification\\report.json",
+      "sha256": "4800c616d32fa0ab073e277f54a91bc13ddaadf923765566b1e00eddbd8c18e7"
+    },
+    "historical_cost_attempts": {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\tariff_coverage\\attempts.json",
+      "sha256": "f24faec3c34bf322a0f8583092eb18c960e83ee82ac9de39a9bad9a158485045"
+    },
+    "historical_cost_audit": {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\tariff_coverage\\books\\manifest.json",
+      "sha256": "352bdccc607811604ee0eaef31561a42242d96d6d478eaee6d2fea225052e043"
+    },
+    "historical_cost_qualification": {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\tariff_coverage\\runtime_qualification\\ordinary_report.json",
+      "sha256": "1e7117976210e53850767b5ba73c2f284548488f044dc92eee9d472a14c94d5c"
+    },
+    "historical_cost_runtime": {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\tariff_coverage\\runtime_qualification\\report.json",
+      "sha256": "7c18ef6f8a2194cfbfa70fca2c2335eb5e07fc82bd40e82473014eac55d210d6"
+    },
+    "historical_cost_sources": {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\tariff_coverage\\qualification.json",
+      "sha256": "b26b08523b56bd81847b812c1a93baa74beea9a59c402c341f29d0083eb8ac0e"
+    }
+  },
+  "historical_adaptive_max_bps": {
+    "1000000": 1.2405309826135637e-06,
+    "10000000": 5.9815477579832085e-06,
+    "5000000": 5.60743734240532e-07
+  },
+  "historical_errors": {
+    "decimal_execution_components": 9.094947017729282e-13,
+    "decimal_fee": 7.105427357601002e-15,
+    "decimal_maintenance": 0.0,
+    "fill_share_conservation": 0.0,
+    "identical_intention_physical": 1.0186340659856796e-10,
+    "income": 4.547473508864641e-12,
+    "independent_physical_flow": 1.4551915228366852e-11,
+    "liability": 0.0,
+    "liability_rollforward": 0.0,
+    "nav": 3.725290298461914e-09,
+    "payment": 7.105427357601002e-15,
+    "physical_source_price_base": 9.313225746154785e-10,
+    "prior_funding": 5.122274160385132e-09
+  },
+  "immutable_contracts": {
+    "corporate_replay": {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\corporate_replay\\dommo_manifest.json",
+      "sha256": "b4dcc7467a5eaafe70c2d57b55217deaafe6fb6dc3e711d7fce91ffc13f91ff9",
+      "status": "default_dommo_pna_admitted_with_explicit_fraction_and_custody_bounds"
+    },
+    "economic_refit_inputs": {
+      "path": "C:\\quant\\b3-quant\\docs\\v2_natura_data_inputs.json",
+      "sha256": "216f14221cac61d3441a1a8fed358e549f54131c5dd10f94d81a0c354d821220"
+    }
+  },
+  "independent_ordinary_physical_cells": 1755483,
+  "monthly_assessments": 141,
+  "monthly_original_archives": 50,
+  "new_original_pdfs": 10,
+  "open_items": [
+    "Spot invoice rounding and actual-exposure daytrade disposition.",
+    "2016-12-30 and2017-01-25 equity-clearing ambiguity.",
+    "Bound primary event/source composition and separately attributed succession-data implications.",
+    "Cielo held-loan cents remain conditional; all34 new books have no loan cash redemption and do not supply a general bound.",
+    "Integrated StageA admission, registered C replays/refits and conditional D."
+  ],
+  "prior_recovery_dependencies": {
+    "bova_loan_reference_audit": {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\bova_loan_reference_audit\\manifest.json",
+      "sha256": "589c5d2011e8e1f1092bda6571c45dd172b2c58a3f88801d87f68edef42b27ff",
+      "status": "recovered_not_admitted"
+    },
+    "cash_calendar": {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\cash_calendar\\manifest.json",
+      "sha256": "687cd4d999bdb39867b5cd59c9972293a1b5748b811f264b66ae4e78905c862c",
+      "status": "cash_calendar_defect_quantified_corrected_explicit_amendment_not_yet_scored"
+    },
+    "cielo_foundation_exposure_recovery": {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\cielo_foundation_exposure_recovery.json",
+      "sha256": "415b68d806b698b0ce8ac9798fe259a55c40050188bb930bbeba583137569fbf"
+    },
+    "clearing_calendar_audit": {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\clearing_calendar_audit.json",
+      "sha256": "4bfd969c94551764038f233bbf1364efb65313d3d384b238b09b3e09c21b52cb"
+    },
+    "clearing_calendar_sources": {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\clearing_calendar_sources.json",
+      "sha256": "5b0057bdb106e26ec2e9ca1fd709786428953a9252e5e978cf57e3fcb25b7bfe"
+    },
+    "copel_loan_bounds_recovery": {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\copel_loan_bounds_recovery.json",
+      "sha256": "6d6675824bb6fcee1ac4cb3d1d9adf077b903dd7c4eaaaba7b13c09e01bfa882"
+    },
+    "custody_fee_recovery": {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\custody_fee_recovery.json",
+      "sha256": "e6bb0dac930cf32b597bf3292caae6379edb2f4f6e85a9e0b6acf598f667e41d"
+    },
+    "economic_store_recovery": {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\economic_store_recovery.json",
+      "sha256": "fa010f13f262d20126fc1f3d54fa104b03891b825fc18d3eaa82322eb62cbf39"
+    },
+    "enat_settlement_recovery": {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\enat_settlement_recovery.json",
+      "sha256": "b808078286ea1c79c9a47039f1e8f0e4989ccb59e83f8be783caf10a0c626e74"
+    },
+    "enat_settlement_terms": {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\enat_settlement\\terms.json",
+      "sha256": "34e5b9a06e0ab604f6e87dc4e8f1602c2ff3d68035176d0832d05d8f0279073b"
+    },
+    "historical_spot_recovery": {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\historical_spot_recovery.json",
+      "sha256": "d03da5fbd4376182c432ecc3e83fa744d906e9a87020af1817c9107956e1e249"
+    },
+    "lending_feature_recovery": {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\lending_feature_recovery.json",
+      "sha256": "95b255ca651f4dce93767d4e06a4088e4610a9ede879ac6491d6c0cd5cc5f8bb"
+    },
+    "loan_invoice_recovery": {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\loan_invoice_recovery.json",
+      "sha256": "1c1aee091d2beb43779a7ca32b53b4f17b959857ab6a60202f24ab908a6685d0"
+    },
+    "loan_return_notice_recovery": {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\loan_return_notice_recovery.json",
+      "sha256": "f066a79d0bea44a44baa6cd3c6fd07dd801202cac974c4486ab4dc5319438546"
+    },
+    "loan_source_panels": {
+      "bytes": 3553,
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\loan_source_panels\\manifest.json",
+      "sha256": "a6741a98d505a049c543cb0c8ed45934b5eadfd6fd2e344fbc916db8ff46cf02",
+      "status": "source_panels_bound_event_overrides_pending"
+    },
+    "natura_settlement_recovery": {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\natura_settlement_recovery.json",
+      "sha256": "425fd9f1a666a4b80be45608bf3b7391b102a22864a3bb2d49ffb3c31a41d42f"
+    },
+    "natura_store_recovery": {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\natura_store_recovery.json",
+      "sha256": "3840780a073e6a214ad247530863bff55500114cc340a9953d7492ff927b21a6"
+    },
+    "payment_bounds_recovery": {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\payment_bounds_recovery.json",
+      "sha256": "6245049904f7795b4c473d82b82b33aed97821b1133e4b3c5b82fc538777c3b8"
+    },
+    "precredit_disposal_recovery": {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\precredit_disposal_recovery.json",
+      "sha256": "0b707598667c79e7752fe33e773cad4a755b907ce626e0b79541b8db71353409"
+    }
+  },
+  "report": {
+    "path": "C:\\quant\\b3-quant\\docs\\v2_HISTORICAL_COST_COVERAGE.md",
+    "sha256": "3236786dc853dd65e46ca28e2875659ccf6fb22292ec00560e81bc4c04f479c7"
+  },
+  "runtime_max_error": 2.7939677238464355e-09,
+  "runtime_state_checks": 498,
+  "saved_qualification_seconds": {
+    "corporate": 2.6213494000257924,
+    "historical": 0.7587480999936815
+  },
+  "sessions": 2635,
+  "skipped_unexposed_rights_variants": 14,
+  "source_entitlement_checks": 1212,
+  "status": "historical_tariff_and_corporate_custody_engineering_accepted_not_final_stage_a",
+  "visual_pages": 34
+}

@@ -47,7 +47,7 @@ def main():
         for path in (PROJECT / "research/src/brazil_rv" / folder).glob("*.py"):
             shutil.copyfile(path, root / f"executed_{folder}_{path.name}")
     corporate = dict(
-        spot_cost_model="b3_spot_2021", cost_bps_per_side=0, hedge_cost_bps_per_side=0
+        spot_cost_model="b3_spot_dated", cost_bps_per_side=0, hedge_cost_bps_per_side=0
     )
     variants = {
         "bundled_control": {},

@@ -1,6 +1,6 @@
 # Stage A closeout contract
 
-2026-09-20, after ordinary custody acceptance V41. This consolidates the remaining
+2026-09-20, updated after historical tariff and corporate custody qualification. This consolidates the remaining
 work following the user's request for a clearer trajectory. It does not change the
 registered economic endpoints, authorize held-out reads, accept Stage A, or start C/D.
 
@@ -11,9 +11,9 @@ checks are evidence to reuse, not a queue to replay.
 
 | Block | Work remaining | Completion criterion |
 | --- | --- | --- |
-| Historical spot costs | Earlier dated regimes and the previous-month **global market** ADTV input; applicable spot invoice/daytrade treatment | Every requested replay date has a sourced regime and explicit rate determination. If a monthly input remains unrecovered after targeted source work, use only a source-supported tariff range as a labelled uncertainty contract; never account capital as market ADTV or an arbitrary flat rate. |
-| Historical custody costs | Earlier dated thresholds/maintenance and corporate physical custody treatment | Both accounts can process every held name and event under the complete dated fee contract. Preserve V41 ordinary physical-flow proofs. Resolve exposed corporate transitions using existing custody/loan claims and explicit source facts or bounded hypotheses; no name deletion or silent zero fee to bypass the current guard. |
-| Calendar | Three older equity-clearing ambiguities: 2016-12-30, 2017-01-25, 2017-11-20 | A specific sourced disposition, or separately attributed date hypotheses where the evidence remains genuinely insufficient. Do not add all monetary-only dates to equity settlement/accrual. |
+| Historical spot costs | Dated regimes and global-market monthly rates are qualified across all 2,099 development sessions: 1,014 published monthly, 976 fixed, 109 source-bounded missing/not-yet-known cells. Applicable spot invoice/daytrade treatment remains. | Reuse the 50 qualified monthly originals and explicit 0.2–0.5bp missing-rate bounds. Complete applicable invoice treatment; do not reopen a source census or use account capital as market ADTV. |
+| Historical custody costs | Earlier thresholds/maintenance and exposed corporate physical transitions are implemented and qualified in both accounts. | Reuse the 18 historical-cost and 34 corporate books, including 14 skipped unexposed variants, plus V41 ordinary proofs. Carry the dated fee contract and explicit rights/valuation/payment hypotheses into integrated admission; add a new run only for an untested interaction or actual exposure. |
+| Calendar | Two older equity-clearing ambiguities remain: 2016-12-30 and 2017-01-25. Dated migration plus holiday notices resolve 2017-11-20 without array changes. | A specific sourced disposition, or separately attributed date hypotheses where the evidence remains genuinely insufficient. Do not add all monetary-only dates to equity settlement/accrual. |
 | Event/source composition | Compose the qualified primary event terms; retain ALSC unknown physical credit and net cash, ENAT unknown fraction auction, and explicit loan conventions | One bound primary term table and separately named one-factor variants, with no contradictory event clocks, invented receipts, new loan/issuer aliases or overwritten stores. Unknown claims stay locked where required. |
 | Cielo held-loan precision | Identify actual loan exposure at the August30 closeout, then apply the already frozen per-share cent variants if that branch is exposed | A held-loan bound requires actual loan cohorts under adaptive decisions. No preference/rate/availability changes to force a holding. An unexposed path may establish zero impact **for that path**, never a general held-loan precision bound. Carry that distinction into the later registered model books. |
 | Remaining succession data implications | Determine whether newly sourced succession changes the accepted model-data contract | Record each actual eligibility/history/wealth/target implication separately. Produce an amendment only for evidenced changes and retain unchanged stores. Account settlement hypotheses do not authorize unrestricted issuer histories or loan aliases. |
@@ -24,7 +24,7 @@ composition; integrated admission. They are not seven new experiment campaigns.
 
 ## Work discipline through admission
 
-- Reuse V31–V41 books, source receipts, Decimal oracles, accepted stores and recovery
+- Reuse V31–V41 and historical-cost/corporate books, source receipts, Decimal oracles, accepted stores and recovery
   dependencies. Do not repeat a completed test matrix to create a newer checkpoint.
 - Add an engineering run only for a specific untested interaction, a changed
   implementation branch, or actual newly identified exposure. Freeze its contrast
@@ -61,6 +61,13 @@ The producer `ops/inspect_foundation_cielo.py` binds the old book/account/fill h
 retains the selected Cielo arrays and actual fills, and records the limitations in
 `cielo_foundation_exposure`. It completed its first invocation in 0.9129214 seconds
 on CPU. No source, store or old-fit bytes changed.
+
+The subsequent 34 corporate cost books save actual loan cash payments and contain
+no Cielo loan redemption. Their already frozen cent variants therefore remain
+conditional. These new diagnostics establish nonexposure for these paths, without
+changing the old books' missing-cohort limitation or establishing a general bound.
+See [historical cost coverage](v2_HISTORICAL_COST_COVERAGE.md) for the qualified
+52 new books, dated sources, measured adaptive uncertainty and remaining scope.
 
 ## Time and progress reporting
 
