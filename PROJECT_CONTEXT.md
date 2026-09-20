@@ -18,9 +18,11 @@ Use the local GPU, all eligible names and full history; no forward capture, depl
 or held-out consumers. Follow the registered stages and
 `docs/v2_economic_data_scaling_progress.md`. Earlier foundation outcomes stay sealed.
 
-The economic program now has a complete, separately accepted development store.
-Resolve `docs/v2_economic_data_inputs.json`; keep `docs/v2_data_inputs.json` and
-all foundation fits sealed. The new store combines source-bound FCA identity,
+The economic program has a complete, separately accepted development baseline.
+`docs/v2_economic_data_inputs.json` preserves that baseline; the current source-corrected
+refit input is `docs/v2_natura_data_inputs.json`, also resolved by the run pointer's
+`economic_refit_inputs`. Keep `docs/v2_data_inputs.json` and all foundation fits sealed.
+The economic baseline combines source-bound FCA identity,
 financial/event/peer observations, ALLOS/ISA full history and issuer clocks,
 qualified lending, activity-only GOLL data, native/scalar M1 and auxiliary history,
 dated to-close normalization, AERI lineage and sourced corporate basket targets.
@@ -54,9 +56,12 @@ November7 is gross JCP .12784527353/share, not an inferred share reduction.
 The JCP pays February26 2020; withholding/tax-credit and loan compensation remain
 separate. `docs/v2_HELD_EVENT_SOURCE_AUDIT.md` and the run pointer bind minute-end
 source clocks, bounded wealth corrections and gross-target attribution with
-accepted risks held fixed. Neither accepted store is overwritten. New economic
-refits require this separately attributed correction's remaining feature/risk/native
-dependencies and final input acceptance; do not repeat the completed baseline build.
+accepted risks held fixed. Neither earlier accepted store is overwritten. The complete
+Natura derivative is now separately qualified through daily/peer/risk, physical magnitude,
+cross-market and actual neutral-target consumers; see `docs/v2_NATURA_DATA_PROPAGATION.md`.
+Its sole accepted M1 assignment begins in2025, so no2019 M1 stream or scalar recovery
+is permitted. Existing activity/filing/unit-barrier inputs remain exact. Resolve the
+explicit Natura store contract for new P/F fits; do not repeat the baseline build.
 Original NATU/ALSC/SOMA conversions are now evidenced, but their account valuation,
 custody/loan/fraction admission is incomplete. This source milestone is not final
 economic admission. Previously passed source audits and lifecycle books remain valid

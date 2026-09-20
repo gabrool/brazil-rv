@@ -580,6 +580,42 @@ def _peer_features(
     return output, valid
 
 
+def _rolling_market_regression(
+    returns: NDArray[np.float64],
+    market: NDArray[np.float64],
+    ambiguous: NDArray[np.bool_],
+    *,
+    source_rows: NDArray[np.integer] | None = None,
+) -> tuple[NDArray[np.float64], NDArray[np.float64], NDArray[np.bool_]]:
+    """Original 60-session beta/idio reducer, optionally on bounded source rows."""
+    beta = np.full(returns.shape, np.nan, dtype=np.float64)
+    idio = np.full(returns.shape, np.nan, dtype=np.float64)
+    beta_valid = np.zeros(returns.shape, dtype=np.bool_)
+    rows = np.arange(59, returns.shape[0]) if source_rows is None else source_rows
+    if np.any((rows < 59) | (rows >= returns.shape[0])):
+        raise ValueError("regression source rows require the full 60-session window")
+    for day in rows:
+        market_window = market[day - 59 : day + 1]
+        for name in range(returns.shape[1]):
+            name_window = returns[day - 59 : day + 1, name]
+            mask = np.isfinite(market_window) & np.isfinite(name_window)
+            if (
+                int(mask.sum()) < math.ceil(0.8 * 60)
+                or np.var(market_window[mask]) <= 0
+            ):
+                continue
+            coefficient = float(
+                np.cov(name_window[mask], market_window[mask], ddof=0)[0, 1]
+                / np.var(market_window[mask])
+            )
+            residual = name_window[mask] - coefficient * market_window[mask]
+            beta[day, name] = coefficient
+            idio[day, name] = float(np.std(residual))
+            beta_valid[day, name] = True
+    beta_valid &= _ambiguous_interval_clear(ambiguous, 60)
+    return beta, idio, beta_valid
+
+
 def build_slow_features_into(
     shareholder_wealth_open: NDArray[np.floating],
     shareholder_wealth_high: NDArray[np.floating],
@@ -733,28 +769,9 @@ def build_slow_features_into(
         mask = retained_returns[1][1][day] & membership[day]
         if mask.any():
             market[day] = float(np.median(retained_returns[1][0][day, mask]))
-    beta = np.full(close.shape, np.nan, dtype=np.float64)
-    idio = np.full(close.shape, np.nan, dtype=np.float64)
-    beta_valid = np.zeros(close.shape, dtype=np.bool_)
-    for day in range(59, close.shape[0]):
-        market_window = market[day - 59 : day + 1]
-        for name in range(close.shape[1]):
-            name_window = retained_returns[1][0][day - 59 : day + 1, name]
-            mask = np.isfinite(market_window) & np.isfinite(name_window)
-            if (
-                int(mask.sum()) < math.ceil(0.8 * 60)
-                or np.var(market_window[mask]) <= 0
-            ):
-                continue
-            coefficient = float(
-                np.cov(name_window[mask], market_window[mask], ddof=0)[0, 1]
-                / np.var(market_window[mask])
-            )
-            residual = name_window[mask] - coefficient * market_window[mask]
-            beta[day, name] = coefficient
-            idio[day, name] = float(np.std(residual))
-            beta_valid[day, name] = True
-    beta_valid &= _ambiguous_interval_clear(ambiguous, 60)
+    beta, idio, beta_valid = _rolling_market_regression(
+        retained_returns[1][0], market, ambiguous
+    )
     assign(15, beta, beta_valid)
     assign(16, idio, beta_valid)
 

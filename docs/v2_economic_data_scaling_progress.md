@@ -1863,3 +1863,27 @@ Recovery1.7444s; complete current research/patch and initial/qualified recipes
 retained without immutable input, accepted store or old-fit duplication. Earlier
 dependencies remain required. This is source/intermediate acceptance, not A/C
 economic admission or final Natura dependency acceptance.
+
+
+## 2026-09-20: complete Natura data dependency acceptance
+
+The two source-proven2019 scalar corrections now reach a separate complete106-array
+store through daily/peer/risk/physical/cross-market/actual neutral-target paths.
+Resolve docs/v2_natura_data_inputs.json and economic_refit_inputs; prior economic
+baseline and foundation stores/weights remain sealed. See
+docs/v2_NATURA_DATA_PROPAGATION.md for every effect, attempt, qualification and limit.
+All933names/full60 retained; no mask/age/eligibility loss. Natura has no admitted2019
+M1 stream, so no raw M1 recovery or scalar/toclose change was performed.
+
+Daily206samples/2241413076packedcells and final33combinedsamples/383630940cells
+pass;506333457changed-array/scope cells and85untouched array hashes agree.
+52968slowvalues,5076clusters,60sigma,191magnitude and1114cross-market values
+change; actual neutral targets14039numeric/no support change. The earlier42
+gross endpoint changes remain separately sourced, not doubled. Old-parent transfer
+is rejected before weights. InitialNaNreport serialization,18unchanged inactive
+scratch-sigma differences andFloat64-vs-Float32 product comparison are retained and
+explicitly qualified. No censuses, original retrieval or prior baseline assembly
+were repeated. New recovery is being finalized separately; A final economics and
+C/D remain incomplete. Next: causal opening claims and distinct custody/loan/tax
+contracts for NATU/ALSC/SOMA, ENAT exposure-ranked original sources, then remaining
+adaptive disposal/rounding/grouping/cost and clearing sensitivities.

@@ -1,0 +1,300 @@
+{
+  "action_deltas": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\natura_store\\action_deltas.npz",
+    "sha256": "fb3aa901b8d276d432f369a9da077174649e304c39a3f27c83ae25e8a1d5c2e8"
+  },
+  "amendments": {
+    "held_event_source_qualification": {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\held_event_sources\\clock_qualification\\manifest.json",
+      "sha256": "e40a4200dea0ceb86a6766c790aa23c2f7d6fe9b58d9c49861aa15bb3f90ba7d"
+    },
+    "natura_auxiliary_qualification": {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\natura_auxiliary\\qualified\\manifest.json",
+      "sha256": "dafdd43e773f454c55065c24ad0a7ec9baf357b6daf07d174a4d5791644a748d"
+    },
+    "natura_daily_input_audit": {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\natura_daily\\qualified\\manifest.json",
+      "sha256": "783ca4ac34aa91f0e5e5374e3d4cf950b9d65d4d06d96057cb31206e29e48cde"
+    },
+    "natura_dependency_scope": {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\natura_daily\\dependency_scope\\manifest.json",
+      "sha256": "3575e9fd21b5029882244b1bcd3b6382a48fd1d2d17aea37fe0af8d0d5ab1b0c"
+    },
+    "natura_gross_target_attribution": {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\natura_gross_targets\\qualified_endpoints\\manifest.json",
+      "sha256": "730d3643bca66929f0a58114fd621fbf90d23a0bdda66b1fb3b8b6c4666a9a4c"
+    },
+    "natura_wealth_amendment": {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\natura_wealth\\manifest.json",
+      "sha256": "02c5861adf2ea2f8e435fee08149d70cb09e9199c80d840472c42360a3e429c6"
+    }
+  },
+  "output": "C:\\quant-data\\b3\\processed\\v2_economic_natura_store_20260920",
+  "parent": {
+    "manifest_sha256": "2e16c8d6dfbba8c8eb65330635507b1eac473e9790c573d3329d889692e9b3f2",
+    "root": "C:\\quant-data\\b3\\processed\\v2_economic_data_store_20260920"
+  },
+  "recovery_parent": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\economic_store_recovery.json",
+    "sha256": "fa010f13f262d20126fc1f3d54fa104b03891b825fc18d3eaa82322eb62cbf39"
+  },
+  "refit_contract": "New P training-only conditioning and weights on this exact store; compatible new F children only. Preserve registered graph/folds/seeds/full933/full60/budget/optimizer/selector. Same schema does not mean compatible coordinates. Optional to-close loss stays inactive.",
+  "remaining_account_program": "Stage A held events, delivery/tax/fraction/pricing and remaining adaptive bounds; C/D unstarted.",
+  "scope": "Exactly the Sep18 q2 and Nov7 gross JCP Natura corrections and their existing daily/risk/auxiliary/target dependencies. No NATU->NTCO succession or issuer inheritance. No custody, withholding or settled-account inference.",
+  "unchanged_scope": {
+    "account_limit": "Sep20 bonus delivery and Feb26 JCP payment/withholding still require separate account treatment; none is an observed fill or cash reinvestment in this data amendment.",
+    "assignment": {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\natura_daily\\dependency_scope\\natura_assignment.parquet",
+      "sha256": "5df88f6042af536ff89b7997fd2855bbede81b0cf4d9cb9f5b9f0b29af690e19"
+    },
+    "barrier_limit": "Corrected contractual q/cash does not retrospectively rewrite the pre-existing market detector or DISMES barrier. That diagnostic is not proof of a split. Removing conservative feature support requires a separate explicit feature contract, not an unlabelled tax/share-count inference.",
+    "daily_plan": {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\natura_daily\\plan.json",
+      "sha256": "e09d2b7e1e2ff6ce22b56702313583940342ff3bfe855822f315831b73ee633e"
+    },
+    "families": {
+      "events": "Existing original CVM publication-time ledger and issuer identity unchanged; these sourced notices are already historical disclosures, not newly timed events.",
+      "fundamentals": "Issuer filings, selected accounts, literal share counts, dated identity and raw prior closes unchanged. valuation_market uses DISMES/detected/ambiguous unit barriers, not inferred q/cash or shareholder wealth. No financial rebuild is warranted.",
+      "lending": "Rates, balances, raw activity/ADV and issuer/float observations unchanged. The same valuation_market unit barrier enters utilization. No rate/balance/loan alias or denominator adjustment is inferred from scalar shareholder terms.",
+      "microstructure_options_oddlot_rebalance": "Raw source activity, cash/option prices and quantities, publication dates, portfolio composition, raw ADV, identity and membership unchanged. These reducers do not consume shareholder wealth, target sigma, beta or monthly peer labels.",
+      "sector_magnitudes_cross_market": "Wealth-dependent returns, physical volatility/beta and issuer-shrunk exposures require the separate bounded propagation. Macro shocks, feature-CDI coordinates, flow/volume interactions and ADR source contracts stay fixed."
+    },
+    "native_and_scalar_checks": [
+      {
+        "array": "fast_present",
+        "cells": 449,
+        "supported": 0
+      },
+      {
+        "array": "fast_patch_valid",
+        "cells": 216867,
+        "supported": 0
+      },
+      {
+        "array": "fast_patch_mask",
+        "cells": 30981,
+        "supported": 0
+      },
+      {
+        "array": "intraday_valid",
+        "cells": 8980,
+        "supported": 0
+      },
+      {
+        "array": "target_to_close_valid",
+        "cells": 449,
+        "supported": 0
+      }
+    ],
+    "no_m1_observations_read": true,
+    "no_native_scalar_or_to_close_amendment": "The sole accepted NATU assignment begins 2025-07-02. No admitted 2019 observations exist. All own-name native/scalar/to-close support is empty over the entire bounded source window. A changed own-name daily sigma cannot affect other names' native channels or absent scalar cross-section entries.",
+    "parent_store": {
+      "manifest_sha256": "2e16c8d6dfbba8c8eb65330635507b1eac473e9790c573d3329d889692e9b3f2",
+      "root": "C:\\quant-data\\b3\\processed\\v2_economic_data_store_20260920"
+    },
+    "seconds": 0.18740670001716353,
+    "source_code": {
+      "auxiliary_history.py": {
+        "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\natura_daily\\dependency_scope\\auxiliary_history.py",
+        "sha256": "b1ce0fe670553ae6326ebc21e8bc845f3ddabf13b1a632e706e8c0b8439d035b"
+      },
+      "intraday_features.py": {
+        "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\natura_daily\\dependency_scope\\intraday_features.py",
+        "sha256": "9a8b2fba0563d0807ecfcffb81c01bf4633e43ee0917c813df26e09bc6d737ef"
+      },
+      "round5_b3.py": {
+        "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\natura_daily\\dependency_scope\\round5_b3.py",
+        "sha256": "e5253fca6ee3b974877a2626acaf35876036e925e92d7afa42566bb9b966c736"
+      },
+      "round5_cvm.py": {
+        "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\natura_daily\\dependency_scope\\round5_cvm.py",
+        "sha256": "b6035f32ab5ee1b52c061b9be025c6e53ec5ca62ba14308412793298fb3f88f4"
+      },
+      "round5_exposures.py": {
+        "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\natura_daily\\dependency_scope\\round5_exposures.py",
+        "sha256": "8e8f99752b67ee610603b265e14da23628aae4356d951ca60b4ffec48b827f45"
+      },
+      "round5_index.py": {
+        "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\natura_daily\\dependency_scope\\round5_index.py",
+        "sha256": "529f116536c7bec34e6879527ec982d7c0fe35d0122a4d3347c558e3f09d1ed2"
+      },
+      "round5_magnitude.py": {
+        "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\natura_daily\\dependency_scope\\round5_magnitude.py",
+        "sha256": "a574617af0cc6f5c3542ac0aad9f4b2ed37841e725009e4ca00460eb4ae85cec"
+      }
+    },
+    "status": "passed_assignment_and_dependency_scope_not_final_combined_store",
+    "unchanged_inputs": {
+      "action_has_action": {
+        "bytes": 3468089,
+        "dtype": "|b1",
+        "path": "C:\\quant-data\\b3\\processed\\v2_economic_data_store_20260920\\action_has_action.npy",
+        "sha256": "d163a902ca23b973f6ee54b4c6ac807d356af9d0d6247b5096e59a252123342d",
+        "shape": [
+          3717,
+          933
+        ]
+      },
+      "action_session_resolved": {
+        "bytes": 3468089,
+        "dtype": "|b1",
+        "path": "C:\\quant-data\\b3\\processed\\v2_economic_data_store_20260920\\action_session_resolved.npy",
+        "sha256": "0d68e60e33fe098a951e67cb56089ec5c0565290c42f9c8448a6d568fc140b4b",
+        "shape": [
+          3717,
+          933
+        ]
+      },
+      "action_successor_index": {
+        "bytes": 27743816,
+        "dtype": "<i8",
+        "path": "C:\\quant-data\\b3\\processed\\v2_economic_data_store_20260920\\action_successor_index.npy",
+        "sha256": "4b6ad7c9b6c22ac7e4eb0e7958186351f61d2b9d94d09963440e44fc3e922a51",
+        "shape": [
+          3717,
+          933
+        ]
+      },
+      "active": {
+        "bytes": 3468089,
+        "dtype": "|b1",
+        "path": "C:\\quant-data\\b3\\processed\\v2_economic_data_store_20260920\\active.npy",
+        "sha256": "5577684fe6870df2887fae01b00dd59d83bdb9f87323a5d35bb12ebca0ba56b6",
+        "shape": [
+          3717,
+          933
+        ]
+      },
+      "activity_valid": {
+        "bytes": 3468089,
+        "dtype": "|b1",
+        "path": "C:\\quant-data\\b3\\processed\\v2_economic_data_store_20260920\\activity_valid.npy",
+        "sha256": "9ad7d2f5f3feb8cf5f64055302b959e668056f28902954c9456499d229b375c5",
+        "shape": [
+          3717,
+          933
+        ]
+      },
+      "ambiguous_action_mask": {
+        "bytes": 3468089,
+        "dtype": "|b1",
+        "path": "C:\\quant-data\\b3\\processed\\v2_economic_data_store_20260920\\ambiguous_action_mask.npy",
+        "sha256": "1c4b613fb021c300c63ed07da8ec2d86d74bb7c2ca98a8c300251d02f26eede2",
+        "shape": [
+          3717,
+          933
+        ]
+      },
+      "detected_split_mask": {
+        "bytes": 3468089,
+        "dtype": "|b1",
+        "path": "C:\\quant-data\\b3\\processed\\v2_economic_data_store_20260920\\detected_split_mask.npy",
+        "sha256": "0347a6c0cd231dcc8f5b549a38332d99141554ceb752a0b5a7c7749b43d54879",
+        "shape": [
+          3717,
+          933
+        ]
+      },
+      "distribution_change_mask": {
+        "bytes": 3468089,
+        "dtype": "|b1",
+        "path": "C:\\quant-data\\b3\\processed\\v2_economic_data_store_20260920\\distribution_change_mask.npy",
+        "sha256": "98c6e203c56b5dbccdd3b7ea630fdb1a2b66921b55868f8d3156b1f1d849a774",
+        "shape": [
+          3717,
+          933
+        ]
+      },
+      "distribution_number": {
+        "bytes": 13871972,
+        "dtype": "<f4",
+        "path": "C:\\quant-data\\b3\\processed\\v2_economic_data_store_20260920\\distribution_number.npy",
+        "sha256": "8dac4d51ce7843c1390d06845670b40c3eee37bdc8ddcaf119141f9678aceea0",
+        "shape": [
+          3717,
+          933
+        ]
+      },
+      "observed": {
+        "bytes": 3468089,
+        "dtype": "|b1",
+        "path": "C:\\quant-data\\b3\\processed\\v2_economic_data_store_20260920\\observed.npy",
+        "sha256": "1d1f277649264bd63edbc54d88507b5257a690fcc053c8899e9e1018f461dace",
+        "shape": [
+          3717,
+          933
+        ]
+      },
+      "quantity": {
+        "bytes": 13871972,
+        "dtype": "<f4",
+        "path": "C:\\quant-data\\b3\\processed\\v2_economic_data_store_20260920\\quantity.npy",
+        "sha256": "acd578251251ab6d5436f68be9bf69e70ffc3383ddf22d57252f0d7516633c43",
+        "shape": [
+          3717,
+          933
+        ]
+      },
+      "raw_close": {
+        "bytes": 13871972,
+        "dtype": "<f4",
+        "path": "C:\\quant-data\\b3\\processed\\v2_economic_data_store_20260920\\raw_close.npy",
+        "sha256": "d822a557e79452270d897c9c0df470efd56519754e56b44840243b5024fd0e16",
+        "shape": [
+          3717,
+          933
+        ]
+      },
+      "raw_high": {
+        "bytes": 13871972,
+        "dtype": "<f4",
+        "path": "C:\\quant-data\\b3\\processed\\v2_economic_data_store_20260920\\raw_high.npy",
+        "sha256": "937a488abe9ce691139e23819cec1627fd4727d82eb65ad9d2a9df919bb54e90",
+        "shape": [
+          3717,
+          933
+        ]
+      },
+      "raw_low": {
+        "bytes": 13871972,
+        "dtype": "<f4",
+        "path": "C:\\quant-data\\b3\\processed\\v2_economic_data_store_20260920\\raw_low.npy",
+        "sha256": "048547d2761f95bad2b6a6715c0a0843b31354dfce3e255c5306e88bb04d5b80",
+        "shape": [
+          3717,
+          933
+        ]
+      },
+      "raw_open": {
+        "bytes": 13871972,
+        "dtype": "<f4",
+        "path": "C:\\quant-data\\b3\\processed\\v2_economic_data_store_20260920\\raw_open.npy",
+        "sha256": "8d412be82944b3015662be37c489f277afa49bed63afde95c721231653693501",
+        "shape": [
+          3717,
+          933
+        ]
+      },
+      "trade_count": {
+        "bytes": 13871972,
+        "dtype": "<f4",
+        "path": "C:\\quant-data\\b3\\processed\\v2_economic_data_store_20260920\\trade_count.npy",
+        "sha256": "7f7362f1b18e1cd79ed6da6e3115eb092a96edc59187cb39932d58110a930072",
+        "shape": [
+          3717,
+          933
+        ]
+      },
+      "volume_brl": {
+        "bytes": 13871972,
+        "dtype": "<f4",
+        "path": "C:\\quant-data\\b3\\processed\\v2_economic_data_store_20260920\\volume_brl.npy",
+        "sha256": "a55bd3084e38e72f578e7c11d8071cb91ac432bc8b052661f23b82b85224e94c",
+        "shape": [
+          3717,
+          933
+        ]
+      }
+    }
+  }
+}

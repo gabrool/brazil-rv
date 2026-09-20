@@ -5,6 +5,7 @@ import numpy as np
 from brazil_rv.v2.features import (
     _peer_features,
     _rolling_stat,
+    _rolling_market_regression,
     build_slow_features,
     deterministic_average_linkage,
     exact_log_return,
@@ -12,6 +13,24 @@ from brazil_rv.v2.features import (
     yang_zhang_volatility,
 )
 from brazil_rv.v2.universe import build_daily_universe
+
+
+def test_bounded_market_regression_keeps_full_window_and_future_isolation() -> None:
+    market = np.sin(np.arange(100) * 0.13) / 100
+    returns = market[:, None] * np.array([2.0, -0.5]) + np.array([0.001, 0.002])
+    returns[61:66, 1] = np.nan
+    ambiguous = np.zeros_like(returns, bool)
+    rows = np.array([60, 79])
+    full = _rolling_market_regression(returns, market, ambiguous)
+    bounded = _rolling_market_regression(returns, market, ambiguous, source_rows=rows)
+    for expected, actual in zip(full, bounded, strict=True):
+        np.testing.assert_array_equal(expected[rows], actual[rows])
+    np.testing.assert_allclose(bounded[0][rows], [[2, -0.5], [2, -0.5]], atol=1e-15)
+    np.testing.assert_allclose(bounded[1][rows], 0, atol=1e-17)
+    returns[80:] *= 20
+    later = _rolling_market_regression(returns, market, ambiguous, source_rows=rows)
+    for expected, actual in zip(bounded, later, strict=True):
+        np.testing.assert_array_equal(expected, actual)
 
 
 def test_rolling_statistics_accept_eighty_percent_complete_window() -> None:
