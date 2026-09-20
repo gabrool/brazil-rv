@@ -19,12 +19,15 @@ or held-out consumers. Follow the registered stages and
 `docs/v2_economic_data_scaling_progress.md`. Earlier foundation outcomes stay sealed.
 
 Stage B now binds a broader FCA identity/financial/event overlay, including the
-earlier C&A recovery. It restores issuer information on 26,271 already eligible
-stock-days, adds 154,656 usable financial values and 181,629 event values, and loses
-no valid eligible observations. Thirteen source-specific corrections retain
-separate evidence-availability clocks. See `docs/v2_FCA_IDENTITY_PROPAGATION.md`
-and the economic/data run pointer. Remaining MGLU/ABC class-source anomalies and
-other dependent families still require resolution. These are intermediate derived
+earlier C&A recovery and dated MGLU/ABC issuer corrections. It restores issuer
+information on 31,858 already eligible stock-days, adds 179,685 usable financial
+values and 219,291 event values, and loses no valid eligible observations.
+Source-specific corrections retain separate evidence clocks and explicitly bound
+ISINs where external issuer documents resolve missing/conflicting FCA fields.
+Sector, cross-market peer and lending-utilization observations now propagate these
+identities on their original market-input contracts. See
+`docs/v2_FCA_IDENTITY_PROPAGATION.md` and the economic/data run pointer.
+Full history/wealth/label and changed-store tensor propagation remain. These are intermediate derived
 observations, not a replacement model store or permission to attach changed
 coordinates to old fits. Original filing clocks and capital units reconcile
 separately in `docs/v2_CVM_SOURCE_AUDIT.md`.

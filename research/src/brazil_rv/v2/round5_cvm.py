@@ -1181,6 +1181,8 @@ def build_identity(
                         continue
                     candidates = name_isins[spelling]
                 for isin in candidates:
+                    if security.get("source_bound_isin") not in (None, isin):
+                        continue
                     observed = known_security[isin]
                     spec = observed.get("security_spec_base", "")
                     share_class = security["class"]

@@ -691,6 +691,3147 @@
       "isin": "BRRCSLACNPR1",
       "known_date": "2019-05-03",
       "reason": "Prior own-ID FCA82621 explicitly distinguishes RCSL3 ON and RCSL4 PN, confirmed by prior COTAHIST. These two later source records duplicate RCSL3 in both share blocks. Restore only the separate PN block; no class inferred from current HTML enum."
+    },
+    {
+      "after": [
+        {
+          "class": "ON",
+          "end": "9999-12-31",
+          "listing_end": "9999-12-31",
+          "listing_start": "2011-05-02",
+          "preferred_class": "",
+          "segment_end": "9999-12-31",
+          "segment_start": "2011-05-02",
+          "source_bound_isin": "BRMGLUACNOR2",
+          "source_class_description": "",
+          "source_segment_description": "Novo Mercado",
+          "source_type_code": "1",
+          "source_type_description": "Ações",
+          "start": "2011-05-02",
+          "ticker": "MGLU3",
+          "unit_composition": ""
+        }
+      ],
+      "before": [
+        {
+          "class": "SHARES",
+          "end": "9999-12-31",
+          "listing_end": "9999-12-31",
+          "listing_start": "2011-05-02",
+          "preferred_class": "",
+          "segment_end": "9999-12-31",
+          "segment_start": "2011-05-02",
+          "source_class_description": "",
+          "source_segment_description": "Novo Mercado",
+          "source_type_code": "1",
+          "source_type_description": "Ações",
+          "start": "2011-05-02",
+          "ticker": "",
+          "unit_composition": ""
+        }
+      ],
+      "cnpj": "47960950000121",
+      "cvm_code": "022470",
+      "evidence": [
+        {
+          "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\primary_sources\\mglu_ipo_20110429.pdf",
+          "sha256": "6db74b73f885a9e1e0f9e129feded8db9ed20bd84c95f9b81a4e0c098364df1e"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\fca_identity_admission\\source_clock\\fca_documents.json",
+          "sha256": "e989c2ef246763704d309a25bdde0df4ce25e5e901181790a6453fabed60c905"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\fca_originals\\7173\\manifest.json",
+          "sha256": "49e4b87e7f6a18b709c7dd1d0aaadc562d6c53a4913dc65d91eab9b7f7d8072a"
+        }
+      ],
+      "id": "7173",
+      "isin": "BRMGLUACNOR2",
+      "known_date": "2011-05-02",
+      "reason": "Original Apr29 2011 offering explicitly binds MGLU3, ordinary shares and this ISIN; next-business-day trading is May2. Restore only the omitted/misclassified dated FCA security."
+    },
+    {
+      "after": [
+        {
+          "class": "ON",
+          "end": "9999-12-31",
+          "listing_end": "9999-12-31",
+          "listing_start": "2011-05-02",
+          "preferred_class": "",
+          "segment_end": "9999-12-31",
+          "segment_start": "2011-05-02",
+          "source_bound_isin": "BRMGLUACNOR2",
+          "source_class_description": "",
+          "source_segment_description": "Novo Mercado",
+          "source_type_code": "1",
+          "source_type_description": "Ações",
+          "start": "2011-05-02",
+          "ticker": "MGLU3",
+          "unit_composition": ""
+        }
+      ],
+      "before": [
+        {
+          "class": "SHARES",
+          "end": "9999-12-31",
+          "listing_end": "9999-12-31",
+          "listing_start": "2011-05-02",
+          "preferred_class": "",
+          "segment_end": "9999-12-31",
+          "segment_start": "2011-05-02",
+          "source_class_description": "",
+          "source_segment_description": "Novo Mercado",
+          "source_type_code": "1",
+          "source_type_description": "Ações",
+          "start": "2011-05-02",
+          "ticker": "",
+          "unit_composition": ""
+        }
+      ],
+      "cnpj": "47960950000121",
+      "cvm_code": "022470",
+      "evidence": [
+        {
+          "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\primary_sources\\mglu_ipo_20110429.pdf",
+          "sha256": "6db74b73f885a9e1e0f9e129feded8db9ed20bd84c95f9b81a4e0c098364df1e"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\fca_identity_admission\\source_clock\\fca_documents.json",
+          "sha256": "e989c2ef246763704d309a25bdde0df4ce25e5e901181790a6453fabed60c905"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\fca_originals\\12571\\manifest.json",
+          "sha256": "5db42664bcce33cc53eb6ebe9ec4e5ade43482b3338a5ae18a99dd0bf655624d"
+        }
+      ],
+      "id": "12571",
+      "isin": "BRMGLUACNOR2",
+      "known_date": "2011-05-02",
+      "reason": "Original Apr29 2011 offering explicitly binds MGLU3, ordinary shares and this ISIN; next-business-day trading is May2. Restore only the omitted/misclassified dated FCA security."
+    },
+    {
+      "after": [
+        {
+          "class": "ON",
+          "end": "9999-12-31",
+          "listing_end": "9999-12-31",
+          "listing_start": "2011-05-02",
+          "preferred_class": "",
+          "segment_end": "9999-12-31",
+          "segment_start": "2011-05-02",
+          "source_bound_isin": "BRMGLUACNOR2",
+          "source_class_description": "",
+          "source_segment_description": "Novo Mercado",
+          "source_type_code": "1",
+          "source_type_description": "Ações",
+          "start": "2011-05-02",
+          "ticker": "MGLU3",
+          "unit_composition": ""
+        }
+      ],
+      "before": [
+        {
+          "class": "SHARES",
+          "end": "9999-12-31",
+          "listing_end": "9999-12-31",
+          "listing_start": "2011-05-02",
+          "preferred_class": "",
+          "segment_end": "9999-12-31",
+          "segment_start": "2011-05-02",
+          "source_class_description": "",
+          "source_segment_description": "Novo Mercado",
+          "source_type_code": "1",
+          "source_type_description": "Ações",
+          "start": "2011-05-02",
+          "ticker": "",
+          "unit_composition": ""
+        }
+      ],
+      "cnpj": "47960950000121",
+      "cvm_code": "022470",
+      "evidence": [
+        {
+          "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\primary_sources\\mglu_ipo_20110429.pdf",
+          "sha256": "6db74b73f885a9e1e0f9e129feded8db9ed20bd84c95f9b81a4e0c098364df1e"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\fca_identity_admission\\source_clock\\fca_documents.json",
+          "sha256": "e989c2ef246763704d309a25bdde0df4ce25e5e901181790a6453fabed60c905"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\fca_originals\\14747\\manifest.json",
+          "sha256": "5b35f7acdfb3981853c60e2679ad673182510e479a6b186262d790efaf17c048"
+        }
+      ],
+      "id": "14747",
+      "isin": "BRMGLUACNOR2",
+      "known_date": "2011-05-02",
+      "reason": "Original Apr29 2011 offering explicitly binds MGLU3, ordinary shares and this ISIN; next-business-day trading is May2. Restore only the omitted/misclassified dated FCA security."
+    },
+    {
+      "after": [
+        {
+          "class": "ON",
+          "end": "9999-12-31",
+          "listing_end": "9999-12-31",
+          "listing_start": "2011-05-02",
+          "preferred_class": "",
+          "segment_end": "9999-12-31",
+          "segment_start": "2011-05-02",
+          "source_bound_isin": "BRMGLUACNOR2",
+          "source_class_description": "",
+          "source_segment_description": "Novo Mercado",
+          "source_type_code": "1",
+          "source_type_description": "Ações",
+          "start": "2011-05-02",
+          "ticker": "MGLU3",
+          "unit_composition": ""
+        }
+      ],
+      "before": [
+        {
+          "class": "SHARES",
+          "end": "9999-12-31",
+          "listing_end": "9999-12-31",
+          "listing_start": "2011-05-02",
+          "preferred_class": "",
+          "segment_end": "9999-12-31",
+          "segment_start": "2011-05-02",
+          "source_class_description": "",
+          "source_segment_description": "Novo Mercado",
+          "source_type_code": "1",
+          "source_type_description": "Ações",
+          "start": "2011-05-02",
+          "ticker": "",
+          "unit_composition": ""
+        }
+      ],
+      "cnpj": "47960950000121",
+      "cvm_code": "022470",
+      "evidence": [
+        {
+          "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\primary_sources\\mglu_ipo_20110429.pdf",
+          "sha256": "6db74b73f885a9e1e0f9e129feded8db9ed20bd84c95f9b81a4e0c098364df1e"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\fca_identity_admission\\source_clock\\fca_documents.json",
+          "sha256": "e989c2ef246763704d309a25bdde0df4ce25e5e901181790a6453fabed60c905"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\fca_originals\\16016\\manifest.json",
+          "sha256": "e8a4894bd0daccc951b7dde756f33e196983455570aa7a48851ee59b5932d582"
+        }
+      ],
+      "id": "16016",
+      "isin": "BRMGLUACNOR2",
+      "known_date": "2011-05-02",
+      "reason": "Original Apr29 2011 offering explicitly binds MGLU3, ordinary shares and this ISIN; next-business-day trading is May2. Restore only the omitted/misclassified dated FCA security."
+    },
+    {
+      "after": [
+        {
+          "class": "ON",
+          "end": "9999-12-31",
+          "listing_end": "9999-12-31",
+          "listing_start": "2011-05-02",
+          "preferred_class": "",
+          "segment_end": "9999-12-31",
+          "segment_start": "2011-05-02",
+          "source_bound_isin": "BRMGLUACNOR2",
+          "source_class_description": "",
+          "source_segment_description": "Novo Mercado",
+          "source_type_code": "1",
+          "source_type_description": "Ações",
+          "start": "2011-05-02",
+          "ticker": "MGLU3",
+          "unit_composition": ""
+        }
+      ],
+      "before": [
+        {
+          "class": "SHARES",
+          "end": "9999-12-31",
+          "listing_end": "9999-12-31",
+          "listing_start": "2011-05-02",
+          "preferred_class": "",
+          "segment_end": "9999-12-31",
+          "segment_start": "2011-05-02",
+          "source_class_description": "",
+          "source_segment_description": "Novo Mercado",
+          "source_type_code": "1",
+          "source_type_description": "Ações",
+          "start": "2011-05-02",
+          "ticker": "",
+          "unit_composition": ""
+        }
+      ],
+      "cnpj": "47960950000121",
+      "cvm_code": "022470",
+      "evidence": [
+        {
+          "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\primary_sources\\mglu_ipo_20110429.pdf",
+          "sha256": "6db74b73f885a9e1e0f9e129feded8db9ed20bd84c95f9b81a4e0c098364df1e"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\fca_identity_admission\\source_clock\\fca_documents.json",
+          "sha256": "e989c2ef246763704d309a25bdde0df4ce25e5e901181790a6453fabed60c905"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\fca_originals\\19150\\manifest.json",
+          "sha256": "b3a441f075e0dcb578a996ca2e60f5d4cbf9588c9dfeb38bbfbc14dc05920186"
+        }
+      ],
+      "id": "19150",
+      "isin": "BRMGLUACNOR2",
+      "known_date": "2011-05-02",
+      "reason": "Original Apr29 2011 offering explicitly binds MGLU3, ordinary shares and this ISIN; next-business-day trading is May2. Restore only the omitted/misclassified dated FCA security."
+    },
+    {
+      "after": [
+        {
+          "class": "ON",
+          "end": "9999-12-31",
+          "preferred_class": "",
+          "source_bound_isin": "BRMGLUACNOR2",
+          "start": "2011-05-02",
+          "ticker": "MGLU3",
+          "unit_composition": ""
+        }
+      ],
+      "before": [],
+      "cnpj": "47960950000121",
+      "cvm_code": "022470",
+      "evidence": [
+        {
+          "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\primary_sources\\mglu_ipo_20110429.pdf",
+          "sha256": "6db74b73f885a9e1e0f9e129feded8db9ed20bd84c95f9b81a4e0c098364df1e"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\fca_identity_admission\\source_clock\\fca_documents.json",
+          "sha256": "e989c2ef246763704d309a25bdde0df4ce25e5e901181790a6453fabed60c905"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\fca_originals\\24007\\manifest.json",
+          "sha256": "938fb6b42f958b9801c7af80a49b5c120b59bc587360bc897037088855e83623"
+        }
+      ],
+      "id": "24007",
+      "isin": "BRMGLUACNOR2",
+      "known_date": "2011-05-02",
+      "reason": "Original Apr29 2011 offering explicitly binds MGLU3, ordinary shares and this ISIN; next-business-day trading is May2. Restore only the omitted/misclassified dated FCA security."
+    },
+    {
+      "after": [
+        {
+          "class": "ON",
+          "end": "9999-12-31",
+          "listing_end": "9999-12-31",
+          "listing_start": "2011-05-02",
+          "preferred_class": "",
+          "segment_end": "9999-12-31",
+          "segment_start": "2011-05-02",
+          "source_bound_isin": "BRMGLUACNOR2",
+          "source_class_description": "",
+          "source_segment_description": "Novo Mercado",
+          "source_type_code": "1",
+          "source_type_description": "Ações",
+          "start": "2011-05-02",
+          "ticker": "MGLU3",
+          "unit_composition": ""
+        }
+      ],
+      "before": [
+        {
+          "class": "SHARES",
+          "end": "9999-12-31",
+          "listing_end": "9999-12-31",
+          "listing_start": "2011-05-02",
+          "preferred_class": "",
+          "segment_end": "9999-12-31",
+          "segment_start": "2011-05-02",
+          "source_class_description": "",
+          "source_segment_description": "Novo Mercado",
+          "source_type_code": "1",
+          "source_type_description": "Ações",
+          "start": "2011-05-02",
+          "ticker": "",
+          "unit_composition": ""
+        }
+      ],
+      "cnpj": "47960950000121",
+      "cvm_code": "022470",
+      "evidence": [
+        {
+          "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\primary_sources\\mglu_ipo_20110429.pdf",
+          "sha256": "6db74b73f885a9e1e0f9e129feded8db9ed20bd84c95f9b81a4e0c098364df1e"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\fca_identity_admission\\source_clock\\fca_documents.json",
+          "sha256": "e989c2ef246763704d309a25bdde0df4ce25e5e901181790a6453fabed60c905"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\fca_originals\\28802\\manifest.json",
+          "sha256": "68bb61dc17cfd0d981c3f982cba1f206005406d6ecc2c1d3cda514a90eee4d0a"
+        }
+      ],
+      "id": "28802",
+      "isin": "BRMGLUACNOR2",
+      "known_date": "2011-05-02",
+      "reason": "Original Apr29 2011 offering explicitly binds MGLU3, ordinary shares and this ISIN; next-business-day trading is May2. Restore only the omitted/misclassified dated FCA security."
+    },
+    {
+      "after": [
+        {
+          "class": "ON",
+          "end": "9999-12-31",
+          "listing_end": "9999-12-31",
+          "listing_start": "2011-05-02",
+          "preferred_class": "",
+          "segment_end": "9999-12-31",
+          "segment_start": "2011-05-02",
+          "source_bound_isin": "BRMGLUACNOR2",
+          "source_class_description": "",
+          "source_segment_description": "Novo Mercado",
+          "source_type_code": "1",
+          "source_type_description": "Ações",
+          "start": "2011-05-02",
+          "ticker": "MGLU3",
+          "unit_composition": ""
+        }
+      ],
+      "before": [
+        {
+          "class": "SHARES",
+          "end": "9999-12-31",
+          "listing_end": "9999-12-31",
+          "listing_start": "2011-05-02",
+          "preferred_class": "",
+          "segment_end": "9999-12-31",
+          "segment_start": "2011-05-02",
+          "source_class_description": "",
+          "source_segment_description": "Novo Mercado",
+          "source_type_code": "1",
+          "source_type_description": "Ações",
+          "start": "2011-05-02",
+          "ticker": "",
+          "unit_composition": ""
+        }
+      ],
+      "cnpj": "47960950000121",
+      "cvm_code": "022470",
+      "evidence": [
+        {
+          "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\primary_sources\\mglu_ipo_20110429.pdf",
+          "sha256": "6db74b73f885a9e1e0f9e129feded8db9ed20bd84c95f9b81a4e0c098364df1e"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\fca_identity_admission\\source_clock\\fca_documents.json",
+          "sha256": "e989c2ef246763704d309a25bdde0df4ce25e5e901181790a6453fabed60c905"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\fca_originals\\32040\\manifest.json",
+          "sha256": "57b3332813dc780ef864cda00d1f91d6b9ca9538cdb2040121968cb7a7a52826"
+        }
+      ],
+      "id": "32040",
+      "isin": "BRMGLUACNOR2",
+      "known_date": "2011-05-02",
+      "reason": "Original Apr29 2011 offering explicitly binds MGLU3, ordinary shares and this ISIN; next-business-day trading is May2. Restore only the omitted/misclassified dated FCA security."
+    },
+    {
+      "after": [
+        {
+          "class": "ON",
+          "end": "9999-12-31",
+          "listing_end": "9999-12-31",
+          "listing_start": "2011-05-02",
+          "preferred_class": "",
+          "segment_end": "9999-12-31",
+          "segment_start": "2011-05-02",
+          "source_bound_isin": "BRMGLUACNOR2",
+          "source_type_authority": "HTML equity category only; class unresolved",
+          "source_type_description": "Ações",
+          "start": "2011-05-02",
+          "ticker": "MGLU3",
+          "unit_composition": ""
+        }
+      ],
+      "before": [
+        {
+          "class": "SHARES",
+          "end": "9999-12-31",
+          "listing_end": "9999-12-31",
+          "listing_start": "2011-05-02",
+          "preferred_class": "",
+          "segment_end": "9999-12-31",
+          "segment_start": "2011-05-02",
+          "source_type_authority": "HTML equity category only; class unresolved",
+          "source_type_description": "Ações",
+          "start": "2011-05-02",
+          "ticker": "",
+          "unit_composition": ""
+        }
+      ],
+      "cnpj": "47960950000121",
+      "cvm_code": "022470",
+      "evidence": [
+        {
+          "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\primary_sources\\mglu_ipo_20110429.pdf",
+          "sha256": "6db74b73f885a9e1e0f9e129feded8db9ed20bd84c95f9b81a4e0c098364df1e"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\fca_identity_admission\\source_clock\\fca_documents.json",
+          "sha256": "e989c2ef246763704d309a25bdde0df4ce25e5e901181790a6453fabed60c905"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\fca_originals\\34129\\manifest.json",
+          "sha256": "323b2806fd28f3c2787f434f16864b0262da9861e3722ad19d01683c3c1bd2c5"
+        }
+      ],
+      "id": "34129",
+      "isin": "BRMGLUACNOR2",
+      "known_date": "2011-05-02",
+      "reason": "Original Apr29 2011 offering explicitly binds MGLU3, ordinary shares and this ISIN; next-business-day trading is May2. Restore only the omitted/misclassified dated FCA security."
+    },
+    {
+      "after": [
+        {
+          "class": "ON",
+          "end": "9999-12-31",
+          "listing_end": "9999-12-31",
+          "listing_start": "2011-05-02",
+          "preferred_class": "",
+          "segment_end": "9999-12-31",
+          "segment_start": "2011-05-02",
+          "source_bound_isin": "BRMGLUACNOR2",
+          "source_type_authority": "HTML equity category only; class unresolved",
+          "source_type_description": "Ações",
+          "start": "2011-05-02",
+          "ticker": "MGLU3",
+          "unit_composition": ""
+        }
+      ],
+      "before": [
+        {
+          "class": "SHARES",
+          "end": "9999-12-31",
+          "listing_end": "9999-12-31",
+          "listing_start": "2011-05-02",
+          "preferred_class": "",
+          "segment_end": "9999-12-31",
+          "segment_start": "2011-05-02",
+          "source_type_authority": "HTML equity category only; class unresolved",
+          "source_type_description": "Ações",
+          "start": "2011-05-02",
+          "ticker": "",
+          "unit_composition": ""
+        }
+      ],
+      "cnpj": "47960950000121",
+      "cvm_code": "022470",
+      "evidence": [
+        {
+          "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\primary_sources\\mglu_ipo_20110429.pdf",
+          "sha256": "6db74b73f885a9e1e0f9e129feded8db9ed20bd84c95f9b81a4e0c098364df1e"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\fca_identity_admission\\source_clock\\fca_documents.json",
+          "sha256": "e989c2ef246763704d309a25bdde0df4ce25e5e901181790a6453fabed60c905"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\fca_originals\\38864\\manifest.json",
+          "sha256": "a6af32502e421f94713c0120e3aa8fdb4a3b6e36d468a1f0516da8cb00c6aaf0"
+        }
+      ],
+      "id": "38864",
+      "isin": "BRMGLUACNOR2",
+      "known_date": "2011-05-02",
+      "reason": "Original Apr29 2011 offering explicitly binds MGLU3, ordinary shares and this ISIN; next-business-day trading is May2. Restore only the omitted/misclassified dated FCA security."
+    },
+    {
+      "after": [
+        {
+          "class": "ON",
+          "end": "9999-12-31",
+          "listing_end": "9999-12-31",
+          "listing_start": "2011-05-02",
+          "preferred_class": "",
+          "segment_end": "9999-12-31",
+          "segment_start": "2011-05-02",
+          "source_bound_isin": "BRMGLUACNOR2",
+          "source_class_description": "",
+          "source_segment_description": "Novo Mercado",
+          "source_type_code": "1",
+          "source_type_description": "Ações",
+          "start": "2011-05-02",
+          "ticker": "MGLU3",
+          "unit_composition": ""
+        }
+      ],
+      "before": [
+        {
+          "class": "SHARES",
+          "end": "9999-12-31",
+          "listing_end": "9999-12-31",
+          "listing_start": "2011-05-02",
+          "preferred_class": "",
+          "segment_end": "9999-12-31",
+          "segment_start": "2011-05-02",
+          "source_class_description": "",
+          "source_segment_description": "Novo Mercado",
+          "source_type_code": "1",
+          "source_type_description": "Ações",
+          "start": "2011-05-02",
+          "ticker": "",
+          "unit_composition": ""
+        }
+      ],
+      "cnpj": "47960950000121",
+      "cvm_code": "022470",
+      "evidence": [
+        {
+          "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\primary_sources\\mglu_ipo_20110429.pdf",
+          "sha256": "6db74b73f885a9e1e0f9e129feded8db9ed20bd84c95f9b81a4e0c098364df1e"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\fca_identity_admission\\source_clock\\fca_documents.json",
+          "sha256": "e989c2ef246763704d309a25bdde0df4ce25e5e901181790a6453fabed60c905"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\fca_originals\\39829\\manifest.json",
+          "sha256": "98128d74b5e791fd03e36325966c27b9675037eeca912b08438523f4927ff79f"
+        }
+      ],
+      "id": "39829",
+      "isin": "BRMGLUACNOR2",
+      "known_date": "2011-05-02",
+      "reason": "Original Apr29 2011 offering explicitly binds MGLU3, ordinary shares and this ISIN; next-business-day trading is May2. Restore only the omitted/misclassified dated FCA security."
+    },
+    {
+      "after": [
+        {
+          "class": "ON",
+          "end": "9999-12-31",
+          "listing_end": "9999-12-31",
+          "listing_start": "2011-05-02",
+          "preferred_class": "",
+          "segment_end": "9999-12-31",
+          "segment_start": "2011-05-02",
+          "source_bound_isin": "BRMGLUACNOR2",
+          "source_class_description": "",
+          "source_segment_description": "Novo Mercado",
+          "source_type_code": "1",
+          "source_type_description": "Ações",
+          "start": "2011-05-02",
+          "ticker": "MGLU3",
+          "unit_composition": ""
+        }
+      ],
+      "before": [
+        {
+          "class": "SHARES",
+          "end": "9999-12-31",
+          "listing_end": "9999-12-31",
+          "listing_start": "2011-05-02",
+          "preferred_class": "",
+          "segment_end": "9999-12-31",
+          "segment_start": "2011-05-02",
+          "source_class_description": "",
+          "source_segment_description": "Novo Mercado",
+          "source_type_code": "1",
+          "source_type_description": "Ações",
+          "start": "2011-05-02",
+          "ticker": "",
+          "unit_composition": ""
+        }
+      ],
+      "cnpj": "47960950000121",
+      "cvm_code": "022470",
+      "evidence": [
+        {
+          "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\primary_sources\\mglu_ipo_20110429.pdf",
+          "sha256": "6db74b73f885a9e1e0f9e129feded8db9ed20bd84c95f9b81a4e0c098364df1e"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\fca_identity_admission\\source_clock\\fca_documents.json",
+          "sha256": "e989c2ef246763704d309a25bdde0df4ce25e5e901181790a6453fabed60c905"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\fca_originals\\44331\\manifest.json",
+          "sha256": "8af3f06473c2fb945e99a9fbf8dcb58d99fbddeaff92e2f0425b044a1a4811e8"
+        }
+      ],
+      "id": "44331",
+      "isin": "BRMGLUACNOR2",
+      "known_date": "2011-05-02",
+      "reason": "Original Apr29 2011 offering explicitly binds MGLU3, ordinary shares and this ISIN; next-business-day trading is May2. Restore only the omitted/misclassified dated FCA security."
+    },
+    {
+      "after": [
+        {
+          "class": "ON",
+          "end": "9999-12-31",
+          "listing_end": "9999-12-31",
+          "listing_start": "2011-05-02",
+          "preferred_class": "",
+          "segment_end": "9999-12-31",
+          "segment_start": "2011-05-02",
+          "source_bound_isin": "BRMGLUACNOR2",
+          "source_class_description": "",
+          "source_segment_description": "Novo Mercado",
+          "source_type_code": "1",
+          "source_type_description": "Ações",
+          "start": "2011-05-02",
+          "ticker": "MGLU3",
+          "unit_composition": ""
+        }
+      ],
+      "before": [
+        {
+          "class": "SHARES",
+          "end": "9999-12-31",
+          "listing_end": "9999-12-31",
+          "listing_start": "2011-05-02",
+          "preferred_class": "",
+          "segment_end": "9999-12-31",
+          "segment_start": "2011-05-02",
+          "source_class_description": "",
+          "source_segment_description": "Novo Mercado",
+          "source_type_code": "1",
+          "source_type_description": "Ações",
+          "start": "2011-05-02",
+          "ticker": "",
+          "unit_composition": ""
+        }
+      ],
+      "cnpj": "47960950000121",
+      "cvm_code": "022470",
+      "evidence": [
+        {
+          "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\primary_sources\\mglu_ipo_20110429.pdf",
+          "sha256": "6db74b73f885a9e1e0f9e129feded8db9ed20bd84c95f9b81a4e0c098364df1e"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\fca_identity_admission\\source_clock\\fca_documents.json",
+          "sha256": "e989c2ef246763704d309a25bdde0df4ce25e5e901181790a6453fabed60c905"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\fca_originals\\48228\\manifest.json",
+          "sha256": "7ed84e8eeafdfd74a8a63045c8f8e248a9dbfb7f814efd935ef98ca26ac5cb7a"
+        }
+      ],
+      "id": "48228",
+      "isin": "BRMGLUACNOR2",
+      "known_date": "2011-05-02",
+      "reason": "Original Apr29 2011 offering explicitly binds MGLU3, ordinary shares and this ISIN; next-business-day trading is May2. Restore only the omitted/misclassified dated FCA security."
+    },
+    {
+      "after": [
+        {
+          "class": "ON",
+          "end": "9999-12-31",
+          "listing_end": "9999-12-31",
+          "listing_start": "2011-05-02",
+          "preferred_class": "",
+          "segment_end": "9999-12-31",
+          "segment_start": "2011-05-02",
+          "source_bound_isin": "BRMGLUACNOR2",
+          "source_type_authority": "HTML equity category only; class unresolved",
+          "source_type_description": "Ações",
+          "start": "2011-05-02",
+          "ticker": "MGLU3",
+          "unit_composition": ""
+        }
+      ],
+      "before": [
+        {
+          "class": "SHARES",
+          "end": "9999-12-31",
+          "listing_end": "9999-12-31",
+          "listing_start": "2011-05-02",
+          "preferred_class": "",
+          "segment_end": "9999-12-31",
+          "segment_start": "2011-05-02",
+          "source_type_authority": "HTML equity category only; class unresolved",
+          "source_type_description": "Ações",
+          "start": "2011-05-02",
+          "ticker": "",
+          "unit_composition": ""
+        }
+      ],
+      "cnpj": "47960950000121",
+      "cvm_code": "022470",
+      "evidence": [
+        {
+          "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\primary_sources\\mglu_ipo_20110429.pdf",
+          "sha256": "6db74b73f885a9e1e0f9e129feded8db9ed20bd84c95f9b81a4e0c098364df1e"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\fca_identity_admission\\source_clock\\fca_documents.json",
+          "sha256": "e989c2ef246763704d309a25bdde0df4ce25e5e901181790a6453fabed60c905"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\fca_originals\\51352\\manifest.json",
+          "sha256": "c1b0f8bae0130a8a076366773bd11b3917f3cea07fd9c319f6caf58e2779a898"
+        }
+      ],
+      "id": "51352",
+      "isin": "BRMGLUACNOR2",
+      "known_date": "2011-05-02",
+      "reason": "Original Apr29 2011 offering explicitly binds MGLU3, ordinary shares and this ISIN; next-business-day trading is May2. Restore only the omitted/misclassified dated FCA security."
+    },
+    {
+      "after": [
+        {
+          "class": "ON",
+          "end": "9999-12-31",
+          "listing_end": "9999-12-31",
+          "listing_start": "2011-05-02",
+          "preferred_class": "",
+          "segment_end": "9999-12-31",
+          "segment_start": "2011-05-02",
+          "source_bound_isin": "BRMGLUACNOR2",
+          "source_class_description": "",
+          "source_segment_description": "Novo Mercado",
+          "source_type_code": "1",
+          "source_type_description": "Ações",
+          "start": "2011-05-02",
+          "ticker": "MGLU3",
+          "unit_composition": ""
+        }
+      ],
+      "before": [
+        {
+          "class": "SHARES",
+          "end": "9999-12-31",
+          "listing_end": "9999-12-31",
+          "listing_start": "2011-05-02",
+          "preferred_class": "",
+          "segment_end": "9999-12-31",
+          "segment_start": "2011-05-02",
+          "source_class_description": "",
+          "source_segment_description": "Novo Mercado",
+          "source_type_code": "1",
+          "source_type_description": "Ações",
+          "start": "2011-05-02",
+          "ticker": "",
+          "unit_composition": ""
+        }
+      ],
+      "cnpj": "47960950000121",
+      "cvm_code": "022470",
+      "evidence": [
+        {
+          "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\primary_sources\\mglu_ipo_20110429.pdf",
+          "sha256": "6db74b73f885a9e1e0f9e129feded8db9ed20bd84c95f9b81a4e0c098364df1e"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\fca_identity_admission\\source_clock\\fca_documents.json",
+          "sha256": "e989c2ef246763704d309a25bdde0df4ce25e5e901181790a6453fabed60c905"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\fca_originals\\52862\\manifest.json",
+          "sha256": "64b22a035eb4a9b49a7820c6d7e9fc16480b46ce09e1030b1067df195126f8a0"
+        }
+      ],
+      "id": "52862",
+      "isin": "BRMGLUACNOR2",
+      "known_date": "2011-05-02",
+      "reason": "Original Apr29 2011 offering explicitly binds MGLU3, ordinary shares and this ISIN; next-business-day trading is May2. Restore only the omitted/misclassified dated FCA security."
+    },
+    {
+      "after": [
+        {
+          "class": "ON",
+          "end": "9999-12-31",
+          "listing_end": "9999-12-31",
+          "listing_start": "2011-05-02",
+          "preferred_class": "",
+          "segment_end": "9999-12-31",
+          "segment_start": "2011-05-02",
+          "source_bound_isin": "BRMGLUACNOR2",
+          "source_class_description": "",
+          "source_segment_description": "Novo Mercado",
+          "source_type_code": "1",
+          "source_type_description": "Ações",
+          "start": "2011-05-02",
+          "ticker": "MGLU3",
+          "unit_composition": ""
+        }
+      ],
+      "before": [
+        {
+          "class": "SHARES",
+          "end": "9999-12-31",
+          "listing_end": "9999-12-31",
+          "listing_start": "2011-05-02",
+          "preferred_class": "",
+          "segment_end": "9999-12-31",
+          "segment_start": "2011-05-02",
+          "source_class_description": "",
+          "source_segment_description": "Novo Mercado",
+          "source_type_code": "1",
+          "source_type_description": "Ações",
+          "start": "2011-05-02",
+          "ticker": "",
+          "unit_composition": ""
+        }
+      ],
+      "cnpj": "47960950000121",
+      "cvm_code": "022470",
+      "evidence": [
+        {
+          "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\primary_sources\\mglu_ipo_20110429.pdf",
+          "sha256": "6db74b73f885a9e1e0f9e129feded8db9ed20bd84c95f9b81a4e0c098364df1e"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\fca_identity_admission\\source_clock\\fca_documents.json",
+          "sha256": "e989c2ef246763704d309a25bdde0df4ce25e5e901181790a6453fabed60c905"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\fca_originals\\57225\\manifest.json",
+          "sha256": "0b8e7f3e97a8d446aa1bb1548363baa711a933f033cc870931c9872ba287afa7"
+        }
+      ],
+      "id": "57225",
+      "isin": "BRMGLUACNOR2",
+      "known_date": "2011-05-02",
+      "reason": "Original Apr29 2011 offering explicitly binds MGLU3, ordinary shares and this ISIN; next-business-day trading is May2. Restore only the omitted/misclassified dated FCA security."
+    },
+    {
+      "after": [
+        {
+          "class": "ON",
+          "end": "9999-12-31",
+          "listing_end": "9999-12-31",
+          "listing_start": "2011-05-02",
+          "preferred_class": "",
+          "segment_end": "9999-12-31",
+          "segment_start": "2011-05-02",
+          "source_bound_isin": "BRMGLUACNOR2",
+          "source_class_description": "",
+          "source_segment_description": "Novo Mercado",
+          "source_type_code": "1",
+          "source_type_description": "Ações",
+          "start": "2011-05-02",
+          "ticker": "MGLU3",
+          "unit_composition": ""
+        }
+      ],
+      "before": [
+        {
+          "class": "SHARES",
+          "end": "9999-12-31",
+          "listing_end": "9999-12-31",
+          "listing_start": "2011-05-02",
+          "preferred_class": "",
+          "segment_end": "9999-12-31",
+          "segment_start": "2011-05-02",
+          "source_class_description": "",
+          "source_segment_description": "Novo Mercado",
+          "source_type_code": "1",
+          "source_type_description": "Ações",
+          "start": "2011-05-02",
+          "ticker": "",
+          "unit_composition": ""
+        }
+      ],
+      "cnpj": "47960950000121",
+      "cvm_code": "022470",
+      "evidence": [
+        {
+          "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\primary_sources\\mglu_ipo_20110429.pdf",
+          "sha256": "6db74b73f885a9e1e0f9e129feded8db9ed20bd84c95f9b81a4e0c098364df1e"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\fca_identity_admission\\source_clock\\fca_documents.json",
+          "sha256": "e989c2ef246763704d309a25bdde0df4ce25e5e901181790a6453fabed60c905"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\fca_originals\\61820\\manifest.json",
+          "sha256": "564a6303c8f3deb814f52c8227551518f9e1d89d65734b458a1b5e29ef635742"
+        }
+      ],
+      "id": "61820",
+      "isin": "BRMGLUACNOR2",
+      "known_date": "2011-05-02",
+      "reason": "Original Apr29 2011 offering explicitly binds MGLU3, ordinary shares and this ISIN; next-business-day trading is May2. Restore only the omitted/misclassified dated FCA security."
+    },
+    {
+      "after": [
+        {
+          "class": "ON",
+          "end": "9999-12-31",
+          "listing_end": "9999-12-31",
+          "listing_start": "2011-05-02",
+          "preferred_class": "",
+          "segment_end": "9999-12-31",
+          "segment_start": "2011-05-02",
+          "source_bound_isin": "BRMGLUACNOR2",
+          "source_class_description": "",
+          "source_segment_description": "Novo Mercado",
+          "source_type_code": "1",
+          "source_type_description": "Ações",
+          "start": "2011-05-02",
+          "ticker": "MGLU3",
+          "unit_composition": ""
+        }
+      ],
+      "before": [
+        {
+          "class": "SHARES",
+          "end": "9999-12-31",
+          "listing_end": "9999-12-31",
+          "listing_start": "2011-05-02",
+          "preferred_class": "",
+          "segment_end": "9999-12-31",
+          "segment_start": "2011-05-02",
+          "source_class_description": "",
+          "source_segment_description": "Novo Mercado",
+          "source_type_code": "1",
+          "source_type_description": "Ações",
+          "start": "2011-05-02",
+          "ticker": "",
+          "unit_composition": ""
+        }
+      ],
+      "cnpj": "47960950000121",
+      "cvm_code": "022470",
+      "evidence": [
+        {
+          "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\primary_sources\\mglu_ipo_20110429.pdf",
+          "sha256": "6db74b73f885a9e1e0f9e129feded8db9ed20bd84c95f9b81a4e0c098364df1e"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\fca_identity_admission\\source_clock\\fca_documents.json",
+          "sha256": "e989c2ef246763704d309a25bdde0df4ce25e5e901181790a6453fabed60c905"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\fca_originals\\64260\\manifest.json",
+          "sha256": "f94eee1921226a7bd424e2226e73fc4d3fdcb1747c5ffe4d6fc656ecf3ae7768"
+        }
+      ],
+      "id": "64260",
+      "isin": "BRMGLUACNOR2",
+      "known_date": "2011-05-02",
+      "reason": "Original Apr29 2011 offering explicitly binds MGLU3, ordinary shares and this ISIN; next-business-day trading is May2. Restore only the omitted/misclassified dated FCA security."
+    },
+    {
+      "after": [
+        {
+          "class": "ON",
+          "end": "9999-12-31",
+          "listing_end": "9999-12-31",
+          "listing_start": "2011-05-02",
+          "preferred_class": "",
+          "segment_end": "9999-12-31",
+          "segment_start": "2011-05-02",
+          "source_bound_isin": "BRMGLUACNOR2",
+          "source_class_description": "",
+          "source_segment_description": "Novo Mercado",
+          "source_type_code": "1",
+          "source_type_description": "Ações",
+          "start": "2011-05-02",
+          "ticker": "MGLU3",
+          "unit_composition": ""
+        }
+      ],
+      "before": [
+        {
+          "class": "SHARES",
+          "end": "9999-12-31",
+          "listing_end": "9999-12-31",
+          "listing_start": "2011-05-02",
+          "preferred_class": "",
+          "segment_end": "9999-12-31",
+          "segment_start": "2011-05-02",
+          "source_class_description": "",
+          "source_segment_description": "Novo Mercado",
+          "source_type_code": "1",
+          "source_type_description": "Ações",
+          "start": "2011-05-02",
+          "ticker": "",
+          "unit_composition": ""
+        }
+      ],
+      "cnpj": "47960950000121",
+      "cvm_code": "022470",
+      "evidence": [
+        {
+          "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\primary_sources\\mglu_ipo_20110429.pdf",
+          "sha256": "6db74b73f885a9e1e0f9e129feded8db9ed20bd84c95f9b81a4e0c098364df1e"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\fca_identity_admission\\source_clock\\fca_documents.json",
+          "sha256": "e989c2ef246763704d309a25bdde0df4ce25e5e901181790a6453fabed60c905"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\fca_originals\\64601\\manifest.json",
+          "sha256": "075ae9bb415acc40a6d648f1f8c872162d8f31a4dd2ef13286e2c3694ef61b09"
+        }
+      ],
+      "id": "64601",
+      "isin": "BRMGLUACNOR2",
+      "known_date": "2011-05-02",
+      "reason": "Original Apr29 2011 offering explicitly binds MGLU3, ordinary shares and this ISIN; next-business-day trading is May2. Restore only the omitted/misclassified dated FCA security."
+    },
+    {
+      "after": [
+        {
+          "class": "ON",
+          "end": "9999-12-31",
+          "preferred_class": "",
+          "segment_end": "",
+          "segment_start": "2011-05-02",
+          "source_bound_isin": "BRMGLUACNOR2",
+          "start": "2011-05-02",
+          "ticker": "MGLU3",
+          "unit_composition": ""
+        }
+      ],
+      "before": [
+        {
+          "class": "PN",
+          "end": "9999-12-31",
+          "preferred_class": "PNA",
+          "segment_end": "",
+          "segment_start": "2011-05-02",
+          "start": "2011-05-02",
+          "ticker": "MGLU3",
+          "unit_composition": ""
+        }
+      ],
+      "cnpj": "47960950000121",
+      "cvm_code": "022470",
+      "evidence": [
+        {
+          "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\primary_sources\\mglu_ipo_20110429.pdf",
+          "sha256": "6db74b73f885a9e1e0f9e129feded8db9ed20bd84c95f9b81a4e0c098364df1e"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\fca_identity_admission\\source_clock\\fca_documents.json",
+          "sha256": "e989c2ef246763704d309a25bdde0df4ce25e5e901181790a6453fabed60c905"
+        }
+      ],
+      "id": "77943",
+      "isin": "BRMGLUACNOR2",
+      "known_date": "2011-05-02",
+      "reason": "Original Apr29 2011 offering explicitly binds MGLU3, ordinary shares and this ISIN; next-business-day trading is May2. Restore only the omitted/misclassified dated FCA security."
+    },
+    {
+      "after": [
+        {
+          "class": "ON",
+          "end": "9999-12-31",
+          "preferred_class": "",
+          "segment_end": "",
+          "segment_start": "2011-05-02",
+          "source_bound_isin": "BRMGLUACNOR2",
+          "start": "2011-05-02",
+          "ticker": "MGLU3",
+          "unit_composition": ""
+        }
+      ],
+      "before": [
+        {
+          "class": "PN",
+          "end": "9999-12-31",
+          "preferred_class": "PNA",
+          "segment_end": "",
+          "segment_start": "2011-05-02",
+          "start": "2011-05-02",
+          "ticker": "MGLU3",
+          "unit_composition": ""
+        }
+      ],
+      "cnpj": "47960950000121",
+      "cvm_code": "022470",
+      "evidence": [
+        {
+          "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\primary_sources\\mglu_ipo_20110429.pdf",
+          "sha256": "6db74b73f885a9e1e0f9e129feded8db9ed20bd84c95f9b81a4e0c098364df1e"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\fca_identity_admission\\source_clock\\fca_documents.json",
+          "sha256": "e989c2ef246763704d309a25bdde0df4ce25e5e901181790a6453fabed60c905"
+        }
+      ],
+      "id": "88916",
+      "isin": "BRMGLUACNOR2",
+      "known_date": "2011-05-02",
+      "reason": "Original Apr29 2011 offering explicitly binds MGLU3, ordinary shares and this ISIN; next-business-day trading is May2. Restore only the omitted/misclassified dated FCA security."
+    },
+    {
+      "after": [
+        {
+          "class": "ON",
+          "end": "9999-12-31",
+          "preferred_class": "",
+          "segment_end": "",
+          "segment_start": "2011-05-02",
+          "source_bound_isin": "BRMGLUACNOR2",
+          "start": "2011-05-02",
+          "ticker": "MGLU3",
+          "unit_composition": ""
+        }
+      ],
+      "before": [
+        {
+          "class": "PN",
+          "end": "9999-12-31",
+          "preferred_class": "PNA",
+          "segment_end": "",
+          "segment_start": "2011-05-02",
+          "start": "2011-05-02",
+          "ticker": "MGLU3",
+          "unit_composition": ""
+        }
+      ],
+      "cnpj": "47960950000121",
+      "cvm_code": "022470",
+      "evidence": [
+        {
+          "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\primary_sources\\mglu_ipo_20110429.pdf",
+          "sha256": "6db74b73f885a9e1e0f9e129feded8db9ed20bd84c95f9b81a4e0c098364df1e"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\fca_identity_admission\\source_clock\\fca_documents.json",
+          "sha256": "e989c2ef246763704d309a25bdde0df4ce25e5e901181790a6453fabed60c905"
+        }
+      ],
+      "id": "94376",
+      "isin": "BRMGLUACNOR2",
+      "known_date": "2011-05-02",
+      "reason": "Original Apr29 2011 offering explicitly binds MGLU3, ordinary shares and this ISIN; next-business-day trading is May2. Restore only the omitted/misclassified dated FCA security."
+    },
+    {
+      "after": [
+        {
+          "class": "ON",
+          "end": "9999-12-31",
+          "preferred_class": "",
+          "segment_end": "",
+          "segment_start": "2011-05-02",
+          "source_bound_isin": "BRMGLUACNOR2",
+          "start": "2011-05-02",
+          "ticker": "MGLU3",
+          "unit_composition": ""
+        }
+      ],
+      "before": [
+        {
+          "class": "PN",
+          "end": "9999-12-31",
+          "preferred_class": "PNA",
+          "segment_end": "",
+          "segment_start": "2011-05-02",
+          "start": "2011-05-02",
+          "ticker": "MGLU3",
+          "unit_composition": ""
+        }
+      ],
+      "cnpj": "47960950000121",
+      "cvm_code": "022470",
+      "evidence": [
+        {
+          "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\primary_sources\\mglu_ipo_20110429.pdf",
+          "sha256": "6db74b73f885a9e1e0f9e129feded8db9ed20bd84c95f9b81a4e0c098364df1e"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\fca_identity_admission\\source_clock\\fca_documents.json",
+          "sha256": "e989c2ef246763704d309a25bdde0df4ce25e5e901181790a6453fabed60c905"
+        }
+      ],
+      "id": "113988",
+      "isin": "BRMGLUACNOR2",
+      "known_date": "2011-05-02",
+      "reason": "Original Apr29 2011 offering explicitly binds MGLU3, ordinary shares and this ISIN; next-business-day trading is May2. Restore only the omitted/misclassified dated FCA security."
+    },
+    {
+      "after": [
+        {
+          "class": "ON",
+          "end": "9999-12-31",
+          "preferred_class": "",
+          "segment_end": "",
+          "segment_start": "2011-05-02",
+          "source_bound_isin": "BRMGLUACNOR2",
+          "start": "2011-05-02",
+          "ticker": "MGLU3",
+          "unit_composition": ""
+        }
+      ],
+      "before": [
+        {
+          "class": "PN",
+          "end": "9999-12-31",
+          "preferred_class": "PNA",
+          "segment_end": "",
+          "segment_start": "2011-05-02",
+          "start": "2011-05-02",
+          "ticker": "MGLU3",
+          "unit_composition": ""
+        }
+      ],
+      "cnpj": "47960950000121",
+      "cvm_code": "022470",
+      "evidence": [
+        {
+          "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\primary_sources\\mglu_ipo_20110429.pdf",
+          "sha256": "6db74b73f885a9e1e0f9e129feded8db9ed20bd84c95f9b81a4e0c098364df1e"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\fca_identity_admission\\source_clock\\fca_documents.json",
+          "sha256": "e989c2ef246763704d309a25bdde0df4ce25e5e901181790a6453fabed60c905"
+        }
+      ],
+      "id": "116102",
+      "isin": "BRMGLUACNOR2",
+      "known_date": "2011-05-02",
+      "reason": "Original Apr29 2011 offering explicitly binds MGLU3, ordinary shares and this ISIN; next-business-day trading is May2. Restore only the omitted/misclassified dated FCA security."
+    },
+    {
+      "after": [
+        {
+          "class": "ON",
+          "end": "9999-12-31",
+          "preferred_class": "",
+          "segment_end": "",
+          "segment_start": "2011-05-02",
+          "source_bound_isin": "BRMGLUACNOR2",
+          "start": "2011-05-02",
+          "ticker": "MGLU3",
+          "unit_composition": ""
+        }
+      ],
+      "before": [
+        {
+          "class": "PN",
+          "end": "9999-12-31",
+          "preferred_class": "PNA",
+          "segment_end": "",
+          "segment_start": "2011-05-02",
+          "start": "2011-05-02",
+          "ticker": "MGLU3",
+          "unit_composition": ""
+        }
+      ],
+      "cnpj": "47960950000121",
+      "cvm_code": "022470",
+      "evidence": [
+        {
+          "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\primary_sources\\mglu_ipo_20110429.pdf",
+          "sha256": "6db74b73f885a9e1e0f9e129feded8db9ed20bd84c95f9b81a4e0c098364df1e"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\fca_identity_admission\\source_clock\\fca_documents.json",
+          "sha256": "e989c2ef246763704d309a25bdde0df4ce25e5e901181790a6453fabed60c905"
+        }
+      ],
+      "id": "127810",
+      "isin": "BRMGLUACNOR2",
+      "known_date": "2011-05-02",
+      "reason": "Original Apr29 2011 offering explicitly binds MGLU3, ordinary shares and this ISIN; next-business-day trading is May2. Restore only the omitted/misclassified dated FCA security."
+    },
+    {
+      "after": [
+        {
+          "class": "ON",
+          "end": "9999-12-31",
+          "preferred_class": "",
+          "segment_end": "",
+          "segment_start": "2011-05-02",
+          "source_bound_isin": "BRMGLUACNOR2",
+          "start": "2011-05-02",
+          "ticker": "MGLU3",
+          "unit_composition": ""
+        }
+      ],
+      "before": [
+        {
+          "class": "PN",
+          "end": "9999-12-31",
+          "preferred_class": "PNA",
+          "segment_end": "",
+          "segment_start": "2011-05-02",
+          "start": "2011-05-02",
+          "ticker": "MGLU3",
+          "unit_composition": ""
+        }
+      ],
+      "cnpj": "47960950000121",
+      "cvm_code": "022470",
+      "evidence": [
+        {
+          "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\primary_sources\\mglu_ipo_20110429.pdf",
+          "sha256": "6db74b73f885a9e1e0f9e129feded8db9ed20bd84c95f9b81a4e0c098364df1e"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\fca_identity_admission\\source_clock\\fca_documents.json",
+          "sha256": "e989c2ef246763704d309a25bdde0df4ce25e5e901181790a6453fabed60c905"
+        }
+      ],
+      "id": "140345",
+      "isin": "BRMGLUACNOR2",
+      "known_date": "2011-05-02",
+      "reason": "Original Apr29 2011 offering explicitly binds MGLU3, ordinary shares and this ISIN; next-business-day trading is May2. Restore only the omitted/misclassified dated FCA security."
+    },
+    {
+      "after": [
+        {
+          "class": "SHARES",
+          "end": "9999-12-31",
+          "listing_end": "9999-12-31",
+          "listing_start": "2007-07-23",
+          "preferred_class": "",
+          "segment_end": "9999-12-31",
+          "segment_start": "2007-07-23",
+          "source_bound_isin": "BRABCBACNPR4",
+          "source_class_description": "",
+          "source_segment_description": "Bovespa Nível 2",
+          "source_type_code": "1",
+          "source_type_description": "Ações",
+          "start": "2007-07-23",
+          "ticker": "ABCB4",
+          "unit_composition": ""
+        }
+      ],
+      "before": [
+        {
+          "class": "SHARES",
+          "end": "9999-12-31",
+          "listing_end": "9999-12-31",
+          "listing_start": "2007-07-23",
+          "preferred_class": "",
+          "segment_end": "9999-12-31",
+          "segment_start": "2007-07-23",
+          "source_class_description": "",
+          "source_segment_description": "Bovespa Nível 2",
+          "source_type_code": "1",
+          "source_type_description": "Ações",
+          "start": "2007-07-23",
+          "ticker": "",
+          "unit_composition": ""
+        }
+      ],
+      "cnpj": "28195667000106",
+      "cvm_code": "020958",
+      "evidence": [
+        {
+          "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\primary_sources\\abc_results_4q2007.pdf",
+          "sha256": "11ef2458ba58e77b7039ff033dac9992c287eb2ca5963a3b25bb6d5349cc4a4b"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\fca_identity_admission\\source_clock\\fca_documents.json",
+          "sha256": "e989c2ef246763704d309a25bdde0df4ce25e5e901181790a6453fabed60c905"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\fca_originals\\265\\manifest.json",
+          "sha256": "cc363aecc82a864d3886461ef499c7d2c37c9155dc3741a5b7c22006b0064ab5"
+        }
+      ],
+      "id": "265",
+      "isin": "BRABCBACNPR4",
+      "known_date": "2008-01-31",
+      "reason": "Issuer Jan30 2008 original release explicitly names ABCB4. Exact dated FCA issuer plus prior original B3 ticker/ISIN/spec establish this PN security. Preserve original PNA wording in before/source fields; normalize its exchange-class join only, without claiming a legal class change or overriding other issuers."
+    },
+    {
+      "after": [
+        {
+          "class": "SHARES",
+          "end": "9999-12-31",
+          "listing_end": "9999-12-31",
+          "listing_start": "2007-07-23",
+          "preferred_class": "",
+          "segment_end": "9999-12-31",
+          "segment_start": "2007-07-23",
+          "source_bound_isin": "BRABCBACNPR4",
+          "source_class_description": "",
+          "source_segment_description": "Bovespa Nível 2",
+          "source_type_code": "1",
+          "source_type_description": "Ações",
+          "start": "2007-07-23",
+          "ticker": "ABCB4",
+          "unit_composition": ""
+        }
+      ],
+      "before": [
+        {
+          "class": "SHARES",
+          "end": "9999-12-31",
+          "listing_end": "9999-12-31",
+          "listing_start": "2007-07-23",
+          "preferred_class": "",
+          "segment_end": "9999-12-31",
+          "segment_start": "2007-07-23",
+          "source_class_description": "",
+          "source_segment_description": "Bovespa Nível 2",
+          "source_type_code": "1",
+          "source_type_description": "Ações",
+          "start": "2007-07-23",
+          "ticker": "",
+          "unit_composition": ""
+        }
+      ],
+      "cnpj": "28195667000106",
+      "cvm_code": "020958",
+      "evidence": [
+        {
+          "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\primary_sources\\abc_results_4q2007.pdf",
+          "sha256": "11ef2458ba58e77b7039ff033dac9992c287eb2ca5963a3b25bb6d5349cc4a4b"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\fca_identity_admission\\source_clock\\fca_documents.json",
+          "sha256": "e989c2ef246763704d309a25bdde0df4ce25e5e901181790a6453fabed60c905"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\fca_originals\\4086\\manifest.json",
+          "sha256": "e0b90ca6b054ae7d75c45b29716ef48274e822160848f026e555e35b03c4134c"
+        }
+      ],
+      "id": "4086",
+      "isin": "BRABCBACNPR4",
+      "known_date": "2008-01-31",
+      "reason": "Issuer Jan30 2008 original release explicitly names ABCB4. Exact dated FCA issuer plus prior original B3 ticker/ISIN/spec establish this PN security. Preserve original PNA wording in before/source fields; normalize its exchange-class join only, without claiming a legal class change or overriding other issuers."
+    },
+    {
+      "after": [
+        {
+          "class": "SHARES",
+          "end": "9999-12-31",
+          "listing_end": "9999-12-31",
+          "listing_start": "2007-07-23",
+          "preferred_class": "",
+          "segment_end": "9999-12-31",
+          "segment_start": "2007-07-23",
+          "source_bound_isin": "BRABCBACNPR4",
+          "source_class_description": "",
+          "source_segment_description": "Bovespa Nível 2",
+          "source_type_code": "1",
+          "source_type_description": "Ações",
+          "start": "2007-07-23",
+          "ticker": "ABCB4",
+          "unit_composition": ""
+        }
+      ],
+      "before": [
+        {
+          "class": "SHARES",
+          "end": "9999-12-31",
+          "listing_end": "9999-12-31",
+          "listing_start": "2007-07-23",
+          "preferred_class": "",
+          "segment_end": "9999-12-31",
+          "segment_start": "2007-07-23",
+          "source_class_description": "",
+          "source_segment_description": "Bovespa Nível 2",
+          "source_type_code": "1",
+          "source_type_description": "Ações",
+          "start": "2007-07-23",
+          "ticker": "",
+          "unit_composition": ""
+        }
+      ],
+      "cnpj": "28195667000106",
+      "cvm_code": "020958",
+      "evidence": [
+        {
+          "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\primary_sources\\abc_results_4q2007.pdf",
+          "sha256": "11ef2458ba58e77b7039ff033dac9992c287eb2ca5963a3b25bb6d5349cc4a4b"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\fca_identity_admission\\source_clock\\fca_documents.json",
+          "sha256": "e989c2ef246763704d309a25bdde0df4ce25e5e901181790a6453fabed60c905"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\fca_originals\\6684\\manifest.json",
+          "sha256": "17d9526d675a0192eca1840db5513282150652ad4a13a91b71cbd0c478a3665d"
+        }
+      ],
+      "id": "6684",
+      "isin": "BRABCBACNPR4",
+      "known_date": "2008-01-31",
+      "reason": "Issuer Jan30 2008 original release explicitly names ABCB4. Exact dated FCA issuer plus prior original B3 ticker/ISIN/spec establish this PN security. Preserve original PNA wording in before/source fields; normalize its exchange-class join only, without claiming a legal class change or overriding other issuers."
+    },
+    {
+      "after": [
+        {
+          "class": "SHARES",
+          "end": "9999-12-31",
+          "listing_end": "9999-12-31",
+          "listing_start": "2007-07-23",
+          "preferred_class": "",
+          "segment_end": "9999-12-31",
+          "segment_start": "2007-07-23",
+          "source_bound_isin": "BRABCBACNPR4",
+          "source_class_description": "",
+          "source_segment_description": "Bovespa Nível 2",
+          "source_type_code": "1",
+          "source_type_description": "Ações",
+          "start": "2007-07-23",
+          "ticker": "ABCB4",
+          "unit_composition": ""
+        }
+      ],
+      "before": [
+        {
+          "class": "SHARES",
+          "end": "9999-12-31",
+          "listing_end": "9999-12-31",
+          "listing_start": "2007-07-23",
+          "preferred_class": "",
+          "segment_end": "9999-12-31",
+          "segment_start": "2007-07-23",
+          "source_class_description": "",
+          "source_segment_description": "Bovespa Nível 2",
+          "source_type_code": "1",
+          "source_type_description": "Ações",
+          "start": "2007-07-23",
+          "ticker": "",
+          "unit_composition": ""
+        }
+      ],
+      "cnpj": "28195667000106",
+      "cvm_code": "020958",
+      "evidence": [
+        {
+          "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\primary_sources\\abc_results_4q2007.pdf",
+          "sha256": "11ef2458ba58e77b7039ff033dac9992c287eb2ca5963a3b25bb6d5349cc4a4b"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\fca_identity_admission\\source_clock\\fca_documents.json",
+          "sha256": "e989c2ef246763704d309a25bdde0df4ce25e5e901181790a6453fabed60c905"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\fca_originals\\8404\\manifest.json",
+          "sha256": "1755403990860cf1abd601291a7aebecad578dc89d17cd414607f197c72f73b1"
+        }
+      ],
+      "id": "8404",
+      "isin": "BRABCBACNPR4",
+      "known_date": "2008-01-31",
+      "reason": "Issuer Jan30 2008 original release explicitly names ABCB4. Exact dated FCA issuer plus prior original B3 ticker/ISIN/spec establish this PN security. Preserve original PNA wording in before/source fields; normalize its exchange-class join only, without claiming a legal class change or overriding other issuers."
+    },
+    {
+      "after": [
+        {
+          "class": "SHARES",
+          "end": "9999-12-31",
+          "listing_end": "9999-12-31",
+          "listing_start": "2007-07-23",
+          "preferred_class": "",
+          "segment_end": "9999-12-31",
+          "segment_start": "2007-07-23",
+          "source_bound_isin": "BRABCBACNPR4",
+          "source_class_description": "",
+          "source_segment_description": "Bovespa Nível 2",
+          "source_type_code": "1",
+          "source_type_description": "Ações",
+          "start": "2007-07-23",
+          "ticker": "ABCB4",
+          "unit_composition": ""
+        }
+      ],
+      "before": [
+        {
+          "class": "SHARES",
+          "end": "9999-12-31",
+          "listing_end": "9999-12-31",
+          "listing_start": "2007-07-23",
+          "preferred_class": "",
+          "segment_end": "9999-12-31",
+          "segment_start": "2007-07-23",
+          "source_class_description": "",
+          "source_segment_description": "Bovespa Nível 2",
+          "source_type_code": "1",
+          "source_type_description": "Ações",
+          "start": "2007-07-23",
+          "ticker": "",
+          "unit_composition": ""
+        }
+      ],
+      "cnpj": "28195667000106",
+      "cvm_code": "020958",
+      "evidence": [
+        {
+          "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\primary_sources\\abc_results_4q2007.pdf",
+          "sha256": "11ef2458ba58e77b7039ff033dac9992c287eb2ca5963a3b25bb6d5349cc4a4b"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\fca_identity_admission\\source_clock\\fca_documents.json",
+          "sha256": "e989c2ef246763704d309a25bdde0df4ce25e5e901181790a6453fabed60c905"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\fca_originals\\13556\\manifest.json",
+          "sha256": "e88860e8a742f8be05c178354393e3120a2d7653122c60c19cff2c0b6a3c95e4"
+        }
+      ],
+      "id": "13556",
+      "isin": "BRABCBACNPR4",
+      "known_date": "2008-01-31",
+      "reason": "Issuer Jan30 2008 original release explicitly names ABCB4. Exact dated FCA issuer plus prior original B3 ticker/ISIN/spec establish this PN security. Preserve original PNA wording in before/source fields; normalize its exchange-class join only, without claiming a legal class change or overriding other issuers."
+    },
+    {
+      "after": [
+        {
+          "class": "SHARES",
+          "end": "9999-12-31",
+          "listing_end": "9999-12-31",
+          "listing_start": "2007-07-23",
+          "preferred_class": "",
+          "segment_end": "9999-12-31",
+          "segment_start": "2007-07-23",
+          "source_bound_isin": "BRABCBACNPR4",
+          "source_type_authority": "HTML equity category only; class unresolved",
+          "source_type_description": "Ações",
+          "start": "2007-07-23",
+          "ticker": "ABCB4",
+          "unit_composition": ""
+        }
+      ],
+      "before": [
+        {
+          "class": "SHARES",
+          "end": "9999-12-31",
+          "listing_end": "9999-12-31",
+          "listing_start": "2007-07-23",
+          "preferred_class": "",
+          "segment_end": "9999-12-31",
+          "segment_start": "2007-07-23",
+          "source_type_authority": "HTML equity category only; class unresolved",
+          "source_type_description": "Ações",
+          "start": "2007-07-23",
+          "ticker": "",
+          "unit_composition": ""
+        }
+      ],
+      "cnpj": "28195667000106",
+      "cvm_code": "020958",
+      "evidence": [
+        {
+          "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\primary_sources\\abc_results_4q2007.pdf",
+          "sha256": "11ef2458ba58e77b7039ff033dac9992c287eb2ca5963a3b25bb6d5349cc4a4b"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\fca_identity_admission\\source_clock\\fca_documents.json",
+          "sha256": "e989c2ef246763704d309a25bdde0df4ce25e5e901181790a6453fabed60c905"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\fca_originals\\14736\\manifest.json",
+          "sha256": "ef7f963a263b179c9a79975b612adac2d0b5e85409488f724d278f497e75498e"
+        }
+      ],
+      "id": "14736",
+      "isin": "BRABCBACNPR4",
+      "known_date": "2008-01-31",
+      "reason": "Issuer Jan30 2008 original release explicitly names ABCB4. Exact dated FCA issuer plus prior original B3 ticker/ISIN/spec establish this PN security. Preserve original PNA wording in before/source fields; normalize its exchange-class join only, without claiming a legal class change or overriding other issuers."
+    },
+    {
+      "after": [
+        {
+          "class": "SHARES",
+          "end": "9999-12-31",
+          "listing_end": "9999-12-31",
+          "listing_start": "2007-07-23",
+          "preferred_class": "",
+          "segment_end": "9999-12-31",
+          "segment_start": "2007-07-23",
+          "source_bound_isin": "BRABCBACNPR4",
+          "source_class_description": "",
+          "source_segment_description": "Bovespa Nível 2",
+          "source_type_code": "1",
+          "source_type_description": "Ações",
+          "start": "2007-07-23",
+          "ticker": "ABCB4",
+          "unit_composition": ""
+        }
+      ],
+      "before": [
+        {
+          "class": "SHARES",
+          "end": "9999-12-31",
+          "listing_end": "9999-12-31",
+          "listing_start": "2007-07-23",
+          "preferred_class": "",
+          "segment_end": "9999-12-31",
+          "segment_start": "2007-07-23",
+          "source_class_description": "",
+          "source_segment_description": "Bovespa Nível 2",
+          "source_type_code": "1",
+          "source_type_description": "Ações",
+          "start": "2007-07-23",
+          "ticker": "",
+          "unit_composition": ""
+        }
+      ],
+      "cnpj": "28195667000106",
+      "cvm_code": "020958",
+      "evidence": [
+        {
+          "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\primary_sources\\abc_results_4q2007.pdf",
+          "sha256": "11ef2458ba58e77b7039ff033dac9992c287eb2ca5963a3b25bb6d5349cc4a4b"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\fca_identity_admission\\source_clock\\fca_documents.json",
+          "sha256": "e989c2ef246763704d309a25bdde0df4ce25e5e901181790a6453fabed60c905"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\fca_originals\\16907\\manifest.json",
+          "sha256": "8c3a0022c2103d255d57823019256316a93fb632290ec3fc9bec87409a42ff5d"
+        }
+      ],
+      "id": "16907",
+      "isin": "BRABCBACNPR4",
+      "known_date": "2008-01-31",
+      "reason": "Issuer Jan30 2008 original release explicitly names ABCB4. Exact dated FCA issuer plus prior original B3 ticker/ISIN/spec establish this PN security. Preserve original PNA wording in before/source fields; normalize its exchange-class join only, without claiming a legal class change or overriding other issuers."
+    },
+    {
+      "after": [
+        {
+          "class": "SHARES",
+          "end": "9999-12-31",
+          "listing_end": "9999-12-31",
+          "listing_start": "2007-07-23",
+          "preferred_class": "",
+          "segment_end": "9999-12-31",
+          "segment_start": "2007-07-23",
+          "source_bound_isin": "BRABCBACNPR4",
+          "source_class_description": "",
+          "source_segment_description": "Bovespa Nível 2",
+          "source_type_code": "1",
+          "source_type_description": "Ações",
+          "start": "2007-07-23",
+          "ticker": "ABCB4",
+          "unit_composition": ""
+        }
+      ],
+      "before": [
+        {
+          "class": "SHARES",
+          "end": "9999-12-31",
+          "listing_end": "9999-12-31",
+          "listing_start": "2007-07-23",
+          "preferred_class": "",
+          "segment_end": "9999-12-31",
+          "segment_start": "2007-07-23",
+          "source_class_description": "",
+          "source_segment_description": "Bovespa Nível 2",
+          "source_type_code": "1",
+          "source_type_description": "Ações",
+          "start": "2007-07-23",
+          "ticker": "",
+          "unit_composition": ""
+        }
+      ],
+      "cnpj": "28195667000106",
+      "cvm_code": "020958",
+      "evidence": [
+        {
+          "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\primary_sources\\abc_results_4q2007.pdf",
+          "sha256": "11ef2458ba58e77b7039ff033dac9992c287eb2ca5963a3b25bb6d5349cc4a4b"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\fca_identity_admission\\source_clock\\fca_documents.json",
+          "sha256": "e989c2ef246763704d309a25bdde0df4ce25e5e901181790a6453fabed60c905"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\fca_originals\\24029\\manifest.json",
+          "sha256": "b565a7563c133e181546e9a834ffb8b3390a4204e860cb63e07bac07b1ab5187"
+        }
+      ],
+      "id": "24029",
+      "isin": "BRABCBACNPR4",
+      "known_date": "2008-01-31",
+      "reason": "Issuer Jan30 2008 original release explicitly names ABCB4. Exact dated FCA issuer plus prior original B3 ticker/ISIN/spec establish this PN security. Preserve original PNA wording in before/source fields; normalize its exchange-class join only, without claiming a legal class change or overriding other issuers."
+    },
+    {
+      "after": [
+        {
+          "class": "SHARES",
+          "end": "9999-12-31",
+          "listing_end": "9999-12-31",
+          "listing_start": "2007-07-23",
+          "preferred_class": "",
+          "segment_end": "9999-12-31",
+          "segment_start": "2007-07-23",
+          "source_bound_isin": "BRABCBACNPR4",
+          "source_class_description": "",
+          "source_segment_description": "Bovespa Nível 2",
+          "source_type_code": "1",
+          "source_type_description": "Ações",
+          "start": "2007-07-23",
+          "ticker": "ABCB4",
+          "unit_composition": ""
+        }
+      ],
+      "before": [
+        {
+          "class": "SHARES",
+          "end": "9999-12-31",
+          "listing_end": "9999-12-31",
+          "listing_start": "2007-07-23",
+          "preferred_class": "",
+          "segment_end": "9999-12-31",
+          "segment_start": "2007-07-23",
+          "source_class_description": "",
+          "source_segment_description": "Bovespa Nível 2",
+          "source_type_code": "1",
+          "source_type_description": "Ações",
+          "start": "2007-07-23",
+          "ticker": "",
+          "unit_composition": ""
+        }
+      ],
+      "cnpj": "28195667000106",
+      "cvm_code": "020958",
+      "evidence": [
+        {
+          "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\primary_sources\\abc_results_4q2007.pdf",
+          "sha256": "11ef2458ba58e77b7039ff033dac9992c287eb2ca5963a3b25bb6d5349cc4a4b"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\fca_identity_admission\\source_clock\\fca_documents.json",
+          "sha256": "e989c2ef246763704d309a25bdde0df4ce25e5e901181790a6453fabed60c905"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\fca_originals\\28287\\manifest.json",
+          "sha256": "7dfb17c2ca07e92fcca1bbe968e761533c871cabba44204be6629f36276c2e2e"
+        }
+      ],
+      "id": "28287",
+      "isin": "BRABCBACNPR4",
+      "known_date": "2008-01-31",
+      "reason": "Issuer Jan30 2008 original release explicitly names ABCB4. Exact dated FCA issuer plus prior original B3 ticker/ISIN/spec establish this PN security. Preserve original PNA wording in before/source fields; normalize its exchange-class join only, without claiming a legal class change or overriding other issuers."
+    },
+    {
+      "after": [
+        {
+          "class": "SHARES",
+          "end": "9999-12-31",
+          "listing_end": "9999-12-31",
+          "listing_start": "2007-07-23",
+          "preferred_class": "",
+          "segment_end": "9999-12-31",
+          "segment_start": "2007-07-23",
+          "source_bound_isin": "BRABCBACNPR4",
+          "source_class_description": "",
+          "source_segment_description": "Bovespa Nível 2",
+          "source_type_code": "1",
+          "source_type_description": "Ações",
+          "start": "2007-07-23",
+          "ticker": "ABCB4",
+          "unit_composition": ""
+        }
+      ],
+      "before": [
+        {
+          "class": "SHARES",
+          "end": "9999-12-31",
+          "listing_end": "9999-12-31",
+          "listing_start": "2007-07-23",
+          "preferred_class": "",
+          "segment_end": "9999-12-31",
+          "segment_start": "2007-07-23",
+          "source_class_description": "",
+          "source_segment_description": "Bovespa Nível 2",
+          "source_type_code": "1",
+          "source_type_description": "Ações",
+          "start": "2007-07-23",
+          "ticker": "",
+          "unit_composition": ""
+        }
+      ],
+      "cnpj": "28195667000106",
+      "cvm_code": "020958",
+      "evidence": [
+        {
+          "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\primary_sources\\abc_results_4q2007.pdf",
+          "sha256": "11ef2458ba58e77b7039ff033dac9992c287eb2ca5963a3b25bb6d5349cc4a4b"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\fca_identity_admission\\source_clock\\fca_documents.json",
+          "sha256": "e989c2ef246763704d309a25bdde0df4ce25e5e901181790a6453fabed60c905"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\fca_originals\\34338\\manifest.json",
+          "sha256": "3ac977c82258692ba439cf78c87ba7e799c9abd5edcde4a70409a56a72570aaa"
+        }
+      ],
+      "id": "34338",
+      "isin": "BRABCBACNPR4",
+      "known_date": "2008-01-31",
+      "reason": "Issuer Jan30 2008 original release explicitly names ABCB4. Exact dated FCA issuer plus prior original B3 ticker/ISIN/spec establish this PN security. Preserve original PNA wording in before/source fields; normalize its exchange-class join only, without claiming a legal class change or overriding other issuers."
+    },
+    {
+      "after": [
+        {
+          "class": "SHARES",
+          "end": "9999-12-31",
+          "listing_end": "9999-12-31",
+          "listing_start": "2007-07-23",
+          "preferred_class": "",
+          "segment_end": "9999-12-31",
+          "segment_start": "2007-07-23",
+          "source_bound_isin": "BRABCBACNPR4",
+          "source_type_authority": "HTML equity category only; class unresolved",
+          "source_type_description": "Ações",
+          "start": "2007-07-23",
+          "ticker": "ABCB4",
+          "unit_composition": ""
+        }
+      ],
+      "before": [
+        {
+          "class": "SHARES",
+          "end": "9999-12-31",
+          "listing_end": "9999-12-31",
+          "listing_start": "2007-07-23",
+          "preferred_class": "",
+          "segment_end": "9999-12-31",
+          "segment_start": "2007-07-23",
+          "source_type_authority": "HTML equity category only; class unresolved",
+          "source_type_description": "Ações",
+          "start": "2007-07-23",
+          "ticker": "",
+          "unit_composition": ""
+        }
+      ],
+      "cnpj": "28195667000106",
+      "cvm_code": "020958",
+      "evidence": [
+        {
+          "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\primary_sources\\abc_results_4q2007.pdf",
+          "sha256": "11ef2458ba58e77b7039ff033dac9992c287eb2ca5963a3b25bb6d5349cc4a4b"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\fca_identity_admission\\source_clock\\fca_documents.json",
+          "sha256": "e989c2ef246763704d309a25bdde0df4ce25e5e901181790a6453fabed60c905"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\fca_originals\\35774\\manifest.json",
+          "sha256": "e546ac659df15fcc6c40acff391bc9e943bda604875b867ba96342e0bc96d0c9"
+        }
+      ],
+      "id": "35774",
+      "isin": "BRABCBACNPR4",
+      "known_date": "2008-01-31",
+      "reason": "Issuer Jan30 2008 original release explicitly names ABCB4. Exact dated FCA issuer plus prior original B3 ticker/ISIN/spec establish this PN security. Preserve original PNA wording in before/source fields; normalize its exchange-class join only, without claiming a legal class change or overriding other issuers."
+    },
+    {
+      "after": [
+        {
+          "class": "SHARES",
+          "end": "9999-12-31",
+          "listing_end": "9999-12-31",
+          "listing_start": "2007-07-23",
+          "preferred_class": "",
+          "segment_end": "9999-12-31",
+          "segment_start": "2007-07-23",
+          "source_bound_isin": "BRABCBACNPR4",
+          "source_class_description": "",
+          "source_segment_description": "Bovespa Nível 2",
+          "source_type_code": "1",
+          "source_type_description": "Ações",
+          "start": "2007-07-23",
+          "ticker": "ABCB4",
+          "unit_composition": ""
+        }
+      ],
+      "before": [
+        {
+          "class": "SHARES",
+          "end": "9999-12-31",
+          "listing_end": "9999-12-31",
+          "listing_start": "2007-07-23",
+          "preferred_class": "",
+          "segment_end": "9999-12-31",
+          "segment_start": "2007-07-23",
+          "source_class_description": "",
+          "source_segment_description": "Bovespa Nível 2",
+          "source_type_code": "1",
+          "source_type_description": "Ações",
+          "start": "2007-07-23",
+          "ticker": "",
+          "unit_composition": ""
+        }
+      ],
+      "cnpj": "28195667000106",
+      "cvm_code": "020958",
+      "evidence": [
+        {
+          "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\primary_sources\\abc_results_4q2007.pdf",
+          "sha256": "11ef2458ba58e77b7039ff033dac9992c287eb2ca5963a3b25bb6d5349cc4a4b"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\fca_identity_admission\\source_clock\\fca_documents.json",
+          "sha256": "e989c2ef246763704d309a25bdde0df4ce25e5e901181790a6453fabed60c905"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\fca_originals\\38481\\manifest.json",
+          "sha256": "1973296b2be4d24dcf3408481726e0610409c2480d2184a822c5758778882428"
+        }
+      ],
+      "id": "38481",
+      "isin": "BRABCBACNPR4",
+      "known_date": "2008-01-31",
+      "reason": "Issuer Jan30 2008 original release explicitly names ABCB4. Exact dated FCA issuer plus prior original B3 ticker/ISIN/spec establish this PN security. Preserve original PNA wording in before/source fields; normalize its exchange-class join only, without claiming a legal class change or overriding other issuers."
+    },
+    {
+      "after": [
+        {
+          "class": "SHARES",
+          "end": "9999-12-31",
+          "listing_end": "9999-12-31",
+          "listing_start": "2007-07-23",
+          "preferred_class": "",
+          "segment_end": "9999-12-31",
+          "segment_start": "2007-07-23",
+          "source_bound_isin": "BRABCBACNPR4",
+          "source_class_description": "",
+          "source_segment_description": "Bovespa Nível 2",
+          "source_type_code": "1",
+          "source_type_description": "Ações",
+          "start": "2007-07-23",
+          "ticker": "ABCB4",
+          "unit_composition": ""
+        }
+      ],
+      "before": [
+        {
+          "class": "SHARES",
+          "end": "9999-12-31",
+          "listing_end": "9999-12-31",
+          "listing_start": "2007-07-23",
+          "preferred_class": "",
+          "segment_end": "9999-12-31",
+          "segment_start": "2007-07-23",
+          "source_class_description": "",
+          "source_segment_description": "Bovespa Nível 2",
+          "source_type_code": "1",
+          "source_type_description": "Ações",
+          "start": "2007-07-23",
+          "ticker": "",
+          "unit_composition": ""
+        }
+      ],
+      "cnpj": "28195667000106",
+      "cvm_code": "020958",
+      "evidence": [
+        {
+          "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\primary_sources\\abc_results_4q2007.pdf",
+          "sha256": "11ef2458ba58e77b7039ff033dac9992c287eb2ca5963a3b25bb6d5349cc4a4b"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\fca_identity_admission\\source_clock\\fca_documents.json",
+          "sha256": "e989c2ef246763704d309a25bdde0df4ce25e5e901181790a6453fabed60c905"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\fca_originals\\43540\\manifest.json",
+          "sha256": "ca5352db3ee5c4fdde85b3f0af5dff8f3a85e1b2037352814fd8af250a5ef416"
+        }
+      ],
+      "id": "43540",
+      "isin": "BRABCBACNPR4",
+      "known_date": "2008-01-31",
+      "reason": "Issuer Jan30 2008 original release explicitly names ABCB4. Exact dated FCA issuer plus prior original B3 ticker/ISIN/spec establish this PN security. Preserve original PNA wording in before/source fields; normalize its exchange-class join only, without claiming a legal class change or overriding other issuers."
+    },
+    {
+      "after": [
+        {
+          "class": "SHARES",
+          "end": "9999-12-31",
+          "listing_end": "9999-12-31",
+          "listing_start": "2007-07-23",
+          "preferred_class": "",
+          "segment_end": "9999-12-31",
+          "segment_start": "2007-07-23",
+          "source_bound_isin": "BRABCBACNPR4",
+          "source_class_description": "",
+          "source_segment_description": "Bovespa Nível 2",
+          "source_type_code": "1",
+          "source_type_description": "Ações",
+          "start": "2007-07-23",
+          "ticker": "ABCB4",
+          "unit_composition": ""
+        }
+      ],
+      "before": [
+        {
+          "class": "SHARES",
+          "end": "9999-12-31",
+          "listing_end": "9999-12-31",
+          "listing_start": "2007-07-23",
+          "preferred_class": "",
+          "segment_end": "9999-12-31",
+          "segment_start": "2007-07-23",
+          "source_class_description": "",
+          "source_segment_description": "Bovespa Nível 2",
+          "source_type_code": "1",
+          "source_type_description": "Ações",
+          "start": "2007-07-23",
+          "ticker": "",
+          "unit_composition": ""
+        }
+      ],
+      "cnpj": "28195667000106",
+      "cvm_code": "020958",
+      "evidence": [
+        {
+          "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\primary_sources\\abc_results_4q2007.pdf",
+          "sha256": "11ef2458ba58e77b7039ff033dac9992c287eb2ca5963a3b25bb6d5349cc4a4b"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\fca_identity_admission\\source_clock\\fca_documents.json",
+          "sha256": "e989c2ef246763704d309a25bdde0df4ce25e5e901181790a6453fabed60c905"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\fca_originals\\43633\\manifest.json",
+          "sha256": "96abb43b272eeed343a6b02ee225cf13d5608a8b703fcd91fc9e6b8f9e66c369"
+        }
+      ],
+      "id": "43633",
+      "isin": "BRABCBACNPR4",
+      "known_date": "2008-01-31",
+      "reason": "Issuer Jan30 2008 original release explicitly names ABCB4. Exact dated FCA issuer plus prior original B3 ticker/ISIN/spec establish this PN security. Preserve original PNA wording in before/source fields; normalize its exchange-class join only, without claiming a legal class change or overriding other issuers."
+    },
+    {
+      "after": [
+        {
+          "class": "SHARES",
+          "end": "9999-12-31",
+          "listing_end": "9999-12-31",
+          "listing_start": "2007-07-23",
+          "preferred_class": "",
+          "segment_end": "9999-12-31",
+          "segment_start": "2007-07-23",
+          "source_bound_isin": "BRABCBACNPR4",
+          "source_class_description": "",
+          "source_segment_description": "Bovespa Nível 2",
+          "source_type_code": "1",
+          "source_type_description": "Ações",
+          "start": "2007-07-23",
+          "ticker": "ABCB4",
+          "unit_composition": ""
+        }
+      ],
+      "before": [
+        {
+          "class": "SHARES",
+          "end": "9999-12-31",
+          "listing_end": "9999-12-31",
+          "listing_start": "2007-07-23",
+          "preferred_class": "",
+          "segment_end": "9999-12-31",
+          "segment_start": "2007-07-23",
+          "source_class_description": "",
+          "source_segment_description": "Bovespa Nível 2",
+          "source_type_code": "1",
+          "source_type_description": "Ações",
+          "start": "2007-07-23",
+          "ticker": "",
+          "unit_composition": ""
+        }
+      ],
+      "cnpj": "28195667000106",
+      "cvm_code": "020958",
+      "evidence": [
+        {
+          "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\primary_sources\\abc_results_4q2007.pdf",
+          "sha256": "11ef2458ba58e77b7039ff033dac9992c287eb2ca5963a3b25bb6d5349cc4a4b"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\fca_identity_admission\\source_clock\\fca_documents.json",
+          "sha256": "e989c2ef246763704d309a25bdde0df4ce25e5e901181790a6453fabed60c905"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\fca_originals\\46301\\manifest.json",
+          "sha256": "f84beb8d582dbc5d48830d782a0770c9dad58ba43be30ce354c353e60ff41766"
+        }
+      ],
+      "id": "46301",
+      "isin": "BRABCBACNPR4",
+      "known_date": "2008-01-31",
+      "reason": "Issuer Jan30 2008 original release explicitly names ABCB4. Exact dated FCA issuer plus prior original B3 ticker/ISIN/spec establish this PN security. Preserve original PNA wording in before/source fields; normalize its exchange-class join only, without claiming a legal class change or overriding other issuers."
+    },
+    {
+      "after": [
+        {
+          "class": "SHARES",
+          "end": "9999-12-31",
+          "listing_end": "9999-12-31",
+          "listing_start": "2007-07-23",
+          "preferred_class": "",
+          "segment_end": "9999-12-31",
+          "segment_start": "2007-07-23",
+          "source_bound_isin": "BRABCBACNPR4",
+          "source_class_description": "",
+          "source_segment_description": "Bovespa Nível 2",
+          "source_type_code": "1",
+          "source_type_description": "Ações",
+          "start": "2007-07-23",
+          "ticker": "ABCB4",
+          "unit_composition": ""
+        }
+      ],
+      "before": [
+        {
+          "class": "SHARES",
+          "end": "9999-12-31",
+          "listing_end": "9999-12-31",
+          "listing_start": "2007-07-23",
+          "preferred_class": "",
+          "segment_end": "9999-12-31",
+          "segment_start": "2007-07-23",
+          "source_class_description": "",
+          "source_segment_description": "Bovespa Nível 2",
+          "source_type_code": "1",
+          "source_type_description": "Ações",
+          "start": "2007-07-23",
+          "ticker": "",
+          "unit_composition": ""
+        }
+      ],
+      "cnpj": "28195667000106",
+      "cvm_code": "020958",
+      "evidence": [
+        {
+          "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\primary_sources\\abc_results_4q2007.pdf",
+          "sha256": "11ef2458ba58e77b7039ff033dac9992c287eb2ca5963a3b25bb6d5349cc4a4b"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\fca_identity_admission\\source_clock\\fca_documents.json",
+          "sha256": "e989c2ef246763704d309a25bdde0df4ce25e5e901181790a6453fabed60c905"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\fca_originals\\53188\\manifest.json",
+          "sha256": "e7d0327855499dad155e502bfad528bfef2eacc0fb6e0ad3c26545a3f1db2b6b"
+        }
+      ],
+      "id": "53188",
+      "isin": "BRABCBACNPR4",
+      "known_date": "2008-01-31",
+      "reason": "Issuer Jan30 2008 original release explicitly names ABCB4. Exact dated FCA issuer plus prior original B3 ticker/ISIN/spec establish this PN security. Preserve original PNA wording in before/source fields; normalize its exchange-class join only, without claiming a legal class change or overriding other issuers."
+    },
+    {
+      "after": [
+        {
+          "class": "SHARES",
+          "end": "9999-12-31",
+          "listing_end": "9999-12-31",
+          "listing_start": "2007-07-23",
+          "preferred_class": "",
+          "segment_end": "9999-12-31",
+          "segment_start": "2007-07-23",
+          "source_bound_isin": "BRABCBACNPR4",
+          "source_type_authority": "HTML equity category only; class unresolved",
+          "source_type_description": "Ações",
+          "start": "2007-07-23",
+          "ticker": "ABCB4",
+          "unit_composition": ""
+        }
+      ],
+      "before": [
+        {
+          "class": "SHARES",
+          "end": "9999-12-31",
+          "listing_end": "9999-12-31",
+          "listing_start": "2007-07-23",
+          "preferred_class": "",
+          "segment_end": "9999-12-31",
+          "segment_start": "2007-07-23",
+          "source_type_authority": "HTML equity category only; class unresolved",
+          "source_type_description": "Ações",
+          "start": "2007-07-23",
+          "ticker": "",
+          "unit_composition": ""
+        }
+      ],
+      "cnpj": "28195667000106",
+      "cvm_code": "020958",
+      "evidence": [
+        {
+          "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\primary_sources\\abc_results_4q2007.pdf",
+          "sha256": "11ef2458ba58e77b7039ff033dac9992c287eb2ca5963a3b25bb6d5349cc4a4b"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\fca_identity_admission\\source_clock\\fca_documents.json",
+          "sha256": "e989c2ef246763704d309a25bdde0df4ce25e5e901181790a6453fabed60c905"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\fca_originals\\56302\\manifest.json",
+          "sha256": "a5225878ec914db4770152b41985456b9c0a24e1319f28f872b6ab3781598671"
+        }
+      ],
+      "id": "56302",
+      "isin": "BRABCBACNPR4",
+      "known_date": "2008-01-31",
+      "reason": "Issuer Jan30 2008 original release explicitly names ABCB4. Exact dated FCA issuer plus prior original B3 ticker/ISIN/spec establish this PN security. Preserve original PNA wording in before/source fields; normalize its exchange-class join only, without claiming a legal class change or overriding other issuers."
+    },
+    {
+      "after": [
+        {
+          "class": "SHARES",
+          "end": "9999-12-31",
+          "listing_end": "9999-12-31",
+          "listing_start": "2007-07-23",
+          "preferred_class": "",
+          "segment_end": "9999-12-31",
+          "segment_start": "2007-07-23",
+          "source_bound_isin": "BRABCBACNPR4",
+          "source_class_description": "",
+          "source_segment_description": "Bovespa Nível 2",
+          "source_type_code": "1",
+          "source_type_description": "Ações",
+          "start": "2007-07-23",
+          "ticker": "ABCB4",
+          "unit_composition": ""
+        }
+      ],
+      "before": [
+        {
+          "class": "SHARES",
+          "end": "9999-12-31",
+          "listing_end": "9999-12-31",
+          "listing_start": "2007-07-23",
+          "preferred_class": "",
+          "segment_end": "9999-12-31",
+          "segment_start": "2007-07-23",
+          "source_class_description": "",
+          "source_segment_description": "Bovespa Nível 2",
+          "source_type_code": "1",
+          "source_type_description": "Ações",
+          "start": "2007-07-23",
+          "ticker": "",
+          "unit_composition": ""
+        }
+      ],
+      "cnpj": "28195667000106",
+      "cvm_code": "020958",
+      "evidence": [
+        {
+          "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\primary_sources\\abc_results_4q2007.pdf",
+          "sha256": "11ef2458ba58e77b7039ff033dac9992c287eb2ca5963a3b25bb6d5349cc4a4b"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\fca_identity_admission\\source_clock\\fca_documents.json",
+          "sha256": "e989c2ef246763704d309a25bdde0df4ce25e5e901181790a6453fabed60c905"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\fca_originals\\58547\\manifest.json",
+          "sha256": "5fd789f7470914e1835525f6e7af919b04bd3ec5f9d109ce2e90eed9f4656814"
+        }
+      ],
+      "id": "58547",
+      "isin": "BRABCBACNPR4",
+      "known_date": "2008-01-31",
+      "reason": "Issuer Jan30 2008 original release explicitly names ABCB4. Exact dated FCA issuer plus prior original B3 ticker/ISIN/spec establish this PN security. Preserve original PNA wording in before/source fields; normalize its exchange-class join only, without claiming a legal class change or overriding other issuers."
+    },
+    {
+      "after": [
+        {
+          "class": "SHARES",
+          "end": "9999-12-31",
+          "listing_end": "9999-12-31",
+          "listing_start": "2007-07-23",
+          "preferred_class": "",
+          "segment_end": "9999-12-31",
+          "segment_start": "2007-07-23",
+          "source_bound_isin": "BRABCBACNPR4",
+          "source_type_authority": "HTML equity category only; class unresolved",
+          "source_type_description": "Ações",
+          "start": "2007-07-23",
+          "ticker": "ABCB4",
+          "unit_composition": ""
+        }
+      ],
+      "before": [
+        {
+          "class": "SHARES",
+          "end": "9999-12-31",
+          "listing_end": "9999-12-31",
+          "listing_start": "2007-07-23",
+          "preferred_class": "",
+          "segment_end": "9999-12-31",
+          "segment_start": "2007-07-23",
+          "source_type_authority": "HTML equity category only; class unresolved",
+          "source_type_description": "Ações",
+          "start": "2007-07-23",
+          "ticker": "",
+          "unit_composition": ""
+        }
+      ],
+      "cnpj": "28195667000106",
+      "cvm_code": "020958",
+      "evidence": [
+        {
+          "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\primary_sources\\abc_results_4q2007.pdf",
+          "sha256": "11ef2458ba58e77b7039ff033dac9992c287eb2ca5963a3b25bb6d5349cc4a4b"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\fca_identity_admission\\source_clock\\fca_documents.json",
+          "sha256": "e989c2ef246763704d309a25bdde0df4ce25e5e901181790a6453fabed60c905"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\fca_originals\\62202\\manifest.json",
+          "sha256": "8e94391141dcd423f910f497144d20aa5cb9efca23a97c25c74a20dfd5593c4e"
+        }
+      ],
+      "id": "62202",
+      "isin": "BRABCBACNPR4",
+      "known_date": "2008-01-31",
+      "reason": "Issuer Jan30 2008 original release explicitly names ABCB4. Exact dated FCA issuer plus prior original B3 ticker/ISIN/spec establish this PN security. Preserve original PNA wording in before/source fields; normalize its exchange-class join only, without claiming a legal class change or overriding other issuers."
+    },
+    {
+      "after": [
+        {
+          "class": "SHARES",
+          "end": "9999-12-31",
+          "listing_end": "9999-12-31",
+          "listing_start": "2007-07-23",
+          "preferred_class": "",
+          "segment_end": "9999-12-31",
+          "segment_start": "2007-07-23",
+          "source_bound_isin": "BRABCBACNPR4",
+          "source_class_description": "",
+          "source_segment_description": "Bovespa Nível 2",
+          "source_type_code": "1",
+          "source_type_description": "Ações",
+          "start": "2007-07-23",
+          "ticker": "ABCB4",
+          "unit_composition": ""
+        }
+      ],
+      "before": [
+        {
+          "class": "SHARES",
+          "end": "9999-12-31",
+          "listing_end": "9999-12-31",
+          "listing_start": "2007-07-23",
+          "preferred_class": "",
+          "segment_end": "9999-12-31",
+          "segment_start": "2007-07-23",
+          "source_class_description": "",
+          "source_segment_description": "Bovespa Nível 2",
+          "source_type_code": "1",
+          "source_type_description": "Ações",
+          "start": "2007-07-23",
+          "ticker": "",
+          "unit_composition": ""
+        }
+      ],
+      "cnpj": "28195667000106",
+      "cvm_code": "020958",
+      "evidence": [
+        {
+          "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\primary_sources\\abc_results_4q2007.pdf",
+          "sha256": "11ef2458ba58e77b7039ff033dac9992c287eb2ca5963a3b25bb6d5349cc4a4b"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\fca_identity_admission\\source_clock\\fca_documents.json",
+          "sha256": "e989c2ef246763704d309a25bdde0df4ce25e5e901181790a6453fabed60c905"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\fca_originals\\65216\\manifest.json",
+          "sha256": "b7a85727a343008430ad5e8d5024cef008485939c55227a238fef5ca8409b3ca"
+        }
+      ],
+      "id": "65216",
+      "isin": "BRABCBACNPR4",
+      "known_date": "2008-01-31",
+      "reason": "Issuer Jan30 2008 original release explicitly names ABCB4. Exact dated FCA issuer plus prior original B3 ticker/ISIN/spec establish this PN security. Preserve original PNA wording in before/source fields; normalize its exchange-class join only, without claiming a legal class change or overriding other issuers."
+    },
+    {
+      "after": [
+        {
+          "class": "SHARES",
+          "end": "9999-12-31",
+          "listing_end": "9999-12-31",
+          "listing_start": "2007-07-23",
+          "preferred_class": "",
+          "segment_end": "9999-12-31",
+          "segment_start": "2007-07-23",
+          "source_bound_isin": "BRABCBACNPR4",
+          "source_class_description": "",
+          "source_segment_description": "Bovespa Nível 2",
+          "source_type_code": "1",
+          "source_type_description": "Ações",
+          "start": "2007-07-23",
+          "ticker": "ABCB4",
+          "unit_composition": ""
+        }
+      ],
+      "before": [
+        {
+          "class": "SHARES",
+          "end": "9999-12-31",
+          "listing_end": "9999-12-31",
+          "listing_start": "2007-07-23",
+          "preferred_class": "",
+          "segment_end": "9999-12-31",
+          "segment_start": "2007-07-23",
+          "source_class_description": "",
+          "source_segment_description": "Bovespa Nível 2",
+          "source_type_code": "1",
+          "source_type_description": "Ações",
+          "start": "2007-07-23",
+          "ticker": "",
+          "unit_composition": ""
+        }
+      ],
+      "cnpj": "28195667000106",
+      "cvm_code": "020958",
+      "evidence": [
+        {
+          "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\primary_sources\\abc_results_4q2007.pdf",
+          "sha256": "11ef2458ba58e77b7039ff033dac9992c287eb2ca5963a3b25bb6d5349cc4a4b"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\fca_identity_admission\\source_clock\\fca_documents.json",
+          "sha256": "e989c2ef246763704d309a25bdde0df4ce25e5e901181790a6453fabed60c905"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\fca_originals\\68611\\manifest.json",
+          "sha256": "93ef501e3cac5cbbd2d7073a3de3ff8ec46c7135eb709f003463a464aa68063a"
+        }
+      ],
+      "id": "68611",
+      "isin": "BRABCBACNPR4",
+      "known_date": "2008-01-31",
+      "reason": "Issuer Jan30 2008 original release explicitly names ABCB4. Exact dated FCA issuer plus prior original B3 ticker/ISIN/spec establish this PN security. Preserve original PNA wording in before/source fields; normalize its exchange-class join only, without claiming a legal class change or overriding other issuers."
+    },
+    {
+      "after": [
+        {
+          "class": "SHARES",
+          "end": "9999-12-31",
+          "listing_end": "9999-12-31",
+          "listing_start": "2007-07-23",
+          "preferred_class": "",
+          "segment_end": "9999-12-31",
+          "segment_start": "2007-07-23",
+          "source_bound_isin": "BRABCBACNPR4",
+          "source_type_authority": "HTML equity category only; class unresolved",
+          "source_type_description": "Ações Preferenciais",
+          "start": "2007-07-23",
+          "ticker": "ABCB4",
+          "unit_composition": ""
+        }
+      ],
+      "before": [
+        {
+          "class": "SHARES",
+          "end": "9999-12-31",
+          "listing_end": "9999-12-31",
+          "listing_start": "2007-07-23",
+          "preferred_class": "",
+          "segment_end": "9999-12-31",
+          "segment_start": "2007-07-23",
+          "source_type_authority": "HTML equity category only; class unresolved",
+          "source_type_description": "Ações Preferenciais",
+          "start": "2007-07-23",
+          "ticker": "",
+          "unit_composition": ""
+        }
+      ],
+      "cnpj": "28195667000106",
+      "cvm_code": "020958",
+      "evidence": [
+        {
+          "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\primary_sources\\abc_results_4q2007.pdf",
+          "sha256": "11ef2458ba58e77b7039ff033dac9992c287eb2ca5963a3b25bb6d5349cc4a4b"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\fca_identity_admission\\source_clock\\fca_documents.json",
+          "sha256": "e989c2ef246763704d309a25bdde0df4ce25e5e901181790a6453fabed60c905"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\fca_originals\\71032\\manifest.json",
+          "sha256": "19bcadaf87a8a0847be74889c145143129332fc2470e27ab7a9f8f5d5d03fbe2"
+        }
+      ],
+      "id": "71032",
+      "isin": "BRABCBACNPR4",
+      "known_date": "2008-01-31",
+      "reason": "Issuer Jan30 2008 original release explicitly names ABCB4. Exact dated FCA issuer plus prior original B3 ticker/ISIN/spec establish this PN security. Preserve original PNA wording in before/source fields; normalize its exchange-class join only, without claiming a legal class change or overriding other issuers."
+    },
+    {
+      "after": [
+        {
+          "class": "PN",
+          "end": "9999-12-31",
+          "preferred_class": "",
+          "segment_end": "",
+          "segment_start": "2007-07-23",
+          "source_bound_isin": "BRABCBACNPR4",
+          "start": "2007-07-23",
+          "ticker": "ABCB4",
+          "unit_composition": ""
+        }
+      ],
+      "before": [
+        {
+          "class": "PN",
+          "end": "9999-12-31",
+          "preferred_class": "PNA",
+          "segment_end": "",
+          "segment_start": "2007-07-23",
+          "start": "2007-07-23",
+          "ticker": "ABCB4",
+          "unit_composition": ""
+        }
+      ],
+      "cnpj": "28195667000106",
+      "cvm_code": "020958",
+      "evidence": [
+        {
+          "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\primary_sources\\abc_results_4q2007.pdf",
+          "sha256": "11ef2458ba58e77b7039ff033dac9992c287eb2ca5963a3b25bb6d5349cc4a4b"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\fca_identity_admission\\source_clock\\fca_documents.json",
+          "sha256": "e989c2ef246763704d309a25bdde0df4ce25e5e901181790a6453fabed60c905"
+        }
+      ],
+      "id": "74903",
+      "isin": "BRABCBACNPR4",
+      "known_date": "2008-01-31",
+      "reason": "Issuer Jan30 2008 original release explicitly names ABCB4. Exact dated FCA issuer plus prior original B3 ticker/ISIN/spec establish this PN security. Preserve original PNA wording in before/source fields; normalize its exchange-class join only, without claiming a legal class change or overriding other issuers."
+    },
+    {
+      "after": [
+        {
+          "class": "PN",
+          "end": "9999-12-31",
+          "listing_end": "9999-12-31",
+          "listing_start": "2007-07-23",
+          "preferred_class": "",
+          "segment_end": "9999-12-31",
+          "segment_start": "2007-07-23",
+          "source_bound_isin": "BRABCBACNPR4",
+          "source_class_description": "Preferencial Classe A",
+          "source_segment_description": "Nível 2 de Governança Corporativa",
+          "source_type_code": "21",
+          "source_type_description": "Ações Preferenciais",
+          "start": "2007-07-23",
+          "ticker": "ABCB4",
+          "unit_composition": ""
+        }
+      ],
+      "before": [
+        {
+          "class": "PN",
+          "end": "9999-12-31",
+          "listing_end": "9999-12-31",
+          "listing_start": "2007-07-23",
+          "preferred_class": "Preferencial Classe A",
+          "segment_end": "9999-12-31",
+          "segment_start": "2007-07-23",
+          "source_class_description": "Preferencial Classe A",
+          "source_segment_description": "Nível 2 de Governança Corporativa",
+          "source_type_code": "21",
+          "source_type_description": "Ações Preferenciais",
+          "start": "2007-07-23",
+          "ticker": "ABCB4",
+          "unit_composition": ""
+        }
+      ],
+      "cnpj": "28195667000106",
+      "cvm_code": "020958",
+      "evidence": [
+        {
+          "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\primary_sources\\abc_results_4q2007.pdf",
+          "sha256": "11ef2458ba58e77b7039ff033dac9992c287eb2ca5963a3b25bb6d5349cc4a4b"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\fca_identity_admission\\source_clock\\fca_documents.json",
+          "sha256": "e989c2ef246763704d309a25bdde0df4ce25e5e901181790a6453fabed60c905"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\fca_originals\\80395\\manifest.json",
+          "sha256": "81663237814ae76d5fa266b95d02e7158748f6ac7b3aba6e481a64bd7f26d9b1"
+        }
+      ],
+      "id": "80395",
+      "isin": "BRABCBACNPR4",
+      "known_date": "2008-01-31",
+      "reason": "Issuer Jan30 2008 original release explicitly names ABCB4. Exact dated FCA issuer plus prior original B3 ticker/ISIN/spec establish this PN security. Preserve original PNA wording in before/source fields; normalize its exchange-class join only, without claiming a legal class change or overriding other issuers."
+    },
+    {
+      "after": [
+        {
+          "class": "PN",
+          "end": "9999-12-31",
+          "listing_end": "9999-12-31",
+          "listing_start": "2007-07-23",
+          "preferred_class": "",
+          "segment_end": "9999-12-31",
+          "segment_start": "2007-07-23",
+          "source_bound_isin": "BRABCBACNPR4",
+          "source_class_description": "Preferencial Classe A",
+          "source_segment_description": "Nível 2 de Governança Corporativa",
+          "source_type_code": "21",
+          "source_type_description": "Ações Preferenciais",
+          "start": "2007-07-23",
+          "ticker": "ABCB4",
+          "unit_composition": ""
+        }
+      ],
+      "before": [
+        {
+          "class": "PN",
+          "end": "9999-12-31",
+          "listing_end": "9999-12-31",
+          "listing_start": "2007-07-23",
+          "preferred_class": "Preferencial Classe A",
+          "segment_end": "9999-12-31",
+          "segment_start": "2007-07-23",
+          "source_class_description": "Preferencial Classe A",
+          "source_segment_description": "Nível 2 de Governança Corporativa",
+          "source_type_code": "21",
+          "source_type_description": "Ações Preferenciais",
+          "start": "2007-07-23",
+          "ticker": "ABCB4",
+          "unit_composition": ""
+        }
+      ],
+      "cnpj": "28195667000106",
+      "cvm_code": "020958",
+      "evidence": [
+        {
+          "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\primary_sources\\abc_results_4q2007.pdf",
+          "sha256": "11ef2458ba58e77b7039ff033dac9992c287eb2ca5963a3b25bb6d5349cc4a4b"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\fca_identity_admission\\source_clock\\fca_documents.json",
+          "sha256": "e989c2ef246763704d309a25bdde0df4ce25e5e901181790a6453fabed60c905"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\fca_originals\\83978\\manifest.json",
+          "sha256": "27db74dae074933ee4b897cf7cd5a569207b442f0326f964288850227222798d"
+        }
+      ],
+      "id": "83978",
+      "isin": "BRABCBACNPR4",
+      "known_date": "2008-01-31",
+      "reason": "Issuer Jan30 2008 original release explicitly names ABCB4. Exact dated FCA issuer plus prior original B3 ticker/ISIN/spec establish this PN security. Preserve original PNA wording in before/source fields; normalize its exchange-class join only, without claiming a legal class change or overriding other issuers."
+    },
+    {
+      "after": [
+        {
+          "class": "PN",
+          "end": "9999-12-31",
+          "preferred_class": "",
+          "segment_end": "",
+          "segment_start": "2007-07-23",
+          "source_bound_isin": "BRABCBACNPR4",
+          "start": "2007-07-23",
+          "ticker": "ABCB4",
+          "unit_composition": ""
+        }
+      ],
+      "before": [
+        {
+          "class": "PN",
+          "end": "9999-12-31",
+          "preferred_class": "PNA",
+          "segment_end": "",
+          "segment_start": "2007-07-23",
+          "start": "2007-07-23",
+          "ticker": "ABCB4",
+          "unit_composition": ""
+        }
+      ],
+      "cnpj": "28195667000106",
+      "cvm_code": "020958",
+      "evidence": [
+        {
+          "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\primary_sources\\abc_results_4q2007.pdf",
+          "sha256": "11ef2458ba58e77b7039ff033dac9992c287eb2ca5963a3b25bb6d5349cc4a4b"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\fca_identity_admission\\source_clock\\fca_documents.json",
+          "sha256": "e989c2ef246763704d309a25bdde0df4ce25e5e901181790a6453fabed60c905"
+        }
+      ],
+      "id": "87297",
+      "isin": "BRABCBACNPR4",
+      "known_date": "2008-01-31",
+      "reason": "Issuer Jan30 2008 original release explicitly names ABCB4. Exact dated FCA issuer plus prior original B3 ticker/ISIN/spec establish this PN security. Preserve original PNA wording in before/source fields; normalize its exchange-class join only, without claiming a legal class change or overriding other issuers."
+    },
+    {
+      "after": [
+        {
+          "class": "PN",
+          "end": "9999-12-31",
+          "listing_end": "9999-12-31",
+          "listing_start": "2007-07-23",
+          "preferred_class": "",
+          "segment_end": "9999-12-31",
+          "segment_start": "2007-07-23",
+          "source_bound_isin": "BRABCBACNPR4",
+          "source_class_description": "Preferencial Classe A",
+          "source_segment_description": "Nível 2 de Governança Corporativa",
+          "source_type_code": "21",
+          "source_type_description": "Ações Preferenciais",
+          "start": "2007-07-23",
+          "ticker": "ABCB4",
+          "unit_composition": ""
+        }
+      ],
+      "before": [
+        {
+          "class": "PN",
+          "end": "9999-12-31",
+          "listing_end": "9999-12-31",
+          "listing_start": "2007-07-23",
+          "preferred_class": "Preferencial Classe A",
+          "segment_end": "9999-12-31",
+          "segment_start": "2007-07-23",
+          "source_class_description": "Preferencial Classe A",
+          "source_segment_description": "Nível 2 de Governança Corporativa",
+          "source_type_code": "21",
+          "source_type_description": "Ações Preferenciais",
+          "start": "2007-07-23",
+          "ticker": "ABCB4",
+          "unit_composition": ""
+        }
+      ],
+      "cnpj": "28195667000106",
+      "cvm_code": "020958",
+      "evidence": [
+        {
+          "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\primary_sources\\abc_results_4q2007.pdf",
+          "sha256": "11ef2458ba58e77b7039ff033dac9992c287eb2ca5963a3b25bb6d5349cc4a4b"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\fca_identity_admission\\source_clock\\fca_documents.json",
+          "sha256": "e989c2ef246763704d309a25bdde0df4ce25e5e901181790a6453fabed60c905"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\fca_originals\\90387\\manifest.json",
+          "sha256": "6216a3171e23fde209b8adc1e4cc20ebdd487f09519acb6d00b9375257e44b88"
+        }
+      ],
+      "id": "90387",
+      "isin": "BRABCBACNPR4",
+      "known_date": "2008-01-31",
+      "reason": "Issuer Jan30 2008 original release explicitly names ABCB4. Exact dated FCA issuer plus prior original B3 ticker/ISIN/spec establish this PN security. Preserve original PNA wording in before/source fields; normalize its exchange-class join only, without claiming a legal class change or overriding other issuers."
+    },
+    {
+      "after": [
+        {
+          "class": "PN",
+          "end": "9999-12-31",
+          "preferred_class": "",
+          "segment_end": "",
+          "segment_start": "2007-07-23",
+          "source_bound_isin": "BRABCBACNPR4",
+          "start": "2007-07-23",
+          "ticker": "ABCB4",
+          "unit_composition": ""
+        }
+      ],
+      "before": [
+        {
+          "class": "PN",
+          "end": "9999-12-31",
+          "preferred_class": "PNA",
+          "segment_end": "",
+          "segment_start": "2007-07-23",
+          "start": "2007-07-23",
+          "ticker": "ABCB4",
+          "unit_composition": ""
+        }
+      ],
+      "cnpj": "28195667000106",
+      "cvm_code": "020958",
+      "evidence": [
+        {
+          "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\primary_sources\\abc_results_4q2007.pdf",
+          "sha256": "11ef2458ba58e77b7039ff033dac9992c287eb2ca5963a3b25bb6d5349cc4a4b"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\fca_identity_admission\\source_clock\\fca_documents.json",
+          "sha256": "e989c2ef246763704d309a25bdde0df4ce25e5e901181790a6453fabed60c905"
+        }
+      ],
+      "id": "93567",
+      "isin": "BRABCBACNPR4",
+      "known_date": "2008-01-31",
+      "reason": "Issuer Jan30 2008 original release explicitly names ABCB4. Exact dated FCA issuer plus prior original B3 ticker/ISIN/spec establish this PN security. Preserve original PNA wording in before/source fields; normalize its exchange-class join only, without claiming a legal class change or overriding other issuers."
+    },
+    {
+      "after": [
+        {
+          "class": "PN",
+          "end": "9999-12-31",
+          "preferred_class": "",
+          "segment_end": "",
+          "segment_start": "2007-07-23",
+          "source_bound_isin": "BRABCBACNPR4",
+          "start": "2007-07-23",
+          "ticker": "ABCB4",
+          "unit_composition": ""
+        }
+      ],
+      "before": [
+        {
+          "class": "PN",
+          "end": "9999-12-31",
+          "preferred_class": "PNA",
+          "segment_end": "",
+          "segment_start": "2007-07-23",
+          "start": "2007-07-23",
+          "ticker": "ABCB4",
+          "unit_composition": ""
+        }
+      ],
+      "cnpj": "28195667000106",
+      "cvm_code": "020958",
+      "evidence": [
+        {
+          "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\primary_sources\\abc_results_4q2007.pdf",
+          "sha256": "11ef2458ba58e77b7039ff033dac9992c287eb2ca5963a3b25bb6d5349cc4a4b"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\fca_identity_admission\\source_clock\\fca_documents.json",
+          "sha256": "e989c2ef246763704d309a25bdde0df4ce25e5e901181790a6453fabed60c905"
+        }
+      ],
+      "id": "99854",
+      "isin": "BRABCBACNPR4",
+      "known_date": "2008-01-31",
+      "reason": "Issuer Jan30 2008 original release explicitly names ABCB4. Exact dated FCA issuer plus prior original B3 ticker/ISIN/spec establish this PN security. Preserve original PNA wording in before/source fields; normalize its exchange-class join only, without claiming a legal class change or overriding other issuers."
+    },
+    {
+      "after": [
+        {
+          "class": "PN",
+          "end": "9999-12-31",
+          "preferred_class": "",
+          "segment_end": "",
+          "segment_start": "2007-07-23",
+          "source_bound_isin": "BRABCBACNPR4",
+          "start": "2007-07-23",
+          "ticker": "ABCB4",
+          "unit_composition": ""
+        }
+      ],
+      "before": [
+        {
+          "class": "PN",
+          "end": "9999-12-31",
+          "preferred_class": "PNA",
+          "segment_end": "",
+          "segment_start": "2007-07-23",
+          "start": "2007-07-23",
+          "ticker": "ABCB4",
+          "unit_composition": ""
+        }
+      ],
+      "cnpj": "28195667000106",
+      "cvm_code": "020958",
+      "evidence": [
+        {
+          "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\primary_sources\\abc_results_4q2007.pdf",
+          "sha256": "11ef2458ba58e77b7039ff033dac9992c287eb2ca5963a3b25bb6d5349cc4a4b"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\fca_identity_admission\\source_clock\\fca_documents.json",
+          "sha256": "e989c2ef246763704d309a25bdde0df4ce25e5e901181790a6453fabed60c905"
+        }
+      ],
+      "id": "122476",
+      "isin": "BRABCBACNPR4",
+      "known_date": "2008-01-31",
+      "reason": "Issuer Jan30 2008 original release explicitly names ABCB4. Exact dated FCA issuer plus prior original B3 ticker/ISIN/spec establish this PN security. Preserve original PNA wording in before/source fields; normalize its exchange-class join only, without claiming a legal class change or overriding other issuers."
+    },
+    {
+      "after": [
+        {
+          "class": "PN",
+          "end": "9999-12-31",
+          "preferred_class": "",
+          "segment_end": "",
+          "segment_start": "2007-07-23",
+          "source_bound_isin": "BRABCBACNPR4",
+          "start": "2007-07-23",
+          "ticker": "ABCB4",
+          "unit_composition": ""
+        }
+      ],
+      "before": [
+        {
+          "class": "PN",
+          "end": "9999-12-31",
+          "preferred_class": "PNA",
+          "segment_end": "",
+          "segment_start": "2007-07-23",
+          "start": "2007-07-23",
+          "ticker": "ABCB4",
+          "unit_composition": ""
+        }
+      ],
+      "cnpj": "28195667000106",
+      "cvm_code": "020958",
+      "evidence": [
+        {
+          "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\primary_sources\\abc_results_4q2007.pdf",
+          "sha256": "11ef2458ba58e77b7039ff033dac9992c287eb2ca5963a3b25bb6d5349cc4a4b"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\fca_identity_admission\\source_clock\\fca_documents.json",
+          "sha256": "e989c2ef246763704d309a25bdde0df4ce25e5e901181790a6453fabed60c905"
+        }
+      ],
+      "id": "123390",
+      "isin": "BRABCBACNPR4",
+      "known_date": "2008-01-31",
+      "reason": "Issuer Jan30 2008 original release explicitly names ABCB4. Exact dated FCA issuer plus prior original B3 ticker/ISIN/spec establish this PN security. Preserve original PNA wording in before/source fields; normalize its exchange-class join only, without claiming a legal class change or overriding other issuers."
+    },
+    {
+      "after": [
+        {
+          "class": "PN",
+          "end": "9999-12-31",
+          "preferred_class": "",
+          "segment_end": "",
+          "segment_start": "2007-07-23",
+          "source_bound_isin": "BRABCBACNPR4",
+          "start": "2007-07-23",
+          "ticker": "ABCB4",
+          "unit_composition": ""
+        }
+      ],
+      "before": [
+        {
+          "class": "PN",
+          "end": "9999-12-31",
+          "preferred_class": "PNA",
+          "segment_end": "",
+          "segment_start": "2007-07-23",
+          "start": "2007-07-23",
+          "ticker": "ABCB4",
+          "unit_composition": ""
+        }
+      ],
+      "cnpj": "28195667000106",
+      "cvm_code": "020958",
+      "evidence": [
+        {
+          "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\primary_sources\\abc_results_4q2007.pdf",
+          "sha256": "11ef2458ba58e77b7039ff033dac9992c287eb2ca5963a3b25bb6d5349cc4a4b"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\fca_identity_admission\\source_clock\\fca_documents.json",
+          "sha256": "e989c2ef246763704d309a25bdde0df4ce25e5e901181790a6453fabed60c905"
+        }
+      ],
+      "id": "143874",
+      "isin": "BRABCBACNPR4",
+      "known_date": "2008-01-31",
+      "reason": "Issuer Jan30 2008 original release explicitly names ABCB4. Exact dated FCA issuer plus prior original B3 ticker/ISIN/spec establish this PN security. Preserve original PNA wording in before/source fields; normalize its exchange-class join only, without claiming a legal class change or overriding other issuers."
     }
   ],
   "boundaries": "Exact listed document/security content only; knowledge must precede its applied decision; raw originals and all model arrays unchanged.",

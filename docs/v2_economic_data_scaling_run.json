@@ -114,16 +114,16 @@
     "sha256": "dfbe7d952f5926f04cede7eed1aa18d37d68fbad1e6877150f0aa8dd4a27aba2"
   },
   "fca_financial_propagation": {
-    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\fca_financial_propagation\\manifest.json",
-    "sha256": "26851537cee472cad8f9ac1f1b1b02d99bb173ffa42fb0b7ca7986ac72fc927c"
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\fca_financial_propagation\\issuer_exceptions\\manifest.json",
+    "sha256": "823d294b35bf9f56c738c820dde0eb9802cacc0b7919749d41ec5695d685d6c8"
   },
   "fca_identity_acceptance": {
     "path": "docs\\v2_fca_identity_acceptance.json",
-    "sha256": "cc907ccedb4c73e598f5be31749a1af4a067cee04199d0e289953da44c5d32c2"
+    "sha256": "faca30ee5915a164755bb13c4fda8277fdce24c7dcae13f1b8c09a754be404df"
   },
   "fca_identity_admission": {
-    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\fca_identity_admission\\source_clock\\manifest.json",
-    "sha256": "ce34599625e3ba60dd00680a16cb61c00810941d2424199a1f7c0a9d088d78b3"
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\fca_identity_admission\\issuer_exceptions\\manifest.json",
+    "sha256": "752a9665127895020ac6707da79fc344e4c2ab234b33175a18b62d977aad607b"
   },
   "fca_identity_financial_recovery": {
     "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\fca_identity_financial_recovery.json",
@@ -132,6 +132,14 @@
   "fca_identity_source_receipts": {
     "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\fca_identity_admission\\primary_source_receipts.json",
     "sha256": "b50e85641c14d72c8e001c91aadc0710b3f088cd0a4a10e4750637d8702511eb"
+  },
+  "fca_issuer_exception_sources": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\fca_identity_admission\\issuer_exceptions\\source_receipts.json",
+    "sha256": "e911a70f6460a28f1f3eef9c2c21d9216bac429c401b77ddc448338fbe8d97aa"
+  },
+  "fca_peer_propagation": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\fca_peer_propagation\\manifest.json",
+    "sha256": "b99a5d17342a3d197a15311d11f3294f53af6d0dc5a2036b83362c80bdb0ff36"
   },
   "fit_conditioning_audit": {
     "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\fit_conditioning_audit\\report.json",

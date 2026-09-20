@@ -1,39 +1,42 @@
 {
-  "events_7_fields_gained_active_values": 181629,
+  "attempts": [
+    "Typed loan-utilization output corrected Float64-versus-Float32 comparison noise; all shared valid values exact after original storage contract restored. Initial output/reproducer retained; completed sector/exposure calculations were not repeated.",
+    "A diagnostic console print required UTF8 for Polars table characters; no data or audit output failure."
+  ],
+  "events_7_fields_gained_active_values": 219291,
   "evidence": {
     "financial_events": {
-      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\fca_financial_propagation\\manifest.json",
-      "sha256": "26851537cee472cad8f9ac1f1b1b02d99bb173ffa42fb0b7ca7986ac72fc927c"
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\fca_financial_propagation\\issuer_exceptions\\manifest.json",
+      "sha256": "823d294b35bf9f56c738c820dde0eb9802cacc0b7919749d41ec5695d685d6c8"
     },
     "identity": {
-      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\fca_identity_admission\\source_clock\\manifest.json",
-      "sha256": "ce34599625e3ba60dd00680a16cb61c00810941d2424199a1f7c0a9d088d78b3"
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\fca_identity_admission\\issuer_exceptions\\manifest.json",
+      "sha256": "752a9665127895020ac6707da79fc344e4c2ab234b33175a18b62d977aad607b"
+    },
+    "peer_dependencies": {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\fca_peer_propagation\\manifest.json",
+      "sha256": "b99a5d17342a3d197a15311d11f3294f53af6d0dc5a2036b83362c80bdb0ff36"
     },
     "primary_receipts": {
-      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\fca_identity_admission\\primary_source_receipts.json",
-      "sha256": "b50e85641c14d72c8e001c91aadc0710b3f088cd0a4a10e4750637d8702511eb"
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\fca_identity_admission\\issuer_exceptions\\source_receipts.json",
+      "sha256": "e911a70f6460a28f1f3eef9c2c21d9216bac429c401b77ddc448338fbe8d97aa"
     },
-    "removal_review": {
-      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\fca_identity_admission\\removal_source_review.json",
-      "sha256": "cbd72643d6d3e4f542990a4c5509ce89861b094721313fd6313862b51ea4b2e5"
+    "prior_preservation": {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\fca_peer_propagation\\prior_preservation.json",
+      "sha256": "73925fcd5ca088607d8332e3fa81709fa248519e464cd2422cbbc9fdd2816e13"
     },
     "source_amendments": {
       "path": "docs\\v2_fca_source_amendments.json",
-      "sha256": "185bc49723abae11d6f22f26c18cefa761d05654579e1fbbad97015d6e233bb4"
-    },
-    "valuation_flag_review": {
-      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\fca_financial_propagation\\valuation_flag_changes.parquet",
-      "sha256": "4b0d964dc7ce737869f0dafd1ad5f2bd692c77132e0b166f7d1f426a3bcea1cc"
+      "sha256": "a1d0c3b42d38d9bafc7ee409c555d390c2968c2ede08a3f3df714c2a3a764345"
     }
   },
-  "financial_8_fields_gained_active_values": 154656,
-  "financial_and_event_eligible_valid_values_lost": 0,
+  "financial_8_fields_gained_active_values": 179685,
   "future_identity_prefix_exact": true,
   "identity_differences": {
     "added": {
-      "active": 26271,
+      "active": 31858,
       "names": 350,
-      "rows": 64333
+      "rows": 70453
     },
     "changed": {
       "active": 9091,
@@ -46,47 +49,57 @@
       "rows": 1772
     }
   },
-  "identity_rows_after": 943419,
-  "identity_rows_before": 880858,
-  "identity_shared_field_differences": {
-    "class": 0,
-    "cnpj": 0,
-    "cvm_code": 0,
-    "fca_id": 0,
-    "identity_effective_start": 0,
-    "identity_known_date": 0,
-    "identity_method": 15257,
-    "preferred_class": 0,
-    "sector": 0,
-    "sector_known_date": 0,
-    "sector_label": 0,
-    "sector_mapping_id": 4438,
-    "unit_composition": 0
-  },
+  "identity_rows": 949539,
+  "incremental_mglu_abc_active_identity_rows": 5587,
   "limits": [
-    "A/B incomplete, C/D unstarted; no profitability or GPU result.",
-    "Further source-specific MGLU/ABC class resolution and remaining dependent families, original financial numerator/TTM/denominator, wealth/labels and new tensor contract remain.",
-    "Original and new source vintages do not establish every historical revision; no source or eligible-name deletion."
+    "A/B incomplete; no C/D or corrected profitability/GPU fit.",
+    "These intermediates preserve family-specific original market inputs; full continuation/wealth/label and new model-store propagation remain.",
+    "Independent financial/float source numerators, TTM, denominators, remaining clocks/revisions and actual changed neural tensors remain.",
+    "ABC exact issuer/ticker plus prior COTAHIST PN semantics; no inferred legal class conversion or admitted failed-prospectus bytes.",
+    "No accepted inputs, original fits or held-out consumers changed."
   ],
-  "new_financial_documents": 427,
-  "schema": "FCA_IDENTITY_PROPAGATION_ACCEPTANCE_V1",
-  "seconds": {
-    "financial_event_propagation": 131.36057019999134,
-    "identity_reconstruction_and_prefix": 58.373721800002386
+  "new_financial_source_extractions": 0,
+  "old_cross_market_non_exposure_fields_exact": true,
+  "old_lending_other_fields_exact": true,
+  "peer_family_changes": {
+    "cross_market": {
+      "changed_shared": 2060611,
+      "gained": 0,
+      "lost": 0
+    },
+    "lending": {
+      "changed_shared": 0,
+      "gained": 2652,
+      "lost": 0
+    },
+    "sector": {
+      "changed_shared": 283551,
+      "gained": 91468,
+      "lost": 0
+    }
   },
+  "prior_implementation": "c91405607a9cc5893b4dbd1634fd6e257de5fbbc",
+  "prior_overlay_rows_bit_exact": 943419,
+  "reused_own_version_filings": 427,
+  "schema": "FCA_IDENTITY_DEPENDENT_ACCEPTANCE_V2",
+  "seconds": {
+    "financial_events": 119.11130810000759,
+    "identity_and_prefix": 70.08862000000954,
+    "peer_dependencies": 124.35966630000621
+  },
+  "source_amendments": 71,
   "source_lf_sha256": {
     "ops/admit_fca_identity.py": "7e210fb3643515f691e8b89413246ba2f8ed3e20c4e60090f6c6758b952018e0",
-    "ops/propagate_fca_financials.py": "e73d2cf0ad6ad17fe12160c1909e0c0ea0383f418db96ed6640bfcb1556d9bfd",
-    "research/src/brazil_rv/v2/round5_cvm.py": "f90e6c3cc3a92eaec5e8cb4bfdad7a8a26b2911f3d5beac14cd10ea012711c0a",
-    "research/tests/test_v2_round5_cvm_identity.py": "6f268d0f91dad2a003a11bbf476cc7ad1c1d51c33de3b12355d2e28331017e4b"
+    "ops/propagate_fca_financials.py": "0371a27b94a4f71622a4819aa1d38deeb0b6e9f13ef722c4403caf1f62b8cfe0",
+    "ops/propagate_fca_peers.py": "c8b4c6f3c365331eb86933c8457ad8410bd65fbfce074186af4b184f58a01170",
+    "research/src/brazil_rv/v2/round5_cvm.py": "d76ea155ef5aac69117c8152ff30c2a92c6ebd1afe549a95eb14c903fc46b978",
+    "research/tests/test_v2_round5_cvm_identity.py": "ec6a52e5ea038f58ceb4279966cc71e74d84c3cd5db83d33663b13d410f5da9e"
   },
-  "statement_age_gained_active_values": 26271,
-  "status": "verified_intermediate_identity_financial_event_overlay_for_next_derived_contract_no_store_or_fit_rebinding",
-  "unaffected_names_exact": 203,
-  "validation": {
-    "new_source_clock_test": "per-security known date, unchanged unrelated security/sector clock, future mutation",
-    "ruff": "passed",
-    "targeted_identity_tests_passed": 10
+  "statement_age_gained_active_values": 31730,
+  "status": "source_identity_and_five_dependent_family_candidates_verified_not_final_store",
+  "tests": {
+    "identity": 11,
+    "ruff": "passed"
   },
-  "valuation_flag_changed_active_rows": 213
+  "unaffected_peer_coordinates_exact": true
 }

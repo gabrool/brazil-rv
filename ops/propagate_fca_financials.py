@@ -36,6 +36,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--identity', type=Path, required=True)
     parser.add_argument('--output', type=Path, required=True)
+    parser.add_argument('--reuse-extraction', type=Path)
     args = parser.parse_args()
     start = time.perf_counter()
     args.output.mkdir(parents=True, exist_ok=False)
@@ -66,10 +67,20 @@ def main():
     missing = {c for c in identity['cnpj'].unique() if c[:8] not in cached_roots}
     root = Path(original['source_root'])
     progress('new_issuer_documents', missing_issuer_roots=len(missing))
-    extra, evidence = cvm.load_financial_documents(root, missing, repair_root=Path(cache['path']).parent)
-    with (args.output/'new_issuer_documents.pkl').open('wb') as handle:
-        pickle.dump((extra, evidence), handle)
-    write_json_atomic(args.output/'new_issuer_sources.json', evidence)
+    if args.reuse_extraction:
+        prior = bound_json(binding(args.reuse_extraction))
+        if not missing.issubset(set(prior['new_issuer_cnpjs'])):
+            raise ValueError('New issuer roots require their own incremental source extraction')
+        extra_binding = prior['artifacts']['new_issuer_documents']
+        assert sha256_file(Path(extra_binding['path'])) == extra_binding['sha256']
+        extra, evidence = pickle.loads(Path(extra_binding['path']).read_bytes())
+        extraction_artifacts = {k:prior['artifacts'][k] for k in ('new_issuer_documents','new_issuer_sources')}
+    else:
+        extra, evidence = cvm.load_financial_documents(root, missing, repair_root=Path(cache['path']).parent)
+        with (args.output/'new_issuer_documents.pkl').open('wb') as handle:
+            pickle.dump((extra, evidence), handle)
+        write_json_atomic(args.output/'new_issuer_sources.json', evidence)
+        extraction_artifacts = {}
     documents.extend(extra)
     # Two previously reviewed own-version capital tables; no date backfill.
     capital = bound_json(run['cvm_capital_admission'])
@@ -111,6 +122,8 @@ def main():
     old_events = pl.read_parquet(families['events']['data']['path'])
     assert_frame_equal(old_events.filter(pl.col('isin').is_in(unaffected)).sort(keys),event_frame.filter(pl.col('isin').is_in(unaffected)).sort(keys),check_exact=True)
     report = {'schema':'FCA_FINANCIAL_EVENT_PROPAGATION_V1','identity_admission':binding(args.identity),'accepted_financial_family':pointer['financial_family'],'accepted_event_family':families['events']['source_manifest'],'prior_document_cache':cache,'new_issuer_cnpjs':sorted(missing),'new_documents':len(extra),'new_documents_with_accounts':sum(bool(d.get('accounts')) for d in extra),'new_documents_with_capital':sum(d.get('shares') is not None for d in extra),'financial_active_changes':compare(old_financial,financial,active_keys),'event_active_changes':compare(old_events,event_frame,active_keys),'unaffected_names_exact':len(unaffected),'financial_audit':audit,'artifacts':{p.stem:binding(p) for p in args.output.iterdir() if p.suffix in ('.parquet','.pkl','.json') and p.name!='progress.json'},'source_code':{p.name:binding(p) for p in (Path(__file__),Path(cvm.__file__))},'seconds':time.perf_counter()-start,'limits':['Derived financial/event observations only; no accepted store, fitted coordinates, forecasts or model scores changed.','Financial formulas are held fixed, not yet an independent numerator/TTM/denominator audit.','New issuer annual accounts retain their own version and unavailable originals/capital remain missing; downstream recovery may add support.','Other identity-dependent families, universe/wealth/labels and original source anomalies remain required before full store acceptance.']}
+    report['artifacts'].update(extraction_artifacts)
+    report['reused_extraction'] = binding(args.reuse_extraction) if args.reuse_extraction else None
     write_json_atomic(args.output/'manifest.json',report)
     progress('complete',seconds=report['seconds'])
 

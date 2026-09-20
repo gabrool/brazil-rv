@@ -14,7 +14,9 @@ separate economic archive; prior stock/hedge references are bound. Event-specifi
 terms and full historical account acceptance remain open. Cielo's source-based
 accounting artifact and ALLOS/ISA rename admissions are now verified as described
 at the end of this log; a corrected full model store remains pending. No training or
-source-census worker is active.
+source-census worker is active. The latest FCA candidate now includes source-bound
+MGLU/ABC corrections and five dependent families; see the final entry and
+`v2_FCA_IDENTITY_PROPAGATION.md`. It is not yet a replacement model store.
 
 Initial inspection: the account supports only one scalar successor and rejects a
 successor already held; multi-leg Copel delivery and mixed contractual consideration
@@ -1175,3 +1177,54 @@ parquets. All 539 bound original-source receipts were verified. Immutable inputs
 and old fits were not duplicated; prior passed censuses were not repeated. Resolve
 fca_identity_financial_recovery. Acceptance SHA-256:
 `cc907ccedb4c73e598f5be31749a1af4a067cee04199d0e289953da44c5d32c2`.
+
+
+2026-09-20 — MGLU/ABC source exceptions and dependent peer propagation:
+
+- The issuer's original MGLU Apr29 2011 announcement binds MGLU3/BRMGLUACNOR2,
+  ordinary shares and next-business-day trading. Twenty-six exact FCA amendments
+  resolve omitted tickers/listings or conflicting ON/PN fields. ABC's original
+  Jan30 2008 release was recovered from its 2007-only issuer archive and visually
+  verified; it explicitly names ABCB4. Thirty-two exact amendments join original
+  CNPJ/CVM filings and prior COTAHIST BRABCBACNPR4/PN. PNA wording remains in the
+  source evidence; this is a security-specific exchange join, not an asserted
+  legal conversion. No failed 2007 prospectus bytes or current FAQ were admitted.
+  The issuer archive's quarter-end metadata is not used as publication time.
+- New exact-ISIN constraints accompany external correction clocks; no corrected
+  ticker can bind another security. All 71 explicit source amendments retain
+  before-fields, evidence hashes and receipt/effective dates. No generic class
+  relaxation or original-source mutation.
+- Full reconstruction: 949,539 rows; 70,453 additions/31,858 already eligible days,
+  1,772 inactive removals/no eligible loss. The earlier 943,419-row overlay remains
+  exact. MGLU/ABC add 6,120 full-calendar rows, 5,587 already eligible, beyond that
+  overlay. Original baseline proof was reused; new global/prefix work took 70.09s.
+- Reused all 427 incremental filings, with no source re-extraction. Total recovery
+  versus sealed inputs: 179,685 values across eight financial fields, 31,730
+  statement-age values separately and 219,291 across seven event fields. Existing
+  valid values and the earlier overlay's shared values remain exact. The existing
+  213 eligible valuation-flag corrections remain. Runtime 119.11s.
+- Actual sector, cross-market and lending-utilization parquets now propagate the
+  full identity repair while holding each family's original market inputs fixed.
+  Sector fields add 91,468 usable values and change 283,551 existing values;
+  exposure/shock-interaction fields change 2,060,611; utilization adds 2,652 with
+  every shared valid value exact. No eligible valid values are lost. Other names
+  can change through their corrected issuer-equal peer groups. Every coordinate
+  outside affected sectors is exact, as are ALL non-exposure cross-market fields
+  and the other six lending fields/ages. Raw lending additions remain separate.
+- Peer computation took 124.36s. Its first utilization output accidentally kept
+  Float64 against the old Float32 storage; max1.39e-8 differences vanish after
+  restoring the existing type. Initial output/reproducer is retained. Only the
+  typed utilization result/comparison was corrected, without repeating passed
+  sector/exposure work. A UTF8 diagnostic console issue had no data effect.
+- Eleven affected identity tests and Ruff passed; full causal prefix and prior
+  overlay preservation passed. Readout/source bytes, receipts and per-field deltas
+  are bound by v2_fca_identity_acceptance.json and the run pointer. The registration
+  was reread. These are CPU source/feature results, not fit timings or profitability.
+- A/B remain incomplete and C/D unstarted. Next B priorities: independently trace
+  financial/float numerators, TTM and denominators (including the new427 filings),
+  remaining original clocks/revisions and ALLOS/ISA full history/universe/warmup/
+  wealth/labels, then actual tensors in an explicit new store contract. Current
+  peer artifacts hold original wealth fixed; final wealth changes must propagate.
+  A still needs denied-renewal/recall, presettlement-disposal and adaptive-book
+  source sensitivities. No old checkpoint was scored on changed coordinates;
+  no new GPU fit, held-out consumer or deployment was launched.

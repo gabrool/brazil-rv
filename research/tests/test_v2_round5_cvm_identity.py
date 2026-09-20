@@ -59,6 +59,16 @@ def test_original_generic_shares_use_independent_prior_classes_and_birth_bounds(
     assert identity.filter(pl.col("isin") == "PN")["preferred_class"][0] == ""
 
 
+def test_source_bound_correction_cannot_assign_another_security():
+    days, document, observations = fixture()
+    security = document["securities"][0]
+    security.update(ticker="ABCD4", source_bound_isin="PN")
+    matched = build_identity([document], observations, days, ["ON", "PN"])
+    assert set(matched["isin"]) == {"PN"}
+    security["source_bound_isin"] = "ON"
+    assert build_identity([document], observations, days, ["ON", "PN"]).is_empty()
+
+
 def test_explicit_generic_ticker_uses_prior_b3_class_without_name_guessing():
     days, document, observations = fixture()
     document["securities"][0]["ticker"] = "ABCD3"
