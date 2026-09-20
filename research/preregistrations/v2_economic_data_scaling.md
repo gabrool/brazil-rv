@@ -500,3 +500,17 @@ reducers were reused and only four activity fields recalculated. The same
 composition block still requires common-state, issuer/financial/lending-denominator,
 native/scalar/auxiliary and final target/complete-store composition. January25
 and integratedStageA remain; neither C nor D starts on these intermediate arrays.
+
+Surviving dependency composition record, after qualification on2026-09-20:
+pre-output issuer/context/lending/auxiliary plans and the two consumer plans are
+retained under surviving_renames; dependency_progress/planning_resolution.json
+preserves the exact pre-update registration and closeout. Own-version surviving
+issuer/financial/events, common state, sector/lending and four further auxiliary
+families are qualified as intermediate sparse layers. The raw74valuation dates
+yield45 losses of previously supported eligible financial fields;181 additional
+live utilization losses retain inherited unit uncertainty. No threshold/source
+override or new loan alias is admitted. Exact initial/resumed audit recipes and
+failed attempts remain; saved reducers and passed consumers were not repeated.
+Continue native M1/scalar, magnitude/cross-market and final target/store composition,
+then January25/integratedStageA before registeredC/D. This does not start a new
+experiment campaign or change any model/economic admission criterion.

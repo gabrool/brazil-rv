@@ -1,6 +1,20 @@
 # Economic accounting, data audit and scaling progress
 
-2026-09-20 latest: [surviving-company propagation](v2_SURVIVING_RENAME_PROPAGATION.md)
+2026-09-20 latest: eight surviving-company sidecar families and common state now
+qualify within the existing composition block. Resolve
+`surviving_rename_dependency_progress`: 158,241,768 old-coordinate typed control
+cells, 303 issuer/context/lending and124 auxiliary actual full933/full60 samples
+pass. Independent selected-unit history, activity/odd-lot and22 changed/new index
+rows pass.4,519 valid feature cells are added;273 removed, of which226 retain
+inherited unit uncertainty and47 are retired predecessors. No support threshold
+or source value changed. Counts overlap raw/family evidence, not independent
+observations. Failed context alignment and Float32 index-oracle attempts remain;
+all saved producers/consumers reused. No research runtime or accepted store/fit
+mutation, model forward or profitability result. Native M1/scalars,
+magnitude/cross-market, final targets/new store, January25 and integratedStageA
+remain; C/D unstarted. See [the combined dependency evidence](v2_SURVIVING_RENAME_PROPAGATION.md).
+
+Earlier same-day [surviving-company propagation](v2_SURVIVING_RENAME_PROPAGATION.md)
 admits SSBR→ALSO/ARZZ→AZZA original-clock spot identities and qualifies their
 liquidity/wealth/daily/risk/peer dependencies.55/60eligible gains;6retired ARZZcells;
 83,150,470control and2,009,467,410actualfull933/full60consumer cells pass.705,221slow

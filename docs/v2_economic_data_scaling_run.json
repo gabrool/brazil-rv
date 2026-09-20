@@ -884,7 +884,7 @@
   },
   "stage_a_closeout_plan": {
     "path": "C:\\quant\\b3-quant\\docs\\v2_STAGE_A_CLOSEOUT.md",
-    "sha256": "578019e9c5bc91589575bc6f10e7e74fefef6a392deac31c3f21010875181118"
+    "sha256": "91bc9fb1529e8957755ae20cd247e21fd1ab4b0eee2480c21be21a58b8d8c0d0"
   },
   "status": "accounting_and_deep_data_audit",
   "succession_identity_dependency_scope": {
@@ -894,6 +894,22 @@
   "surviving_rename_admission": {
     "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\surviving_renames\\manifest.json",
     "sha256": "7502ee6ea97c7e1dfda2ea2ef3bac7096f3a60b891c059359c9f5562b91234da"
+  },
+  "surviving_rename_auxiliaries": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\surviving_renames\\auxiliaries\\manifest.json",
+    "sha256": "1a0b39c32783f7107aaab4dabe52f8bedaf2ccfed189fbc4bfc3e038a49ee049"
+  },
+  "surviving_rename_auxiliary_arithmetic": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\surviving_renames\\auxiliaries\\qualification\\manifest.json",
+    "sha256": "406c99fbea6d106adc2d98aa7d454ab902454e5fa70c0cecc834cab8389ddd45"
+  },
+  "surviving_rename_auxiliary_input_audit": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\surviving_renames\\auxiliary_consumer\\manifest.json",
+    "sha256": "806414c0e618cf899137272fd944ae8784000418063b77a06cddc6758aac0451"
+  },
+  "surviving_rename_context": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\surviving_renames\\context\\manifest.json",
+    "sha256": "22f84b5c808db09c76775ee49df2cfb8507d2baf95f8fbc80413142db8ebe7e4"
   },
   "surviving_rename_daily": {
     "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\surviving_renames\\daily\\manifest.json",
@@ -907,9 +923,25 @@
     "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\surviving_renames\\daily\\admitted\\manifest.json",
     "sha256": "75e296c6353e829b2178b1b2399294cc031a7440d9b5ba1bd2395f553f8dfa6a"
   },
+  "surviving_rename_dependency_input_audit": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\surviving_renames\\dependency_consumer\\manifest.json",
+    "sha256": "b1d9b7c4694853a016845c6cf55c2381a3373c5f9a3853bd7ec44d5ec2629dbd"
+  },
+  "surviving_rename_dependency_progress": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\surviving_renames\\dependency_progress\\manifest.json",
+    "sha256": "0a94b76218adbd7397d7ff8260038b0900b45a550b2d2c16e08f2748e091ddcd"
+  },
   "surviving_rename_documentation": {
     "path": "C:\\quant\\b3-quant\\docs\\v2_SURVIVING_RENAME_PROPAGATION.md",
-    "sha256": "884a2b9e68e31b06a31da24fea055fa2cd7ec59eb709adadd6d6bd4af255c36b"
+    "sha256": "4665e06200dfd6ad93141a898f5a9c0fe699a2434435a9b6f17812853227e3f6"
+  },
+  "surviving_rename_issuers": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\surviving_renames\\issuers\\manifest.json",
+    "sha256": "9ed96e26bcb26e78873f4cfaab9924ea7b04fe8bcbc66c2b8d142b2573b219d5"
+  },
+  "surviving_rename_lending": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\surviving_renames\\lending\\manifest.json",
+    "sha256": "dcba1d191c8bd406fb5a7942f7c0fe9398b3e18dac32f4317176628d4a7e839f"
   },
   "surviving_rename_lineage_recovery": {
     "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\surviving_rename_lineage_recovery.json",
@@ -926,6 +958,10 @@
   "surviving_rename_source_lineage": {
     "path": "C:\\quant\\b3-quant\\docs\\v2_surviving_source_lineage.json",
     "sha256": "73064a70077b478ff6cd9ee90bf47b36470496555c35df9ff04f56151e0adf2e"
+  },
+  "surviving_rename_unit_history": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\surviving_renames\\unit_history\\manifest.json",
+    "sha256": "aa1267dcbd8798f99e39a990782817e10db1ee412158497fbb0993fa3f3cc314"
   },
   "surviving_rename_wealth": {
     "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\surviving_renames\\wealth\\manifest.json",
