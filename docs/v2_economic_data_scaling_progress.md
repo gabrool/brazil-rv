@@ -1354,3 +1354,49 @@ Exact runtime code, source patch, audits and historical-code resolutions verify.
 The two input-audit stores are rebuildable from the same arrays/axes and their
 archived manifest/table bytes; duplicate data copies are omitted. No immutable
 inputs or old fits were archived again. Canonical recovery pointer updated.
+
+### Rename issuer/dependent families and GOLL activity (2026-09-20)
+
+- Source-bound unit links now preserve exact issuer/class identity through
+  ALLOS/ISA. The949,568-row overlay adds31 mappings/30 eligible days and retires
+  two stale inactive rows; shared mappings remain exact. Sector metadata keeps
+  its separate known date. Two future-row deletion prefixes and conflict/late
+  knowledge fixtures pass. Prior-price valuation follows the same admitted
+  links without erasing predecessor capital barriers or inferring loan aliases.
+- Recomputed only the two affected financial issuers using the existing audited
+  extraction: +240 eight-field financial values, +30 statement ages separately,
+  +210 event values; no valid loss or changed shared value. Runtime21.00s.
+- Independently sound printed GOLL2011-02-16 volume/quantity/trades now survive
+  its invalid OHLC row. Prices remain unobserved, eligibility unchanged. The
+  four-field old control matches74,640 cells. The activity amendment changes471
+  ranked values across124 names in the next20 decisions, no mask/age loss, and
+  changes20 physical log-volume observations. Invalid returns remain invalid.
+- Rename propagation now updates sector, magnitude and cross-market families
+  on the changed tail with all933 names and original lookbacks/support. Relative
+  to prior FCA families: sector+457 valid/change3,648; magnitudes+352/change662
+  includingGOLL; cross-market+6,508/change19,111. No valid values lost. Original
+  oil/non-oil feature return contracts and cash-source coordinates stay distinct.
+  Source shocks/flows are routed to restored eligibility without inventing ADR
+  pairs or publication clocks. This is not a completed new store or model replay.
+- The91.31s dependency run initially promoted volume toFloat64. A narrow
+  log-volume/flow qualification restoresFloat32. Its first one-column sum used
+  NumPy's different pairwise reduction; a strided reduction now matches the
+  original all-name producer. Initial outputs/executed code remain preserved;
+  passed sector/volatility/regression work was not repeated. An earlier GOLL
+  audit-axis error used a replicated matrix where the universe needs a vector;
+  corrected without changing source values. Final activity qualification1.86s.
+- Independent scope checks preserve all values outside affected issuer/sector/
+  activity paths. The actual dated-family loader matches3,090,096 value/mask/age
+  cells across92 fields,12 dates and933 names,3.18s. This verifies intermediate
+  family alignment, not a neural forward or complete-store acceptance.36 affected
+  tests and Ruff pass; no accounting/source census was repeated. Registration
+  reread, all workers finished, no GPU fit or corrected profitability result.
+- `v2_RENAME_DEPENDENCIES.md` and `v2_rename_dependency_acceptance.json` bind the
+  milestone; acceptance SHA-256
+  `b856e9e0ba8e0bd1afca877e33125077a59c8a6e2d48adf17a642aa01a0fb52a`.
+  Resolve `rename_issuer_propagation`, `goll_activity_admission`,
+  `rename_dependents`, `activity_magnitude_propagation`, `dependency_update_audit`.
+  A/B incomplete, C/D unstarted. Next propagate recovered lending and remaining
+  M1/auxiliary families, finish contractual wealth/labels and remaining source
+  clocks/revisions, then accept full derived tensors/refits. Stage A execution
+  bounds remain required. No changed coordinates may enter old checkpoints.

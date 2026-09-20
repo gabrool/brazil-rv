@@ -9,6 +9,55 @@ from brazil_rv.v2 import round5_cvm, round5_cvm_fca
 from brazil_rv.v2.round5_cvm import build_identity
 
 
+def test_sourced_rename_preserves_class_and_separate_sector_clock():
+    days, document, observations = fixture()
+    source = build_identity([document], observations, days, ["ON", "PN"])
+    links = pl.DataFrame(
+        [
+            dict(
+                predecessor_index=0,
+                successor_index=2,
+                effective_index=2,
+                known_index=3,
+                evidence_sha256="source",
+            )
+        ]
+    )
+    later = source.with_columns(
+        pl.when(pl.col("date") >= days[4])
+        .then(pl.lit("99"))
+        .otherwise(pl.col("sector"))
+        .alias("sector"),
+        pl.when(pl.col("date") >= days[4])
+        .then(pl.lit(days[4]))
+        .otherwise(pl.col("sector_known_date"))
+        .alias("sector_known_date"),
+    )
+    result = round5_cvm.continue_issuer_identity(
+        later, links, days, ["ON", "PN", "NEW"]
+    )
+    assert result.filter(pl.col("date") < days[3]).equals(
+        later.filter(pl.col("date") < days[3]).sort("date", "isin")
+    )
+    new = result.filter(pl.col("isin") == "NEW")
+    assert new["date"].to_list() == days[3:]
+    assert new["class"].to_list() == ["ON", "ON"]
+    assert new["sector"].to_list() == ["17", "99"]
+    assert new["identity_known_date"].to_list() == [days[3]] * 2
+    assert not result.filter(
+        (pl.col("isin") == "ON") & (pl.col("date") >= days[3])
+    ).height
+    shortened = round5_cvm.continue_issuer_identity(
+        later.filter(pl.col("date") < days[4]), links, days[:4], ["ON", "PN", "NEW"]
+    )
+    assert shortened.equals(result.filter(pl.col("date") < days[4]))
+    bad = pl.concat([later, new.with_columns(pl.lit("PN").alias("class"))])
+    import pytest
+
+    with pytest.raises(ValueError, match="Conflicting rename issuer/class"):
+        round5_cvm.continue_issuer_identity(bad, links, days, ["ON", "PN", "NEW"])
+
+
 def fixture():
     days = [date(2024, 1, d) for d in (2, 3, 4, 5, 8)]
     document = {

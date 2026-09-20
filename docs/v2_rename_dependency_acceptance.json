@@ -1,0 +1,159 @@
+{
+  "activity_return_boundary": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\goll_activity_admission\\return_boundary.json",
+    "sha256": "47441908d6714ccfec8897bb0cbdeaee253113e9893f4ff3845b88d873cda87a"
+  },
+  "base_commit": "f5b0416f270296cfdc9cdd5c341f48e0d6790ff9",
+  "code": {
+    "ops/admit_rejected_quote_activity.py": {
+      "path": "C:\\quant\\b3-quant\\ops\\admit_rejected_quote_activity.py",
+      "sha256": "c90cd0745aa1da03ecbacc28c61635c096fe065c25c610925c881efec137272a"
+    },
+    "ops/audit_dependency_updates.py": {
+      "path": "C:\\quant\\b3-quant\\ops\\audit_dependency_updates.py",
+      "sha256": "f51d87c721eb938d29bfeca9db2a8e4379769c265cd2d3b314660c73509b8697"
+    },
+    "ops/propagate_activity_magnitudes.py": {
+      "path": "C:\\quant\\b3-quant\\ops\\propagate_activity_magnitudes.py",
+      "sha256": "bc8a4f4d0bf4059e74dc80ba85c9160e2db954a75e5bc002a1cb2a4fdd2f80c9"
+    },
+    "ops/propagate_rename_dependents.py": {
+      "path": "C:\\quant\\b3-quant\\ops\\propagate_rename_dependents.py",
+      "sha256": "58040d27325e298c6215d72c45c0ed88b9726312ec8230ffa5e9daaf180ccd48"
+    },
+    "ops/propagate_rename_history.py": {
+      "path": "C:\\quant\\b3-quant\\ops\\propagate_rename_history.py",
+      "sha256": "6317ca9b98165d49e186d9ff1826cd03d6cef774531a399df56d92c5ddc836cb"
+    },
+    "ops/propagate_rename_issuers.py": {
+      "path": "C:\\quant\\b3-quant\\ops\\propagate_rename_issuers.py",
+      "sha256": "1234339da70c45ce6d2df19c9f61a2e277a688cc479e7a7d0f8491bd81545038"
+    },
+    "research/src/brazil_rv/v2/data_foundation.py": {
+      "path": "C:\\quant\\b3-quant\\research\\src\\brazil_rv\\v2\\data_foundation.py",
+      "sha256": "f13d6a4a8631366be9bc5944181ca42a9dfb5059eb637a6a78f4d0701b5d96be"
+    },
+    "research/src/brazil_rv/v2/round5_cvm.py": {
+      "path": "C:\\quant\\b3-quant\\research\\src\\brazil_rv\\v2\\round5_cvm.py",
+      "sha256": "b6035f32ab5ee1b52c061b9be025c6e53ec5ca62ba14308412793298fb3f88f4"
+    },
+    "research/tests/test_v2_data_foundation.py": {
+      "path": "C:\\quant\\b3-quant\\research\\tests\\test_v2_data_foundation.py",
+      "sha256": "0cfe3bebfe3fd70d8a2e13ab7f678e89395fe413d113d60455212c0ead52edb0"
+    },
+    "research/tests/test_v2_round5_cvm_identity.py": {
+      "path": "C:\\quant\\b3-quant\\research\\tests\\test_v2_round5_cvm_identity.py",
+      "sha256": "216212a810ea2e6f78767b8a4cfed7ca23ac3b336c17a9addaed8f0812f0cec0"
+    },
+    "research/tests/test_v2_round5_valuation.py": {
+      "path": "C:\\quant\\b3-quant\\research\\tests\\test_v2_round5_valuation.py",
+      "sha256": "f3debd132cc6415752208e021af2a14d66b619040172bf1487aad9aa284850ff"
+    }
+  },
+  "gpu_fits": 0,
+  "historical_code_and_artifact_resolutions": [
+    {
+      "recorded": {
+        "path": "C:\\Brazil-RV\\quant\\b3-quant\\ops\\propagate_rename_dependents.py",
+        "sha256": "1f01afda860ed127df59ba699cbae900be13e1afef48aa24fd2a9c69e5dc8f86"
+      },
+      "snapshot": {
+        "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\rename_dependents\\executed_reproducer.py",
+        "sha256": "1f01afda860ed127df59ba699cbae900be13e1afef48aa24fd2a9c69e5dc8f86"
+      }
+    },
+    {
+      "recorded": {
+        "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\activity_magnitude_propagation\\cross_market.parquet",
+        "sha256": "910ae2fbdfe6a61fc7ce393ae194d6fb0831d0353272cd11afadb7bf95ad6c66"
+      },
+      "snapshot": {
+        "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\activity_magnitude_initial\\cross_market.parquet",
+        "sha256": "910ae2fbdfe6a61fc7ce393ae194d6fb0831d0353272cd11afadb7bf95ad6c66"
+      }
+    },
+    {
+      "recorded": {
+        "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\activity_magnitude_propagation\\magnitude_changes.parquet",
+        "sha256": "5727d98f2b3cf18518643de0d8ed592170b4df202ad6d6209f9d10b881a25d18"
+      },
+      "snapshot": {
+        "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\activity_magnitude_initial\\magnitude_changes.parquet",
+        "sha256": "5727d98f2b3cf18518643de0d8ed592170b4df202ad6d6209f9d10b881a25d18"
+      }
+    },
+    {
+      "recorded": {
+        "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\activity_magnitude_propagation\\magnitudes.parquet",
+        "sha256": "cd58e30db5f1b01c3150ecbbaad36df742a368276d6148b059c96bea08229509"
+      },
+      "snapshot": {
+        "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\activity_magnitude_initial\\magnitudes.parquet",
+        "sha256": "cd58e30db5f1b01c3150ecbbaad36df742a368276d6148b059c96bea08229509"
+      }
+    }
+  ],
+  "inputs": {
+    "fca_financial_propagation": {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\fca_financial_propagation\\issuer_exceptions\\manifest.json",
+      "sha256": "823d294b35bf9f56c738c820dde0eb9802cacc0b7919749d41ec5695d685d6c8"
+    },
+    "fca_identity_admission": {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\fca_identity_admission\\issuer_exceptions\\manifest.json",
+      "sha256": "752a9665127895020ac6707da79fc344e4c2ab234b33175a18b62d977aad607b"
+    },
+    "fca_peer_propagation": {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\fca_peer_propagation\\manifest.json",
+      "sha256": "b99a5d17342a3d197a15311d11f3294f53af6d0dc5a2036b83362c80bdb0ff36"
+    },
+    "rename_history_propagation": {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\rename_history_propagation\\manifest.json",
+      "sha256": "e0ab9e9ad52d5ad0fa56973a709ba1da5db00805379843df700cbecfe40bfd89"
+    },
+    "rename_peer_propagation": {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\rename_peer_history\\manifest.json",
+      "sha256": "e064dfaada8ee6bd8d15d1b61dc226f2db97b3636218ad8c5a10706a14b6b62e"
+    }
+  },
+  "limits": [
+    "Source-bound issuer/valuation, five dependent family updates and GOLL activity only; no accepted model store or old fit changed.",
+    "Read initial rename volume outputs with the final Float32/strided-reduction qualification.",
+    "Recovered lending, M1/remaining auxiliary, upstream revisions and corporate wealth/labels still require full derived-store acceptance."
+  ],
+  "model_profitability_claim": false,
+  "results": {
+    "activity_magnitude_propagation": {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\activity_magnitude_propagation\\manifest.json",
+      "sha256": "89c33b64ea052492238e0d1a2dee6fa1130a7ba43d64a36a3442903a11a9622a"
+    },
+    "goll_activity_admission": {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\goll_activity_admission\\manifest.json",
+      "sha256": "7868108bdc97e193b7f86a510b2317174171b22629441025d5936069474c6fca"
+    },
+    "rename_dependents": {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\rename_dependents\\manifest.json",
+      "sha256": "83196483828edcc597d1910731e57ec5f96d03fa81f0ea5b0fdd810a96930456"
+    },
+    "rename_issuer_propagation": {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\rename_issuer_propagation\\manifest.json",
+      "sha256": "2b5a9322117c57d00d10472e43335ca35e6ff7af5e4922f949e07f27a2b5cd08"
+    }
+  },
+  "schema": "RENAME_DEPENDENCY_ACTIVITY_ACCEPTANCE_V1",
+  "scope_alignment_audit": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\dependency_update_audit.json",
+    "sha256": "87547edf25105b5eb0e22470c60c91bec83294902eb20a4d2e9707ee31050cb5"
+  },
+  "stage_status": {
+    "A": "incomplete_execution_bounds",
+    "B": "incomplete_full_store_other_dependencies",
+    "C": "not_started",
+    "D": "not_started"
+  },
+  "status": "verified_intermediate_derived_dependencies_not_complete_A_B",
+  "tests": {
+    "affected_passed": 36,
+    "repeated_accounting_or_source_census": false,
+    "ruff": "passed"
+  }
+}

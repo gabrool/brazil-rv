@@ -1,4 +1,8 @@
 {
+  "activity_magnitude_propagation": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\activity_magnitude_propagation\\manifest.json",
+    "sha256": "89c33b64ea052492238e0d1a2dee6fa1130a7ba43d64a36a3442903a11a9622a"
+  },
   "auxiliary_tensor_audit": {
     "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\auxiliary_tensor_audit\\report.json",
     "sha256": "ca53993c49424f7383a02064cae6b137c612115d10bbf639549d4820a30337d5"
@@ -83,6 +87,10 @@
   "cvm_zip_capital_audit": {
     "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\cvm_source_audit\\zip_capital.json",
     "sha256": "cf3c4495d894f9047818239f1376d5cdd8f8d32ce490f28b731f2bc45ad1873f"
+  },
+  "dependency_update_audit": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\dependency_update_audit.json",
+    "sha256": "87547edf25105b5eb0e22470c60c91bec83294902eb20a4d2e9707ee31050cb5"
   },
   "dommo_conversion_acceptance": {
     "path": "docs\\v2_dommo_conversion_acceptance.json",
@@ -176,6 +184,10 @@
   "fit_conditioning_audit": {
     "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\fit_conditioning_audit\\report.json",
     "sha256": "814a0a846feea64b0694859fc90924e9dd42bafbc84f1ea64807415c237e181d"
+  },
+  "goll_activity_admission": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\goll_activity_admission\\manifest.json",
+    "sha256": "7868108bdc97e193b7f86a510b2317174171b22629441025d5936069474c6fca"
   },
   "identity_source_admission": {
     "path": "docs\\v2_identity_source_admission.json",
@@ -277,6 +289,14 @@
     "status": "observations_admitted_for_new_economics_no_model_feature_change"
   },
   "registration": "research/preregistrations/v2_economic_data_scaling.md",
+  "rename_dependency_acceptance": {
+    "path": "C:\\quant\\b3-quant\\docs\\v2_rename_dependency_acceptance.json",
+    "sha256": "b856e9e0ba8e0bd1afca877e33125077a59c8a6e2d48adf17a642aa01a0fb52a"
+  },
+  "rename_dependents": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\rename_dependents\\manifest.json",
+    "sha256": "83196483828edcc597d1910731e57ec5f96d03fa81f0ea5b0fdd810a96930456"
+  },
   "rename_history_acceptance": {
     "path": "C:\\Brazil-RV\\quant\\b3-quant\\docs\\v2_rename_history_acceptance.json",
     "sha256": "0f0c277c4297c8a309983beb74b258506ad284d803297fcea29381bf71b2a6cd"
@@ -292,6 +312,10 @@
   "rename_input_audit": {
     "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\rename_peer_history\\input_audit.json",
     "sha256": "dd0239b33c2a99657e7b00a154260ff2bbcd841772f4f08ef75c32243ccf18d1"
+  },
+  "rename_issuer_propagation": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\rename_issuer_propagation\\manifest.json",
+    "sha256": "2b5a9322117c57d00d10472e43335ca35e6ff7af5e4922f949e07f27a2b5cd08"
   },
   "rename_peer_propagation": {
     "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\rename_peer_history\\manifest.json",

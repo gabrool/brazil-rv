@@ -34,6 +34,28 @@ def valuation_fixture():
     return sessions, document, identity, market
 
 
+def test_rename_valuation_uses_prior_class_price_and_keeps_old_barriers():
+    sessions, document, _, market = valuation_fixture()
+    document["shares"] = {"ON": 100}
+    market["observed"][:2, 1] = False
+    market["history_links"] = [
+        dict(predecessor_index=0, successor_index=1, effective_index=2, known_index=1)
+    ]
+    row = [{"isin": "PN", "class": "ON"}]
+    assert issuer_market_cap({1: document}, row, 2, sessions, market, []) == (2000, 0)
+    market["history_links"][0]["known_index"] = 3
+    assert issuer_market_cap({1: document}, row, 2, sessions, market, []) == (
+        None,
+        None,
+    )
+    market["history_links"][0]["known_index"] = 1
+    market["barrier_prefix"][1:, 0] = 1
+    assert issuer_market_cap({1: document}, row, 3, sessions, market, []) == (
+        None,
+        None,
+    )
+
+
 def test_issuer_valuation_prices_each_class_and_ignores_duplicate_unit_claims():
     sessions, document, identity, market = valuation_fixture()
     ledger = {("DFP", document["reference"]): document}

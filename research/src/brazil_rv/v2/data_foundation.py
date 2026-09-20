@@ -245,8 +245,9 @@ def validate_cotahist_daily(
 
     Exact duplicate source rows collapse to one. Distinct records for the same
     date/ISIN are conflicting economic observations and stop the build.
-    Invalid observations remain in the returned audit but not the accepted
-    panel; no price or activity value is repaired or invented.
+    Invalid observations remain in the returned audit. The panel may separately
+    retain sound printed activity from a price-only rejection; no price or
+    activity value is repaired or invented.
     """
 
     identity = _identity_column(daily)
@@ -866,6 +867,35 @@ def panel_from_daily(
             )
         observed[date_index, isin_index] = True
         trade_observed[date_index, isin_index] = True
+
+    # Price bounds do not invalidate independently printed turnover/counts.
+    # Recheck activity and units: the first rejection reason can hide a second
+    # defect in the same row. Rejected prices/distribution marks stay absent.
+    if invalid_observations is not None and invalid_observations.height:
+        for row in invalid_observations.iter_rows(named=True):
+            if row.get("raw_validation_reason") not in {
+                "nonfinite_or_nonpositive_ohlc",
+                "inconsistent_ohlc_bounds",
+            }:
+                continue
+            t = date_lookup.get(row["trade_date"])
+            n = isin_lookup.get(row[invalid_identity])
+            if t is None or n is None or not complete[t]:
+                continue
+            if any(
+                row.get(c) is None or not np.isfinite(row[c]) or row[c] < 0
+                for c in ("volume_brl", "trades", "quantity")
+            ):
+                continue
+            if "currency" in row and str(row["currency"]).strip() not in {"R$", "BRL"}:
+                continue
+            factor = row.get("quote_factor", 1)
+            if factor is None or not np.isfinite(factor) or factor <= 0:
+                continue
+            for c in ("volume_brl", "trades", "quantity"):
+                values[c][t, n] = row[c]
+            trade_observed[t, n] = True
+            excluded[t, n] = False
 
     activity_valid = np.zeros(shape, dtype=np.bool_)
     for isin_index in range(len(security_axis)):

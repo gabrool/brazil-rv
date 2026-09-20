@@ -1292,6 +1292,86 @@ def build_identity(
     return pl.DataFrame(output, schema=schema)
 
 
+def continue_issuer_identity(
+    identity: pl.DataFrame,
+    history_links: pl.DataFrame,
+    sessions: list[date],
+    isins: list[str],
+) -> pl.DataFrame:
+    """Carry exact issuer/class identity through admitted unit/no-cash renames.
+
+    The caller binds the source-validated history links to these axes. Neither
+    ticker similarity nor another share class establishes the link. Only dated
+    issuer metadata may update the inherited sector; existing successor rows
+    remain authoritative after checking issuer and class consistency.
+    """
+    result = identity
+    core = ("cnpj", "cvm_code", "class", "preferred_class", "unit_composition")
+    sector_fields = ("sector", "sector_label", "sector_known_date", "sector_mapping_id")
+    for link in history_links.sort("effective_index").iter_rows(named=True):
+        begin = max(link["effective_index"], link["known_index"])
+        if begin >= len(sessions):
+            continue
+        predecessor = isins[link["predecessor_index"]]
+        successor = isins[link["successor_index"]]
+        prior = result.filter(
+            (pl.col("isin") == predecessor) & (pl.col("date") <= sessions[begin])
+        ).sort("date")
+        if prior.is_empty():
+            raise ValueError(f"Rename has no known predecessor issuer: {predecessor}")
+        inherited = prior.row(-1, named=True)
+        existing = {
+            r["date"]: r
+            for r in result.filter(pl.col("isin") == successor).iter_rows(named=True)
+        }
+        metadata = result.filter(
+            (pl.col("cnpj") == inherited["cnpj"])
+            & (pl.col("cvm_code") == inherited["cvm_code"])
+            & (pl.col("date") >= sessions[begin])
+        ).partition_by("date", as_dict=True)
+        additions = []
+        for current in sessions[begin:]:
+            if current in existing:
+                if any(existing[current][c] != inherited[c] for c in core):
+                    raise ValueError(
+                        f"Conflicting rename issuer/class: {successor} {current}"
+                    )
+            rows = metadata.get((current,))
+            if rows is not None:
+                latest = rows["sector_known_date"].max()
+                if latest is not None:
+                    known = rows.filter(pl.col("sector_known_date") == latest)
+                    choices = known.select(sector_fields).unique()
+                    if choices.height != 1:
+                        raise ValueError(
+                            f"Conflicting dated issuer sector: {successor} {current}"
+                        )
+                    inherited.update(choices.row(0, named=True))
+            if current not in existing:
+                additions.append(
+                    {
+                        **inherited,
+                        "date": current,
+                        "isin": successor,
+                        "identity_known_date": max(
+                            inherited["identity_known_date"],
+                            sessions[link["known_index"]],
+                        ),
+                        "identity_effective_start": sessions[link["effective_index"]],
+                        "identity_method": "source_bound_unit_rename:"
+                        + link["evidence_sha256"],
+                    }
+                )
+        result = result.filter(
+            ~((pl.col("isin") == predecessor) & (pl.col("date") >= sessions[begin]))
+        )
+        if additions:
+            result = pl.concat(
+                [result, pl.DataFrame(additions, schema=identity.schema)]
+            )
+    return result.sort("date", "isin")
+
+
 def quarter_next(value: date) -> date:
     month = value.month + 3
     year = value.year + (month - 1) // 12
@@ -1949,7 +2029,7 @@ def fundamental_state(ledger: dict, sector: str | None = None) -> dict:
     return result
 
 
-def valuation_market(store: Path) -> dict:
+def valuation_market(store: Path, *, history_links: list[dict] = ()) -> dict:
     """Only completed observations are used; retrospective action terms are not.
 
     DISMES changes are a conservative uncertainty barrier, not an inferred
@@ -1965,6 +2045,7 @@ def valuation_market(store: Path) -> dict:
     barriers = changed | np.load(store / "detected_split_mask.npy", mmap_mode="r")
     barriers |= np.load(store / "ambiguous_action_mask.npy", mmap_mode="r")
     return {
+        "history_links": history_links,
         "columns": {s: i for i, s in enumerate(np.load(store / "isin_index.npy"))},
         "close": np.load(store / "raw_close.npy", mmap_mode="r"),
         "observed": observed,
@@ -2022,11 +2103,35 @@ def issuer_market_cap(
         if share_class == "PN" and identity.get("preferred_class"):
             return None, None
         column = market["columns"].get(identity["isin"])
-        if column is None or not market["observed"][index - 1, column]:
+        if column is None:
             return None, None
-        if prefix[index, column] != prefix[first, column]:
+        # A sourced unit rename preserves both the prior price and capital
+        # uncertainty history. Do not erase predecessor barriers or use a link
+        # before its decision-time knowledge/effect clock.
+        price_column = column
+        end = index
+        barriers = 0
+        for link in sorted(
+            market.get("history_links", ()),
+            key=lambda r: r["effective_index"],
+            reverse=True,
+        ):
+            if (
+                link["successor_index"] != column
+                or max(link["known_index"], link["effective_index"]) > index
+            ):
+                continue
+            boundary = link["effective_index"]
+            if index - 1 < boundary:
+                price_column = link["predecessor_index"]
+            if first >= boundary:
+                continue
+            barriers += prefix[end, column] - prefix[boundary, column]
+            end, column = boundary, link["predecessor_index"]
+        barriers += prefix[end, column] - prefix[first, column]
+        if barriers or not market["observed"][index - 1, price_column]:
             return None, None
-        close = float(market["close"][index - 1, column])
+        close = float(market["close"][index - 1, price_column])
         if not np.isfinite(close) or close <= 0:
             return None, None
         total += shares[share_class] * close

@@ -140,6 +140,32 @@ def test_daily_panel_requires_explicit_authoritative_calendar_contract() -> None
         )
 
 
+@pytest.mark.parametrize("secondary", [None, "currency", "quantity", "quote_factor"])
+def test_rejected_prices_preserve_only_independently_valid_activity(secondary):
+    day, isin = date(2011, 2, 16), "BRTESTACNOR1"
+    row = {**_row(day, isin, "TEST3"), "low_brl": 12.0}
+    if secondary == "currency":
+        row[secondary] = "USD"
+    elif secondary == "quantity":
+        row[secondary] = -1
+    elif secondary == "quote_factor":
+        row[secondary] = 0
+    validation = validate_cotahist_daily(pl.DataFrame([row]))
+    panel = panel_from_daily(
+        validation.accepted,
+        dates=[day],
+        isins=[isin],
+        source_session_complete=[True],
+        invalid_observations=validation.rejected,
+    )
+    assert not panel.observed[0, 0]
+    assert np.isnan(panel.close_brl[0, 0])
+    assert panel.activity_valid[0, 0] == (secondary is None)
+    assert panel.trade_observed[0, 0] == (secondary is None)
+    if secondary is None:
+        assert panel.volume_brl[0, 0] == row["volume_brl"]
+
+
 def test_same_ticker_isin_succession_is_proposed_but_not_accepted_by_default(
     tmp_path,
 ) -> None:

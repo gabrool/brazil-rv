@@ -30,7 +30,13 @@ identities on their original market-input contracts. See
 ALLOS/ISA daily history, universe, slow fields, labels and full 60-session input
 routing now propagate under dated source links; monthly peers also inherit prior
 identity history. See `docs/v2_RENAME_HISTORY_PROPAGATION.md`. Dependent-family,
-remaining corporate wealth/label and final store assembly work remains. These are
+remaining corporate wealth/label and final store assembly work remains. The
+rename links now also carry exact issuer/class identity and prior-price capital
+barriers through financial/event, sector, physical-magnitude and cross-market
+dependencies. Independently valid activity from the rejected GOLL price row is
+retained without admitting its OHLC prices or changing eligibility. See
+`docs/v2_RENAME_DEPENDENCIES.md`. Recovered lending, M1 and the remaining auxiliary
+joins still need their separately attributed propagation. These are
 intermediate derived observations, not a replacement model store or permission to attach changed
 coordinates to old fits. Original filing clocks and capital units reconcile
 separately in `docs/v2_CVM_SOURCE_AUDIT.md`.

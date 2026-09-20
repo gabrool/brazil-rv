@@ -114,7 +114,9 @@ def main():
     )
     kept = np.searchsorted(panel.dates, dates)
     np.testing.assert_array_equal(panel.dates[kept], dates)
-    activity_changes = panel.activity_valid[kept] != old("activity_valid")
+    activity_changes = (panel.activity_valid[kept] != old("activity_valid")) | (
+        panel.trade_observed[kept] != old("trade_observed")
+    )
     # Preserve the sealed activity contract for rename-only attribution. The
     # separately recorded invalid-OHLC GOLL row needs its own source disposition;
     # it must not silently remove twenty unrelated eligible sessions here.
@@ -130,6 +132,7 @@ def main():
     ]
     for t, j in zip(activity_rows, activity_names, strict=True):
         panel.activity_valid[kept[t], j] = old("activity_valid")[t, j]
+        panel.trade_observed[kept[t], j] = old("trade_observed")[t, j]
         for value, key in (
             (panel.volume_brl, "volume_brl"),
             (panel.trades, "trade_count"),
