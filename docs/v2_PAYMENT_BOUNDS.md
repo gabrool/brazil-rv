@@ -58,3 +58,6 @@ Six distinct new tests pass, including four signed/continuous/provisioned cases 
 ## Remaining work
 
 Actual-exposure Cielo cent bound; invoice cents, security-day grouping and older R10 final-partial minimum payment allocation; dated B3 spot/custody separation and other negotiated-account components; three older clearing dates; held-source and succession data admission; final A then C/D. ALSC physical credit/exact net receipts and ENAT auction remain unknown. No completed program or corrected model profit.
+
+
+Verified recovery: implementatione0a5af96502852e0d4f4169ccbbb04e6f37483bd; payment_bounds_e0a5af9.zip, SHAe7e52af7fe999f6f583aa49f2089453690d3d86123a8d4278e5fd5d7a3d924b5, 26482819bytes. 883unique/1248logical restored/hashchecked members, 365aliases;54completebooks/9645408accountcells. Recovery2.131333s. Current research/patch/frozen plan/nine term variants/initial-failed-qualified-resumed recipes/tests/newbooks recover without immutable sources/stores/old-fit copies. Prior Copel/precredit/ENAT/Natura/lifecycle/lending/economic-store dependencies remain required. AcceptanceSHAaea3d8b96cea1cc0d54d4c9ccc8110dec20bcf14f41bb10be0877fb351547e33; actual-exposure Cielo and final A/C/D remain open.

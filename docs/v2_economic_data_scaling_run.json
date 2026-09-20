@@ -572,6 +572,10 @@
     "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\payment_bounds\\qualification\\manifest.json",
     "sha256": "ac2773788c00c8b3b95e145f538644e91fd5d62cfe34c3afa2a55bea7192c8fa"
   },
+  "payment_bounds_recovery": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\payment_bounds_recovery.json",
+    "sha256": "6245049904f7795b4c473d82b82b33aed97821b1133e4b3c5b82fc538777c3b8"
+  },
   "payment_bounds_runtime_qualification": {
     "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\payment_bounds\\runtime_qualification.json",
     "sha256": "e0d450a916c79173c5d463041bef5ddcb9266abfe4fa895f65fefbae9e764dc3"
