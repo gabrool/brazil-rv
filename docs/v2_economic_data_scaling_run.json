@@ -556,6 +556,10 @@
     "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\precredit_disposal\\qualified\\qualification\\manifest.json",
     "sha256": "1ceae52207e48e73ad749f4b6bcc7020765b4be34281cb351c39186969c54615"
   },
+  "precredit_disposal_recovery": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\precredit_disposal_recovery.json",
+    "sha256": "0b707598667c79e7752fe33e773cad4a755b907ce626e0b79541b8db71353409"
+  },
   "qualified_lending": {
     "balances_sha256": "b50feb75dcde9168eaa1eb53916de67bde565e1c0164037f29e1adc87d45bc6e",
     "manifest_sha256": "4f07b607e206eb90b95e184d966daeb4d0f89792621f09dac3fcc9ca1bca7c87",

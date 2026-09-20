@@ -52,3 +52,7 @@ Seven new focused cases cover single/basket and long/short paths, missing/partia
 ## Remaining work
 
 This completes the frozen owned-disposal engineering bound. Apply the explicit alternatives in later actual-model economic contrasts. Other allocation/timing/sweep/fraction/invoice/security-day/minimum/clearing and corporate-cost bounds remain, together with unresolved held-event sources and separate new succession data attribution. ALSC physical credit, exact net fraction fees/payment and ENAT fraction auction are unknown. Prior originals and completed source/store/engineering work must not be repeated. Final A acceptance and registered C/D are pending.
+
+## Verified recovery
+
+Implementation b3c765dc40101df440cae7f739ee7102da8366cc is recoverable from `precredit_disposal_b3c765d.zip`, 6,616,536 bytes, SHA256 `37ebe48fbb5877487f678e9d4705fffde317563f2c563a3666d8b742ffe4fc2b`. All 898 unique / 1,428 logical members, including 530 aliases, were restored and hash-checked; all 54 books / 2,839,536 account cells match. Recovery took 1.591935 seconds. Current research, patch, initial failed and qualified executed recipes, frozen plan, terms and new evidence are included. Immutable sources, accepted stores and old fits remain external verified dependencies. Acceptance SHA256 is `bf4d4ecf980a16c5dfbf3521b77bc2c70f77a2795c4ff9fda971fac8203917a6`. Resolve `precredit_disposal_recovery` for the full receipt. All workers exited.
