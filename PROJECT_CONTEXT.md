@@ -35,16 +35,19 @@ rename links now also carry exact issuer/class identity and prior-price capital
 barriers through financial/event, sector, physical-magnitude and cross-market
 dependencies. Independently valid activity from the rejected GOLL price row is
 retained without admitting its OHLC prices or changing eligibility. See
-`docs/v2_RENAME_DEPENDENCIES.md`. Recovered lending, M1 and the remaining auxiliary
-joins still need their separately attributed propagation. Reconciled lending now
+`docs/v2_RENAME_DEPENDENCIES.md`. M1 and remaining auxiliary
+joins require separately attributed propagation. Reconciled lending now
 also propagates through the seven feature fields on the renamed axes, retaining
 the larger original feature-source archive and its exact field-unit exclusions.
 The new qualified economics view leaves rates and eligible availability unchanged
 versus recovered economics. Utilization carries predecessor capital uncertainty;
 126 specifically enumerated ALOS denominators lose support under the existing
-rule. See `docs/v2_LENDING_FEATURE_PROPAGATION.md`. Current-day native M1 routing
-is verified on all 88 restored eligible dates, but its initial scale and same-clock
-history still reset at the two renames and require a bounded repair. These are
+rule. See `docs/v2_LENDING_FEATURE_PROPAGATION.md`. Native M1 predecessor history now propagates at the two renames with separate
+effect/knowledge gates, source-assignment bounds and unchanged support thresholds.
+It restores 7,419 native feature cells without losses. An actual dataset/collator
+audit covers 314 full-population, 60-session samples; raw M1 scalar amendments
+still need final cross-sectional transforms and to-close target assembly. See
+`docs/v2_M1_RENAME_HISTORY.md`. These are
 intermediate derived observations, not a replacement model store or permission to attach changed
 coordinates to old fits. Original filing clocks and capital units reconcile
 separately in `docs/v2_CVM_SOURCE_AUDIT.md`.

@@ -340,6 +340,18 @@
     "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\rename_issuer_propagation\\manifest.json",
     "sha256": "2b5a9322117c57d00d10472e43335ca35e6ff7af5e4922f949e07f27a2b5cd08"
   },
+  "rename_m1_acceptance": {
+    "path": "C:\\Brazil-RV\\quant\\b3-quant\\docs\\v2_m1_rename_acceptance.json",
+    "sha256": "ea75bfca068c741a01624532dfbcd2e902fcebf96965406cb4fb5706bc3c123b"
+  },
+  "rename_m1_input_audit": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\rename_m1_propagation\\qualification\\manifest.json",
+    "sha256": "90ddf9cdeddccf4f95271a73166578ce863f7d9683b7402d69a634d3fab95a47"
+  },
+  "rename_m1_propagation": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\rename_m1_propagation\\manifest.json",
+    "sha256": "572efa8926a9578951d9e4202330acb749c8c0af43e5bdfb26863edbc24de765"
+  },
   "rename_m1_support_audit": {
     "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\rename_m1_support_audit.json",
     "sha256": "4624fbcd368d21e00afdcfdbdc1772c59867a594f19e8a4888967e1befb5dcfc"

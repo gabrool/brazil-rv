@@ -1,0 +1,76 @@
+{
+  "actual_input_audit": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\rename_m1_propagation\\qualification\\manifest.json",
+    "sha256": "90ddf9cdeddccf4f95271a73166578ce863f7d9683b7402d69a634d3fab95a47"
+  },
+  "heldout_access": false,
+  "historical_artifact_resolutions": [
+    {
+      "current_file": "C:\\Brazil-RV\\quant\\b3-quant\\ops\\propagate_rename_m1.py",
+      "original": {
+        "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\rename_m1_propagation\\executed_reproducer.py",
+        "sha256": "bbe63234194c688199c0a7c5a5e4ef82b5ad631171d453346b1d859014ed9620"
+      },
+      "reason": "Exact passed runtime before formatting; numerical outputs unchanged."
+    },
+    {
+      "current_file": "C:\\Brazil-RV\\quant\\b3-quant\\ops\\qualify_rename_m1.py",
+      "original": {
+        "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\rename_m1_propagation\\qualification\\executed_reproducer.py",
+        "sha256": "4ca88e0989b5018b4ec8349aaa8a906ff9cb153f627c33dc8f311e10cace9a96"
+      },
+      "reason": "Tail reconstruction passed; initial consumer readout stopped on fixture key. Final qualification reuses those produced arrays."
+    }
+  ],
+  "initial_numeric_changes": 11253,
+  "native_valid_gained": 7419,
+  "native_valid_lost": 0,
+  "next": [
+    "Finalize full-population M1 scalar transforms, ages and to-close labels.",
+    "Finish remaining auxiliary histories/source clocks and contractual corporate wealth/labels in a separately accepted derived store.",
+    "Implement or bound Stage A adaptive-book execution and lifecycle assumptions; then C/D under the unchanged registration."
+  ],
+  "old_fit_inputs_changed": false,
+  "parent_commit": "710f4073fff8a2f31d016cca07f42ea9af17f7e2",
+  "propagation": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\rename_m1_propagation\\manifest.json",
+    "sha256": "572efa8926a9578951d9e4202330acb749c8c0af43e5bdfb26863edbc24de765"
+  },
+  "raw_scalar_gained_not_final_model_values": 196,
+  "scale_tail_numeric_changes": 28287,
+  "schema": "M1_RENAME_HISTORY_ACCEPTANCE_V1",
+  "source_code": {
+    "ops/propagate_rename_m1.py": {
+      "path": "C:\\Brazil-RV\\quant\\b3-quant\\ops\\propagate_rename_m1.py",
+      "sha256": "da46ec999316f8c0436118fee29359d57a984f7679a45599aa6f1fc40f63674e"
+    },
+    "ops/qualify_rename_m1.py": {
+      "path": "C:\\Brazil-RV\\quant\\b3-quant\\ops\\qualify_rename_m1.py",
+      "sha256": "823ea28625ffac6488494e3c948ea08ccb730cd7f3dc94542b9e028f3012439e"
+    },
+    "research/src/brazil_rv/v2/build_store.py": {
+      "path": "C:\\Brazil-RV\\quant\\b3-quant\\research\\src\\brazil_rv\\v2\\build_store.py",
+      "sha256": "1fec2a08b9d3510d55eac1fb1b9089c71625728b8258c60d6f19148651f90750"
+    },
+    "research/tests/test_v2_intraday_features.py": {
+      "path": "C:\\Brazil-RV\\quant\\b3-quant\\research\\tests\\test_v2_intraday_features.py",
+      "sha256": "da897e2d11335a4ff3ef50170d172b1606c26ac4ccbf40cc16069dfa351d76b8"
+    }
+  },
+  "stage_A_complete": false,
+  "stage_B_complete": false,
+  "stages_C_D_started": false,
+  "status": "accepted_native_and_raw_scalar_intermediates",
+  "validation": {
+    "actual_packed_cells": 36892996,
+    "bounded_sealed_control_cells": 243916,
+    "counts_overlap": true,
+    "existing_affected_tests_passed": 18,
+    "full_population_samples": 314,
+    "history_sessions": 60,
+    "mismatches": 0,
+    "names": 933,
+    "new_and_overlapping_tests_passed": 2,
+    "ruff": "pass"
+  }
+}

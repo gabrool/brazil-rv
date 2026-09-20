@@ -560,17 +560,25 @@ def test_future_only_source_has_zero_bounded_coverage_without_symbol_payload(tmp
         (pl.col("ts_exchange") + pl.duration(days=366)).alias("ts_exchange"),
         pl.lit("FUTURE_ONLY").alias("symbol"),
     ).write_parquet(source_path)
-    assignments = pl.DataFrame({
-        "security_id": ["SEC_TEST"], "isin": ["BRTESTACNOR1"],
-        "xp_symbol": ["TEST3"], "source_file": [str(source_path)],
-    })
+    assignments = pl.DataFrame(
+        {
+            "security_id": ["SEC_TEST"],
+            "isin": ["BRTESTACNOR1"],
+            "xp_symbol": ["TEST3"],
+            "source_file": [str(source_path)],
+        }
+    )
     daily = pl.DataFrame(schema={"isin": pl.String, "trade_date": pl.Date})
     workspace = tmp_path / "workspace"
     workspace.mkdir()
     result = stream_intraday_from_assignments(
-        assignments, daily, sessions, ["BRTESTACNOR1"],
+        assignments,
+        daily,
+        sessions,
+        ["BRTESTACNOR1"],
         sigma_asof=np.full((len(sessions), 1), 0.02),
-        kept_rows=np.arange(len(sessions)), workspace=workspace,
+        kept_rows=np.arange(len(sessions)),
+        workspace=workspace,
     )
     assert not result.result.valid.any()
     assert result.audit["allowed_date_count"].to_list() == [0]
@@ -660,3 +668,110 @@ def test_streamed_intraday_grids_only_the_assignment_date_span(
         [69, 63, 69],
     )
     assert result.native_mapping.get_column("security_id").to_list() == ["SEC_TEST"]
+
+
+def test_streamed_rename_history_obeys_identity_knowledge_and_decision_clocks(tmp_path):
+    sessions = tuple(
+        SessionDefinition(
+            trade_date=date(2024, 1, 1) + timedelta(days=d),
+            continuous_open=time(10),
+            decision_time=time(15, 45),
+            continuous_close=time(17),
+            auction_close=time(17, 15),
+            source="test",
+        )
+        for d in range(52)
+    )
+    dates = [s.trade_date for s in sessions]
+    path = tmp_path / "original.parquet"
+    source = _source_bars(sessions, frozenset(dates))
+    source.write_parquet(path)
+    isins = ["BROLDACNOR1", "BRNEWACNOR1"]
+    assignments = pl.DataFrame(
+        {
+            "security_id": ["OLD", "NEW"],
+            "isin": isins,
+            "source_file": [str(path)] * 2,
+            "first_overlap_date": [dates[0], dates[28]],
+            "last_overlap_date": [dates[27], dates[-1]],
+        }
+    )
+    daily = pl.DataFrame(
+        {"isin": [isins[0]] * 28 + [isins[1]] * 24, "trade_date": dates}
+    )
+    link = pl.DataFrame(
+        {
+            "predecessor_index": [0],
+            "successor_index": [1],
+            "effective_index": [28],
+            "known_index": [30],
+        }
+    )
+
+    def run(name, assignments=assignments, daily=daily, links=None):
+        workspace = tmp_path / name
+        workspace.mkdir()
+        return stream_intraday_from_assignments(
+            assignments,
+            daily,
+            sessions,
+            isins,
+            sigma_asof=np.full((52, 2), 0.02),
+            kept_rows=np.arange(52),
+            workspace=workspace,
+            history_links=links,
+        )
+
+    baseline, continued = run("baseline"), run("continued", links=link)
+    # An uninterrupted same-security stream is an independent history oracle.
+    oracle = run(
+        "oracle",
+        assignments=assignments.slice(1).with_columns(
+            pl.lit(dates[0]).alias("first_overlap_date")
+        ),
+        daily=daily.with_columns(pl.lit(isins[1]).alias("isin")),
+    )
+    f = int(
+        continued.native_mapping.filter(pl.col("isin") == isins[1])[0, "fast_index"]
+    )
+    for key, value in continued.native_arrays.items():
+        np.testing.assert_array_equal(value[:30], baseline.native_arrays[key][:30])
+        np.testing.assert_array_equal(value[30:, f], oracle.native_arrays[key][30:, 0])
+    assert continued.native_arrays["fast_patch_valid"][30, f, :, 3].all()
+    assert not baseline.native_arrays["fast_patch_valid"][30, f, :, 3].any()
+    for key in ("values", "valid", "support_fraction", "source_age_sessions"):
+        actual = getattr(continued.result, key)
+        np.testing.assert_array_equal(actual[:30], getattr(baseline.result, key)[:30])
+        np.testing.assert_allclose(
+            actual[30:, 1], getattr(oracle.result, key)[30:, 1], atol=1e-7
+        )
+    assert not continued.result.fast_present[:28, 1].any()
+    assert continued.audit["allowed_date_count"].sum() == 52
+
+    # Drop future sessions and mutate the decision bar and all later bars.
+    future = (pl.col("ts_exchange").dt.date() > dates[31]) | (
+        (pl.col("ts_exchange").dt.date() == dates[31])
+        & (pl.col("ts_exchange").dt.time() >= time(15, 45))
+    )
+    source.with_columns(
+        [
+            pl.when(future).then(pl.col(c) * 3).otherwise(pl.col(c)).alias(c)
+            for c in ("open", "high", "low", "close", "real_volume")
+        ]
+    ).write_parquet(path)
+    mutated = run("mutated", links=link)
+    for key, value in continued.native_arrays.items():
+        np.testing.assert_array_equal(value[:32], mutated.native_arrays[key][:32])
+    np.testing.assert_array_equal(
+        continued.result.values[:32], mutated.result.values[:32]
+    )
+
+    # The source still has these rows, but its accepted assignment does not.
+    restricted = assignments.with_columns(
+        pl.when(pl.col("isin") == isins[0])
+        .then(pl.lit(dates[24]))
+        .otherwise(pl.col("first_overlap_date"))
+        .alias("first_overlap_date")
+    )
+    missing = run("missing_history", assignments=restricted, links=link)
+    assert not missing.native_arrays["fast_patch_valid"][30, f, :, 3].any()

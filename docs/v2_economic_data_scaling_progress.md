@@ -1467,3 +1467,37 @@ recovered rate bytes remain an explicit external dependency of the earlier
 lending-source recovery; no immutable dataset or old fit was duplicated. The
 current research source, binary patch, initial attempts and final qualification
 are recoverable. A/B remain incomplete; heartbeat stays active.
+
+
+## Native M1 rename history admission — 2026-09-20
+
+The bounded original-source M1 continuation now repairs ALOS/ISAE4 reset histories,
+preserving effect/knowledge gates, original assignment bounds and missing-minute
+semantics. No source, accepted store, eligibility or old checkpoint is changed.
+Native validity gains7,419 cells/no losses; first20-session scaled-return/range
+support is restored, with same-clock volume still requiring16/20. Current-day
+stream/patch/age channels remain exact. Initial native numeric changes11,253;
+an additional28,287 ALOS values propagate the already admitted small daily-scale
+differences through2024 rather than reverting to old coordinates.
+
+The sealed bounded controls match243,916 cells. Future-source deletion preserves
+prior native/scalar outputs; the fixture checks delayed knowledge, source bounds
+and entry-bar exclusion against an uninterrupted-source oracle.18 existing
+affected tests passed; the new case plus one overlapping assignment check pass
+after correcting displaced fixture-tail assertions. Ruff passes. The actual
+dataset/collator checks314 full933-name/60-session samples and36,892,996 packed
+native cells, zero mismatches; all88 restored eligible dates are included.
+No model forward, GPU fit or profitability inference.
+
+Raw scalar gains196 (71ALOS/125ISA) remain intermediate: final cross-sectional
+transforms/ages and to-close targets are still required. The native input audit
+does not claim these boundaries. Reconstruction9.35s and resumed consumer audit
+18.57s are not fit estimates. An initial68-versus69 patch-padding comparison and
+a collator-key readout failed in the audit, were corrected, and retain executed
+bytes/outputs. The passed tail source computation was reused.
+
+Resolve rename_m1_propagation, rename_m1_input_audit and rename_m1_acceptance;
+see v2_M1_RENAME_HISTORY.md. Next finish scalar/auxiliary histories, remaining
+upstream clocks and contractual wealth/labels, then accept the complete derived
+store/refit contract. A execution/lifecycle bounds remain. A/B incomplete,
+C/D unstarted; heartbeat remains active.

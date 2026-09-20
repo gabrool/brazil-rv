@@ -580,6 +580,7 @@ def stream_intraday_from_assignments(
     official_log_return: NDArray[np.floating] | None = None,
     completed_action_boundary: NDArray[np.bool_] | None = None,
     same_day_boundary: NDArray[np.bool_] | None = None,
+    history_links: pl.DataFrame | None = None,
 ) -> StreamedIntraday:
     """Build sparse native M1 and broad daily summaries source-by-source.
 
@@ -766,6 +767,31 @@ def stream_intraday_from_assignments(
         )
         for key, group in daily.select("isin", "trade_date").group_by("isin")
     }
+    history_by_successor = (
+        {}
+        if history_links is None
+        else {
+            int(row["successor_index"]): row
+            for row in history_links.iter_rows(named=True)
+        }
+    )
+    assignment_by_isin = {row["isin"]: row for row in ordered_assignments.to_dicts()}
+
+    def allowed_dates(isin):
+        row = assignment_by_isin[isin]
+        first, last = row.get("first_overlap_date"), row.get("last_overlap_date")
+        if isinstance(first, str):
+            first = date.fromisoformat(first)
+        if isinstance(last, str):
+            last = date.fromisoformat(last)
+        return frozenset(
+            d
+            for d in dates_by_isin.get(isin, ())
+            if d in date_lookup
+            and (first is None or d >= first)
+            and (last is None or d <= last)
+        )
+
     for group in ordered_assignments.partition_by("source_file"):
         raw_path = Path(str(group[0, "source_file"]))
         source_path = raw_path if raw_path.is_file() else workspace_path(raw_path)
@@ -788,18 +814,7 @@ def stream_intraday_from_assignments(
             target = isin_lookup.get(isin)
             assert target is not None
             fast_index = fast_by_isin[isin]
-            allowed = dates_by_isin.get(isin, frozenset())
-            first = row.get("first_overlap_date")
-            last = row.get("last_overlap_date")
-            if isinstance(first, str):
-                first = date.fromisoformat(first)
-            if isinstance(last, str):
-                last = date.fromisoformat(last)
-            if first is not None:
-                allowed = frozenset(value for value in allowed if value >= first)
-            if last is not None:
-                allowed = frozenset(value for value in allowed if value <= last)
-            allowed = allowed.intersection(date_lookup)
+            allowed = allowed_dates(isin)
             overlap = claimed_dates.intersection(allowed)
             if overlap:
                 raise ValueError(
@@ -821,212 +836,311 @@ def stream_intraday_from_assignments(
                     }
                 )
                 continue
-            # Preserve global-calendar semantics for the longest 20-session
-            # reducers and one-session lags while avoiding the years of empty
-            # M1 history outside this accepted identity segment.
-            start = max(date_lookup[min(allowed)] - 20, 0)
-            stop = date_lookup[max(allowed)] + 1
-            local_calendar = calendar[start:stop]
-            local_sessions = tuple(sessions[start:stop])
-            schedule_index = pl.DataFrame(
-                {
-                    "trade_date": pl.Series(local_calendar, dtype=pl.Date),
-                    "date_idx": pl.Series(range(len(local_calendar)), dtype=pl.Int32),
-                    "continuous_open_minute": pl.Series(
-                        [
-                            value.continuous_open.hour * 60
-                            + value.continuous_open.minute
-                            for value in local_sessions
-                        ],
-                        dtype=pl.Int16,
-                    ),
-                    "continuous_minute_count": pl.Series(
-                        [
-                            value.continuous_close.hour * 60
-                            + value.continuous_close.minute
-                            - value.continuous_open.hour * 60
-                            - value.continuous_open.minute
-                            for value in local_sessions
-                        ],
-                        dtype=pl.Int16,
-                    ),
-                }
-            )
-            bars = (
-                source.with_columns(
-                    pl.col("ts_exchange").dt.date().alias("trade_date"),
-                    (
-                        pl.col("ts_exchange").dt.hour().cast(pl.Int16) * 60
-                        + pl.col("ts_exchange").dt.minute().cast(pl.Int16)
-                    ).alias("clock_minute"),
+            passes = [(allowed, source, None)]
+            link = history_by_successor.get(target)
+            if (
+                link is not None
+                and isins[int(link["predecessor_index"])] in assignment_by_isin
+            ):
+                predecessor = isins[int(link["predecessor_index"])]
+                effect = int(link["effective_index"])
+                gate = max(effect, int(link["known_index"]))
+                # Twenty-session reducers can also need the preceding close.
+                inherited = allowed_dates(predecessor).intersection(
+                    calendar[max(0, effect - 21) : effect]
                 )
-                .filter(pl.col("trade_date").is_in(tuple(allowed)))
-                .join(schedule_index, on="trade_date", how="inner")
-                .with_columns(
-                    (pl.col("clock_minute") - pl.col("continuous_open_minute"))
-                    .cast(pl.Int16)
-                    .alias("minute_idx")
+                if inherited and gate < min(len(calendar), effect + 21):
+                    predecessor_path = Path(
+                        str(assignment_by_isin[predecessor]["source_file"])
+                    )
+                    predecessor_path = (
+                        predecessor_path
+                        if predecessor_path.is_file()
+                        else workspace_path(predecessor_path)
+                    ).resolve()
+                    history_source = source
+                    if predecessor_path != source_path:
+                        history_source = (
+                            pl.scan_parquet(predecessor_path)
+                            .filter(
+                                pl.col("ts_exchange").dt.date().is_in(tuple(inherited))
+                            )
+                            .select(list(SOURCE_COLUMNS))
+                            .collect()
+                        )
+                        if "xp_symbol" in ordered_assignments.columns:
+                            validate_physical_source_identity(
+                                ordered_assignments.filter(
+                                    pl.col("isin") == predecessor
+                                ),
+                                history_source,
+                                predecessor_path,
+                            )
+                        history_source = pl.concat(
+                            [
+                                source.filter(
+                                    ~pl.col("ts_exchange")
+                                    .dt.date()
+                                    .is_in(tuple(inherited))
+                                ),
+                                history_source,
+                            ]
+                        )
+                        source_paths.append(predecessor_path)
+                    overlap_dates = inherited.intersection(allowed)
+                    if overlap_dates:
+                        raise ValueError(
+                            "M1 continuation has overlapping original identity dates"
+                        )
+                    overlay_dates = (
+                        allowed.intersection(calendar[effect : effect + 21]) | inherited
+                    )
+                    passes.append((overlay_dates, history_source, link))
+            for gridded_dates, gridded_source, history_link in passes:
+                # Preserve global-calendar semantics for the longest 20-session
+                # reducers and one-session lags while avoiding the years of empty
+                # M1 history outside this accepted identity segment.
+                start = max(date_lookup[min(gridded_dates)] - 20, 0)
+                stop = date_lookup[max(gridded_dates)] + 1
+                local_calendar = calendar[start:stop]
+                local_sessions = tuple(sessions[start:stop])
+                schedule_index = pl.DataFrame(
+                    {
+                        "trade_date": pl.Series(local_calendar, dtype=pl.Date),
+                        "date_idx": pl.Series(
+                            range(len(local_calendar)), dtype=pl.Int32
+                        ),
+                        "continuous_open_minute": pl.Series(
+                            [
+                                value.continuous_open.hour * 60
+                                + value.continuous_open.minute
+                                for value in local_sessions
+                            ],
+                            dtype=pl.Int16,
+                        ),
+                        "continuous_minute_count": pl.Series(
+                            [
+                                value.continuous_close.hour * 60
+                                + value.continuous_close.minute
+                                - value.continuous_open.hour * 60
+                                - value.continuous_open.minute
+                                for value in local_sessions
+                            ],
+                            dtype=pl.Int16,
+                        ),
+                    }
                 )
-                .filter(
-                    pl.col("minute_idx") >= 0,
-                    pl.col("minute_idx") < pl.col("continuous_minute_count"),
+                bars = (
+                    gridded_source.with_columns(
+                        pl.col("ts_exchange").dt.date().alias("trade_date"),
+                        (
+                            pl.col("ts_exchange").dt.hour().cast(pl.Int16) * 60
+                            + pl.col("ts_exchange").dt.minute().cast(pl.Int16)
+                        ).alias("clock_minute"),
+                    )
+                    .filter(pl.col("trade_date").is_in(tuple(gridded_dates)))
+                    .join(schedule_index, on="trade_date", how="inner")
+                    .with_columns(
+                        (pl.col("clock_minute") - pl.col("continuous_open_minute"))
+                        .cast(pl.Int16)
+                        .alias("minute_idx")
+                    )
+                    .filter(
+                        pl.col("minute_idx") >= 0,
+                        pl.col("minute_idx") < pl.col("continuous_minute_count"),
+                    )
+                    .sort("ts_exchange")
                 )
-                .sort("ts_exchange")
-            )
-            validate_session_bars(bars, source_path)
-            max_minutes = max(
-                value.continuous_close.hour * 60
-                + value.continuous_close.minute
-                - value.continuous_open.hour * 60
-                - value.continuous_open.minute
-                for value in local_sessions
-            )
-            grid, observed = dense_grid(bars, len(local_calendar), max_minutes)
-            session_valid = (
-                np.asarray(
-                    [value in allowed for value in local_calendar], dtype=np.bool_
-                )
-                & observed.any(axis=1)
-            )[:, None]
-            # The accepted sparse MT5 archive does not certify that an absent
-            # minute is a zero-trade minute.  Only physical rows therefore
-            # carry valid activity; gaps remain unknown even on a supported
-            # source session.
-            volume_valid = observed[:, None, :].copy()
-            native = build_intraday_daily_features(
-                grid[:, None, :, 0],
-                grid[:, None, :, 1],
-                grid[:, None, :, 2],
-                grid[:, None, :, 3],
-                grid[:, None, :, 4],
-                observed[:, None, :],
-                volume_valid=volume_valid,
-                session_valid=session_valid,
-                sessions=local_sessions,
-                official_log_return=(
-                    None
-                    if official_log_return is None
-                    else official_log_return[start:stop, target, None]
-                ),
-                completed_action_boundary=(
-                    None
-                    if completed_action_boundary is None
-                    else completed_action_boundary[start:stop, target, None]
-                ),
-                same_day_boundary=(
-                    None
-                    if same_day_boundary is None
-                    else same_day_boundary[start:stop, target, None]
-                ),
-            )
-            prefix_indices = np.asarray(
-                [
-                    value.decision_time.hour * 60
-                    + value.decision_time.minute
+                validate_session_bars(bars, source_path)
+                max_minutes = max(
+                    value.continuous_close.hour * 60
+                    + value.continuous_close.minute
                     - value.continuous_open.hour * 60
                     - value.continuous_open.minute
                     for value in local_sessions
-                ],
-                dtype=np.int64,
-            )
-            local_entry = grid[np.arange(len(local_calendar)), prefix_indices, 0]
-            local_entry_valid = (
-                observed[np.arange(len(local_calendar)), prefix_indices]
-                & np.isfinite(local_entry)
-                & (local_entry > 0.0)
-                & session_valid[:, 0]
-            )
-            to_close_entry[start:stop, target] = np.where(
-                local_entry_valid, local_entry, np.nan
-            ).astype(np.float32)
-            to_close_entry_valid[start:stop, target] = local_entry_valid
-            feature_values[start:stop, target] = native.values[:, 0]
-            feature_valid[start:stop, target] = native.valid[:, 0]
-            support[start:stop, target] = native.support_fraction[:, 0]
-            source_age[start:stop, target] = native.source_age_sessions[:, 0]
-            return_consistent[start:stop, target] = native.return_consistent[:, 0]
-            entry[start:stop, target] = native.decision_mark[:, 0]
-            entry_valid[start:stop, target] = native.decision_mark_valid[:, 0]
-            realized[start:stop, target] = native.realized_daily_vol[:, 0]
-            present[start:stop, target] = native.fast_present[:, 0]
-            session_close[start:stop, target] = native.session_close[:, 0]
-            session_close_valid[start:stop, target] = native.session_close_valid[:, 0]
-            local_native_shape = (len(local_calendar), 1, patch_count)
-            local_native_values = np.empty(
-                (*local_native_shape, len(NATIVE_FAST_FEATURES)), dtype=np.float32
-            )
-            local_native_valid = np.empty_like(local_native_values, dtype=np.bool_)
-            local_native_patch_mask = np.empty(local_native_shape, dtype=np.bool_)
-            local_native_age = np.empty(local_native_shape, dtype=np.float32)
-            local_native_age_valid = np.empty(local_native_shape, dtype=np.bool_)
-            build_native_fast_features_into(
-                grid[:, None, :, 1],
-                grid[:, None, :, 2],
-                grid[:, None, :, 3],
-                grid[:, None, :, 4],
-                observed[:, None, :],
-                volume_valid=volume_valid,
-                session_valid=session_valid,
-                sigma_asof=sigma[start:stop, target, None],
-                sessions=local_sessions,
-                values_out=local_native_values,
-                valid_out=local_native_valid,
-                patch_mask_out=local_native_patch_mask,
-                last_price_age_minutes_out=local_native_age,
-                last_price_age_valid_out=local_native_age_valid,
-            )
-            local_store_rows = store_row_by_global[start:stop]
-            retained_local = np.flatnonzero(local_store_rows >= 0)
-            retained_store = local_store_rows[retained_local]
-            native_arrays["fast_patch_values"][retained_store, fast_index] = (
-                local_native_values[retained_local, 0]
-            )
-            native_arrays["fast_patch_valid"][retained_store, fast_index] = (
-                local_native_valid[retained_local, 0]
-            )
-            native_arrays["fast_patch_mask"][retained_store, fast_index] = (
-                local_native_patch_mask[retained_local, 0]
-            )
-            native_arrays["fast_last_price_age_minutes"][retained_store, fast_index] = (
-                local_native_age[retained_local, 0]
-            )
-            native_arrays["fast_last_price_age_valid"][retained_store, fast_index] = (
-                local_native_age_valid[retained_local, 0]
-            )
-            has_bar = observed.any(axis=1)
-            exact_close = np.asarray(
-                [
-                    observed[day_index, minutes - 1]
-                    for day_index, minutes in enumerate(
-                        schedule_index.get_column("continuous_minute_count").to_list()
+                )
+                grid, observed = dense_grid(bars, len(local_calendar), max_minutes)
+                session_valid = (
+                    np.asarray(
+                        [value in gridded_dates for value in local_calendar],
+                        dtype=np.bool_,
                     )
-                ],
-                dtype=np.bool_,
-            )
-            audit_rows.append(
-                {
-                    "isin": isin,
-                    "security_id": row.get("security_id"),
-                    "source_file": str(source_path),
-                    "source_sha256": source_sha256,
-                    "allowed_date_count": len(allowed),
-                    "observed_session_count": int(has_bar.sum()),
-                    "exact_session_close_count": int(exact_close.sum()),
-                    "fast_present_count": int(native.fast_present.sum()),
-                }
-            )
-            del (
-                bars,
-                grid,
-                observed,
-                native,
-                volume_valid,
-                local_native_values,
-                local_native_valid,
-                local_native_patch_mask,
-                local_native_age,
-                local_native_age_valid,
-            )
+                    & observed.any(axis=1)
+                )[:, None]
+                # The accepted sparse MT5 archive does not certify that an absent
+                # minute is a zero-trade minute.  Only physical rows therefore
+                # carry valid activity; gaps remain unknown even on a supported
+                # source session.
+                volume_valid = observed[:, None, :].copy()
+                local_reference = {}
+                for key, array in (
+                    ("official_log_return", official_log_return),
+                    ("completed_action_boundary", completed_action_boundary),
+                    ("same_day_boundary", same_day_boundary),
+                ):
+                    value = (
+                        None
+                        if array is None
+                        else np.array(array[start:stop, target, None], copy=True)
+                    )
+                    if value is not None and history_link is not None:
+                        effect = int(history_link["effective_index"])
+                        pred = int(history_link["predecessor_index"])
+                        pre = min(effect, stop) - start
+                        value[:pre, 0] = array[start : start + pre, pred]
+                        if key == "official_log_return" and start <= effect < stop:
+                            value[effect - start, 0] = array[effect, pred]
+                    local_reference[key] = value
+                output_start = (
+                    start
+                    if history_link is None
+                    else max(
+                        start,
+                        int(history_link["effective_index"]),
+                        int(history_link["known_index"]),
+                    )
+                )
+                write_local = slice(output_start - start, stop - start)
+                write_global = slice(output_start, stop)
+                native = build_intraday_daily_features(
+                    grid[:, None, :, 0],
+                    grid[:, None, :, 1],
+                    grid[:, None, :, 2],
+                    grid[:, None, :, 3],
+                    grid[:, None, :, 4],
+                    observed[:, None, :],
+                    volume_valid=volume_valid,
+                    session_valid=session_valid,
+                    sessions=local_sessions,
+                    **local_reference,
+                )
+                prefix_indices = np.asarray(
+                    [
+                        value.decision_time.hour * 60
+                        + value.decision_time.minute
+                        - value.continuous_open.hour * 60
+                        - value.continuous_open.minute
+                        for value in local_sessions
+                    ],
+                    dtype=np.int64,
+                )
+                local_entry = grid[np.arange(len(local_calendar)), prefix_indices, 0]
+                local_entry_valid = (
+                    observed[np.arange(len(local_calendar)), prefix_indices]
+                    & np.isfinite(local_entry)
+                    & (local_entry > 0.0)
+                    & session_valid[:, 0]
+                )
+                to_close_entry[write_global, target] = np.where(
+                    local_entry_valid[write_local], local_entry[write_local], np.nan
+                ).astype(np.float32)
+                to_close_entry_valid[write_global, target] = local_entry_valid[
+                    write_local
+                ]
+                feature_values[write_global, target] = native.values[write_local, 0]
+                feature_valid[write_global, target] = native.valid[write_local, 0]
+                support[write_global, target] = native.support_fraction[write_local, 0]
+                source_age[write_global, target] = native.source_age_sessions[
+                    write_local, 0
+                ]
+                return_consistent[write_global, target] = native.return_consistent[
+                    write_local, 0
+                ]
+                entry[write_global, target] = native.decision_mark[write_local, 0]
+                entry_valid[write_global, target] = native.decision_mark_valid[
+                    write_local, 0
+                ]
+                realized[write_global, target] = native.realized_daily_vol[
+                    write_local, 0
+                ]
+                present[write_global, target] = native.fast_present[write_local, 0]
+                session_close[write_global, target] = native.session_close[
+                    write_local, 0
+                ]
+                session_close_valid[write_global, target] = native.session_close_valid[
+                    write_local, 0
+                ]
+                local_native_shape = (len(local_calendar), 1, patch_count)
+                local_native_values = np.empty(
+                    (*local_native_shape, len(NATIVE_FAST_FEATURES)), dtype=np.float32
+                )
+                local_native_valid = np.empty_like(local_native_values, dtype=np.bool_)
+                local_native_patch_mask = np.empty(local_native_shape, dtype=np.bool_)
+                local_native_age = np.empty(local_native_shape, dtype=np.float32)
+                local_native_age_valid = np.empty(local_native_shape, dtype=np.bool_)
+                build_native_fast_features_into(
+                    grid[:, None, :, 1],
+                    grid[:, None, :, 2],
+                    grid[:, None, :, 3],
+                    grid[:, None, :, 4],
+                    observed[:, None, :],
+                    volume_valid=volume_valid,
+                    session_valid=session_valid,
+                    sigma_asof=sigma[start:stop, target, None],
+                    sessions=local_sessions,
+                    values_out=local_native_values,
+                    valid_out=local_native_valid,
+                    patch_mask_out=local_native_patch_mask,
+                    last_price_age_minutes_out=local_native_age,
+                    last_price_age_valid_out=local_native_age_valid,
+                )
+                local_store_rows = store_row_by_global[start:stop]
+                retained_local = np.flatnonzero(
+                    (local_store_rows >= 0) & (np.arange(start, stop) >= output_start)
+                )
+                retained_store = local_store_rows[retained_local]
+                native_arrays["fast_patch_values"][retained_store, fast_index] = (
+                    local_native_values[retained_local, 0]
+                )
+                native_arrays["fast_patch_valid"][retained_store, fast_index] = (
+                    local_native_valid[retained_local, 0]
+                )
+                native_arrays["fast_patch_mask"][retained_store, fast_index] = (
+                    local_native_patch_mask[retained_local, 0]
+                )
+                native_arrays["fast_last_price_age_minutes"][
+                    retained_store, fast_index
+                ] = local_native_age[retained_local, 0]
+                native_arrays["fast_last_price_age_valid"][
+                    retained_store, fast_index
+                ] = local_native_age_valid[retained_local, 0]
+                has_bar = observed.any(axis=1)
+                exact_close = np.asarray(
+                    [
+                        observed[day_index, minutes - 1]
+                        for day_index, minutes in enumerate(
+                            schedule_index.get_column(
+                                "continuous_minute_count"
+                            ).to_list()
+                        )
+                    ],
+                    dtype=np.bool_,
+                )
+                if history_link is None:
+                    audit_rows.append(
+                        {
+                            "isin": isin,
+                            "security_id": row.get("security_id"),
+                            "source_file": str(source_path),
+                            "source_sha256": source_sha256,
+                            "allowed_date_count": len(allowed),
+                            "observed_session_count": int(has_bar.sum()),
+                            "exact_session_close_count": int(exact_close.sum()),
+                            "fast_present_count": int(native.fast_present.sum()),
+                        }
+                    )
+                del (
+                    bars,
+                    grid,
+                    observed,
+                    native,
+                    volume_valid,
+                    local_native_values,
+                    local_native_valid,
+                    local_native_patch_mask,
+                    local_native_age,
+                    local_native_age_valid,
+                )
         del source
     # The completed native tensors are only read again by the final writer.
     # Release their dirty mapped pages before transforming the scalar families.
@@ -2398,6 +2512,9 @@ def build_daily_store(
             official_log_return=intraday_official_return,
             completed_action_boundary=intraday_completed_boundary,
             same_day_boundary=intraday_same_day_boundary,
+            history_links=slow_history_links(
+                isin_successions, panel.dates, panel.isins, decision_timestamps
+            ),
         )
     if minute_panel is not None:
         if not np.array_equal(minute_panel.dates, panel.dates):
