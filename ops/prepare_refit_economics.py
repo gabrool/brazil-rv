@@ -80,8 +80,11 @@ def main():
     accepted = bound_json(run["matched_data_inputs"])
     plan = bound_json(run["stage_c_plan"])
     out = Path(run["stage_c_root"]) / "refit_economics"
-    out.mkdir(exist_ok=False)
-    (out / "executed.py").write_bytes(Path(__file__).read_bytes())
+    resume = out.exists()
+    out.mkdir(exist_ok=True)
+    (out / ("executed_resume.py" if resume else "executed.py")).write_bytes(
+        Path(__file__).read_bytes()
+    )
     old, old_binding = load_data(Path(plan["prior_root"]), "C6")
     root = Path(accepted["store"]["root"])
     manifest = bound_json(
@@ -168,127 +171,148 @@ def main():
             bova.close_by_session[rows],
         )
 
-    shape = (len(dates), len(names))
-    raw, raw_valid = np.full(shape, np.nan), np.zeros(shape, bool)
-    resolved, diagonal, support = (
-        np.full(shape, np.nan),
-        np.full(shape, np.nan),
-        np.zeros(shape, np.int16),
-    )
-    factor = np.full(len(dates), np.nan)
-    previous, ages = np.ones(len(names)), np.full(len(names), 21)
-    selected = {int(indices[0]), int(indices[-1])}
-    selected.update(
-        r["effective_index"] + offset
-        for r in links
-        for offset in (-1, 0, 1, 20, 60)
-        if first <= r["effective_index"] + offset <= indices[-1]
-    )
-    formula_checks = []
-    for t in range(first, int(indices[-1]) + 1):
-        prices, mask, hedge = history(t)
-        x, y = returns(prices, mask, hedge)
-        raw[t], raw_valid[t] = beta_row(x, y)
-        for link in links:
-            if t == link["effective_index"]:
-                a, b = link["predecessor_index"], link["successor_index"]
-                previous[b], ages[b] = previous[a], ages[a]
-        ages += 1
-        valid = raw_valid[t]
-        previous[valid], ages[valid] = raw[t, valid], 0
-        resolved[t] = np.where(ages <= 20, previous, 1.0)
-        diagonal[t], factor[t], support[t] = variance_row(x, y, resolved[t], active[t])
-        if t in selected:
-            # The unused final close deliberately carries an arbitrary value;
-            # original routines must exclude that current endpoint.
-            p = np.concatenate([prices, np.full((1, len(names)), 123456.0)])
-            s = np.concatenate([mask, np.ones((1, len(names)), bool)])
-            h = np.r_[hedge, 987654.0]
-            b, v = rolling_hedge_beta(p, s, h)
-            np.testing.assert_array_equal(b[-1], raw[t])
-            np.testing.assert_array_equal(v[-1], raw_valid[t])
-            d, f, n = causal_risk(
-                p,
-                s,
-                h,
-                np.broadcast_to(resolved[t], p.shape),
-                np.broadcast_to(active[t], p.shape),
-            )
-            np.testing.assert_array_equal(d[-1], diagonal[t])
-            np.testing.assert_array_equal(f[-1], factor[t])
-            np.testing.assert_array_equal(n[-1], support[t])
-            formula_checks.append(
-                dict(
-                    date=str(dates[t]),
-                    cells=4 * len(names) + 1,
-                    current_endpoint_excluded=True,
-                )
-            )
-    np.savez_compressed(
-        out / "risk.npz",
-        raw_beta=raw,
-        raw_valid=raw_valid,
-        resolved_beta=resolved,
-        diagonal=diagonal,
-        factor=factor,
-        support=support,
-    )
-    write_json_atomic(out / "formula_checks.json", formula_checks)
-    # Original-cache control is bounded to its first61 available wealth closes;
-    # earlier repaired corporate events do not intersect this2016 decision.
-    original_store = Path(
-        json.loads((Path(plan["prior_root"]) / "frozen_design.json").read_text())[
-            "store"
-        ]["root"]
-    )
-    t = int(indices[0])
-    old_p = np.load(original_store / "shareholder_wealth_close.npy", mmap_mode="r")[
-        t - 61 : t + 1
-    ]
-    old_s = np.load(original_store / "shareholder_wealth_valid.npy", mmap_mode="r")[
-        t - 61 : t + 1
-    ]
-    b, v = rolling_hedge_beta(old_p, old_s, bova.close_by_session[t - 61 : t + 1])
-    np.testing.assert_array_equal(b[-1], old.inputs.hedge_beta[0])
-    np.testing.assert_array_equal(v[-1], old.inputs.hedge_beta_valid[0])
-    d, f, _ = causal_risk(
-        old_p,
-        old_s,
-        bova.close_by_session[t - 61 : t + 1],
-        np.broadcast_to(old.beta[0], old_p.shape),
-        np.broadcast_to(old.inputs.active[0], old_p.shape),
-    )
-    np.testing.assert_array_equal(d[-1], old.diagonal[0])
-    np.testing.assert_array_equal(f[-1], old.factor[0])
-    hedge_root = out / "hedge_beta"
-    hedge_root.mkdir()
-    arrays = {}
-    for key, values in (
-        ("hedge_beta", raw),
-        ("hedge_beta_valid", raw_valid),
-        ("date_index", dates),
-        ("isin_index", np.asarray(names)),
-    ):
-        path = hedge_root / f"{key}.npy"
-        np.save(path, values)
-        arrays[key] = dict(
-            path=path.name, bytes=path.stat().st_size, sha256=binding(path)["sha256"]
+    if resume:
+        with np.load(out / "risk.npz") as saved:
+            resolved, diagonal, factor = [
+                saved[k].copy() for k in ("resolved_beta", "diagonal", "factor")
+            ]
+        hedge_root = out / "hedge_beta"
+        bound_json(binding(hedge_root / "manifest.json"))
+    else:
+        shape = (len(dates), len(names))
+        raw, raw_valid = np.full(shape, np.nan), np.zeros(shape, bool)
+        resolved, diagonal, support = (
+            np.full(shape, np.nan),
+            np.full(shape, np.nan),
+            np.zeros(shape, np.int16),
         )
-    write_json_atomic(
-        hedge_root / "manifest.json",
-        dict(
-            schema=HEDGE_BETA_SCHEMA,
-            status="complete",
-            store=accepted["store"],
-            bova11={**bova_spec, "data_sha256": bova.data_sha256},
-            arrays=arrays,
-            contract=bound_json(binding(out / "plan.json")),
-            implementation=binding(Path(__file__)),
-        ),
-    )
+        factor = np.full(len(dates), np.nan)
+        previous, ages = np.ones(len(names)), np.full(len(names), 21)
+        selected = {int(indices[0]), int(indices[-1])}
+        selected.update(
+            r["effective_index"] + offset
+            for r in links
+            for offset in (-1, 0, 1, 20, 60)
+            if first <= r["effective_index"] + offset <= indices[-1]
+        )
+        formula_checks = []
+        for t in range(first, int(indices[-1]) + 1):
+            prices, mask, hedge = history(t)
+            x, y = returns(prices, mask, hedge)
+            raw[t], raw_valid[t] = beta_row(x, y)
+            for link in links:
+                if t == link["effective_index"]:
+                    a, b = link["predecessor_index"], link["successor_index"]
+                    previous[b], ages[b] = previous[a], ages[a]
+            ages += 1
+            valid = raw_valid[t]
+            previous[valid], ages[valid] = raw[t, valid], 0
+            resolved[t] = np.where(ages <= 20, previous, 1.0)
+            diagonal[t], factor[t], support[t] = variance_row(
+                x, y, resolved[t], active[t]
+            )
+            if t in selected:
+                # The unused final close deliberately carries an arbitrary value;
+                # original routines must exclude that current endpoint.
+                p = np.concatenate([prices, np.full((1, len(names)), 123456.0)])
+                s = np.concatenate([mask, np.ones((1, len(names)), bool)])
+                h = np.r_[hedge, 987654.0]
+                b, v = rolling_hedge_beta(p, s, h)
+                np.testing.assert_array_equal(b[-1], raw[t])
+                np.testing.assert_array_equal(v[-1], raw_valid[t])
+                d, f, n = causal_risk(
+                    p,
+                    s,
+                    h,
+                    np.broadcast_to(resolved[t], p.shape),
+                    np.broadcast_to(active[t], p.shape),
+                )
+                np.testing.assert_array_equal(d[-1], diagonal[t])
+                np.testing.assert_array_equal(f[-1], factor[t])
+                np.testing.assert_array_equal(n[-1], support[t])
+                formula_checks.append(
+                    dict(
+                        date=str(dates[t]),
+                        cells=4 * len(names) + 1,
+                        current_endpoint_excluded=True,
+                    )
+                )
+        np.savez_compressed(
+            out / "risk.npz",
+            raw_beta=raw,
+            raw_valid=raw_valid,
+            resolved_beta=resolved,
+            diagonal=diagonal,
+            factor=factor,
+            support=support,
+        )
+        write_json_atomic(out / "formula_checks.json", formula_checks)
+        # Original-cache control is bounded to its first61 available wealth closes;
+        # earlier repaired corporate events do not intersect this2016 decision.
+        original_store = Path(
+            json.loads((Path(plan["prior_root"]) / "frozen_design.json").read_text())[
+                "store"
+            ]["root"]
+        )
+        t = int(indices[0])
+        old_p = np.load(original_store / "shareholder_wealth_close.npy", mmap_mode="r")[
+            t - 61 : t + 1
+        ]
+        old_s = np.load(original_store / "shareholder_wealth_valid.npy", mmap_mode="r")[
+            t - 61 : t + 1
+        ]
+        b, v = rolling_hedge_beta(old_p, old_s, bova.close_by_session[t - 61 : t + 1])
+        np.testing.assert_array_equal(b[-1], old.inputs.hedge_beta[0])
+        np.testing.assert_array_equal(v[-1], old.inputs.hedge_beta_valid[0])
+        d, f, _ = causal_risk(
+            old_p,
+            old_s,
+            bova.close_by_session[t - 61 : t + 1],
+            np.broadcast_to(old.beta[0], old_p.shape),
+            np.broadcast_to(old.inputs.active[0], old_p.shape),
+        )
+        np.testing.assert_array_equal(d[-1], old.diagonal[0])
+        np.testing.assert_array_equal(f[-1], old.factor[0])
+        hedge_root = out / "hedge_beta"
+        hedge_root.mkdir()
+        arrays = {}
+        for key, values in (
+            ("hedge_beta", raw),
+            ("hedge_beta_valid", raw_valid),
+            ("date_index", dates),
+            ("isin_index", np.asarray(names)),
+        ):
+            path = hedge_root / f"{key}.npy"
+            np.save(path, values)
+            arrays[key] = dict(
+                path=path.name,
+                bytes=path.stat().st_size,
+                sha256=binding(path)["sha256"],
+            )
+        write_json_atomic(
+            hedge_root / "manifest.json",
+            dict(
+                schema=HEDGE_BETA_SCHEMA,
+                status="complete",
+                store=accepted["store"],
+                bova11={**bova_spec, "data_sha256": bova.data_sha256},
+                arrays=arrays,
+                contract=bound_json(binding(out / "plan.json")),
+                implementation=binding(Path(__file__)),
+            ),
+        )
     cdi_source = bound_json(run["cash_calendar"])["panel"]
     with np.load(cdi_source["path"]) as z:
         cdi = z["cdi_returns"].copy()
+    covered = np.isfinite(cdi[indices])
+    write_json_atomic(
+        out / "cash_scope.json",
+        dict(
+            uncovered_unused_prelude=[str(d) for d in dates[indices][~covered]],
+            actual_books_require_full_corrected_coverage=True,
+        ),
+    )
+    cdi[indices[~covered]] = old.inputs.cdi_returns[~covered]
     assert np.isfinite(cdi[indices]).all()
     lending = load_lending_borrow_panels(
         Path(run["qualified_lending"]["root"]),
@@ -393,6 +417,8 @@ def main():
         plan=binding(out / "plan.json"),
         cache={**binding(cache), "bytes": cache.stat().st_size},
         risk=binding(out / "risk.npz"),
+        reused_saved_risk_and_controls=resume,
+        cash_scope=binding(out / "cash_scope.json"),
         formula_checks=binding(out / "formula_checks.json"),
         old_control_cells=3 * len(names) + 1,
         source_actions_represented_once=cleared,
