@@ -1081,12 +1081,15 @@ def build_identity(
     A missing original FCA version contributes no invented mapping. Sector is
     the versioned FCA classification, not a current B3 sector retrojection.
     Name fallback requires a unique contemporaneous CNPJ and an instrument
-    already observed before that FCA receipt. Original generic Ações can map
-    only to independently observed ON/PN classes through that exact name route.
+    already observed before that FCA receipt. Original generic Ações take their
+    ON/PN class from prior B3 observations, joined by explicit dated ticker or
+    the exact-name route when no ticker was disclosed.
     New securities cannot inherit an old company's spelling.
     Explicit sector codes enter at their own receipt. Label-only sectors use
     only unambiguous code/label evidence already received by this decision;
     later evidence never fills or removes an earlier sector classification.
+    A reviewed external identity correction has its own known-session bound;
+    it cannot backdate its ticker while retaining the filing's earlier clock.
     """
     universe = set(isins)
     events = defaultdict(list)
@@ -1156,6 +1159,12 @@ def build_identity(
                 else None
             )
             for security in document["securities"]:
+                identity_known_index = max(
+                    document["available_index"],
+                    security.get("source_identity_known_index", 0),
+                )
+                if index < identity_known_index:
+                    continue
                 if not security["start"] <= current_date <= security["end"]:
                     continue
                 method = "dated_fca_ticker"
@@ -1254,7 +1263,7 @@ def build_identity(
                         "preferred_class": preferred,
                         "unit_composition": security["unit_composition"],
                         "fca_id": document["id"],
-                        "identity_known_date": sessions[document["available_index"]],
+                        "identity_known_date": sessions[identity_known_index],
                         "identity_method": identity_method,
                         "identity_effective_start": max(
                             security["start"], first_seen[isin]
@@ -2830,7 +2839,7 @@ def build(root: Path, store: Path, output: Path) -> dict:
         "through": str(END),
         "availability_rule": "exact RAD minute upper bound (+1min), first15:45at-or-after; date-only nextsession",
         "version_rule": "only own version account contents; missing original versions remain unavailable until recovered or replaced at actual later receipt",
-        "identity_rule": "own-receipt FCA cash ticker or unique exact historical legal spelling, prior COTAHIST ISIN and class, bounded existing security; original generic shares require exact-name observed ON/PN, never units or modern HTML class backfill; legal CNPJ root plus CVM registration",
+        "identity_rule": "own-receipt FCA cash ticker or unique exact historical legal spelling, prior COTAHIST ISIN and class, bounded existing security; original generic shares require prior observed ON/PN through literal ticker or exact-name join, never units or modern HTML class backfill; source corrections retain their separate known-session bound; legal CNPJ root plus CVM registration",
         "sector_rule": "explicit numeric FCA code at own receipt; annual labels resolve at each decision using only already-received unambiguous exact-ID code/label evidence; sector_known_date and sector_mapping_id bind availability and source; future evidence never changes earlier groups; display labels remain own-receipt accounting annotations",
         "identity_rows": identity.height,
         "identity_isins": identity.get_column("isin").n_unique(),

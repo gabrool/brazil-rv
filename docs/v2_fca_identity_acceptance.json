@@ -1,0 +1,92 @@
+{
+  "events_7_fields_gained_active_values": 181629,
+  "evidence": {
+    "financial_events": {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\fca_financial_propagation\\manifest.json",
+      "sha256": "26851537cee472cad8f9ac1f1b1b02d99bb173ffa42fb0b7ca7986ac72fc927c"
+    },
+    "identity": {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\fca_identity_admission\\source_clock\\manifest.json",
+      "sha256": "ce34599625e3ba60dd00680a16cb61c00810941d2424199a1f7c0a9d088d78b3"
+    },
+    "primary_receipts": {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\fca_identity_admission\\primary_source_receipts.json",
+      "sha256": "b50e85641c14d72c8e001c91aadc0710b3f088cd0a4a10e4750637d8702511eb"
+    },
+    "removal_review": {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\fca_identity_admission\\removal_source_review.json",
+      "sha256": "cbd72643d6d3e4f542990a4c5509ce89861b094721313fd6313862b51ea4b2e5"
+    },
+    "source_amendments": {
+      "path": "docs\\v2_fca_source_amendments.json",
+      "sha256": "185bc49723abae11d6f22f26c18cefa761d05654579e1fbbad97015d6e233bb4"
+    },
+    "valuation_flag_review": {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\fca_financial_propagation\\valuation_flag_changes.parquet",
+      "sha256": "4b0d964dc7ce737869f0dafd1ad5f2bd692c77132e0b166f7d1f426a3bcea1cc"
+    }
+  },
+  "financial_8_fields_gained_active_values": 154656,
+  "financial_and_event_eligible_valid_values_lost": 0,
+  "future_identity_prefix_exact": true,
+  "identity_differences": {
+    "added": {
+      "active": 26271,
+      "names": 350,
+      "rows": 64333
+    },
+    "changed": {
+      "active": 9091,
+      "names": 91,
+      "rows": 15257
+    },
+    "removed": {
+      "active": 0,
+      "names": 9,
+      "rows": 1772
+    }
+  },
+  "identity_rows_after": 943419,
+  "identity_rows_before": 880858,
+  "identity_shared_field_differences": {
+    "class": 0,
+    "cnpj": 0,
+    "cvm_code": 0,
+    "fca_id": 0,
+    "identity_effective_start": 0,
+    "identity_known_date": 0,
+    "identity_method": 15257,
+    "preferred_class": 0,
+    "sector": 0,
+    "sector_known_date": 0,
+    "sector_label": 0,
+    "sector_mapping_id": 4438,
+    "unit_composition": 0
+  },
+  "limits": [
+    "A/B incomplete, C/D unstarted; no profitability or GPU result.",
+    "Further source-specific MGLU/ABC class resolution and remaining dependent families, original financial numerator/TTM/denominator, wealth/labels and new tensor contract remain.",
+    "Original and new source vintages do not establish every historical revision; no source or eligible-name deletion."
+  ],
+  "new_financial_documents": 427,
+  "schema": "FCA_IDENTITY_PROPAGATION_ACCEPTANCE_V1",
+  "seconds": {
+    "financial_event_propagation": 131.36057019999134,
+    "identity_reconstruction_and_prefix": 58.373721800002386
+  },
+  "source_lf_sha256": {
+    "ops/admit_fca_identity.py": "7e210fb3643515f691e8b89413246ba2f8ed3e20c4e60090f6c6758b952018e0",
+    "ops/propagate_fca_financials.py": "e73d2cf0ad6ad17fe12160c1909e0c0ea0383f418db96ed6640bfcb1556d9bfd",
+    "research/src/brazil_rv/v2/round5_cvm.py": "f90e6c3cc3a92eaec5e8cb4bfdad7a8a26b2911f3d5beac14cd10ea012711c0a",
+    "research/tests/test_v2_round5_cvm_identity.py": "6f268d0f91dad2a003a11bbf476cc7ad1c1d51c33de3b12355d2e28331017e4b"
+  },
+  "statement_age_gained_active_values": 26271,
+  "status": "verified_intermediate_identity_financial_event_overlay_for_next_derived_contract_no_store_or_fit_rebinding",
+  "unaffected_names_exact": 203,
+  "validation": {
+    "new_source_clock_test": "per-security known date, unchanged unrelated security/sector clock, future mutation",
+    "ruff": "passed",
+    "targeted_identity_tests_passed": 10
+  },
+  "valuation_flag_changed_active_rows": 213
+}

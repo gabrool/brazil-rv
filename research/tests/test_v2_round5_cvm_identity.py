@@ -89,6 +89,26 @@ def test_explicit_original_class_remains_stricter_than_generic():
     assert set(identity["isin"]) == {"ON"}
 
 
+def test_source_correction_keeps_its_own_clock_and_other_security_metadata():
+    days, document, observations = fixture()
+    ordinary = document["securities"][0]
+    ordinary.update(ticker="ABCD3", source_identity_known_index=3)
+    preferred = deepcopy(ordinary)
+    preferred.update(ticker="ABCD4", source_identity_known_index=1)
+    document["securities"].append(preferred)
+    rows = build_identity([document], observations, days, ["ON", "PN"])
+    assert rows.filter(pl.col("isin") == "ON")["date"].min() == days[3]
+    assert set(rows.filter(pl.col("isin") == "ON")["identity_known_date"]) == {days[3]}
+    assert rows.filter(pl.col("isin") == "PN")["date"].min() == days[1]
+    assert set(rows["sector_known_date"]) == {days[1]}
+    delayed = deepcopy(document)
+    delayed["securities"][0]["source_identity_known_index"] = 4
+    later = build_identity([delayed], observations, days, ["ON", "PN"])
+    assert later.filter(pl.col("date") < days[3]).equals(
+        rows.filter(pl.col("date") < days[3])
+    )
+
+
 def test_explicit_ticker_class_must_match_observation_and_preserve_preferred_suffix():
     days, document, observations = fixture()
     security = document["securities"][0]

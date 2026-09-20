@@ -1,0 +1,702 @@
+{
+  "amendments": [
+    {
+      "after": [
+        {
+          "class": "ON",
+          "end": "9999-12-31",
+          "preferred_class": "",
+          "start": "2021-02-18",
+          "ticker": "CMIN3",
+          "unit_composition": ""
+        }
+      ],
+      "before": [],
+      "cnpj": "08902291000115",
+      "cvm_code": "025585",
+      "evidence": [
+        {
+          "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\fca_originals\\100284\\manifest.json",
+          "sha256": "20c71037081249561374840da9e31ed469082ebe68e4d3950d876d46be69efaf"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\primary_sources\\csn_ipo_20210217.pdf",
+          "sha256": "edc37d2891b36c7e78814786976d410f77b39b62fe342f5851042cf5812b047f"
+        }
+      ],
+      "id": "100284",
+      "isin": "BRCMINACNOR2",
+      "known_date": "2021-02-18",
+      "reason": "Original offering front page binds ticker, ISIN, issuer and ordinary shares; timeline binds publication/trading start. Correct explicit wrong ticker or omitted exchange listing. No earlier FCA/sector receipt is invented."
+    },
+    {
+      "after": [
+        {
+          "class": "ON",
+          "end": "9999-12-31",
+          "preferred_class": "",
+          "start": "2021-02-18",
+          "ticker": "CMIN3",
+          "unit_composition": ""
+        }
+      ],
+      "before": [],
+      "cnpj": "08902291000115",
+      "cvm_code": "025585",
+      "evidence": [
+        {
+          "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\fca_originals\\105976\\manifest.json",
+          "sha256": "331210141600680974408e3056a6f493fd886b072e8d84e4353d674436e723f7"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\primary_sources\\csn_ipo_20210217.pdf",
+          "sha256": "edc37d2891b36c7e78814786976d410f77b39b62fe342f5851042cf5812b047f"
+        }
+      ],
+      "id": "105976",
+      "isin": "BRCMINACNOR2",
+      "known_date": "2021-02-18",
+      "reason": "Original offering front page binds ticker, ISIN, issuer and ordinary shares; timeline binds publication/trading start. Correct explicit wrong ticker or omitted exchange listing. No earlier FCA/sector receipt is invented."
+    },
+    {
+      "after": [
+        {
+          "class": "SHARES",
+          "end": "9999-12-31",
+          "listing_end": "9999-12-31",
+          "listing_start": "2021-02-12",
+          "preferred_class": "",
+          "segment_end": "9999-12-31",
+          "segment_start": "2021-02-12",
+          "source_market_code": "3",
+          "source_segment_code": "4",
+          "source_type_code": "1",
+          "start": "2021-02-18",
+          "ticker": "CMIN3",
+          "unit_composition": ""
+        }
+      ],
+      "before": [
+        {
+          "class": "SHARES",
+          "end": "9999-12-31",
+          "listing_end": "9999-12-31",
+          "listing_start": "2021-02-12",
+          "preferred_class": "",
+          "segment_end": "9999-12-31",
+          "segment_start": "2021-02-12",
+          "source_market_code": "3",
+          "source_segment_code": "4",
+          "source_type_code": "1",
+          "start": "2021-02-12",
+          "ticker": "25585",
+          "unit_composition": ""
+        }
+      ],
+      "cnpj": "08902291000115",
+      "cvm_code": "025585",
+      "evidence": [
+        {
+          "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\fca_originals\\112749\\manifest.json",
+          "sha256": "38f7b8e25d08c6425e735fcae66f110fcc6992980bd4158ac1d8c1eed0671cd9"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\primary_sources\\csn_ipo_20210217.pdf",
+          "sha256": "edc37d2891b36c7e78814786976d410f77b39b62fe342f5851042cf5812b047f"
+        }
+      ],
+      "id": "112749",
+      "isin": "BRCMINACNOR2",
+      "known_date": "2021-02-18",
+      "reason": "Original offering front page binds ticker, ISIN, issuer and ordinary shares; timeline binds publication/trading start. Correct explicit wrong ticker or omitted exchange listing. No earlier FCA/sector receipt is invented."
+    },
+    {
+      "after": [
+        {
+          "class": "SHARES",
+          "end": "9999-12-31",
+          "listing_end": "9999-12-31",
+          "listing_start": "2021-02-12",
+          "preferred_class": "",
+          "segment_end": "9999-12-31",
+          "segment_start": "2021-02-12",
+          "source_market_code": "3",
+          "source_segment_code": "4",
+          "source_type_code": "1",
+          "start": "2021-02-18",
+          "ticker": "CMIN3",
+          "unit_composition": ""
+        }
+      ],
+      "before": [
+        {
+          "class": "SHARES",
+          "end": "9999-12-31",
+          "listing_end": "9999-12-31",
+          "listing_start": "2021-02-12",
+          "preferred_class": "",
+          "segment_end": "9999-12-31",
+          "segment_start": "2021-02-12",
+          "source_market_code": "3",
+          "source_segment_code": "4",
+          "source_type_code": "1",
+          "start": "2021-02-12",
+          "ticker": "25585",
+          "unit_composition": ""
+        }
+      ],
+      "cnpj": "08902291000115",
+      "cvm_code": "025585",
+      "evidence": [
+        {
+          "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\fca_originals\\119190\\manifest.json",
+          "sha256": "4b3f7d4911e08b60b5b0d88098e5c9b04de5fff2acfb64abfcd624a0592a2419"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\primary_sources\\csn_ipo_20210217.pdf",
+          "sha256": "edc37d2891b36c7e78814786976d410f77b39b62fe342f5851042cf5812b047f"
+        }
+      ],
+      "id": "119190",
+      "isin": "BRCMINACNOR2",
+      "known_date": "2021-02-18",
+      "reason": "Original offering front page binds ticker, ISIN, issuer and ordinary shares; timeline binds publication/trading start. Correct explicit wrong ticker or omitted exchange listing. No earlier FCA/sector receipt is invented."
+    },
+    {
+      "after": [
+        {
+          "class": "SHARES",
+          "end": "9999-12-31",
+          "listing_end": "9999-12-31",
+          "listing_start": "2021-02-12",
+          "preferred_class": "",
+          "segment_end": "9999-12-31",
+          "segment_start": "2021-02-12",
+          "source_market_code": "3",
+          "source_segment_code": "4",
+          "source_type_code": "1",
+          "start": "2021-02-18",
+          "ticker": "CMIN3",
+          "unit_composition": ""
+        }
+      ],
+      "before": [
+        {
+          "class": "SHARES",
+          "end": "9999-12-31",
+          "listing_end": "9999-12-31",
+          "listing_start": "2021-02-12",
+          "preferred_class": "",
+          "segment_end": "9999-12-31",
+          "segment_start": "2021-02-12",
+          "source_market_code": "3",
+          "source_segment_code": "4",
+          "source_type_code": "1",
+          "start": "2021-02-12",
+          "ticker": "25585",
+          "unit_composition": ""
+        }
+      ],
+      "cnpj": "08902291000115",
+      "cvm_code": "025585",
+      "evidence": [
+        {
+          "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\fca_originals\\127187\\manifest.json",
+          "sha256": "b1270c5870a819829ebc6e9005747062458cc7164d16bee07ade515618a7675c"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\primary_sources\\csn_ipo_20210217.pdf",
+          "sha256": "edc37d2891b36c7e78814786976d410f77b39b62fe342f5851042cf5812b047f"
+        }
+      ],
+      "id": "127187",
+      "isin": "BRCMINACNOR2",
+      "known_date": "2021-02-18",
+      "reason": "Original offering front page binds ticker, ISIN, issuer and ordinary shares; timeline binds publication/trading start. Correct explicit wrong ticker or omitted exchange listing. No earlier FCA/sector receipt is invented."
+    },
+    {
+      "after": [
+        {
+          "class": "SHARES",
+          "end": "9999-12-31",
+          "listing_end": "9999-12-31",
+          "listing_start": "2021-02-12",
+          "preferred_class": "",
+          "segment_end": "9999-12-31",
+          "segment_start": "2021-02-12",
+          "source_market_code": "3",
+          "source_segment_code": "4",
+          "source_type_code": "1",
+          "start": "2021-02-18",
+          "ticker": "CMIN3",
+          "unit_composition": ""
+        }
+      ],
+      "before": [
+        {
+          "class": "SHARES",
+          "end": "9999-12-31",
+          "listing_end": "9999-12-31",
+          "listing_start": "2021-02-12",
+          "preferred_class": "",
+          "segment_end": "9999-12-31",
+          "segment_start": "2021-02-12",
+          "source_market_code": "3",
+          "source_segment_code": "4",
+          "source_type_code": "1",
+          "start": "2021-02-12",
+          "ticker": "25585",
+          "unit_composition": ""
+        }
+      ],
+      "cnpj": "08902291000115",
+      "cvm_code": "025585",
+      "evidence": [
+        {
+          "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\fca_originals\\137872\\manifest.json",
+          "sha256": "c24afa5b4ad0a307fab81a60c30685cce74874c8f5cd70ca7100025a6fddd301"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\primary_sources\\csn_ipo_20210217.pdf",
+          "sha256": "edc37d2891b36c7e78814786976d410f77b39b62fe342f5851042cf5812b047f"
+        }
+      ],
+      "id": "137872",
+      "isin": "BRCMINACNOR2",
+      "known_date": "2021-02-18",
+      "reason": "Original offering front page binds ticker, ISIN, issuer and ordinary shares; timeline binds publication/trading start. Correct explicit wrong ticker or omitted exchange listing. No earlier FCA/sector receipt is invented."
+    },
+    {
+      "after": [
+        {
+          "class": "SHARES",
+          "end": "9999-12-31",
+          "listing_end": "9999-12-31",
+          "listing_start": "2021-02-11",
+          "preferred_class": "",
+          "segment_end": "9999-12-31",
+          "segment_start": "2021-02-12",
+          "source_type_authority": "HTML equity category only; class unresolved",
+          "source_type_description": "Ações Ordinárias",
+          "start": "2021-02-17",
+          "ticker": "ELMD3",
+          "unit_composition": ""
+        }
+      ],
+      "before": [
+        {
+          "class": "SHARES",
+          "end": "9999-12-31",
+          "listing_end": "9999-12-31",
+          "listing_start": "2021-02-11",
+          "preferred_class": "",
+          "segment_end": "9999-12-31",
+          "segment_start": "2021-02-12",
+          "source_type_authority": "HTML equity category only; class unresolved",
+          "source_type_description": "Ações Ordinárias",
+          "start": "2021-02-11",
+          "ticker": "ELEMD3",
+          "unit_composition": ""
+        }
+      ],
+      "cnpj": "09347516000181",
+      "cvm_code": "025569",
+      "evidence": [
+        {
+          "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\fca_originals\\100157\\manifest.json",
+          "sha256": "e8f0e4dfd1b2d684ecc18e069bfc684b0cbf5746f20be9394f87cc994a6c7608"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\primary_sources\\eletromidia_ipo_20210212.pdf",
+          "sha256": "e04e29bae534f9659276026f9443b57f0c2c356a6d6029e536fdda55e58706c4"
+        }
+      ],
+      "id": "100157",
+      "isin": "BRELMDACNOR3",
+      "known_date": "2021-02-17",
+      "reason": "Original offering front page binds ticker, ISIN, issuer and ordinary shares; timeline binds publication/trading start. Correct explicit wrong ticker or omitted exchange listing. No earlier FCA/sector receipt is invented."
+    },
+    {
+      "after": [
+        {
+          "class": "ON",
+          "end": "9999-12-31",
+          "listing_end": "9999-12-31",
+          "listing_start": "2021-02-11",
+          "preferred_class": "",
+          "segment_end": "9999-12-31",
+          "segment_start": "2021-02-17",
+          "source_class_description": "",
+          "source_segment_description": "Novo Mercado",
+          "source_type_code": "1",
+          "source_type_description": "Ações Ordinárias",
+          "start": "2021-02-17",
+          "ticker": "ELMD3",
+          "unit_composition": ""
+        }
+      ],
+      "before": [
+        {
+          "class": "ON",
+          "end": "9999-12-31",
+          "listing_end": "9999-12-31",
+          "listing_start": "2021-02-11",
+          "preferred_class": "",
+          "segment_end": "9999-12-31",
+          "segment_start": "2021-02-17",
+          "source_class_description": "",
+          "source_segment_description": "Novo Mercado",
+          "source_type_code": "1",
+          "source_type_description": "Ações Ordinárias",
+          "start": "2021-02-11",
+          "ticker": "ELEMD3",
+          "unit_composition": ""
+        }
+      ],
+      "cnpj": "09347516000181",
+      "cvm_code": "025569",
+      "evidence": [
+        {
+          "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\fca_originals\\100286\\manifest.json",
+          "sha256": "25e2ddf049c1d1950fa2786d7121baa0eb4682bb0f36684c8916e33ba5fb84ee"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\primary_sources\\eletromidia_ipo_20210212.pdf",
+          "sha256": "e04e29bae534f9659276026f9443b57f0c2c356a6d6029e536fdda55e58706c4"
+        }
+      ],
+      "id": "100286",
+      "isin": "BRELMDACNOR3",
+      "known_date": "2021-02-17",
+      "reason": "Original offering front page binds ticker, ISIN, issuer and ordinary shares; timeline binds publication/trading start. Correct explicit wrong ticker or omitted exchange listing. No earlier FCA/sector receipt is invented."
+    },
+    {
+      "after": [
+        {
+          "class": "ON",
+          "end": "9999-12-31",
+          "listing_end": "9999-12-31",
+          "listing_start": "2021-02-11",
+          "preferred_class": "",
+          "segment_end": "9999-12-31",
+          "segment_start": "2021-02-17",
+          "source_class_description": "",
+          "source_segment_description": "Novo Mercado",
+          "source_type_code": "1",
+          "source_type_description": "Ações Ordinárias",
+          "start": "2021-02-17",
+          "ticker": "ELMD3",
+          "unit_composition": ""
+        }
+      ],
+      "before": [
+        {
+          "class": "ON",
+          "end": "9999-12-31",
+          "listing_end": "9999-12-31",
+          "listing_start": "2021-02-11",
+          "preferred_class": "",
+          "segment_end": "9999-12-31",
+          "segment_start": "2021-02-17",
+          "source_class_description": "",
+          "source_segment_description": "Novo Mercado",
+          "source_type_code": "1",
+          "source_type_description": "Ações Ordinárias",
+          "start": "2021-02-11",
+          "ticker": "ELEMD3",
+          "unit_composition": ""
+        }
+      ],
+      "cnpj": "09347516000181",
+      "cvm_code": "025569",
+      "evidence": [
+        {
+          "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\fca_originals\\105057\\manifest.json",
+          "sha256": "c2312eda2934e069b381a373ce233a1026f253f0bdc0e28d0fb2418f9d749b21"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\primary_sources\\eletromidia_ipo_20210212.pdf",
+          "sha256": "e04e29bae534f9659276026f9443b57f0c2c356a6d6029e536fdda55e58706c4"
+        }
+      ],
+      "id": "105057",
+      "isin": "BRELMDACNOR3",
+      "known_date": "2021-02-17",
+      "reason": "Original offering front page binds ticker, ISIN, issuer and ordinary shares; timeline binds publication/trading start. Correct explicit wrong ticker or omitted exchange listing. No earlier FCA/sector receipt is invented."
+    },
+    {
+      "after": [
+        {
+          "class": "SHARES",
+          "end": "9999-12-31",
+          "listing_end": "9999-12-31",
+          "listing_start": "2021-02-11",
+          "preferred_class": "",
+          "segment_end": "9999-12-31",
+          "segment_start": "2021-02-17",
+          "source_market_code": "3",
+          "source_segment_code": "5",
+          "source_type_code": "1",
+          "start": "2021-02-17",
+          "ticker": "ELMD3",
+          "unit_composition": ""
+        }
+      ],
+      "before": [
+        {
+          "class": "SHARES",
+          "end": "9999-12-31",
+          "listing_end": "9999-12-31",
+          "listing_start": "2021-02-11",
+          "preferred_class": "",
+          "segment_end": "9999-12-31",
+          "segment_start": "2021-02-17",
+          "source_market_code": "3",
+          "source_segment_code": "5",
+          "source_type_code": "1",
+          "start": "2021-02-11",
+          "ticker": "ELEMD3",
+          "unit_composition": ""
+        }
+      ],
+      "cnpj": "09347516000181",
+      "cvm_code": "025569",
+      "evidence": [
+        {
+          "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\fca_originals\\110844\\manifest.json",
+          "sha256": "2b7442295fa035a080e1e4ba8bbd17528f25241fa8b501c8a2ef50f68d40394e"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\primary_sources\\eletromidia_ipo_20210212.pdf",
+          "sha256": "e04e29bae534f9659276026f9443b57f0c2c356a6d6029e536fdda55e58706c4"
+        }
+      ],
+      "id": "110844",
+      "isin": "BRELMDACNOR3",
+      "known_date": "2021-02-17",
+      "reason": "Original offering front page binds ticker, ISIN, issuer and ordinary shares; timeline binds publication/trading start. Correct explicit wrong ticker or omitted exchange listing. No earlier FCA/sector receipt is invented."
+    },
+    {
+      "after": [
+        {
+          "class": "SHARES",
+          "end": "9999-12-31",
+          "listing_end": "9999-12-31",
+          "listing_start": "2021-02-11",
+          "preferred_class": "",
+          "segment_end": "9999-12-31",
+          "segment_start": "2021-02-17",
+          "source_market_code": "3",
+          "source_segment_code": "5",
+          "source_type_code": "1",
+          "start": "2021-02-17",
+          "ticker": "ELMD3",
+          "unit_composition": ""
+        }
+      ],
+      "before": [
+        {
+          "class": "SHARES",
+          "end": "9999-12-31",
+          "listing_end": "9999-12-31",
+          "listing_start": "2021-02-11",
+          "preferred_class": "",
+          "segment_end": "9999-12-31",
+          "segment_start": "2021-02-17",
+          "source_market_code": "3",
+          "source_segment_code": "5",
+          "source_type_code": "1",
+          "start": "2021-02-11",
+          "ticker": "ELEMD3",
+          "unit_composition": ""
+        }
+      ],
+      "cnpj": "09347516000181",
+      "cvm_code": "025569",
+      "evidence": [
+        {
+          "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\fca_originals\\110846\\manifest.json",
+          "sha256": "41fe21359863f27ce9bb44e1a7d86a2847bb49c59981e7742766a9ce5f8ed8d9"
+        },
+        {
+          "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\primary_sources\\eletromidia_ipo_20210212.pdf",
+          "sha256": "e04e29bae534f9659276026f9443b57f0c2c356a6d6029e536fdda55e58706c4"
+        }
+      ],
+      "id": "110846",
+      "isin": "BRELMDACNOR3",
+      "known_date": "2021-02-17",
+      "reason": "Original offering front page binds ticker, ISIN, issuer and ordinary shares; timeline binds publication/trading start. Correct explicit wrong ticker or omitted exchange listing. No earlier FCA/sector receipt is invented."
+    },
+    {
+      "after": [
+        {
+          "class": "SHARES",
+          "end": "9999-12-31",
+          "listing_end": "9999-12-31",
+          "listing_start": "1985-12-20",
+          "preferred_class": "",
+          "segment_end": "9999-12-31",
+          "segment_start": "1985-12-20",
+          "source_type_authority": "HTML equity category only; class unresolved",
+          "source_type_description": "Ações Ordinárias",
+          "start": "1985-12-20",
+          "ticker": "RCSL3",
+          "unit_composition": ""
+        },
+        {
+          "class": "PN",
+          "end": "9999-12-31",
+          "listing_end": "9999-12-31",
+          "listing_start": "1985-12-20",
+          "preferred_class": "",
+          "segment_end": "9999-12-31",
+          "segment_start": "1985-12-20",
+          "source_type_authority": "HTML equity category only; class unresolved",
+          "source_type_description": "Ações Preferenciais",
+          "start": "1985-12-20",
+          "ticker": "RCSL4",
+          "unit_composition": ""
+        }
+      ],
+      "before": [
+        {
+          "class": "SHARES",
+          "end": "9999-12-31",
+          "listing_end": "9999-12-31",
+          "listing_start": "1985-12-20",
+          "preferred_class": "",
+          "segment_end": "9999-12-31",
+          "segment_start": "1985-12-20",
+          "source_type_authority": "HTML equity category only; class unresolved",
+          "source_type_description": "Ações Ordinárias",
+          "start": "1985-12-20",
+          "ticker": "RCSL3",
+          "unit_composition": ""
+        },
+        {
+          "class": "SHARES",
+          "end": "9999-12-31",
+          "listing_end": "9999-12-31",
+          "listing_start": "1985-12-20",
+          "preferred_class": "",
+          "segment_end": "9999-12-31",
+          "segment_start": "1985-12-20",
+          "source_type_authority": "HTML equity category only; class unresolved",
+          "source_type_description": "Ações Preferenciais",
+          "start": "1985-12-20",
+          "ticker": "RCSL3",
+          "unit_composition": ""
+        }
+      ],
+      "cnpj": "91333666000117",
+      "cvm_code": "012572",
+      "evidence": [
+        {
+          "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\fca_originals\\91757\\manifest.json",
+          "sha256": "83e6a96d1049e45311569f9529da02d2ecd110210a3e3aae0f5425b33b724c4d"
+        },
+        {
+          "path": "C:\\quant-data\\b3\\raw\\cvm\\snapshot_20260821\\fca_cia_aberta_2019.zip",
+          "sha256": "09f84e5f5485217c8b36f8379c36f718dbdcd6d6908b4e96b68861394e76fe97"
+        }
+      ],
+      "id": "91757",
+      "isin": "BRRCSLACNPR1",
+      "known_date": "2019-05-03",
+      "reason": "Prior own-ID FCA82621 explicitly distinguishes RCSL3 ON and RCSL4 PN, confirmed by prior COTAHIST. These two later source records duplicate RCSL3 in both share blocks. Restore only the separate PN block; no class inferred from current HTML enum."
+    },
+    {
+      "after": [
+        {
+          "class": "ON",
+          "end": "9999-12-31",
+          "listing_end": "9999-12-31",
+          "listing_start": "1985-12-20",
+          "preferred_class": "",
+          "segment_end": "9999-12-31",
+          "segment_start": "1985-12-20",
+          "source_class_description": "",
+          "source_segment_description": "Básico",
+          "source_type_code": "1",
+          "source_type_description": "Ações Ordinárias",
+          "start": "1985-12-20",
+          "ticker": "RCSL3",
+          "unit_composition": ""
+        },
+        {
+          "class": "PN",
+          "end": "9999-12-31",
+          "listing_end": "9999-12-31",
+          "listing_start": "1985-12-20",
+          "preferred_class": "",
+          "segment_end": "9999-12-31",
+          "segment_start": "1985-12-20",
+          "source_class_description": "",
+          "source_segment_description": "Básico",
+          "source_type_code": "21",
+          "source_type_description": "Ações Preferenciais",
+          "start": "1985-12-20",
+          "ticker": "RCSL4",
+          "unit_composition": ""
+        }
+      ],
+      "before": [
+        {
+          "class": "ON",
+          "end": "9999-12-31",
+          "listing_end": "9999-12-31",
+          "listing_start": "1985-12-20",
+          "preferred_class": "",
+          "segment_end": "9999-12-31",
+          "segment_start": "1985-12-20",
+          "source_class_description": "",
+          "source_segment_description": "Básico",
+          "source_type_code": "1",
+          "source_type_description": "Ações Ordinárias",
+          "start": "1985-12-20",
+          "ticker": "RCSL3",
+          "unit_composition": ""
+        },
+        {
+          "class": "PN",
+          "end": "9999-12-31",
+          "listing_end": "9999-12-31",
+          "listing_start": "1985-12-20",
+          "preferred_class": "",
+          "segment_end": "9999-12-31",
+          "segment_start": "1985-12-20",
+          "source_class_description": "",
+          "source_segment_description": "Básico",
+          "source_type_code": "21",
+          "source_type_description": "Ações Preferenciais",
+          "start": "1985-12-20",
+          "ticker": "RCSL3",
+          "unit_composition": ""
+        }
+      ],
+      "cnpj": "91333666000117",
+      "cvm_code": "012572",
+      "evidence": [
+        {
+          "path": "D:\\quant-data\\b3\\interim\\round5_data_20260910T140442Z\\cvm\\fca_originals\\92907\\manifest.json",
+          "sha256": "8e0463c0b529d8f459abfdb3f9357f57e58ef1f84e36818e867382e37b155da1"
+        },
+        {
+          "path": "C:\\quant-data\\b3\\raw\\cvm\\snapshot_20260821\\fca_cia_aberta_2019.zip",
+          "sha256": "09f84e5f5485217c8b36f8379c36f718dbdcd6d6908b4e96b68861394e76fe97"
+        }
+      ],
+      "id": "92907",
+      "isin": "BRRCSLACNPR1",
+      "known_date": "2019-05-03",
+      "reason": "Prior own-ID FCA82621 explicitly distinguishes RCSL3 ON and RCSL4 PN, confirmed by prior COTAHIST. These two later source records duplicate RCSL3 in both share blocks. Restore only the separate PN block; no class inferred from current HTML enum."
+    }
+  ],
+  "boundaries": "Exact listed document/security content only; knowledge must precede its applied decision; raw originals and all model arrays unchanged.",
+  "input_documents": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\fca_identity_admission\\fca_documents.json",
+    "sha256": "0dc5c60837559ab190aeff610498220b5ccac2fac360a95b6cd2c5b4ed012855"
+  },
+  "schema": "FCA_REVIEWED_SOURCE_AMENDMENTS_V1"
+}

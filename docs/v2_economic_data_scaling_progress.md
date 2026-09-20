@@ -1115,3 +1115,53 @@ source, exact captured reproducer bytes, the prior parser snapshot, source indic
 attempt evidence and C&A parquet overlays. Fifty-two newly recovered original
 source files were verified; the earlier 109,777-file audit was not rerun. Immutable
 inputs and old fits were not duplicated. Resolve cvm_source_identity_recovery.
+
+## Full FCA identity and financial/event propagation — 2026-09-20
+
+The full causal reconstruction first reproduced all 880,858 sealed identity rows
+exactly. Its broad fallback/C&A candidates exposed 708 lost eligible mappings;
+source review recovered wrong CSN/Eletromidia ticker literals and duplicate
+Recrusul class tickers. Thirteen explicit amendments bind original offerings,
+prior own-ID FCA rows and dated quotes. The new per-security correction clock
+keeps later offering evidence out of earlier filing decisions, without delaying
+unrelated metadata. Raw sources and all 933 security axes remain intact.
+
+The verified overlay has 943,419 rows: 64,333 added, including 26,271 eligible,
+and 1,772 obsolete inactive identity rows removed. All 708 originally endangered
+eligible mappings are retained. Shared issuer, CVM, class and sector values are
+unchanged; method/sector-mapping provenance changes are separate. No cross-issuer
+conflict. Future-document/quote deletion preserves the full pre-2021 prefix.
+The baseline proof was reused, not repeated. Revised reconstruction took 58.37s.
+
+The next stage actually propagated the overlay into financial and event parquets.
+An incremental extraction found 427 additional own-version financial filings in
+the existing archives; the old 21,783-document cache remains immutable. Eight
+financial fields gain 154,656 usable eligible observations, statement age gains
+26,271 separately, and seven event fields gain 181,629. These are totals versus
+the sealed store, including the earlier C&A overlay. No prior valid eligible
+value is lost. All shared valid financial numbers/event values remain exact;
+213 eligible valuation-availability flags improve after class-identity resolution.
+Every financial/event value and age for 203 unaffected names remains exact.
+Extraction and propagation took 131.36s, not a model-training ETA.
+
+Read `v2_FCA_IDENTITY_PROPAGATION.md` and `v2_fca_identity_acceptance.json`; resolve
+fca_identity_admission/fca_financial_propagation through the run pointer. Ten
+affected identity tests and Ruff pass. The source-clock guard and JSON-date
+diagnostic failure are preserved; no source/model outcomes were changed by failed
+attempts. No prior quote/lending/auxiliary/conditioning/CVM census was repeated.
+
+This is an intermediate derived contract, not full B acceptance. Remaining FCA
+anomalies include MGLU3 labelled PNA in annual data and ABCB4 preferred suffix
+inconsistencies, plus missing early literal tickers. Magazine Luiza's original
+April29 2011 offering is archived and visually verified but not yet applied to
+those additional records. ABC's indexed 2007 underwriter PDF returned non-PDF
+content; current FAQ text is not used for historical admission. Resolve exact
+source-specific class/ticker evidence rather than weaken global identity checks.
+Other identity-dependent families, ALLOS/ISA full history propagation, financial
+numerator/TTM/denominator/source clocks, wealth/labels and actual new tensors remain.
+Reuse the new 427-document cache on subsequent identity amendments instead of
+re-extracting it. Accepted stores/static learned-policy coordinates are unchanged.
+
+Registration reread. A/B remain incomplete and C/D unstarted. No GPU job or
+corrected profitability was produced. Stage A still needs execution/recall and
+presettlement-disposal bounds; the source audit must not replace those requirements.
