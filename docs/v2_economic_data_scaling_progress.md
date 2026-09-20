@@ -1622,3 +1622,12 @@ Final combined store/refit contract, contractual wealth/labels, remaining origin
 option/cash numerical source boundary and other upstream gaps still require work.
 Stage A's adaptive-book execution/lifecycle bounds remain. A/B incomplete;
 C/D unstarted. No passed source census or earlier model tests repeated.
+
+Recovery for dea8c53 verifies572 unique/575 logical restored members and237
+previously verified source receipts. Archive auxiliary_histories_dea8c53.zip is
+17,291,760bytes, SHA a6dd5fcb4a1ccf684bee3427ce00635fb39b790869681efa62e0768bd6ad2989.
+Restored sparse deltas reconstruct196,489,800 actual auxiliary audit-view cells
+exactly. Current research source, source patch, qualified families, original
+executed recipes and failed audit attempts recover without immutable input/old-fit
+duplication. Acceptance SHA a2524456b3659adb4648eb9c5c846f51fe297d3db01eae6c700c32f6cc78f545.
+The earlier history/M1/lending/target recovery chain remains required and valid.
