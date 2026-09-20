@@ -55,7 +55,12 @@ AERI's final-date boundary is traced to a rejected pre-Round-7 inference;
 a sparse amendment removes that factor from four inherited wealth values and
 one retrospective M1 diagnostic, preserving all existing horizon outcomes.
 See `docs/v2_TO_CLOSE_CLOCK_AERI.md`, `docs/v2_M1_SCALAR_ASSEMBLY.md` and
-`docs/v2_M1_RENAME_HISTORY.md`. These are
+`docs/v2_M1_RENAME_HISTORY.md`. The remaining activity/options/odd-lot
+histories and index-preview composition identities now propagate under those
+same dated links. They add 778 valid auxiliary cells and retire 16 predecessor
+cells, with no loss on still-eligible names; 90 full-population CPU consumer
+samples and all 44 original index portfolios reconcile. See
+`docs/v2_REMAINING_AUXILIARY_HISTORY.md`. These are
 intermediate derived observations, not a replacement model store or permission to attach changed
 coordinates to old fits. Original filing clocks and capital units reconcile
 separately in `docs/v2_CVM_SOURCE_AUDIT.md`.

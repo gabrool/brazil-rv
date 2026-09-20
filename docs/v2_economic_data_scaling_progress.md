@@ -1590,3 +1590,35 @@ source patch, initial/qualified executed recipes and new target inputs recover;
 immutable inputs and old fits were not duplicated. Acceptance SHA
 `569544f83eadc2feb2247068dfcb686be7fe04caafa760bac1bd5ea616f75f03`.
 Prior M1/native/history/dependency/lending recoveries remain explicit dependencies.
+
+
+## Four remaining auxiliary histories — 2026-09-20
+
+Activity/options retain exact 20/5-session support and publication clocks across
+ALLOS/ISA. Odd-lot retains exact five-session vintage joins. Index pressure now
+routes both preview and prior composition only after the share rename is known
+and effective; prior ADV follows its admitted share history. All 933 names remain.
+Four families add 778 valid cells and retire 16 predecessor cells; no valid
+still-eligible loss and no shared valid numerical change. There are 38 restored
+index rows: 27 already have standalone ADV but need the composition correction,
+11 need inherited ADV too. Read the source-audit attribution qualification,
+which supersedes only the initial index attribution counts, not its passed arrays.
+
+The bounded producer control matches 3564 activity and1615956 index grid cells.
+Independent formulas check621 activity/702 odd-lot fields. All44 original index
+portfolios/12712 rows reconcile. Eight original IN/PR headers reproduce selected
+versions around both renames. Older IBRX naming, alphanumeric B3SA3 and Mac ZIP
+metadata caused audit-only failures; executed versions and completed-workbook
+reuse are retained. GOLL activity already existed in this family's cash path.
+
+Thirteen targeted tests and Ruff pass. Actual dataset/collator90samples/all933/
+full60sessions checks6549660 packed field cells, zero differences; full array
+qualification135250479cells. Producer4.48s/consumer26.45s; source final resumption
+.58s excludes already completed work and is not a fit ETA. No new forward,
+scoring or GPU fit. Resolve remaining_auxiliaries, remaining_auxiliary_input_audit,
+remaining_auxiliary_source_audit and v2_REMAINING_AUXILIARY_HISTORY.md.
+
+Final combined store/refit contract, contractual wealth/labels, remaining original
+option/cash numerical source boundary and other upstream gaps still require work.
+Stage A's adaptive-book execution/lifecycle bounds remain. A/B incomplete;
+C/D unstarted. No passed source census or earlier model tests repeated.

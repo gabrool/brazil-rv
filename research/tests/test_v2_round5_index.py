@@ -106,6 +106,45 @@ def test_pressure_uses_dated_identity_prior_effective_and_native_units():
     assert frame["date"].max() == date(2024, 4, 4)  # Stops before effective opening.
 
 
+def test_sourced_isin_rename_routes_both_compositions_only_after_known_effect():
+    cash = _cash().with_columns(
+        pl.when(pl.col("ticker") == "NEW3")
+        .then(pl.lit("ISIN_NEW"))
+        .otherwise(pl.col("isin"))
+        .alias("isin")
+    )
+    sessions = [date(2024, 4, day) for day in range(1, 6)]
+    args = (
+        _snapshots(False),
+        cash,
+        sessions,
+        ("ISIN_A", "ISIN_NEW", "ISIN_B"),
+        np.ones((5, 3), bool),
+        np.full((5, 3), 20e6),
+    )
+    original = pressure_panel(*args)[0]
+    amended = pressure_panel(
+        *args,
+        history_links=(
+            {
+                "predecessor_index": 0,
+                "successor_index": 1,
+                "effective_index": 1,
+                "known_index": 2,
+            },
+        ),
+    )[0]
+    assert amended.filter(pl.col("date") < sessions[2]).equals(
+        original.filter(pl.col("date") < sessions[2])
+    )
+    successor = amended.filter(
+        (pl.col("isin") == "ISIN_NEW") & (pl.col("date") >= sessions[2])
+    )
+    assert successor["index_pressure"].to_list() == pytest.approx([3.0, 1.5])
+    old = amended.filter((pl.col("isin") == "ISIN_A") & (pl.col("date") >= sessions[2]))
+    assert old["index_pressure"].to_list() == [0, 0]
+
+
 def test_future_preview_and_ticker_mutations_do_not_change_earlier_pressure():
     source = _snapshots()
     before = _panel(source).filter(pl.col("date") < date(2024, 4, 3))

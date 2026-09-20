@@ -1,0 +1,86 @@
+{
+  "accepted_store_or_old_fits_changed": false,
+  "actual_consumer_cells": 6549660,
+  "actual_consumer_samples": 90,
+  "all_names": 933,
+  "consumer": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\remaining_auxiliaries\\qualified\\qualification\\manifest.json",
+    "sha256": "67ab6d3c6bec2b31d8932fdf1dfcf008a5dc6cc831a61e6f5203743b1547835b"
+  },
+  "consumer_code_qualification": "Canonical reproducer now uses the archived eligibility-only index panel for attribution. Original successful arrays/tensor audit are retained with exact executed code; source_audit.index_attribution supersedes only those initial count labels.",
+  "executed_consumer_code": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\remaining_auxiliaries\\qualified\\qualification\\executed_reproducer.py",
+    "sha256": "5201eed12a206a4e525c4bd46c2ffe27068d3b6cb0e3f6316016a801c0b12477"
+  },
+  "history_sessions": 60,
+  "model_forward_or_scoring_or_gpu_fit": false,
+  "original_xml_header_checks": 8,
+  "parent": {
+    "manifest_sha256": "61149d43a23fc55fcd92b43aaa4e74d747fbdf62f852bedbbbdb2cf18281f3cc",
+    "root": "C:\\quant-data\\b3\\processed\\v2_data_store_2d59b9d_20260913T211700Z"
+  },
+  "producer": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\remaining_auxiliaries\\qualified\\manifest.json",
+    "sha256": "fcdc15b883533a4c366300299d76ba7cb5411eba46af967e708b1e3dd7e58d69"
+  },
+  "remaining": [
+    "remaining original option/cash numerical source boundary and upstream gaps",
+    "contractual wealth and labels",
+    "complete derived store, final tensors and explicit refit contract",
+    "A adaptive-book execution/lifecycle bounds; C/D unstarted"
+  ],
+  "report": {
+    "path": "C:\\Brazil-RV\\quant\\b3-quant\\docs\\v2_REMAINING_AUXILIARY_HISTORY.md",
+    "sha256": "6b156a72fe643fe48df6361b8bb363d7ea1c49b0426c0e4bf4011f13f8928b70"
+  },
+  "retired_predecessor_cells": 16,
+  "shared_valid_numeric_changes": 0,
+  "source_audit": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\remaining_auxiliaries\\qualified\\source_audit\\manifest.json",
+    "sha256": "bcb105fb23d60d45a44062fbbf1f93bc97712cffdc1adc342c7a244e8b9827f9"
+  },
+  "source_code": {
+    "ops/audit_remaining_auxiliary_sources.py": {
+      "path": "C:\\Brazil-RV\\quant\\b3-quant\\ops\\audit_remaining_auxiliary_sources.py",
+      "sha256": "e1a03d39d378917061e980912311aeaae808081d5507874d2d8ef48945e508f1"
+    },
+    "ops/propagate_remaining_auxiliaries.py": {
+      "path": "C:\\Brazil-RV\\quant\\b3-quant\\ops\\propagate_remaining_auxiliaries.py",
+      "sha256": "ab2758180d061c78afb1a1c490e77579abb2c4ed1429e28e5e40de289a9bd0b4"
+    },
+    "ops/qualify_remaining_auxiliaries.py": {
+      "path": "C:\\Brazil-RV\\quant\\b3-quant\\ops\\qualify_remaining_auxiliaries.py",
+      "sha256": "292d7fbba3c410abbc12aae982da928ab9ea49aaf92797860a0629866033bb9c"
+    },
+    "research/src/brazil_rv/v2/auxiliary_history.py": {
+      "path": "C:\\Brazil-RV\\quant\\b3-quant\\research\\src\\brazil_rv\\v2\\auxiliary_history.py",
+      "sha256": "b1ce0fe670553ae6326ebc21e8bc845f3ddabf13b1a632e706e8c0b8439d035b"
+    },
+    "research/src/brazil_rv/v2/round5_index.py": {
+      "path": "C:\\Brazil-RV\\quant\\b3-quant\\research\\src\\brazil_rv\\v2\\round5_index.py",
+      "sha256": "529f116536c7bec34e6879527ec982d7c0fe35d0122a4d3347c558e3f09d1ed2"
+    },
+    "research/tests/test_v2_auxiliary_history.py": {
+      "path": "C:\\Brazil-RV\\quant\\b3-quant\\research\\tests\\test_v2_auxiliary_history.py",
+      "sha256": "d76d0062b858012e85a010af4cf7e7e41144aafbd1520c94215b2e61734cd32a"
+    },
+    "research/tests/test_v2_round5_index.py": {
+      "path": "C:\\Brazil-RV\\quant\\b3-quant\\research\\tests\\test_v2_round5_index.py",
+      "sha256": "f92b52277dfe4365d34041a899073485134d77dd8af9490ea830f5afbf4a87ee"
+    }
+  },
+  "source_original_portfolio_rows": 12712,
+  "source_original_workbooks": 44,
+  "sparse_deltas": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\remaining_auxiliaries\\qualified\\qualification\\deltas.npz",
+    "sha256": "11ec4e0f554028cacfb22f95ecb655585be35eac2c019a4f526b69b99a78edbb"
+  },
+  "status": "four_auxiliary_histories_and_source_qualification_verified_full_store_pending",
+  "tests": {
+    "affected_tests_passed": 13,
+    "ruff": "passed",
+    "seconds": 2.63
+  },
+  "valid_cells_added": 778,
+  "valid_still_eligible_losses": 0
+}

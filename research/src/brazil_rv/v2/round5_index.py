@@ -251,6 +251,7 @@ def pressure_panel(
     prior_adv20: np.ndarray,
     *,
     future_sessions: list[date] = (),
+    history_links: tuple[dict, ...] = (),
 ) -> tuple[pl.DataFrame, list[dict]]:
     """Two native fields on active dated ISINs, no post-effective signal.
 
@@ -306,25 +307,17 @@ def pressure_panel(
             else None
         )
         known = prior is not None and not unmapped and not prior[2]
-        delta = {}
-        if known:
-            for index, isin in set(weights) | set(prior[1]):
-                delta[isin] = (
-                    delta.get(isin, 0)
-                    + weights.get((index, isin), 0)
-                    - prior[1].get((index, isin), 0)
-                )
         events.append(
             (
                 first_available_decision(available, sessions),
                 effective_day,
-                delta,
+                (weights, prior[1] if known else {}),
                 known,
                 day,
             )
         )
     rows = []
-    for start, effective_day, delta, known, source_day in events:
+    for start, effective_day, compositions, known, source_day in events:
         if not known:
             continue
         if effective_day not in all_sessions:
@@ -338,6 +331,30 @@ def pressure_panel(
         if next_starts:
             end = min(end, min(next_starts))
         for day_index in range(start, min(end, len(sessions))):
+            # Re-key BOTH dated compositions only once the sourced share rename
+            # is effective and known. Otherwise the new ticker can appear as
+            # an index addition while the unchanged old holding is a removal.
+            def route(composition):
+                routed = {}
+                for (index, isin), weight in composition.items():
+                    for link in history_links:
+                        if isin == isins[
+                            link["predecessor_index"]
+                        ] and day_index >= max(
+                            link["effective_index"], link["known_index"]
+                        ):
+                            isin = isins[link["successor_index"]]
+                    routed[index, isin] = routed.get((index, isin), 0) + weight
+                return routed
+
+            current, previous = map(route, compositions)
+            delta = {}
+            for index, isin in set(current) | set(previous):
+                delta[isin] = (
+                    delta.get(isin, 0)
+                    + current.get((index, isin), 0)
+                    - previous.get((index, isin), 0)
+                )
             remaining = int(
                 np.searchsorted(all_sessions, effective_day)
                 - np.searchsorted(all_sessions, sessions[day_index])

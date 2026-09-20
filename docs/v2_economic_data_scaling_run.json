@@ -340,6 +340,22 @@
     "status": "observations_admitted_for_new_economics_no_model_feature_change"
   },
   "registration": "research/preregistrations/v2_economic_data_scaling.md",
+  "remaining_auxiliaries": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\remaining_auxiliaries\\qualified\\manifest.json",
+    "sha256": "fcdc15b883533a4c366300299d76ba7cb5411eba46af967e708b1e3dd7e58d69"
+  },
+  "remaining_auxiliary_acceptance": {
+    "path": "C:\\Brazil-RV\\quant\\b3-quant\\docs\\v2_remaining_auxiliary_acceptance.json",
+    "sha256": "a2524456b3659adb4648eb9c5c846f51fe297d3db01eae6c700c32f6cc78f545"
+  },
+  "remaining_auxiliary_input_audit": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\remaining_auxiliaries\\qualified\\qualification\\manifest.json",
+    "sha256": "67ab6d3c6bec2b31d8932fdf1dfcf008a5dc6cc831a61e6f5203743b1547835b"
+  },
+  "remaining_auxiliary_source_audit": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\remaining_auxiliaries\\qualified\\source_audit\\manifest.json",
+    "sha256": "bcb105fb23d60d45a44062fbbf1f93bc97712cffdc1adc342c7a244e8b9827f9"
+  },
   "rename_dependency_acceptance": {
     "path": "C:\\quant\\b3-quant\\docs\\v2_rename_dependency_acceptance.json",
     "sha256": "b856e9e0ba8e0bd1afca877e33125077a59c8a6e2d48adf17a642aa01a0fb52a"
