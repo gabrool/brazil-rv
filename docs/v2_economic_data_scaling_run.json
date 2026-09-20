@@ -338,6 +338,22 @@
     "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\loan_renewal_unchanged\\result.json",
     "sha256": "cb4f60b3ea8ad9dd22d55e907960753ed7644161e31d42cce1d7e9ce8097521d"
   },
+  "loan_return_notice_acceptance": {
+    "path": "C:\\quant\\b3-quant\\docs\\v2_loan_return_notice_acceptance.json",
+    "sha256": "c265a296b86a31632c31f7412c24bb6f0e6ce95d0ad8accb889259e93bcbdd18"
+  },
+  "loan_return_notice_audit": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\loan_return_notices\\adaptive_bound\\manifest.json",
+    "sha256": "85e27ca18e380dc7064e8250e07da33fc58c7b9d440facb6f076cc8a10400070"
+  },
+  "loan_return_notice_qualification": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\loan_return_notices\\readout_qualification\\manifest.json",
+    "sha256": "7573d03b98e9f83effd73741ff69ea79b509dc1d46c24e71a7de92e66d116531"
+  },
+  "loan_return_notice_runtime_qualification": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\loan_return_notices\\runtime_qualification\\manifest.json",
+    "sha256": "71a03f1f8552dd49804e1686e3db8b73ac2d7c300625d54708a0930c74adee02"
+  },
   "loan_source_panels": {
     "bytes": 3553,
     "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\loan_source_panels\\manifest.json",

@@ -33,10 +33,10 @@ def solve(
 
 def test_cash_and_linear_cost_no_trade_region():
     mu = torch.tensor([1e-6, -1e-6], dtype=torch.float64)
-    assert solve(mu).detach().numpy() == pytest.approx([0, 0], abs=1e-7)
+    np.testing.assert_array_equal(solve(mu).detach().numpy(), [0, 0])
     prior = torch.tensor([0.02, -0.02], dtype=torch.float64)
-    assert solve(prior * 0.002, prior).detach().numpy() == pytest.approx(
-        prior.numpy(), abs=1e-7
+    np.testing.assert_array_equal(
+        solve(prior * 0.002, prior).detach().numpy(), prior.numpy()
     )
 
 

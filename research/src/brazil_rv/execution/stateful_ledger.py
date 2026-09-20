@@ -20,6 +20,8 @@ from .share_custody import ShareCustody
 from .loan_contracts import (
     LoanCharge,
     LoanRenewal,
+    LoanRecall,
+    LoanReturnNotice,
     LoanCashSettlement,
     LoanCashPayment,
     LoanContracts,
@@ -37,6 +39,7 @@ ExitInstructionCause = Literal[
     "rank_out_of_retention",
     "terminal",
     "policy_rebalance",
+    "loan_return_notice",
 ]
 CancellationReason = Literal[
     "band_exit",
@@ -70,6 +73,7 @@ EXIT_INSTRUCTION_CAUSE_CODES: dict[ExitInstructionCause, int] = {
     "rank_out_of_retention": 3,
     "terminal": 4,
     "policy_rebalance": 5,
+    "loan_return_notice": 6,
 }
 
 
@@ -97,6 +101,8 @@ class LedgerConfig:
     borrow_fee_modality: LoanModality = "normal"
     borrow_fee_multiplier: float = 1.0
     loan_term_sessions: int = 63
+    approve_loan_renewals: bool = True
+    loan_recalls: tuple[LoanRecall, ...] = ()
     electronic_loan_settlement_days: int = 1
     volatility_balanced_entries: bool = True
     volatility_group_count: int = 5
@@ -319,6 +325,8 @@ class StatefulLedgerResult:
     loan_outstanding_principal: NDArray[np.float64]
     loan_charges: tuple[LoanCharge, ...]
     loan_renewals: tuple[LoanRenewal, ...]
+    loan_return_notices: tuple[LoanReturnNotice, ...]
+    loan_overdue_principal: NDArray[np.float64]
     loan_cash_payments: tuple[LoanCashPayment, ...]
     equity_borrow_raw_bps: NDArray[np.float64]
     equity_borrow_fee_bps: NDArray[np.float64]
@@ -614,6 +622,9 @@ class StatefulLedgerResult:
             "mean_free_cash_income_bps": float(self.free_cash_income_bps.mean()),
             "mean_debit_financing_bps": float(self.debit_financing_bps.mean()),
             "terminal_loan_liability": float(self.loan_liability[-1]),
+            "loan_return_notice_count": len(self.loan_return_notices),
+            "loan_overdue_sessions": int((self.loan_overdue_principal > 0).sum()),
+            "maximum_loan_overdue_principal": float(self.loan_overdue_principal.max()),
             "terminal_loan_outstanding_principal": float(
                 self.loan_outstanding_principal[-1]
             ),
@@ -1220,6 +1231,7 @@ def _book_fill(
     cost_rate: float,
     loan_covers: NDArray[np.float64],
     loan_openings: NDArray[np.float64],
+    loan_full_returns: NDArray[np.bool_],
     loan_name: int,
     long_purchases: NDArray[np.float64],
     long_sales: NDArray[np.float64],
@@ -1229,6 +1241,7 @@ def _book_fill(
     if side == "buy" and old_shares < 0.0:
         cover = min(remaining, -old_shares)
         loan_covers[loan_name] += cover
+        loan_full_returns[loan_name] |= cover == -old_shares
         release = restricted_by_name[name] * cover / -old_shares
         restricted_by_name[name] -= release
         free_cash += release - cover * price
@@ -1274,6 +1287,7 @@ class PortfolioDecisionState:
     locked: NDArray[np.bool_]
     effective_beta: NDArray[np.float64]
     claim_exposure: NDArray[np.float64]
+    loan_short_blocked: NDArray[np.bool_]
 
 
 @dataclass(frozen=True)
@@ -1358,6 +1372,9 @@ def simulate_stateful_ledger(
     if portfolio_policy is not None and config.volatility_balanced_entries:
         raise ValueError("portfolio allocation does not use fixed volatility slots")
     day_count, name_count = inputs.score.shape
+    for event in config.loan_recalls:
+        if not 0 <= event.security_index <= name_count:
+            raise ValueError("recall security must align with equity-plus-hedge axis")
     if loan_cash_settlements:
         shortable_mask = inputs.shortable.copy()
         keys = set()
@@ -1501,6 +1518,7 @@ def simulate_stateful_ledger(
     cost_rows: list[float] = []
     borrow_rows: list[float] = []
     loan_liability_rows: list[float] = []
+    loan_overdue_rows: list[float] = []
     loan_redemption_rows: list[float] = []
     loan_payment_rows: list[float] = []
     loan_principal_rows: list[float] = []
@@ -2005,6 +2023,9 @@ def simulate_stateful_ledger(
         cancelled_today = 0
         custody.settle(day)
         deliver_due(day)
+        loans.observe_recalls(day, config.loan_recalls)
+        loan_blocked = loans.short_blocked(day, config.loan_recalls)
+        decision_shortable = inputs.shortable[day] & ~loan_blocked[:-1]
         locked = np.zeros(name_count, dtype=bool)
         if pending_distributions:
             locked[list(pending_distributions)] = True
@@ -2049,7 +2070,9 @@ def simulate_stateful_ledger(
             ~inputs.action_resolved[day - 1] if day else initial_unresolved_action
         )
         for name in tuple(pending_entries):
-            if decision_unresolved[name]:
+            if loan_blocked[name] and pending_entries[name].order.side == "sell":
+                cancelled_today += int(cancel_entry(name, day, "exit_instruction"))
+            elif decision_unresolved[name]:
                 cancelled_today += int(
                     cancel_entry(name, day, "prior_action_unresolved")
                 )
@@ -2085,6 +2108,7 @@ def simulate_stateful_ledger(
             required_exit = (ineligible_streak > config.ineligible_hold_sessions) | (
                 missing_sessions >= config.settlement_grace_sessions
             )
+            required_exit |= loan_blocked[:-1] & (shares < 0)
             required_exit[locked] = False
             pending_entry_weights = np.zeros(name_count, dtype=np.float64)
             pending_exit_fractions = np.zeros(name_count, dtype=np.float64)
@@ -2115,11 +2139,12 @@ def simulate_stateful_ledger(
                     0.0,
                 ),
                 entry_allowed=entry_eligible.copy(),
-                shortable=inputs.shortable[day].copy(),
+                shortable=decision_shortable.copy(),
                 required_exit=required_exit,
                 locked=locked.copy(),
                 effective_beta=decision_beta,
                 claim_exposure=claim_exposure,
+                loan_short_blocked=loan_blocked.copy(),
             )
             target = (
                 portfolio_policy(decision_state)
@@ -2139,11 +2164,13 @@ def simulate_stateful_ledger(
             ) & (np.abs(desired) > tol)
             opening_short = desired < np.minimum(weights, 0.0) - tol
             if np.any(opening & ~entry_eligible) or np.any(
-                opening_short & ~inputs.shortable[day]
+                opening_short & ~decision_shortable
             ):
                 raise ValueError("portfolio requests an unavailable opening trade")
             if np.any(required_exit & (np.abs(desired) > tol)):
                 raise ValueError("portfolio retains required exits")
+            if loan_blocked[-1] and target.hedge_weight < -tol:
+                raise ValueError("portfolio retains a called or unavailable hedge loan")
             if (
                 np.abs(desired).sum() + abs(target.hedge_weight)
                 > config.planned_gross_cap + tol
@@ -2180,7 +2207,10 @@ def simulate_stateful_ledger(
                     if reverse
                     else max(abs(old_weight) - abs(new_weight), 0.0)
                 )
-                if reduction > 1e-10 and old_weight != 0.0:
+                mandatory = day == day_count - 1 or loan_blocked[name]
+                if (
+                    reduction > 1e-10 or (mandatory and reduction > 0)
+                ) and old_weight != 0.0:
                     pending_exits[name] = submit_order(
                         day,
                         name,
@@ -2193,7 +2223,13 @@ def simulate_stateful_ledger(
                     )
                     submitted_exits += 1
                     exit_cause_today[name] = (
-                        4 if day == day_count - 1 else 1 if required_exit[name] else 5
+                        4
+                        if day == day_count - 1
+                        else 6
+                        if loan_blocked[name]
+                        else 1
+                        if required_exit[name]
+                        else 5
                     )
                     exit_side_today[name] = 1 if old_weight > 0 else -1
                 increase = (
@@ -2406,6 +2442,10 @@ def simulate_stateful_ledger(
             exit_required: set[int] = set()
             exit_cause_by_name: dict[int, ExitInstructionCause] = {}
             for name in np.flatnonzero(held):
+                if loan_blocked[name] and shares[name] < 0:
+                    exit_required.add(int(name))
+                    exit_cause_by_name[int(name)] = "loan_return_notice"
+                    continue
                 if not eligible[name]:
                     kept = (
                         retention > 0
@@ -2759,7 +2799,7 @@ def simulate_stateful_ledger(
                     if entry_eligible[name]
                     if name not in unavailable
                     and not decision_unresolved[name]
-                    and inputs.shortable[day, name]
+                    and decision_shortable[name]
                 ]
                 long_candidates.sort(
                     key=lambda name: (float(inputs.score[day, name]), name),
@@ -2772,7 +2812,7 @@ def simulate_stateful_ledger(
                     entry_eligible[name]
                     and name not in unavailable
                     and not decision_unresolved[name]
-                    and not inputs.shortable[day, name]
+                    and not decision_shortable[name]
                     for name in short_band
                 )
                 band_candidates_long = len(long_candidates)
@@ -3127,6 +3167,8 @@ def simulate_stateful_ledger(
         hedge_target_notional = float(
             np.clip(hedge_unconstrained_target_notional, -hedge_limit, hedge_limit)
         )
+        if loan_blocked[-1]:
+            hedge_target_notional = max(0.0, hedge_target_notional)
         hedge_capped = (
             abs(hedge_unconstrained_target_notional - hedge_target_notional) > 1e-12
         )
@@ -3141,6 +3183,7 @@ def simulate_stateful_ledger(
             * start_nav
             or abs(hedge_notional_before) > hedge_limit + 1e-12
             or (day == day_count - 1 and hedge_shares != 0.0)
+            or (loan_blocked[-1] and hedge_shares < 0)
         )
         hedge_order = None
         if rebalance_required and np.isfinite(hedge_mark):
@@ -3443,6 +3486,7 @@ def simulate_stateful_ledger(
             terminal_printed = printed.copy()
         loan_covers = np.zeros(name_count + 1)
         loan_openings = np.zeros(name_count + 1)
+        loan_full_returns = np.zeros(name_count + 1, dtype=bool)
         long_purchases = np.zeros(name_count + 1)
         long_sales = np.zeros(name_count + 1)
         long_before_fill = np.maximum(np.r_[shares, hedge_shares], 0)
@@ -3496,6 +3540,7 @@ def simulate_stateful_ledger(
                     cost_rate=cost_rate,
                     loan_covers=loan_covers,
                     loan_openings=loan_openings,
+                    loan_full_returns=loan_full_returns,
                     loan_name=name,
                     long_purchases=long_purchases,
                     long_sales=long_sales,
@@ -3656,6 +3701,7 @@ def simulate_stateful_ledger(
                     cost_rate=hedge_cost_rate,
                     loan_covers=loan_covers,
                     loan_openings=loan_openings,
+                    loan_full_returns=loan_full_returns,
                     loan_name=name_count,
                     long_purchases=long_purchases,
                     long_sales=long_sales,
@@ -3708,14 +3754,21 @@ def simulate_stateful_ledger(
             day,
             spot_settlement_session(day, inputs.dates[day]),
         )
-        loans.fill(loan_covers, loan_openings, loan_session)
+        loans.fill(
+            loan_covers, loan_openings, loan_session, full_return=loan_full_returns
+        )
         for event in loan_cash_settlements:
             if event.effective_session == day and event.unreturned_only:
                 convert_loan_cash(event)
         free_cash -= float(
             loans.settle_cash_claims(day, payments=loan_cash_payments).sum()
         )
-        loans.renew(loan_session, config.loan_term_sessions)
+        loans.renew(
+            loan_session,
+            config.loan_term_sessions,
+            approved=config.approve_loan_renewals,
+        )
+        loan_overdue_rows.append(float(loans.overdue_principal(day).sum()))
         loan_rent, loan_fees = loans.accrue(
             day, inputs.dates[day], charges=loan_charges
         )
@@ -4082,6 +4135,7 @@ def simulate_stateful_ledger(
     unpriced_fraction = float(np.max(unpriced_fraction_rows))
     economics_unresolved = (
         insolvent
+        or any(value > 0 for value in loan_overdue_rows)
         or action_uncertainty_seen
         or unresolved_count > 0
         or receivable_by_name.any()
@@ -4208,6 +4262,8 @@ def simulate_stateful_ledger(
         loan_outstanding_principal=np.asarray(loan_principal_rows, dtype=np.float64),
         loan_charges=tuple(loan_charges),
         loan_renewals=tuple(loans.renewals),
+        loan_return_notices=tuple(loans.return_notices),
+        loan_overdue_principal=np.asarray(loan_overdue_rows, dtype=np.float64),
         loan_cash_payments=tuple(loan_cash_payments),
         equity_borrow_raw_bps=np.asarray(equity_borrow_raw_rows, dtype=np.float64),
         equity_borrow_fee_bps=np.asarray(equity_borrow_fee_rows, dtype=np.float64),

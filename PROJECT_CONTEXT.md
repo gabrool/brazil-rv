@@ -48,6 +48,18 @@ Stage A adaptive-book lifecycle/execution and exposure-ranked event bounds remai
 followed by registered matched C and conditional D work. No corrected model
 profitability, new GPU fit or final program completion is claimed.
 
+Denied-renewal and ordinary-recall stress now reaches both adaptive accounts,
+including hedge loans, morning custody identity and independent training copies.
+Called loans preserve original terms until actual physical return; missing fills
+retain overdue principal and unresolved economics. The verified engineering
+checkpoint is `docs/v2_LOAN_RETURN_NOTICES.md` and its acceptance pointer. Actual
+full covers no longer renew floating-point loan residues; mandatory closures bypass
+ordinary order deadbands and strict optimizer faces are polished. Identical-intention
+money agrees closely, while independently adaptive paths retain measured fixed-fee
+uncertainty. These synthetic-preference books do not establish model profitability.
+Exposure-ranked NATU/ALSC/SOMA source disposition and the remaining execution/source
+sensitivities still precede final Stage A admission. Neither accepted store changed.
+
 The current accounting code retains unpriced equity/hedge inventory and its cash,
 claims and financing obligations until an observed execution or contractual event.
 Missing quotes and evaluation boundaries never manufacture last-mark fills or
@@ -56,7 +68,7 @@ against existing inventory in both accounts, preserving signed cash claims and
 releasing only the extinguished short portion's restricted proceeds. Sparse sourced
 multi-leg distributions can now retain signed, non-tradable baskets until separately
 dated custody delivery, with separate cash claims/payment. Allocation reserves their
-capacity and risk/readouts use the underlying exposures. Evaluation V31 binds these
+capacity and risk/readouts use the underlying exposures. Evaluation V32 binds these
 terms and reports undelivered and unpriced inventory separately on the full calendar.
 Both cost paths now use dated B3 loan components, with stock/hedge rent separated
 from exchange fees. Both accounts now retain fixed-principal/rate loan cohorts,

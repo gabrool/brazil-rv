@@ -51,6 +51,8 @@ class PortfolioAccount:
     def empty(cls, reference, *, config=LedgerConfig()):
         """Reference axis includes the optional hedge as the last coordinate."""
         n = len(reference)
+        if any(event.security_index >= n for event in config.loan_recalls):
+            raise ValueError("recall security index is outside the account axis")
         zero = torch.zeros(n, dtype=torch.float64)
         return cls(
             shares=zero.clone(),
@@ -137,7 +139,8 @@ class PortfolioAccount:
 
     def prepare_day(self, day, *, realize_auctions=False):
         """Known settlement/delivery dates inform decisions, never current prices."""
-        if day != self.funding_day:
+        fresh = day != self.funding_day
+        if fresh:
             self.funding_cash, restricted = self.settled_balances()
             self.funding_restricted = restricted.sum()
             self.funding_day = day
@@ -270,6 +273,10 @@ class PortfolioAccount:
                 self.marks = marks
             else:
                 del self.distributions[name]
+        if fresh:
+            # A known morning delivery changes the identity held at the notice.
+            # The post-realization preparation of this same day is idempotent.
+            self.loans.observe_recalls(day, self.config.loan_recalls)
 
     def _pay_claims(self, day):
         unpaid = []
@@ -312,6 +319,9 @@ class PortfolioAccount:
         required = (self.ineligible_sessions > self.config.ineligible_hold_sessions) | (
             self.missing_sessions >= self.config.settlement_grace_sessions
         )
+        required |= self.loans.short_blocked(
+            self.funding_day, self.config.loan_recalls
+        ) & (self.shares.detach().numpy() < 0)
         if self.distributions:
             required[list(self.distributions)] = False
         return allowed, required
@@ -333,7 +343,12 @@ class PortfolioAccount:
             loan_session.day,
             spot_settlement_session(loan_session.day, loan_session.date),
         )
-        self.loans.fill(cover, new_short, loan_session)
+        self.loans.fill(
+            cover,
+            new_short,
+            loan_session,
+            full_return=((cover == short_shares) & (cover > 0)).detach().numpy(),
+        )
         notional = signed_quantity.abs() * price
         costs = (cost_rate * notional).sum()
         cash_delta = (
@@ -553,13 +568,19 @@ class PortfolioAccount:
         )
         before = self.weights
         target = torch.zeros_like(before) if terminal else target
+        loan_blocked = self.loans.short_blocked(day, self.config.loan_recalls)
+        if self.distributions:
+            loan_blocked[list(self.distributions)] = False
+        if np.any(loan_blocked & (target.detach().numpy() < -2e-6)):
+            raise ValueError("portfolio retains a called or unavailable loan")
         reverse = before * target < 0
         reduction = torch.where(
             reverse, before.abs(), (before.abs() - target.abs()).clamp_min(0)
         )
         # Match the exact ledger's order-submission threshold in NAV units.
         # Solver dust must not create held/age state only in the training account.
-        reduction = torch.where(reduction > 1e-10, reduction, 0.0)
+        mandatory = torch.as_tensor(loan_blocked) | terminal
+        reduction = torch.where((reduction > 1e-10) | mandatory, reduction, 0.0)
         exit_fraction = (reduction / before.abs().clamp_min(1e-30)).clamp(max=1)
         increase = torch.where(
             reverse, target.abs(), (target.abs() - before.abs()).clamp_min(0)
@@ -743,7 +764,12 @@ class PortfolioAccount:
         cash_loan_payment = self.loans.settle_cash_claims(day).sum()
         self.trade_cash = self.trade_cash - cash_loan_payment
         cash_loan_payment = cash_loan_payment + self.prepared_loan_cash_payment
-        self.loans.renew(loan_session, self.config.loan_term_sessions)
+        self.loans.renew(
+            loan_session,
+            self.config.loan_term_sessions,
+            approved=self.config.approve_loan_renewals,
+        )
+        overdue_principal = self.loans.overdue_principal(day).sum()
         loan_rent, loan_fee = self.loans.accrue(day, session_date)
         borrow = loan_rent.sum() + loan_fee.sum()
         rent_paid, fees_paid = self.loans.pay(day)
@@ -793,6 +819,7 @@ class PortfolioAccount:
             "borrow_paid": rent_paid.sum() + fees_paid.sum(),
             "borrow_liability": self.loans.liability,
             "loan_redemption_liability": self.loans.cash_liability,
+            "loan_overdue_principal": overdue_principal,
             "loan_cash_settlement_payment": cash_loan_payment,
             "unsettled_cash": self.unsettled_cash,
             "free_cash_income": self.funding_cash.clamp_min(0) * cdi,

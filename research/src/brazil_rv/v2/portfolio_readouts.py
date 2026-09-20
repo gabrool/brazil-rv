@@ -137,6 +137,7 @@ def book_summary(data, result, previous, start, first):
         "borrow_bps": result.borrow_bps[selection],
         "unsettled_cash": result.unsettled_cash[selection],
         "loan_liability": result.loan_liability[selection],
+        "loan_overdue_principal": result.loan_overdue_principal[selection],
         "loan_payment": result.loan_payment[selection],
         "loan_outstanding_principal": result.loan_outstanding_principal[selection],
         "loan_rent_bps": (result.equity_borrow_raw_bps + result.hedge_borrow_raw_bps)[
@@ -190,6 +191,13 @@ def book_summary(data, result, previous, start, first):
             np.max(np.abs(result.reconciliation_error))
         ),
         "economics_unresolved": bool(result.economics_unresolved),
+        "loan_return_notice_count": len(result.loan_return_notices),
+        "loan_overdue_sessions": int(
+            (result.loan_overdue_principal[selection] > 0).sum()
+        ),
+        "maximum_loan_overdue_principal": float(
+            result.loan_overdue_principal[selection].max()
+        ),
         "max_joint_gross": float(gross[selection].max()),
         "max_absolute_net": float(np.abs(signed_net[selection]).max()),
         "max_absolute_beta": float(np.abs(beta[selection]).max()),
@@ -220,6 +228,7 @@ def save_book(output, data, result, targets, previous, start, first, provenance)
         "receivables",
         "payables",
         "loan_liability",
+        "loan_overdue_principal",
         "loan_payment",
         "loan_outstanding_principal",
         "signed_shares",
@@ -242,6 +251,11 @@ def save_book(output, data, result, targets, previous, start, first, provenance)
         write_json_atomic(
             output / "share_claim_positions.json",
             [asdict(claim) for claim in result.share_claim_positions],
+        )
+    if result.loan_return_notices:
+        write_json_atomic(
+            output / "loan_return_notices.json",
+            [asdict(notice) for notice in result.loan_return_notices],
         )
     # Detailed primary audit; stresses keep exact positions/targets and daily
     # accounting, and are reproducible from the same frozen market inputs.

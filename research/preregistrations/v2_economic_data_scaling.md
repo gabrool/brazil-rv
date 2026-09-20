@@ -83,6 +83,38 @@ assumed absent, while the already sourced corporate lender elections still apply
 Denied renewal/ordinary recall remain execution assumptions to resolve or bound
 before final accounting acceptance.
 
+Lifecycle stress amendment, frozen 2026-09-20 before any corrected model outcome:
+retain approved renewal/no ordinary recall as primary. A denied-roll endpoint denies
+every due renewal after that day's intentions and fills, retains the original terms,
+and requests liquidation of the entire same-security book at the next decision.
+Younger same-name cohorts close too; this explicit execution response preserves
+the existing pro-rata return allocation. No replacement loan is permitted while
+the called contracts await physical settlement; later independent locates may
+resume after settlement under the original availability hypothesis. Recall stress
+uses explicit pre-decision notices and two/four-session physical-return deadlines,
+with no new borrowing through the deadline or while called loans remain outstanding.
+These notice rights/deadlines are analyst hypotheses, not recovered lender terms.
+Keep source economic/custody/payment clocks separate. A locked corporate entitlement
+cannot be sold before delivery merely because its loan is called. Missing/partial
+fills retain inventory, original rent/fees and proceeds; crossing a return deadline
+flags unresolved economics and records outstanding principal without inventing a
+buy-in, punitive charge, replacement locate or price. Both independent and training
+accounts must expose identical constraints, including hedge loans and copied state.
+
+Numerical accounting qualification, 2026-09-20: full-cover fills now carry their
+full-return instruction into the proportional loan subledger, with the existing
+quantity reconciliation tolerance. A relative floating-point summation bound also
+protects direct full returns. Do not renew residual ulps or charge a fresh minimum
+on them; genuine tiny loans/partial returns remain. Mandatory covers and terminal
+closures bypass the ordinary opening/rebalance deadband. Polish only strict
+zero/no-trade/bound faces already identified by the optimizer's existing adjoint
+tolerance and dual signs; free optima, objective, limits and learning budget stay.
+This correction changes accounting/decision implementation, not accepted model
+data. Separate identical-intention money parity from independently adaptive paths:
+tiny different free trades can change discrete old minimum charges and feed back
+into later decisions. Record that measured path uncertainty; do not assert bitwise
+adaptive equality or call the engineering preferences a model-profitability result.
+
 Value-date amendment, 2026-09-19, before corrected model outcomes: use registered
 D0 before the electronic-platform launch on 2020-10-26, explicitly a historical
 modality hypothesis, and normal electronic D1 afterward. The electronic D0 endpoint

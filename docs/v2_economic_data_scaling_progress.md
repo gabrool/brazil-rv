@@ -5,7 +5,10 @@ additional historical B3 retrieval and economic-primary attention/GRU capacity
 follow-ups. Read `research/preregistrations/v2_economic_data_scaling.md` after each
 stage. Foundation outcomes remain sealed at the canonical foundation pointer.
 
-**Current status:** A/B remain in progress; C/D have not started. Corporate-account
+**Current status:** The complete Stage B derived store is accepted. Stage A and
+final economic admission remain incomplete; C/D have not started. The latest
+denied-renewal/recall engineering checkpoint is documented at the end of this file
+and in `v2_LOAN_RETURN_NOTICES.md`. Corporate-account
 research and the source censuses below are complete. BOVA11 borrowing-path
 consistency, removal of fabricated missing-quote liquidations, inventory netting and
 multi-leg/delayed-delivery, fixed-contract loans and dated money settlement are
@@ -1737,3 +1740,46 @@ no immutable raw archives or old fits are copied. Exact source, executed recipes
 contract, acceptance, new claim rows and complete store recovery instructions are
 recoverable. Resolve economic_store_recovery; earlier recovery receipts remain
 valid for their source commits. No GPU/source worker active at this checkpoint.
+
+### 2026-09-20 — denied renewal/recall and numerical accounting qualification
+
+V32 implements the frozen denied-all-renewals and two/four-session ordinary-recall
+stresses in both actual adaptive accounts, stock and hedge constraints, notices,
+overdue-principal readouts and independent copied state. Old references/rates and
+physical-return obligations remain; no unquoted fill, buy-in charge or replacement
+locate is invented. Notice rights/deadlines are hypotheses. Known morning delivery
+precedes recall identity; three final narrow cases pass without repeating books
+whose recall dates do not intersect any sourced delivery.
+
+Historical engineering exposed full-cover roundoff roots being renewed and billed
+old minimums. Actual fills now carry full-return intent; relative summation bounds
+retain genuine tiny partial loans. Mandatory closure bypasses the ordinary order
+deadband. Strict optimizer faces use the existing adjoint tolerance and dual signs;
+free optima remain. Initial failed root/zero-exit/adaptive qualifications are retained.
+
+Twenty-four 128-session/all933-name engineering scenarios passed identical-intention
+money comparison, max R$2.0489096641540527e-8. Actual adaptive synthetic-preference
+books use R$10m/R$1m/R$5m over two source-bound 2019/2024 windows, with the unchanged
+bundled4bp engineering bridge (no B3 spot addition). They are not model forecasts
+or final corporate pricing. Independently adaptive paths have maximum total NAV
+differences .01943544645/.29492822018/.13988375371bp respectively, reflecting discrete
+old minimums on small different trades. Max target distance3.1801671271300402e-6 is
+a two-path comparison, not individual QP infeasibility; the original misleading
+field label is qualified without book reruns. Carry this measured uncertainty into
+actual-model attribution and remaining rounding/grouping bounds.
+
+At R$10m, 2019 denied/recall2/recall4 retain65/76/74 overdue sessions; 2024 denial
+retains5. Missing-quote held exposure ranks NATU BRNATUACNOR6 R$157068.2990,
+ALSC BRALSCACNOR0 R$141608.5343 and SOMA BRSOMAACNOR3 R$28065.4469 for next original
+source review. These are inventory priorities, not admitted event terms. Source
+obligations remain unresolved. No accepted store was changed.
+
+Successful 24-case audit95.0149s, not fit ETA. Ten distinct new lifecycle cases
+passed across focused batches; eight allocation tests, six earlier finite-renewal
+tests and five directly affected loan/gradient/copy checks passed during development
+(overlapping batches not summed). Final changed-code Ruff passes. Resolve
+loan_return_notice_audit, loan_return_notice_qualification,
+loan_return_notice_runtime_qualification and loan_return_notice_acceptance. Full
+report `docs/v2_LOAN_RETURN_NOTICES.md`. Stage A still needs exposure-ranked events,
+pre-custody disposal, allocation/timing/sweep/fraction/invoice/grouping/minimum and
+older clearing-calendar bounds before matched C economics/refits and conditional D.

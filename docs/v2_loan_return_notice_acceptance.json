@@ -1,0 +1,35 @@
+{
+  "contract": "Approved 63-session primary unchanged. Denial at term-minus-four after intentions retains old terms and next-decision whole-name cover; explicit two/four-session recalls arrive pre-decision after known custody delivery. Called borrowing is blocked until required physical settlement. Missing fills retain original obligations and overdue principal; no fabricated buy-in or penalty.",
+  "evidence": {
+    "loan_return_notice_audit": {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\loan_return_notices\\adaptive_bound\\manifest.json",
+      "sha256": "85e27ca18e380dc7064e8250e07da33fc58c7b9d440facb6f076cc8a10400070"
+    },
+    "loan_return_notice_qualification": {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\loan_return_notices\\readout_qualification\\manifest.json",
+      "sha256": "7573d03b98e9f83effd73741ff69ea79b509dc1d46c24e71a7de92e66d116531"
+    },
+    "loan_return_notice_runtime_qualification": {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\loan_return_notices\\runtime_qualification\\manifest.json",
+      "sha256": "71a03f1f8552dd49804e1686e3db8b73ac2d7c300625d54708a0930c74adee02"
+    }
+  },
+  "execution_cost_scope": "unchanged bundled4bp bridge; no additional B3 spot component",
+  "identical_intentions_max_nav_error_brl": 2.0489096641540527e-08,
+  "independent_adaptive_path_max_nav_difference_bps_by_capital": {
+    "1000000": 0.29492822018219156,
+    "10000000": 0.019435446452349424,
+    "5000000": 0.13988375370763242
+  },
+  "independent_adaptive_path_max_target_difference": 3.1801671271300402e-06,
+  "numerical_corrections": "Actual full-cover intent and relative summation bounds eliminate roundoff loan residues; mandatory closures bypass ordinary order deadbands; only optimizer strict active faces are polished. Genuine tiny loans and free-optimum trades remain.",
+  "primary_corporate_cost_admission": "Still pending dated separated spot/loan/custody/brokerage/shortfall/funding sensitivities on actual model books. The bundled 4bp engineering bridge is not the final corporate cost contract.",
+  "remaining": "Source-bound NATU/ALSC/SOMA held-event disposition; pre-custody disposal and remaining allocation/timing/invoice/grouping/minimum/clearing bounds; final real-model matched economics and refits.",
+  "schema": "BRAZIL_RV_V2_EVALUATION_V32",
+  "scope": "24 frozen engineering scenarios, each 128 sessions/all 933 names; R$10m primary and R$1m/R$5m. Synthetic preferences use the actual adaptive allocator. No forecast fit, neural forward or model-alpha claim.",
+  "status": "lifecycle_implementation_and_engineering_books_verified_stage_A_incomplete",
+  "tests": "Ten distinct lifecycle tests passed across targeted batches, eight existing allocation tests, six prior finite-renewal tests and five directly affected loan/gradient/copy tests passed. Overlaps were not added into one inflated suite count; exact failed engineering recipes and qualified outputs remain retained.",
+  "timing_seconds": 95.01487949999864,
+  "uncertainty": "Old fixed minimum charges can differ for genuinely small free-optimum trades between independently accumulated/re-solved books. Report their measured total path differences; not daily alpha or bit-exact adaptive equality.",
+  "unchanged": "No source, accepted store, old fit, security axis or 60-session history changed. Stage B remains separately accepted; C/D unstarted; no final economic admission."
+}

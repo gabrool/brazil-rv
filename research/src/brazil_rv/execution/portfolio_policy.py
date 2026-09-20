@@ -298,6 +298,7 @@ def decide(
     locked=None,
     effective_beta=None,
     claim_exposure=None,
+    loan_short_blocked=None,
 ):
     """Compact exactly to available or held names, preserving all real inventory."""
     if model is None:
@@ -333,6 +334,9 @@ def decide(
             upper, torch.maximum(previous, allocation.stock_cap - exposure)
         )
         lower[-1], upper[-1] = -allocation.hedge_cap, allocation.hedge_cap
+    if loan_short_blocked is not None:
+        lower = torch.where(torch.as_tensor(loan_short_blocked[ids]), 0.0, lower)
+        upper = torch.maximum(upper, lower)
     if locked is not None:
         fixed = torch.as_tensor(np.r_[locked[names], False])
         lower, upper = (
@@ -453,6 +457,9 @@ def account_decision(data, model, account, day, *, allocation=AllocationConfig()
             account.distributions, account.marks.detach().numpy(), data.beta[day]
         ),
         claim_exposure=claim_exposure,
+        loan_short_blocked=account.loans.short_blocked(
+            day, account.config.loan_recalls
+        ),
     )
 
 
@@ -569,6 +576,7 @@ def exact_replay(
                     locked=state.locked,
                     effective_beta=state.effective_beta,
                     claim_exposure=tensor(state.claim_exposure),
+                    loan_short_blocked=state.loan_short_blocked,
                 )
             )
         chosen.append(target.numpy())
@@ -580,7 +588,18 @@ def exact_replay(
 
     result = simulate_stateful_ledger(
         **arguments,
-        config=config,
+        config=replace(
+            config,
+            loan_recalls=tuple(
+                replace(
+                    event,
+                    notice_session=event.notice_session - start,
+                    return_session=event.return_session - start,
+                )
+                for event in config.loan_recalls
+                if event.notice_session < stop
+            ),
+        ),
         shortable=data.shortable[start:stop],
         portfolio_policy=callback,
     )

@@ -59,6 +59,38 @@ class LoanRenewal:
 
 
 @dataclass(frozen=True)
+class LoanRecall:
+    """A pre-decision notice with an explicit physical-return deadline.
+
+    Research scenarios must label their notice/deadline as assumptions. This
+    does not assert an ordinary lender's contractual right to recall a loan.
+    """
+
+    security_index: int
+    notice_session: int
+    return_session: int
+    source: str
+
+    def __post_init__(self):
+        if self.security_index < 0:
+            raise ValueError("recall requires a nonnegative security index")
+        if self.return_session < self.notice_session or not self.source:
+            raise ValueError(
+                "recall requires a dated deadline and source or hypothesis"
+            )
+
+
+@dataclass(frozen=True)
+class LoanReturnNotice:
+    session: int
+    security_index: int
+    return_session: int
+    quantity: float
+    principal: float
+    cause: str
+
+
+@dataclass(frozen=True)
 class LoanCashValue:
     available_session: int
     cash_per_share: float
@@ -172,6 +204,9 @@ class LoanContracts:
         default_factory=lambda: np.empty(0, dtype=np.int64)
     )
     return_day: np.ndarray = field(default_factory=lambda: np.empty(0, dtype=np.int64))
+    return_deadline: np.ndarray = field(
+        default_factory=lambda: np.empty(0, dtype=np.int64)
+    )
     accrual_end: np.ndarray = field(default_factory=lambda: np.empty(0, dtype=np.int64))
     root: np.ndarray = field(default_factory=lambda: np.empty(0, dtype=np.int64))
     annual_rate: np.ndarray = field(default_factory=lambda: np.empty(0))
@@ -195,6 +230,7 @@ class LoanContracts:
         default_factory=list
     )
     renewals: list[LoanRenewal] = field(default_factory=list)
+    return_notices: list[LoanReturnNotice] = field(default_factory=list)
 
     def _by_name(self, values, names=None):
         return torch.zeros(self.names, dtype=torch.float64).index_add(
@@ -262,6 +298,7 @@ class LoanContracts:
         ]
         self.return_requested = np.r_[self.return_requested, np.full(len(ids), -1)]
         self.return_day = np.r_[self.return_day, np.full(len(ids), -1)]
+        self.return_deadline = np.r_[self.return_deadline, np.full(len(ids), -1)]
         self.accrual_end = np.r_[self.accrual_end, np.full(len(ids), -1)]
         self.root = np.r_[self.root, roots]
         self.annual_rate = np.r_[self.annual_rate, rate]
@@ -378,7 +415,9 @@ class LoanContracts:
             minimum_change, self.root_name
         )
 
-    def request_return(self, quantity, settlement_day, *, request_day=None):
+    def request_return(
+        self, quantity, settlement_day, *, request_day=None, full_return=None
+    ):
         """Allocate partial returns pro rata across unreturned contracts of a name."""
         quantity = _tensor(quantity)
         if not np.any(quantity.detach().numpy() > 0):
@@ -390,6 +429,29 @@ class LoanContracts:
         ):
             raise ValueError("loan return exceeds unreturned quantity")
         fraction = (quantity / total.clamp_min(1e-30)).clamp(0, 1)
+        # The account's held-share reduction and the sum of independently split
+        # cohorts can differ by a few floating-point operations. A mathematical
+        # full return must not leave an ulp-sized root to renew and incur another
+        # fixed minimum. This relative summation bound has no absolute quantity
+        # floor: genuine tiny loans and partial returns remain distinct.
+        count = np.bincount(self.name[self.return_day < 0], minlength=self.names)
+        rounding = _tensor(4 * (count + 2) * np.finfo(np.float64).eps) * total.abs()
+        full = (quantity > 0) & ((quantity - total).abs() <= rounding)
+        if full_return is not None:
+            declared = np.asarray(full_return, dtype=bool)
+            # Actual fills carry the exact full-position-close instruction.
+            # Repeated prior partial allocations can accumulate a residual whose
+            # relative size is large only because almost nothing remains.
+            mismatch = (quantity - total).detach().numpy()
+            if np.any(
+                declared
+                & (np.abs(mismatch) > 1e-10 * np.maximum(1, total.detach().numpy()))
+            ):
+                raise ValueError(
+                    "full loan return differs from actually covered position"
+                )
+            full |= torch.as_tensor(declared)
+        fraction = torch.where(full, torch.ones_like(fraction), fraction)
         part = fraction[self.name] * _tensor(self.return_day < 0)
         ids = np.flatnonzero(part.detach().numpy() > 0)
         if not len(ids):
@@ -403,6 +465,7 @@ class LoanContracts:
             "opened",
             "value_lag",
             "accrual_end",
+            "return_deadline",
             "root",
             "annual_rate",
             "fee_rate",
@@ -423,8 +486,10 @@ class LoanContracts:
             | (self.principal.detach().numpy() != 0)
         )
 
-    def fill(self, cover, new_short, session):
-        self.request_return(cover, session.return_day, request_day=session.day)
+    def fill(self, cover, new_short, session, *, full_return=None):
+        self.request_return(
+            cover, session.return_day, request_day=session.day, full_return=full_return
+        )
         self.open(
             new_short,
             session.reference,
@@ -435,7 +500,64 @@ class LoanContracts:
             session.placeholder,
         )
 
-    def renew(self, session, term_sessions):
+    def _call_name(self, name, day, deadline, cause):
+        # The bounded execution response closes the entire same-security book.
+        # This also covers younger cohorts; it avoids inventing a lender-level
+        # locate or reallocating the existing pro-rata physical-return contract.
+        ids = (
+            (self.name == name)
+            & (self.accrual_end < 0)
+            & (self.quantity.detach().numpy() > 0)
+        )
+        if not ids.any():
+            return
+        self.return_deadline[ids] = np.where(
+            self.return_deadline[ids] < 0,
+            deadline,
+            np.minimum(self.return_deadline[ids], deadline),
+        )
+        self.return_notices.append(
+            LoanReturnNotice(
+                day,
+                int(name),
+                int(deadline),
+                float(self.quantity[ids].detach().sum()),
+                float(self.principal[ids].detach().sum()),
+                cause,
+            )
+        )
+
+    def observe_recalls(self, day, recalls):
+        for event in recalls:
+            if event.notice_session == day:
+                self._call_name(
+                    event.security_index, day, event.return_session, event.source
+                )
+
+    def short_blocked(self, day, recalls=()):
+        """No replacement borrowing until called contracts physically settle.
+
+        A recall additionally closes new borrowing through its stated deadline.
+        Once that interval and all returns end, later independent locates remain
+        permitted by the original availability hypothesis.
+        """
+        blocked = np.zeros(self.names, dtype=bool)
+        blocked[self.name[(self.return_deadline >= 0) & (self.accrual_end < 0)]] = True
+        for event in recalls:
+            if event.notice_session <= day <= event.return_session:
+                blocked[event.security_index] = True
+        return blocked
+
+    def overdue_principal(self, day):
+        overdue = (
+            (self.return_deadline >= 0)
+            & (self.return_deadline <= day)
+            & ((self.return_day < 0) | (self.return_day > day))
+            & (self.accrual_end < 0)
+        )
+        return self._by_name(self.principal * _tensor(overdue))
+
+    def renew(self, session, term_sessions, *, approved=True):
         """Approved renewal of the still-unreturned portion, four sessions early.
 
         Approval is an explicit research assumption, not inferred from a balance
@@ -448,6 +570,7 @@ class LoanContracts:
             (self.return_day < 0)
             & (self.accrual_end < 0)
             & (self.quantity.detach().numpy() > 0)
+            & (self.return_deadline < 0)
             & (session.day - self.opened >= term_sessions - 4)
         )
         ids = np.flatnonzero(eligible)
@@ -457,6 +580,13 @@ class LoanContracts:
             raise ValueError("compulsory loans cannot be renewed")
         if np.any(session.day - self.opened[ids] > term_sessions - 4):
             raise ValueError("a finite loan missed its registered renewal date")
+        if not approved:
+            for name in np.unique(self.name[ids]):
+                deadline = (
+                    int(self.opened[ids[self.name[ids] == name]].min()) + term_sessions
+                )
+                self._call_name(name, session.day, deadline, "renewal_denied")
+            return
         # Validate before touching a contract or paying a liability.
         names = self.name[ids]
         reference = np.asarray(session.reference)[names]
@@ -600,6 +730,7 @@ class LoanContracts:
             "value_lag",
             "return_requested",
             "return_day",
+            "return_deadline",
             "accrual_end",
             "root",
             "annual_rate",
@@ -683,6 +814,7 @@ class LoanContracts:
             "value_lag",
             "return_requested",
             "return_day",
+            "return_deadline",
             "accrual_end",
             "root",
             "annual_rate",
@@ -720,7 +852,7 @@ class LoanContracts:
                     (event, quantity.detach().clone(), mark)
                     for event, quantity, mark in value
                 ]
-            elif item.name == "renewals":
+            elif item.name in ("renewals", "return_notices"):
                 value = value.copy()
             values[item.name] = value
         return LoanContracts(**values)

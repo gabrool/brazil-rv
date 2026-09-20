@@ -58,6 +58,28 @@ def _solve_primal_dual(p, q, a, lower, upper):
     return np.asarray(result.x), dual
 
 
+def _fixed_faces(w, dual, lower, upper):
+    """The same strict active faces determine primal polishing and its adjoint."""
+    n = len(w)
+    tolerance = 1e-6  # percent NAV; the established adjoint face tolerance
+    at_lower = (np.abs(w - lower[:n]) < tolerance) & (dual[:n] < -1e-9)
+    at_upper = (np.abs(w - upper[:n]) < tolerance) & (dual[:n] > 1e-9)
+    equal = lower[:n] == upper[:n]
+    at_lower |= equal
+    at_upper &= ~equal
+    zero = (
+        (np.abs(w) < tolerance)
+        & (dual[3 * n : 4 * n] > 1e-9)
+        & (dual[4 * n : 5 * n] > 1e-9)
+    )
+    no_trade = (
+        (np.abs(w - upper[n : 2 * n]) < tolerance)
+        & (dual[n : 2 * n] > 1e-9)
+        & (dual[2 * n : 3 * n] > 1e-9)
+    )
+    return at_lower, at_upper, zero, no_trade
+
+
 class _SparseQP(torch.autograd.Function):
     """Accurate forward QP with its reduced active-face implicit derivative."""
 
@@ -67,6 +89,20 @@ class _SparseQP(torch.autograd.Function):
             value.detach().numpy() for value in (q, lower, upper)
         )
         x, dual = _solve_primal_dual(p, q_np, a, lower_np, upper_np)
+        n = (len(x) - 1) // 3
+        lo, hi, zero, no_trade = _fixed_faces(x[:n], dual, lower_np, upper_np)
+        # A strict zero/no-trade face is exactly zero/previous, not an interior
+        # solver residual that opens a microscopic loan with a fixed R$10 fee.
+        # Free optima remain untouched, including genuinely small positions.
+        x[:n] = np.where(
+            lo,
+            lower_np[:n],
+            np.where(
+                hi,
+                upper_np[:n],
+                np.where(zero, 0, np.where(no_trade, upper_np[n : 2 * n], x[:n])),
+            ),
+        )
         if any(ctx.needs_input_grad[:3]):
             ctx.problem = (x, dual, p.diagonal(), a, lower_np, upper_np)
         return torch.from_numpy(x)
@@ -81,22 +117,7 @@ class _SparseQP(torch.autograd.Function):
         # strict kink the corresponding weight is fixed; elsewhere their
         # slopes are constant. The remaining Hessian is positive diagonal
         # plus one factor, so only a tiny exposure-constraint system remains.
-        tolerance = 1e-6  # percent NAV, below the accepted primal tolerance
-        at_lower = (np.abs(w - lower[:n]) < tolerance) & (dual[:n] < -1e-9)
-        at_upper = (np.abs(w - upper[:n]) < tolerance) & (dual[:n] > 1e-9)
-        equal = lower[:n] == upper[:n]
-        at_lower |= equal
-        at_upper &= ~equal
-        zero = (
-            (np.abs(w) < tolerance)
-            & (dual[3 * n : 4 * n] > 1e-9)
-            & (dual[4 * n : 5 * n] > 1e-9)
-        )
-        no_trade = (
-            (np.abs(w - upper[n : 2 * n]) < tolerance)
-            & (dual[n : 2 * n] > 1e-9)
-            & (dual[2 * n : 3 * n] > 1e-9)
-        )
+        at_lower, at_upper, zero, no_trade = _fixed_faces(w, dual, lower, upper)
         fixed = at_lower | at_upper | zero | no_trade
         free = ~fixed
         rows, sides, exposures = [], [], []
