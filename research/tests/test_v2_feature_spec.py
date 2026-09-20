@@ -182,6 +182,28 @@ def test_source_age_uses_raw_observations_before_output_and_not_rank_support() -
     np.testing.assert_array_equal(output[:, 0, 0], [2.0, 0.0])
 
 
+def test_source_age_identity_snapshot_waits_for_knowledge_and_keeps_newer_sources():
+    valid = np.zeros((7, 2, 2), dtype=bool)
+    valid[1, 0] = True
+    valid[3, 0] = True  # After effect: cannot refresh inherited history.
+    valid[3, 1, 1] = True
+    active = np.ones((7, 2), dtype=bool)
+    active[:2, 1] = False
+    links = [
+        dict(predecessor_index=0, successor_index=1, effective_index=2, known_index=4)
+    ]
+    output = np.empty(valid.shape, dtype=np.float32)
+    observation_age_sessions_into(valid, active, output, history_links=links)
+    np.testing.assert_array_equal(output[:4, 1, 0], -1)
+    np.testing.assert_array_equal(output[4:, 1], [[3, 1], [4, 2], [5, 3]])
+    prefix = np.empty((5, 2, 2), dtype=np.float32)
+    observation_age_sessions_into(valid[:5], active[:5], prefix, history_links=links)
+    np.testing.assert_array_equal(prefix, output[:5])
+    valid[5:] = True
+    observation_age_sessions_into(valid, active, output, history_links=links)
+    np.testing.assert_array_equal(prefix, output[:5])
+
+
 def test_every_canonical_feature_has_field_level_semantics() -> None:
     specs = [*feature_specs("slow", SLOW_FEATURES)]
     specs.extend(feature_specs("intraday", INTRADAY_DAILY_FEATURES))

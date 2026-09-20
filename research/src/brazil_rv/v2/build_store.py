@@ -2569,6 +2569,9 @@ def build_daily_store(
             source_rows=kept_rows,
             decision_rows=kept_rows,
             source_age_sessions=aligned.source_age_sessions,
+            history_links=slow_history_links(
+                isin_successions, panel.dates, panel.isins, decision_timestamps
+            ).to_dicts(),
         )
         for start in range(0, kept_rows.size, 64):
             intraday_support_fraction[start : start + 64] = aligned.support_fraction[
@@ -2713,6 +2716,9 @@ def build_daily_store(
             source_rows=kept_rows,
             decision_rows=kept_rows,
             source_age_sessions=aligned.source_age_sessions,
+            history_links=slow_history_links(
+                isin_successions, panel.dates, panel.isins, decision_timestamps
+            ).to_dicts(),
         )
         for start in range(0, kept_rows.size, 64):
             intraday_support_fraction[start : start + 64] = aligned.support_fraction[

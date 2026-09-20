@@ -284,6 +284,26 @@
     "sha256": "a6741a98d505a049c543cb0c8ed45934b5eadfd6fd2e344fbc916db8ff46cf02",
     "status": "source_panels_bound_event_overrides_pending"
   },
+  "m1_scalar_acceptance": {
+    "path": "C:\\Brazil-RV\\quant\\b3-quant\\docs\\v2_m1_scalar_acceptance.json",
+    "sha256": "d02c4400927f6cdb1521a64acbc0a3935b1b5056417e48ffe194b765b03c4623"
+  },
+  "m1_scalar_assembly": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\m1_scalar_assembly\\amendments\\manifest.json",
+    "sha256": "fde1bd464534c825734e933d26273cd6d79821e8f782b502dff90fc12909f1ce"
+  },
+  "m1_scalar_attribution": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\m1_scalar_assembly\\attribution_and_clock.json",
+    "sha256": "c3473bc689d4dc755312971a42c71af6ae0c0e32ba7dfc4f1f0698c2a6c3b979"
+  },
+  "m1_scalar_input_audit": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\m1_scalar_assembly\\input_audit\\manifest.json",
+    "sha256": "c1f04e982e4710cbc06ec581ccb6d41ee1190946affbebe768cdd9c14237b984"
+  },
+  "m1_scalar_target_oracle": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\m1_scalar_assembly\\target_oracle.json",
+    "sha256": "ba51bc8eeeec6336b43f28b60e3ec89fc2703973119737f8ac827df3cc7f0072"
+  },
   "oddlot_tensor_audit": {
     "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\auxiliary_tensor_audit\\oddlot.json",
     "sha256": "1952956f665fde2f211969d5d8571383af7fccb3dd654ea8b33106d8750f4ab5"

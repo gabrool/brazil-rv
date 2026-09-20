@@ -1002,6 +1002,7 @@ def observation_age_sessions_into(
     source_rows: NDArray[np.integer] | None = None,
     decision_rows: NDArray[np.integer] | None = None,
     source_age_sessions: NDArray[np.floating] | None = None,
+    history_links: Sequence[dict[str, object]] = (),
 ) -> None:
     """Write source ages independently of transforms or current membership.
 
@@ -1012,6 +1013,10 @@ def observation_age_sessions_into(
     rows before the requested output window, so a pre-window observation keeps
     its honest as-of age.  Crucially, rank support and transformed validity do
     not reset the source clock.
+
+    Admitted unit/no-cash identity links carry the predecessor's last source
+    observation strictly before effect. The snapshot enters only after both
+    effect and knowledge, and never overwrites a newer successor observation.
     """
 
     mask = np.asarray(valid, dtype=np.bool_)
@@ -1045,12 +1050,24 @@ def observation_age_sessions_into(
         raise ValueError("feature age destination must be aligned float32")
     destination[...] = -1.0
     last_seen = np.full(mask.shape[1:], -1, dtype=np.int32)
+    inherited = {}
     scanned_through = -1
     for output_row, (source_row, decision_row) in enumerate(
         zip(rows, decisions, strict=True)
     ):
         if source_row >= 0:
             for raw_row in range(scanned_through + 1, source_row + 1):
+                for index, link in enumerate(history_links):
+                    effect = int(link["effective_index"])
+                    if raw_row == effect:
+                        inherited[index] = last_seen[
+                            int(link["predecessor_index"])
+                        ].copy()
+                    if raw_row == max(effect, int(link["known_index"])):
+                        successor = int(link["successor_index"])
+                        last_seen[successor] = np.maximum(
+                            last_seen[successor], inherited[index]
+                        )
                 usable = mask[raw_row]
                 last_seen[usable] = (
                     raw_row

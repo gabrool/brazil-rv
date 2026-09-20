@@ -1,0 +1,78 @@
+{
+  "accepted_store_modified": false,
+  "assembly": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\m1_scalar_assembly\\amendments\\manifest.json",
+    "sha256": "fde1bd464534c825734e933d26273cd6d79821e8f782b502dff90fc12909f1ce"
+  },
+  "attribution": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\m1_scalar_assembly\\attribution_and_clock.json",
+    "sha256": "c3473bc689d4dc755312971a42c71af6ae0c0e32ba7dfc4f1f0698c2a6c3b979"
+  },
+  "consumer": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\m1_scalar_assembly\\input_audit\\manifest.json",
+    "sha256": "c1f04e982e4710cbc06ec581ccb6d41ee1190946affbebe768cdd9c14237b984"
+  },
+  "forecast_scoring": false,
+  "heldout_access": false,
+  "parent": {
+    "manifest_sha256": "61149d43a23fc55fcd92b43aaa4e74d747fbdf62f852bedbbbdb2cf18281f3cc",
+    "root": "C:\\quant-data\\b3\\processed\\v2_data_store_2d59b9d_20260913T211700Z"
+  },
+  "remaining": [
+    "dated to-close normalization; all89799 existing supported outcomes use old constants,65 clipped residuals",
+    "AERI final-date retrospective corporate boundary discrepancy",
+    "other auxiliary histories/joins and contractual wealth/labels",
+    "complete derived store and final neural tensor/refit contract",
+    "Stage A lifecycle/execution bounds; C/D unstarted"
+  ],
+  "source_code": {
+    "ops/assemble_m1_scalars.py": {
+      "path": "C:\\Brazil-RV\\quant\\b3-quant\\ops\\assemble_m1_scalars.py",
+      "sha256": "f7f5faeb7fe38a40d48636a3c08c8f7dd5eeed1df1274c91b3e293020c3f0201"
+    },
+    "ops/audit_m1_scalar_attribution.py": {
+      "path": "C:\\Brazil-RV\\quant\\b3-quant\\ops\\audit_m1_scalar_attribution.py",
+      "sha256": "d1de4bf8606f02150db2425ca39836ea040476a2cf25f4bf11ef25ac65284b27"
+    },
+    "ops/audit_m1_scalar_inputs.py": {
+      "path": "C:\\Brazil-RV\\quant\\b3-quant\\ops\\audit_m1_scalar_inputs.py",
+      "sha256": "2f69f9e8d615fd6c08513d8141b644c9225f6ed7b681a0b13a65241b98475e65"
+    },
+    "ops/finalize_m1_scalars.py": {
+      "path": "C:\\Brazil-RV\\quant\\b3-quant\\ops\\finalize_m1_scalars.py",
+      "sha256": "e9c059d0c45156744ad989d6c26ae440089d2a8c9859a3c44ab6f9f60c826f8c"
+    },
+    "ops/verify_m1_scalar_targets.py": {
+      "path": "C:\\Brazil-RV\\quant\\b3-quant\\ops\\verify_m1_scalar_targets.py",
+      "sha256": "cf71290a248a762022887624a55f9b09a24b6393b00cbee5578b18ce162d3f36"
+    },
+    "research/src/brazil_rv/v2/build_store.py": {
+      "path": "C:\\Brazil-RV\\quant\\b3-quant\\research\\src\\brazil_rv\\v2\\build_store.py",
+      "sha256": "41e17ba1d20340cd536c1ba13637ad46c9a2e2062f8d555a9e4a72d19d78a1ee"
+    },
+    "research/src/brazil_rv/v2/feature_spec.py": {
+      "path": "C:\\Brazil-RV\\quant\\b3-quant\\research\\src\\brazil_rv\\v2\\feature_spec.py",
+      "sha256": "afea5617eded05cfd634f52cfeb699a1dd96a0f3a24c5b07cf19c784e7d31ed1"
+    },
+    "research/tests/test_v2_feature_spec.py": {
+      "path": "C:\\Brazil-RV\\quant\\b3-quant\\research\\tests\\test_v2_feature_spec.py",
+      "sha256": "e5f44bf9c38464f53f326ab12722bd94eb5c3045a3f6527ae866f57f7a067d68"
+    }
+  },
+  "status": "scalar_rename_boundary_verified_full_target_clock_and_store_pending",
+  "target_oracle": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\m1_scalar_assembly\\target_oracle.json",
+    "sha256": "ba51bc8eeeec6336b43f28b60e3ec89fc2703973119737f8ac827df3cc7f0072"
+  },
+  "tests": {
+    "build_store_audits": {
+      "passed": 5,
+      "seconds": 0.36
+    },
+    "feature_spec": {
+      "passed": 14,
+      "seconds": 0.35
+    },
+    "ruff": "passed"
+  }
+}

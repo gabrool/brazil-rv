@@ -1512,3 +1512,29 @@ patch, exact initial/final reproducers and initial outputs are recoverable;
 immutable inputs, original sources and old fits are not duplicated. Acceptance
 SHA `ea75bfca068c741a01624532dfbcd2e902fcebf96965406cb4fb5706bc3c123b`.
 Prior source/rename/lending recovery receipts remain valid.
+
+
+### M1 scalar/age and original-convention target assembly (2026-09-20)
+
+The bounded all-name scalar cross-sections now match 3,358,800 sealed value/mask
+cells after narrow ALOS consistency qualifications. No passed native or source
+census was repeated. Final transforms add1,116 valid cells/no losses:936 from
+eligibility and180 from inherited history. Shared valid values change104,448;
+1,900 ages and350 support cells change.78 valid to-close outcomes are added,
+76from eligibility and2from the original-reference rename bridge. Source ages
+carry only the pre-effect snapshot after effect/knowledge.
+
+The actual dataset/collator verifies90full933-name/60-session samples and
+10,412,280 scalar/target cells, zero mismatches. An independent arithmetic oracle
+matches8,786 supported outcomes.14feature/age and5affected store tests pass;
+Ruff passes. Initial raw-tail/age-harness attempts and successful reused ALOS
+assembly remain recoverable. No model scoring or GPU fits.
+
+The separate clock audit finds all89,799 existing valid auxiliary outcomes use
+fixed405/345normalization despite dated sessions;65residuals are clipped. AERI's
+Dec30 2024 sealed M1 retrospective boundary differs from its stored action arrays;
+retain the old non-rename diagnostic until the corporate source/wealth audit.
+These are still intermediate new data. See v2_M1_SCALAR_ASSEMBLY.md and resolve
+m1_scalar_assembly/input_audit/attribution/target_oracle/acceptance. A/B incomplete,
+C/D unstarted. Next correct the auxiliary target clock and finish remaining
+auxiliary/corporate wealth/label and full derived-store acceptance, alongside A.
