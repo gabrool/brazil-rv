@@ -842,6 +842,10 @@
     "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\spot_invoice\\qualification\\report.json",
     "sha256": "bcfef16e563f46ae37c722b10898f7826161e171edcaa1916cf6569e0fd881cb"
   },
+  "spot_invoice_recovery": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\spot_invoice_recovery.json",
+    "sha256": "577901fec8ba99ba2259efc4e4b7ddfa6729f52dfe2cac16327573a89291d4b0"
+  },
   "spot_invoice_runtime": {
     "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\spot_invoice\\runtime_identity.json",
     "sha256": "a308446eae63fb9c986953ed7943820cb26ce161ea75c5bfbe5e09e055390ffd"
