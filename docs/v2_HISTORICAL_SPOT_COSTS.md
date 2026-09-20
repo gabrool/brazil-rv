@@ -56,3 +56,6 @@ Seven distinct new tests and32 affected existing account/ledger tests pass; firs
 Twelve saved V32 2024 books have last negative Cielo stock positions August6 and zero shares August29/30. Only the three base books saved source-specific loan_charges; their charge tails are inspected in the bound receipt. The other nine variants lack those files, so flat inventory is not proof of no pending old loans. No new held-redemption case is established and the actual-held-Cielo cent bound stays open. Earlier18 unexposed Cielo controls were not repeated. This is not an exhaustive old-model exposure search.
 
 Final A remains open: custody/earlier tariffs, spot invoices/daytrade if exposed, clearing ambiguities, Cielo held-loan precision and remaining source/data admission. Both stores remain sealed; C/D unstarted. No final profitability conclusion.
+
+
+Recovery verified: `historical_spot_2c79cec.zip`, SHA `9d222b264c8d498d1070d7ac8a8131bf52619c79552b766184f07d1d50a6cee5`, 9444339 bytes; 786 unique/1009 logical restored/hash-checked members, 223 aliases,30books/3613440cells and3original PDFs; 1.3285189s. Complete current research, implementation patch, frozen plan, executed recipes/tests and sources recover without immutable input/store/old-fit duplication. Prior recovery dependencies remain required. Final A/C/D still open.

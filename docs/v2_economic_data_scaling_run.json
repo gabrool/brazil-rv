@@ -321,6 +321,10 @@
     "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\historical_spot\\qualification\\report.json",
     "sha256": "d026cea99f25a4dca993c53695fafe8d37ae8be206a69918f91566876de0a158"
   },
+  "historical_spot_recovery": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\historical_spot_recovery.json",
+    "sha256": "d03da5fbd4376182c432ecc3e83fa744d906e9a87020af1817c9107956e1e249"
+  },
   "historical_spot_runtime_identity": {
     "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\historical_spot\\runtime_identity.json",
     "sha256": "b3d169db68b641577aca236827e5326f10d1cebd8af13851f5b4a32657462957"
