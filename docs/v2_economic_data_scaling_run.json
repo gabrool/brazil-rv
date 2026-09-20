@@ -125,6 +125,10 @@
     "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\fca_identity_admission\\source_clock\\manifest.json",
     "sha256": "ce34599625e3ba60dd00680a16cb61c00810941d2424199a1f7c0a9d088d78b3"
   },
+  "fca_identity_financial_recovery": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\fca_identity_financial_recovery.json",
+    "sha256": "77da10ca8a9bce6267b3401bf8f8c392aef48fa3f2e747da26ec4b2051a0b729"
+  },
   "fca_identity_source_receipts": {
     "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\fca_identity_admission\\primary_source_receipts.json",
     "sha256": "b50e85641c14d72c8e001c91aadc0710b3f088cd0a4a10e4750637d8702511eb"

@@ -1165,3 +1165,13 @@ re-extracting it. Accepted stores/static learned-policy coordinates are unchange
 Registration reread. A/B remain incomplete and C/D unstarted. No GPU job or
 corrected profitability was produced. Stage A still needs execution/recall and
 presettlement-disposal bounds; the source audit must not replace those requirements.
+
+Recovery: implementation `c914056`; `fca_identity_financial_c914056.zip` SHA-256
+`7bfd9aedb45c82b21f8afa74b9de70f7e8294cc647d1d5d3c788ab301cd40726`.
+All 306 members were restored and hash-checked, including complete current
+research source, exact bytes for the initial/final audit implementations, source
+patch, reproducers, identity deltas, the new 427-document cache and financial/event
+parquets. All 539 bound original-source receipts were verified. Immutable inputs
+and old fits were not duplicated; prior passed censuses were not repeated. Resolve
+fca_identity_financial_recovery. Acceptance SHA-256:
+`cc907ccedb4c73e598f5be31749a1af4a067cee04199d0e289953da44c5d32c2`.
