@@ -12,6 +12,11 @@ Common-state, issuer/financial/lending-denominator, native/scalar/auxiliary,
 final target/new-store composition, January25 and integratedStageA remain.
 This advances the existing composition block; C/D unstarted, no model profit.
 
+Recovery for implementationcbbd77b passes:275,958,720byte archive,
+SHA8276456df297755a3113f326a5ac9d72a3af15d6b632e31018e217f6b3167456;
+215unique/241logical members,26aliases,28parent+sparse reconstructed arrays/
+158,397,482cells,13.7534755seconds. No immutable input/store/old-fit duplication.
+
 2026-09-19: user authorized accounting repairs, a deep source-to-model audit,
 additional historical B3 retrieval and economic-primary attention/GRU capacity
 follow-ups. Read `research/preregistrations/v2_economic_data_scaling.md` after each

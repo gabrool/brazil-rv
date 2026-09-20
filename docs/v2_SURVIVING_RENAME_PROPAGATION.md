@@ -64,3 +64,12 @@ final risks and new identity/eligibility target effects into a new complete stor
 January25 2017 clearing still needs its separate cash/delivery/rent disposition,
 followed by integrated Stage A admission. Both earlier complete stores and every
 old fit remain sealed. Existing V31–V41/cost/event/source proofs must not repeat.
+
+Recovery verified for implementationcbbd77b: `surviving_renames_cbbd77b.zip`,
+SHA `8276456df297755a3113f326a5ac9d72a3af15d6b632e31018e217f6b3167456`,
+275,958,720bytes.215unique/241logical members and26aliases restore and hash-check;
+28array files/158,397,482cells reconstruct to exact byte hashes from sparse
+amendments and the immutable Natura parent.13.7534755seconds. New reducers,
+failed/qualified/executed recipes, source subsets, config, docs and patch recover
+with prior event/Natura/economic/held-source/lending dependencies. No full immutable
+input/store/old-fit copies are included. Resolve `surviving_rename_recovery`.

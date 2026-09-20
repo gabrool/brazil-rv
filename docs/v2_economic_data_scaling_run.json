@@ -909,11 +909,15 @@
   },
   "surviving_rename_documentation": {
     "path": "C:\\quant\\b3-quant\\docs\\v2_SURVIVING_RENAME_PROPAGATION.md",
-    "sha256": "6f3fcbb940e3802dfcc5113fba2fba7ed35b89e1e17d22c786e469cd1ba91e67"
+    "sha256": "c94786266d877f4539547cef52c9b70f23859929e3cd80ae5a4a8ba6ce8c3216"
   },
   "surviving_rename_progress": {
     "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\surviving_renames\\progress.json",
     "sha256": "7beb86d0008dad8652e05dba4bd5ac59ff9026a860f57fc9b2faa223b34743e0"
+  },
+  "surviving_rename_recovery": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\surviving_rename_recovery.json",
+    "sha256": "49dbeba5a2c700d926895811ddddaf547e14a5cc615cfcbf069f8573d398cbd1"
   },
   "surviving_rename_wealth": {
     "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\surviving_renames\\wealth\\manifest.json",
