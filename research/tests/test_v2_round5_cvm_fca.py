@@ -82,6 +82,59 @@ def test_original_generic_equity_is_not_modern_ordinary_label(tmp_path):
     assert row["segment_start"] == "2017-12-22"
 
 
+@pytest.mark.parametrize("encoding", ["utf-8", "cp1252"])
+def test_flat_original_keeps_numeric_class_and_exact_ticker(tmp_path, encoding):
+    document, path = original_fixture(tmp_path)
+    with zipfile.ZipFile(path) as archive:
+        envelope = archive.read("FormularioCadastral.xml")
+    payload = """<?xml version="1.0" encoding="utf-8"?>
+    <Xmlformulariocadastral><DadosEmpresa><CodigoCVM>004170</CodigoCVM>
+    <CnpjEmpresa>33592510000154</CnpjEmpresa></DadosEmpresa>
+    <Documento><VersaoDocumento>1</VersaoDocumento></Documento><DadosFCA>
+    <AnoReferencia>2018</AnoReferencia><Formulario><DadosGerais>
+    <RazaoSocial>Empresa de Mineração &amp; Ações</RazaoSocial>
+    <CnpjCompanhia>33592510000154</CnpjCompanhia><CodigoCvm>004170</CodigoCvm>
+    <SetorAtividade>1030</SetorAtividade></DadosGerais><ValoresMobiliarios>
+    <ValoresMobiliariosNegociados><ValorMobiliarioNegociado>1</ValorMobiliarioNegociado>
+    <MercadoVmCapitalNegociado>3</MercadoVmCapitalNegociado>
+    <AcoesBdrsUnitsAdmitidosNegociacao><CodigoNegociacao>VALE3</CodigoNegociacao>
+    </AcoesBdrsUnitsAdmitidosNegociacao><DtInicioListagem>01/04/1968 0:00:00</DtInicioListagem>
+    <DtFimListagem/><DtInicioNegociacao>22/12/2017</DtInicioNegociacao>
+    <DtFimNegociacao>22/12/2017</DtFimNegociacao></ValoresMobiliariosNegociados>
+    </ValoresMobiliarios></Formulario></DadosFCA></Xmlformulariocadastral>"""
+
+    def package(text):
+        nested = io.BytesIO()
+        with zipfile.ZipFile(nested, "w") as archive:
+            archive.writestr("004170FCA2018v1.xml", text.encode(encoding))
+        with zipfile.ZipFile(path, "w") as archive:
+            archive.writestr("FormularioCadastral.xml", envelope)
+            archive.writestr("004170.fca", nested.getvalue())
+
+    package(payload)
+    before = path.read_bytes()
+    result = original_fca(document, path)
+    assert result["legal_name"] == "Empresa de Mineração & Ações"
+    assert result["xml_decoding"] == encoding
+    row = result["securities"][0]
+    assert (row["ticker"], row["class"], row["start"], row["end"]) == (
+        "VALE3",
+        "SHARES",
+        "1968-04-01",
+        "9999-12-31",
+    )
+    assert row["segment_end"] == "2017-12-22"
+    assert path.read_bytes() == before
+    package(payload.replace("<VersaoDocumento>1", "<VersaoDocumento>2"))
+    with pytest.raises(ValueError, match="Nested FCA identity differs"):
+        original_fca(document, path)
+    package(
+        payload.replace("<ValorMobiliarioNegociado>1", "<ValorMobiliarioNegociado>7")
+    )
+    with pytest.raises(ValueError, match="type needs source admission"):
+        original_fca(document, path)
+
+
 def test_historical_establishment_preserves_same_legal_issuer(tmp_path):
     document, path = original_fixture(tmp_path, inner_cnpj="33.592.510/0002-35")
     metadata = original_fca(document, path)
@@ -188,6 +241,33 @@ def test_html_general_binds_issuer_and_never_promotes_rendered_class():
     assert len(result) == 1
     assert result[0]["class"] == "SHARES" and result[0]["ticker"] == ""
     assert "source_segment_description" not in result[0]
+
+
+def test_exact_html_ticker_is_literal_and_does_not_promote_modern_enum():
+    payload = """<button id="btnDado_1">Ações Ordinárias</button>
+    <div id="divDado_1"><table><tr><td>Bolsa</td><td>B3</td>
+    <td>24/10/2019</td><td></td><td>Novo Mercado</td><td>28/10/2019</td><td></td></tr>
+    <tr><td>Código de negociação: CEAB3</td></tr></table></div>""".encode()
+    row = _generic_html_securities(payload)[0]
+    assert row["ticker"] == "CEAB3" and row["class"] == "SHARES"
+    assert row["listing_start"] == "2019-10-24"
+    assert "source_segment_description" not in row
+
+
+def test_html_multiple_share_tickers_keep_their_own_listing_bounds():
+    payload = """<button id="btnDado_1">Ações Preferenciais</button>
+    <div id="divDado_1"><table>
+    <tr><td>Bolsa</td><td>B3</td><td>01/01/1994</td><td>01/01/2018</td><td>Básico</td><td></td><td></td></tr>
+    <tr><td>Código de negociação: CEEB5</td><td>Classe de ação preferencial: Classe A</td></tr>
+    <tr><td>Bolsa</td><td>B3</td><td>02/01/2018</td><td></td><td>Básico</td><td></td><td></td></tr>
+    <tr><td>Código de negociação: CEEB6</td><td>Classe de ação preferencial: Classe B</td></tr>
+    </table></div>""".encode()
+    rows = _generic_html_securities(payload)
+    assert [(r["ticker"], r["start"], r["end"]) for r in rows] == [
+        ("CEEB5", "1994-01-01", "2018-01-01"),
+        ("CEEB6", "2018-01-02", "9999-12-31"),
+    ]
+    assert {r["class"] for r in rows} == {"SHARES"}
 
 
 def test_transient_original_response_retries_before_html(tmp_path, monkeypatch):

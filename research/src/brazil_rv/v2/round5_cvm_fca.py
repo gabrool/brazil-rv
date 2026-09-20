@@ -12,7 +12,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 import zipfile
-from datetime import date
+from datetime import date, datetime
 from pathlib import Path
 import xml.etree.ElementTree as ET
 
@@ -31,6 +31,82 @@ def _document_identity(document: dict) -> dict:
 
 def _date(value: str | None, missing: date) -> str:
     return str(missing) if not value or value.startswith("0001-") else value[:10]
+
+
+def _flat_fca(document: dict, payload: bytes) -> dict:
+    # The flat packages can declare UTF-8 while containing Windows-1252 bytes.
+    # Decode strictly, preserving the original archive and recording the choice.
+    try:
+        text, encoding = payload.decode("utf-8-sig"), "utf-8"
+    except UnicodeDecodeError:
+        text, encoding = payload.decode("cp1252"), "cp1252"
+    root = ET.fromstring(text)
+    if root.tag != "Xmlformulariocadastral":
+        raise ValueError("Unrecognized flat FCA source layout")
+    for key, expected in {
+        "DadosEmpresa/CodigoCVM": document["cvm_code"],
+        "DadosEmpresa/CnpjEmpresa": document["cnpj"],
+        "Documento/VersaoDocumento": str(document["version"]),
+        "DadosFCA/AnoReferencia": str(document["reference"])[:4],
+        "DadosFCA/Formulario/DadosGerais/CodigoCvm": document["cvm_code"],
+        "DadosFCA/Formulario/DadosGerais/CnpjCompanhia": document["cnpj"],
+    }.items():
+        if digits(root.findtext(key, "")) != expected:
+            raise ValueError(f"Nested FCA identity differs at {key}")
+    general = root.find("DadosFCA/Formulario/DadosGerais")
+    result = {
+        "source_cnpj": digits(general.findtext("CnpjCompanhia", "")),
+        "legal_name": general.findtext("RazaoSocial"),
+        "sector_code": general.findtext("SetorAtividade"),
+        "sector": None,
+        "sector_label_source": None,
+        "securities": [],
+        "metadata_source": "original_fca_xml",
+        "xml_layout": "flat",
+        "xml_decoding": encoding,
+    }
+    if not result["legal_name"]:
+        raise ValueError("Original FCA omits its historical issuer name")
+
+    def source_date(element, key, missing):
+        value = element.findtext(key, "").split(" ")[0]
+        return (
+            str(datetime.strptime(value, "%d/%m/%Y").date()) if value else str(missing)
+        )
+
+    for security in root.findall(
+        "DadosFCA/Formulario/ValoresMobiliarios/ValoresMobiliariosNegociados"
+    ):
+        code = security.findtext("ValorMobiliarioNegociado")
+        market = security.findtext("MercadoVmCapitalNegociado")
+        # Only the recovered equity/stock-exchange layout is supported. Code 1
+        # remains generic shares, not a modern-renderer ON label. Dated B3
+        # observations establish the class of the explicitly disclosed ticker.
+        if (code, market) != ("1", "3"):
+            raise ValueError("Flat FCA security type needs source admission")
+        listed = security.find("AcoesBdrsUnitsAdmitidosNegociacao")
+        if listed is None or not listed.findtext("CodigoNegociacao"):
+            raise ValueError("Flat FCA equity omits its explicit ticker")
+        start = source_date(security, "DtInicioListagem", date.min)
+        end = source_date(security, "DtFimListagem", date.max)
+        result["securities"].append(
+            {
+                "ticker": listed.findtext("CodigoNegociacao").strip().upper(),
+                "class": "SHARES",
+                "preferred_class": "",
+                "unit_composition": listed.findtext("ComposicaoBdrUnit", "").strip(),
+                "start": start,
+                "end": end,
+                "listing_start": start,
+                "listing_end": end,
+                "segment_start": source_date(security, "DtInicioNegociacao", date.min),
+                "segment_end": source_date(security, "DtFimNegociacao", date.max),
+                "source_type_code": code,
+                "source_market_code": market,
+                "source_segment_code": security.findtext("SegmentoNegociacao"),
+            }
+        )
+    return result
 
 
 def original_fca(document: dict, source: Path) -> dict:
@@ -58,6 +134,13 @@ def original_fca(document: dict, source: Path) -> dict:
         if len(nested) != 1:
             raise ValueError("Original FCA has no unique nested source package")
         with zipfile.ZipFile(io.BytesIO(outer.read(nested[0]))) as inner:
+            flat = [
+                n for n in inner.namelist() if re.fullmatch(r"\d+FCA\d{4}v\d+\.xml", n)
+            ]
+            if flat:
+                if len(flat) != 1:
+                    raise ValueError("Original FCA has no unique flat source document")
+                return _flat_fca(document, inner.read(flat[0]))
             general = ET.fromstring(inner.read("FormularioCadastral.xml"))
             securities = ET.fromstring(
                 inner.read("ValorMobiliarioMercadoNegociacao.xml")
@@ -179,12 +262,29 @@ def _generic_html_securities(payload: bytes) -> list[dict]:
         if not normalized(label).startswith("acoes"):
             continue
         identifier = button.get("id").replace("btnDado_", "divDado_")
-        for row in tree.xpath(f'//div[@id="{identifier}"]/table/tr'):
+        rows = tree.xpath(f'//div[@id="{identifier}"]/table/tr')
+        for index, row in enumerate(rows):
             cells = [
                 " ".join("".join(cell.itertext()).split()) for cell in row.findall("td")
             ]
             if len(cells) != 7 or normalized(cells[0]) != "bolsa":
                 continue
+            # One class tab may contain several securities. The literal ticker
+            # is in the detail row immediately after its own market/date row.
+            details = rows[index + 1].findall("td") if index + 1 < len(rows) else []
+            ticker_fields = [
+                normalized(" ".join(cell.itertext()))
+                for cell in details
+                if normalized(" ".join(cell.itertext())).startswith(
+                    "codigo de negociacao:"
+                )
+            ]
+            tickers = {
+                field.split(":", 1)[1].strip().upper() for field in ticker_fields
+            }
+            if len(tickers) > 1:
+                raise ValueError("Exact FCA security row contains conflicting tickers")
+            ticker = next(iter(tickers), "")
 
             def parsed(value, missing):
                 if not value:
@@ -194,7 +294,7 @@ def _generic_html_securities(payload: bytes) -> list[dict]:
 
             result.append(
                 {
-                    "ticker": "",
+                    "ticker": ticker,
                     "class": "SHARES",
                     "preferred_class": "",
                     "unit_composition": "",
@@ -224,7 +324,7 @@ def load_fca(document: dict, destination: Path) -> dict | None:
         if sha256(Path(source["path"])) != source["sha256"]:
             raise ValueError("FCA source hash differs")
     metadata = manifest["metadata"]
-    if metadata and metadata["metadata_source"] == "original_fca_xml":
+    if metadata:
         for source in manifest["sources"]:
             path = Path(source["path"])
             if not zipfile.is_zipfile(path):
@@ -238,7 +338,15 @@ def load_fca(document: dict, destination: Path) -> dict | None:
                 sector_label_source=metadata["sector_label_source"],
             )
             return result
-        raise ValueError("FCA original metadata has no matching source package")
+        if metadata["metadata_source"] == "original_fca_xml":
+            raise ValueError("FCA original metadata has no matching source package")
+        for source in manifest["sources"]:
+            path = Path(source["path"])
+            if path.name == "securities.html":
+                return {
+                    **metadata,
+                    "securities": _generic_html_securities(path.read_bytes()),
+                }
     return manifest["metadata"]
 
 

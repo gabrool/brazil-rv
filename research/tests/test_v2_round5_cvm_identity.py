@@ -59,13 +59,25 @@ def test_original_generic_shares_use_independent_prior_classes_and_birth_bounds(
     assert identity.filter(pl.col("isin") == "PN")["preferred_class"][0] == ""
 
 
-def test_generic_shares_cannot_bypass_name_ambiguity_with_a_ticker():
+def test_explicit_generic_ticker_uses_prior_b3_class_without_name_guessing():
     days, document, observations = fixture()
     document["securities"][0]["ticker"] = "ABCD3"
-    other = {**document, "id": "2", "cnpj": "87654321000100", "cvm_code": "654321"}
-    assert build_identity([document, other], observations, days, ["ON"]).is_empty()
     document["legal_name"] = "DIFFERENT S.A."
-    assert build_identity([document], observations, days, ["ON"]).is_empty()
+    rows = build_identity([document], observations, days, ["ON", "PN", "UNIT"])
+    assert set(rows["isin"]) == {"ON"}
+    assert set(rows["class"]) == {"ON"}
+    assert set(rows["identity_method"]) == {"original_generic_shares_dated_ticker"}
+    # An explicit pair must still fail conflicting issuer claims and cannot
+    # attach a ticker born later than the disclosure without a listing boundary.
+    other = {**document, "id": "2", "cnpj": "87654321000100", "cvm_code": "654321"}
+    import pytest
+
+    with pytest.raises(ValueError, match="Ambiguous dated issuer"):
+        build_identity([document, other], observations, days, ["ON"])
+    document["securities"][0]["ticker"] = "NEW3"
+    assert build_identity([document], observations, days, ["SUCCESSOR"]).is_empty()
+    document["securities"][0]["ticker"] = "ABCD11"
+    assert build_identity([document], observations, days, ["UNIT"]).is_empty()
 
 
 def test_explicit_original_class_remains_stricter_than_generic():

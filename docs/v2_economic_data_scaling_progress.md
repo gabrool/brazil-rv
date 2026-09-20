@@ -1050,3 +1050,60 @@ All 264 members were restored and hash-checked, including complete current resea
 source, the patch, audit reproducers/results and acceptance source-code hashes.
 All 28 bound original source receipts were verified. Immutable inputs and old fits
 were not duplicated. The canonical run pointer binds loan_accrual_us_recovery.
+
+## CVM capital/receipt audit and recovered issuer coverage — 2026-09-20
+
+The independent CVM audit reconciles 21,783 own-version documents, including 21,767
+exact-minute receipts and 16 date-only bounds. Those clocks reproduce 880,858
+statement-age rows. All 21,749 HTML capital tables reconcile in their printed share
+units; 184 prior own-note dispositions retain exact source identities/arithmetic.
+109,777 source-file hashes match. Thirteen remaining ZIP capital records also
+match. Timings: 96.30s and .83s. These are new upstream checks, not repeats of the
+completed quote/lending/auxiliary/conditioning censuses. Original financial account
+numerators, TTM and every valuation denominator still need their own audit.
+
+Two missing C&A capital tables were recovered with exact filing dates. The 2019
+reference/version2 record is first usable August21 2020, not backdated; the 2022
+record enters May6. Their incremental feature effect is zero under both original
+and repaired issuer joins. A real upstream defect emerged instead: subsequent FCA
+fallbacks discarded literal CEAB3 tickers, and a generic-shares ticker was forced
+through an inexact legal-name join. C&A retained model eligibility but lost its CVM
+link after May26 2020.
+
+The parser now reads exact HTML tickers and flat FCA XML with validated envelope,
+issuer/year/version and strictly recorded UTF-8/Windows-1252 decoding. Generic
+shares take ON/PN/suffix only from prior dated B3 observations; no modern enum label
+or fuzzy name assignment. Multiple securities within a tab retain their own ticker
+and listing dates. The immutable loader reparses verified source bytes and leaves
+source manifests unchanged.
+
+The admitted C&A source/financial overlay restores 1,146 already eligible dates,
+May27 2020 through December30 2024, growing issuer rows from 140 to 1,286. Existing
+identity and financial rows remain exact; future-document removal preserves earlier
+rows. Eight financial fields gain 8,578 usable values; statement-age and dependency
+metadata are reported separately. Paired generation took 15.50s. No eligibility,
+quote, label, neural tensor or old policy coordinate has changed. Full derived-store
+propagation and compatible refits remain required before using these observations.
+
+A bounded reread of the 2,820 old FCA fallback records now completes without errors,
+finding changed metadata in 1,068 documents across 327 issuers; 283 existing ZIP
+packages yield original XML. The first pass exposed 71 multi-security row groups;
+the new row association and final affected reread resolve them (9.97s). The prior
+attempt and code snapshots are retained. These wider candidates are not blanket
+admitted: global issuer conflicts, dated identity and all dependent families need
+quantification. C&A's ten refreshed metadata records are identical under the final
+row parser, without repeating its financial replay.
+
+Twenty-four affected parser/identity tests pass, including new encoding/source
+binding, literal ticker, per-security row grouping and future-identity protections;
+Ruff passes. The ZIP filename and admission-report junction failures were audit
+harness defects, not financial-data mismatches. See v2_CVM_SOURCE_AUDIT.md and the
+run pointer's CVM/CEA receipts. Historical converter/revision fidelity remains
+unknown for a single archived vintage.
+
+Registration reread. A/B remain incomplete, C/D unstarted; no GPU job or corrected
+model-profitability result. Next: admit the wider FCA improvements only after a
+global causal identity check, propagate C&A/ALLOS/ISA and other supported repairs
+through dependent families/wealth/labels into a separately accepted store; complete
+remaining upstream account/denominator clocks and Stage A execution bounds. Preserve
+all names/history and separate accounting-only replay from new coordinates/refits.

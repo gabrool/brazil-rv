@@ -1165,7 +1165,7 @@ def build_identity(
                     else []
                 )
                 generic = security["class"] == "SHARES"
-                if not security["ticker"] or generic:
+                if not security["ticker"]:
                     spelling = legal_spelling(document.get("legal_name", ""))
                     method = "exact_historical_legal_spelling"
                     if not spelling or legal_issuers[spelling] != {cnpj}:
@@ -1193,6 +1193,12 @@ def build_identity(
                         if spec == "UNT"
                         else None
                     )
+                    if generic and method == "dated_fca_ticker":
+                        if cls not in {"ON", "PN"}:
+                            continue
+                        share_class = cls
+                        preferred = spec[2:] if cls == "PN" else ""
+                        identity_method = "original_generic_shares_dated_ticker"
                     if not generic and cls is not None:
                         if cls != share_class:
                             continue

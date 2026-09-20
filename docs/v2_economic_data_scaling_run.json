@@ -21,6 +21,10 @@
     "path": "docs\\v2_cash_calendar_audit.json",
     "sha256": "687cd4d999bdb39867b5cd59c9972293a1b5748b811f264b66ae4e78905c862c"
   },
+  "cea_identity_admission": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\cea_identity_admission\\completed\\manifest.json",
+    "sha256": "55f7b0008b400c947fe5acc10b38f275a06eed0c7e359e67cc070fef2ce7c684"
+  },
   "clearing_calendar_audit": {
     "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\clearing_calendar_audit.json",
     "sha256": "4bfd969c94551764038f233bbf1364efb65313d3d384b238b09b3e09c21b52cb"
@@ -60,6 +64,22 @@
     "reproducer_sha256": "93b1616d1eac81ed5507f2432b7984430a2d71c703af5ec5b23056d34045ded8",
     "sha256": "788fce91bce7c1f0b7035e9b8ee1bd1b1e93047b4f68332f4f0c1fb19792de3d"
   },
+  "cvm_capital_admission": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\cvm_capital_admission\\manifest.json",
+    "sha256": "0b3641cde62bb6b7ff9680f3a755774c8a4abc1466336777813e44c5ba082c56"
+  },
+  "cvm_source_acceptance": {
+    "path": "docs/v2_cvm_source_acceptance.json",
+    "sha256": "fa05f2c030b1e8a9bf8ab941699791dac8e339674ec62223a9a57ead813c68c0"
+  },
+  "cvm_source_audit": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\cvm_source_audit\\report.json",
+    "sha256": "b2c3a2399d1b41195ea17f46a62a1d376448c3a9fa2397215d6fe224b41a4c28"
+  },
+  "cvm_zip_capital_audit": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\cvm_source_audit\\zip_capital.json",
+    "sha256": "cf3c4495d894f9047818239f1376d5cdd8f8d32ce490f28b731f2bc45ad1873f"
+  },
   "dommo_conversion_acceptance": {
     "path": "docs\\v2_dommo_conversion_acceptance.json",
     "sha256": "82b22397367baffce9eafc7d16f8b43ba99d8b50d7cc69a568f08256f3ca1464"
@@ -84,6 +104,10 @@
   "ewz_decision_audit": {
     "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\ewz_decision_audit.json",
     "sha256": "92ebff9b4fb27d939d803ebcf43b14ac3946709482c997c65424589bf15d188d"
+  },
+  "fca_fallback_audit": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\fca_fallback_audit\\row_grouping\\report.json",
+    "sha256": "dfbe7d952f5926f04cede7eed1aa18d37d68fbad1e6877150f0aa8dd4a27aba2"
   },
   "fit_conditioning_audit": {
     "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\fit_conditioning_audit\\report.json",

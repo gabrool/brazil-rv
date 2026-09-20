@@ -1,0 +1,71 @@
+{
+  "evidence": {
+    "cea_identity_admission": {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\cea_identity_admission\\completed\\manifest.json",
+      "sha256": "55f7b0008b400c947fe5acc10b38f275a06eed0c7e359e67cc070fef2ce7c684"
+    },
+    "cvm_capital_admission": {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\cvm_capital_admission\\manifest.json",
+      "sha256": "0b3641cde62bb6b7ff9680f3a755774c8a4abc1466336777813e44c5ba082c56"
+    },
+    "cvm_source_audit": {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\cvm_source_audit\\report.json",
+      "sha256": "b2c3a2399d1b41195ea17f46a62a1d376448c3a9fa2397215d6fe224b41a4c28"
+    },
+    "cvm_zip_capital_audit": {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\cvm_source_audit\\zip_capital.json",
+      "sha256": "cf3c4495d894f9047818239f1376d5cdd8f8d32ce490f28b731f2bc45ad1873f"
+    },
+    "fca_fallback_audit": {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\fca_fallback_audit\\row_grouping\\report.json",
+      "sha256": "dfbe7d952f5926f04cede7eed1aa18d37d68fbad1e6877150f0aa8dd4a27aba2"
+    }
+  },
+  "fallback_candidates": {
+    "admission": "Candidates only; global causal/ambiguity and dependent-family propagation remain.",
+    "changed_documents": 1068,
+    "changed_issuers": 327,
+    "checked": 2820,
+    "failures": 0
+  },
+  "historical_acceptance": {
+    "capital_recovery_incremental_feature_changes": 0,
+    "eight_financial_fields_additional_valid_values": 8578,
+    "final_row_parser_existing_CEA_metadata_exact": 10,
+    "future_document_deletion_prior_rows_exact": true,
+    "old_identity_rows_exact": 140,
+    "recovered_already_eligible_sessions": 1146,
+    "statement_age_additional_values": 1146
+  },
+  "limits": [
+    "Capital and statement-age agreement does not certify all financial accounts, TTM, market-cap denominator histories or wealth/labels.",
+    "A single retrieved source vintage cannot establish every historical converter/revision behavior.",
+    "C&A overlay and broader candidates need full new-store propagation; never rescore old checkpoints on changed inputs."
+  ],
+  "prior_parser_snapshot": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\fca_fallback_audit\\parser_before_row_grouping.py",
+    "sha256": "caf025f647e9f069d8256d0cbf6c7c2146fe054a1142071f98897008e70a4e2f"
+  },
+  "schema": "CVM_SOURCE_IDENTITY_ACCEPTANCE_V1",
+  "source_lf_sha256": {
+    "ops/admit_cea_identity.py": "fc286c918b63037685b51f9fdaaca7cc7f5095b420096444920c0db4dbcbb3d3",
+    "ops/admit_cvm_capital.py": "edee5ff319d0769ac792dba18cd3cf09faf1366d649d7a6ab9782b8c3f2f2aa9",
+    "ops/audit_cvm_sources.py": "ffc0f33a6b800cd7b53f67385ccd5eb2e67d1cdedd619bca5c61fbc786e2bc01",
+    "ops/audit_cvm_zip_capital.py": "183b772aff637f84d25df3fc7f8c1ed6cfe14487ea896b4afc978b11bcc16c70",
+    "ops/audit_fca_fallbacks.py": "22781ee2c3c8ceaec3a5d342e4adc94d910808a1d86cb988f0e539442aeb4935",
+    "ops/recover_cea_fca.py": "63ea398f006c275515b0bfe9fde859c8fba08f630911080436306b4e9a89abc1",
+    "research/src/brazil_rv/v2/round5_cvm.py": "5ab1ec4b53ab2c66a6625cc905c232a49934d27387af387da205c745e633a982",
+    "research/src/brazil_rv/v2/round5_cvm_fca.py": "6cc6e9f672345fd2d93641352cdedef4286899bc47fc2a9f5c238c4f50a919c0",
+    "research/tests/test_v2_round5_cvm_fca.py": "104c66c74236ce95763bd02e7c443209364b79f2413b20242e859172308e102e",
+    "research/tests/test_v2_round5_cvm_identity.py": "f4a3b4f7da9676f9862d309cf9e298bcf0a8c478b82f881c5f42bbc3df89bbab"
+  },
+  "status": "CVM_receipts_capital_and_CEA_overlay_accepted_A_B_incomplete_C_D_unstarted",
+  "tests": {
+    "passed": 24,
+    "ruff": "passed",
+    "scope": "Affected FCA parser and causal identity tests; includes flat source encoding and source-bound metadata plus per-security HTML row grouping.",
+    "seconds": 0.35
+  },
+  "unchanged": "Immutable sources, accepted stores, old fits and static policy coordinates; no corrected-profitability or GPU fit.",
+  "verified_utc": "2026-09-20T00:05:53.199881+00:00"
+}

@@ -18,6 +18,14 @@ Use the local GPU, all eligible names and full history; no forward capture, depl
 or held-out consumers. Follow the registered stages and
 `docs/v2_economic_data_scaling_progress.md`. Earlier foundation outcomes stay sealed.
 
+Stage B has now recovered an explicit C&A issuer/financial overlay: literal FCA
+tickers, including the flat XML layout, restore 1,146 already eligible stock-days
+whose issuer join was absent after May2020. The eight financial fields gain 8,578
+usable values; existing rows remain exact. Original filing clocks and capital
+units reconcile separately. See `docs/v2_CVM_SOURCE_AUDIT.md` and the economic/data
+run pointer. This is a source-bound overlay for the next derived contract, not a
+replacement accepted store or permission to attach changed coordinates to old fits.
+
 The current accounting code retains unpriced equity/hedge inventory and its cash,
 claims and financing obligations until an observed execution or contractual event.
 Missing quotes and evaluation boundaries never manufacture last-mark fills or
