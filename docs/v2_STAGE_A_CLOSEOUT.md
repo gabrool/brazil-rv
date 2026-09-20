@@ -1,10 +1,10 @@
 # Stage A closeout contract
 
-2026-09-20, updated after all surviving-company feature dependencies qualify. This consolidates the remaining
+2026-09-20, updated after complete composed-store acceptance. This consolidates the remaining
 work following the user's request for a clearer trajectory. It does not change the
 registered economic endpoints, authorize held-out reads, accept Stage A, or start C/D.
 
-Most account mechanics are implemented. Both complete derived stores are accepted
+Most account mechanics are implemented. Three complete derived stores are accepted
 and immutable. The remaining deliverable is one historically supported, internally
 consistent account configuration with explicit uncertainty. Completed engineering
 checks are evidence to reuse, not a queue to replay.
@@ -16,7 +16,7 @@ checks are evidence to reuse, not a queue to replay.
 | Calendar | January25 2017 remains ambiguous. Original Elektro erratum528672 explicitly corroborates no December30 2016 trading/settlement; combined with the dated B3 calendar this supports the closed-day primary. Dated migration plus holiday notices resolve November20 2017.22of23 money-only dates have supported dispositions, without array changes. | A specific sourced January25 disposition, or separately attributed cash/physical delivery and rent hypotheses. Reuse the completed bounded search and new issuer original. Do not import the unapproved2017 draft, assume2011 revision continuity or add all monetary dates. |
 | Event/source composition | Seven distributions, two Natura scalar settlements and Cielo cash now compose with numerically identical actual loader terms. ALSC unknown physical credit/net cash and ENAT unknown fraction auction stay explicit; previous one-factor proofs remain dependencies. | Use composed_primary_event_terms with its identity proof at integrated admission, retaining separate variants and exposure conditions. Surviving-company SSBR/ARZZ spot identities are separately source-admitted; no guessed loan aliases or physical credit. |
 | Cielo held-loan precision | Identify actual loan exposure at the August30 closeout, then apply the already frozen per-share cent variants if that branch is exposed | A held-loan bound requires actual loan cohorts under adaptive decisions. No preference/rate/availability changes to force a holding. An unexposed path may establish zero impact **for that path**, never a general held-loan precision bound. Carry that distinction into the later registered model books. |
-| Remaining succession data implications | NATU/ALSC/SOMA/ENAT sparse attribution adds72 valid outcomes; prior33 target consumers are complete. SSBR→ALSO and ARZZ→AZZA add55/60eligible dates. Wealth/daily/risk/peer, common state, issuer/financial/events/sector/lending and microstructure/options/odd-lot/index dependencies now qualify. | Native M1/scalars and magnitude/cross-market are now qualified. Compose new eligibility/same-class targets and the72 outcomes with final risks into a new complete store. Reuse every saved control and both accepted stores. No acquired-company pooling, fabricated source quotes or loan aliases. |
+| Remaining succession data implications | Complete composed store accepted: all qualified feature layers plus596 newly supported identity/eligibility outcomes and72 reused corporate outcomes. Final virtual primary changes126777 values, gains668/no losses. | Reuse the complete106-array store,19 combined full933/full60 consumer samples and earlier exhaustive per-family proofs. New fits require its explicit coordinate contract. No acquired-company pooling, fabricated quotes or loan aliases. |
 | Integrated admission | Combine the above with existing cash, loan, execution and event mechanics | Verify the remaining interactions and full date/exposure coverage, reconcile components in both accounts, and retain all measured adaptive uncertainty. Publish one acceptance with explicit residual limitations. No model-profit claim from synthetic preferences. |
 
 The rows form three delivery blocks. Historical costs are complete for their
@@ -25,7 +25,8 @@ admission remain. They are not seven new experiment campaigns, and this is not
 a completion percentage. See [cost closeout](v2_SPOT_INVOICE_CLOSEOUT.md).
 The current [composition evidence](v2_EVENT_SOURCE_COMPOSITION.md) closes the
 December30 source gap and qualifies the sparse target consequences; this second
-delivery block still has the January25 and surviving-company identity dependencies.
+delivery block still has the January25 disposition. Surviving-company dependencies
+and final data composition are accepted separately from economic admission.
 
 The [surviving-company identities and daily history](v2_SURVIVING_RENAME_PROPAGATION.md)
 are now source-admitted and qualified:55ALSO/60AZZAeligible gains, both wealth
@@ -33,13 +34,17 @@ chains, full-name daily/risk/peer fields and185actualfull60consumers. Reuse thes
 saved results. Eight further sidecar families and common state now qualify through
 303 and124 actual full-history consumers. All226 newly lost live sidecar values
 retain evidenced inherited unit uncertainty;47 other losses are retired cells.
-These counts are separate from prior daily peer losses. Remaining dependencies
-are final primary-target/complete-store composition. The remaining four feature
+These counts are separate from prior daily peer losses. Final primary-target and
+complete-store composition are accepted. The remaining four feature
 families now pass877 actual full-history consumers; all398 newly lost market
-fields are retired predecessors. Reuse their saved deltas and controls. January25 and integratedStageA remain open. This is still work
+fields are retired predecessors. Their deltas and controls now compose in the
+[accepted complete dataset](v2_COMPOSED_DATA_STORE.md). January25 and integratedStageA remain open. This is still work
 within the same second delivery block.
 
 ## Work discipline through admission
+
+The user paused the one-minute heartbeat and requested continuous implementation.
+Do not restart that scheduler or pause at routine checkpoints; research remains active.
 
 - Reuse V31–V41 and historical-cost/corporate books, source receipts, Decimal oracles, accepted stores and recovery
   dependencies. Do not repeat a completed test matrix to create a newer checkpoint.

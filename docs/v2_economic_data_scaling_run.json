@@ -81,9 +81,29 @@
     "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\closeout_calendar_sources\\qualification.json",
     "sha256": "ca450ed93ac8736983fbde9be5fce04b4bddc17b6813d67443253fe999552770"
   },
+  "composed_data_inputs": {
+    "path": "C:\\quant\\b3-quant\\docs\\v2_composed_data_inputs.json",
+    "sha256": "bba9df8c53feeb131b788a3cd83013e12753fa64bad8aeaed9d2b8d5e1e25604"
+  },
+  "composed_neutral_attribution": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\surviving_store\\neutral_attribution.json",
+    "sha256": "873eef595386077a61e44e9b75c427ca4ad3f24459b8fda056827cadbe89112b"
+  },
   "composed_primary_event_terms": {
     "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\event_composition\\primary_terms.json",
     "sha256": "4da015daa600736bbc23d1dc968e8a533f6dc4b10d70a528cb1e53e1700ba6d3"
+  },
+  "composed_store_assembly": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\surviving_store\\manifest.json",
+    "sha256": "703d85669596d4f852ab746467a7b46be00e75ae45ba39a93e1fe101e5bb1733"
+  },
+  "composed_store_input_audit": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\surviving_store\\qualification\\manifest.json",
+    "sha256": "5c25e99e79c06574e3e5a9d60a38b533b6dd8a008030ab98422eaca18e5c3f14"
+  },
+  "composed_target_qualification": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\surviving_store\\target_qualification.json",
+    "sha256": "20fa81b15a189fb0800af9e6946d4c23b15f0639582b257dd367f46670fa4591"
   },
   "conditioned_tensor_audit": {
     "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\fit_conditioning_audit\\tensors.json",
@@ -246,8 +266,8 @@
     "sha256": "feb7483d455f9c77093814c1fdfc52725acabfbaa6c8f9d6e6c183777932ae50"
   },
   "economic_refit_inputs": {
-    "path": "C:\\quant\\b3-quant\\docs\\v2_natura_data_inputs.json",
-    "sha256": "216f14221cac61d3441a1a8fed358e549f54131c5dd10f94d81a0c354d821220"
+    "path": "C:\\quant\\b3-quant\\docs\\v2_composed_data_inputs.json",
+    "sha256": "bba9df8c53feeb131b788a3cd83013e12753fa64bad8aeaed9d2b8d5e1e25604"
   },
   "economic_store_recovery": {
     "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\economic_store_recovery.json",
@@ -884,7 +904,7 @@
   },
   "stage_a_closeout_plan": {
     "path": "C:\\quant\\b3-quant\\docs\\v2_STAGE_A_CLOSEOUT.md",
-    "sha256": "4395088bee0bac5a74fa9918dd3b5fd8acbdf41a26f695c5cb2a738c71afb5bd"
+    "sha256": "9d86c6440f7a0a5dc54566ecdbc9eaabff8f882131c90b5b485b7aa25058cf58"
   },
   "status": "accounting_and_deep_data_audit",
   "succession_identity_dependency_scope": {

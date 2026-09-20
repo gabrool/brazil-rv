@@ -226,5 +226,7 @@ bounded source subsets are retained for recovery.
 
 Resolve `surviving_rename_market_recovery` for the verified recovery of these new
 artifacts, using prior recovery dependencies instead of copying immutable inputs,
-accepted stores or old fits. Final primary targets/new complete store, January25
-cash/delivery/rent disposition and integrated StageA remain before C/D.
+accepted stores or old fits. Final primary targets and the new complete store now
+qualify in [the composed acceptance](v2_COMPOSED_DATA_STORE.md); all earlier family
+proofs are reused. January25 cash/delivery/rent disposition and integrated StageA
+remain before C/D.

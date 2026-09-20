@@ -1,0 +1,65 @@
+{
+  "accounting": "Old forecasts use frozen OLDPolicyData and explicit account/source amendments. No inferred loan alias/custody permission. StageA calendar and integrated admission remain.",
+  "layers": [
+    {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\surviving_renames\\liquidity_deltas.npz",
+      "sha256": "85c35c97206578744db77fd0c07bc60dc9074b3b99f853ccd0d5a49813e6aaca"
+    },
+    {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\surviving_renames\\wealth\\deltas.npz",
+      "sha256": "c82958645d4fe806fe618f96825308ad240838d2c8890cfc20b2853a81e46229"
+    },
+    {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\surviving_renames\\daily\\admitted\\deltas.npz",
+      "sha256": "d380b6f7796555f55195534d1f3247d0f878c3cb8605d9787ec022be2a183389"
+    },
+    {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\surviving_renames\\context\\common_deltas.npz",
+      "sha256": "519721983e1335e56dd0c7f2a87f89ae6f30d7c88346a5efb45b0a26e79e3ec6"
+    },
+    {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\surviving_renames\\dependency_consumer\\deltas.npz",
+      "sha256": "5ca5de0cd9741723d2683e00eb9fa8c76ede10aca33cec0618851c774968c8f7"
+    },
+    {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\surviving_renames\\auxiliary_consumer\\deltas.npz",
+      "sha256": "115d1bde92425eac7787a8ce9f89164359d19046793ec51c833c713511ea1585"
+    },
+    {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\surviving_renames\\m1\\native_deltas.npz",
+      "sha256": "df2fe7033e1d91c852ffad625440743f4e498efeede30ec8520a51e36004c607"
+    },
+    {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\surviving_renames\\m1\\scalar_deltas.npz",
+      "sha256": "baea7be00eb6201cb3708a31657322d3b135cdd910aba0a2501e25ce67fee2ca"
+    },
+    {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\surviving_renames\\market\\deltas.npz",
+      "sha256": "a5c7b844a71f6fbaa9b4578a31a7132b8d267a19b88ad8ebd9a10b57f6b42477"
+    },
+    {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\surviving_store\\action_deltas.npz",
+      "sha256": "542dc188b32859e943cd946e02074ceda093f91482ac52712f1d160f06c34b1b"
+    },
+    {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\surviving_store\\target_deltas.npz",
+      "sha256": "d74cc8fc1cabcefcb3da61d7a339ae0ca87e8c2ebd4e02f9ff9d4015fba51703"
+    }
+  ],
+  "output": "D:\\quant-data\\b3\\processed\\v2_economic_composed_store_20260920",
+  "parent": {
+    "manifest_sha256": "93f65b11f31979c6eafee0ca7e68afe5bb591a303eb8b5e2148072828e8d04bf",
+    "root": "C:\\quant-data\\b3\\processed\\v2_economic_natura_store_20260920"
+  },
+  "plan": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\surviving_store\\plan.json",
+    "sha256": "cb1e48ce1e4f793a4803c255b1dfe6330455ec53807298a1e335c1210e424e11"
+  },
+  "refit": "New training-only conditioning and P weights required; only compatible new F inherits. Same schema does not mean compatible coordinates. Original graph/folds/seeds/full933/full60/learning budget/optimizer/selector; optional to-close loss inactive.",
+  "source_limits": "Reuse prior source/revision/publication limits, ALSC locked unknown delivery/net cash and ENAT unknown auction. Preserve all existing peer/unit support barriers and missing M1 history.",
+  "storage": "Lossless NTFS compression on the new staging directory only; independent files, unchanged NPY bytes, full store retained. No parent file compression or hard links.",
+  "target_qualification": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\surviving_store\\target_qualification.json",
+    "sha256": "20fa81b15a189fb0800af9e6946d4c23b15f0639582b257dd367f46670fa4591"
+  }
+}

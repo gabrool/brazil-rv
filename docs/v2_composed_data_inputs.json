@@ -1,0 +1,64 @@
+{
+  "accounting_source_replay": "Frozen OLD PolicyData; no old checkpoint reads altered store coordinates.",
+  "contract": {
+    "path": "C:\\quant\\b3-quant\\docs\\v2_composed_store_contract.json",
+    "sha256": "e2e6c98e66449714ab212fb4d97fee191bf77daf30b3102874521d23c9d272f4"
+  },
+  "earlier_baseline_preserved": {
+    "path": "C:\\quant\\b3-quant\\docs\\v2_natura_data_inputs.json",
+    "sha256": "216f14221cac61d3441a1a8fed358e549f54131c5dd10f94d81a0c354d821220"
+  },
+  "evidence": {
+    "composed_neutral_attribution": {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\surviving_store\\neutral_attribution.json",
+      "sha256": "873eef595386077a61e44e9b75c427ca4ad3f24459b8fda056827cadbe89112b"
+    },
+    "composed_store_assembly": {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\surviving_store\\manifest.json",
+      "sha256": "703d85669596d4f852ab746467a7b46be00e75ae45ba39a93e1fe101e5bb1733"
+    },
+    "composed_store_input_audit": {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\surviving_store\\qualification\\manifest.json",
+      "sha256": "5c25e99e79c06574e3e5a9d60a38b533b6dd8a008030ab98422eaca18e5c3f14"
+    },
+    "composed_target_qualification": {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\surviving_store\\target_qualification.json",
+      "sha256": "20fa81b15a189fb0800af9e6946d4c23b15f0639582b257dd367f46670fa4591"
+    },
+    "event_composition_qualification": {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\event_composition\\qualification\\manifest.json",
+      "sha256": "c0b469f1009017fa074a0e94d9ef2adff677128a6d0a78007f8aca478d2a92f0"
+    },
+    "surviving_rename_auxiliary_input_audit": {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\surviving_renames\\auxiliary_consumer\\manifest.json",
+      "sha256": "806414c0e618cf899137272fd944ae8784000418063b77a06cddc6758aac0451"
+    },
+    "surviving_rename_daily_input_audit": {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\surviving_renames\\consumer\\manifest.json",
+      "sha256": "1f4f5f6810261769264089e7d76215f7a32fc9e33ea91f1ba8981dc28d8ab443"
+    },
+    "surviving_rename_dependency_input_audit": {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\surviving_renames\\dependency_consumer\\manifest.json",
+      "sha256": "b1d9b7c4694853a016845c6cf55c2381a3373c5f9a3853bd7ec44d5ec2629dbd"
+    },
+    "surviving_rename_market_input_audit": {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\surviving_renames\\market_consumer\\manifest.json",
+      "sha256": "403ca3f66289a229c54ecb070742b246b05e53b4fcfeb501924274ca1570aab6"
+    }
+  },
+  "parent": {
+    "manifest_sha256": "93f65b11f31979c6eafee0ca7e68afe5bb591a303eb8b5e2148072828e8d04bf",
+    "root": "C:\\quant-data\\b3\\processed\\v2_economic_natura_store_20260920"
+  },
+  "refit_required": true,
+  "remaining_program": "January25 2017 cash/delivery/rent disposition and integrated StageA, then registered C and conditional D.",
+  "report": {
+    "path": "C:\\quant\\b3-quant\\docs\\v2_COMPOSED_DATA_STORE.md",
+    "sha256": "4cbccba843d03161af6ee856947403a2b12bff89be25956cda0918cd6aa041f7"
+  },
+  "status": "accepted_complete_composed_data_contract_not_economic_admission",
+  "store": {
+    "manifest_sha256": "fab704fccbd7ceed0624bcfcc67178327f392e43d124242caf8d77ff1c64dfc0",
+    "root": "D:\\quant-data\\b3\\processed\\v2_economic_composed_store_20260920"
+  }
+}

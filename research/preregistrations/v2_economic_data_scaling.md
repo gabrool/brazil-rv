@@ -528,3 +528,5 @@ assignment-tail and magnitude inactive-row audit recipes are retained; saved
 reducers reused. Compose final primary targets and a new complete store next,
 then January25 and integratedStageA before C/D. This remains the same delivery
 block and does not change any economic/model gate or activate the to-close loss.
+
+Complete-composition amendment,2026-09-20: all previously qualified surviving-company feature deltas and final risk coordinates now feed a complete new accepted store. The596 new same-class/eligibility outcomes and72 prior corporate outcomes add668 usable labels without support losses. Preserve the same schema, support, full population/history, optional-loss inactivity and new-P/compatible-F requirement. Accounting-only old forecasts retain OLDPolicyData. Existing source/engineering proofs are reused; this does not change model hypotheses or admit final StageA. The user has paused the one-minute heartbeat and requests continuous implementation without routine checkpoint restarts.
