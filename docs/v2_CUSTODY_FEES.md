@@ -64,3 +64,6 @@ Ten distinct new cases and32affected existing account/ledger tests pass; overlap
 Engineering 58.12927399997716s, summed cases 56.87193560000742s, qualification 1.3938129000016488s are CPU audit times, not fit estimates. Source retrieval times exclude manual search/visual checks. The original three-source index was restored byte-for-byte after the boundary retrieval using its unchanged receipts; the expanded four-source index and source qualification are separate companions, preserving the frozen plan bindings.
 
 FinalA remains incomplete: corporate physical custody, older tariffs, spot invoice/daytrade if exposed, older clearing, held-Cielo cent bound and remaining source/data admission. C/D unstarted; no corrected model profitability claim.
+
+
+Recovery verified: `custody_fees_0194723.zip`, SHA `de066862feefe220722ee63359eaff46a1fd365d1658729e1329a189c5ec593d`, 19741243 bytes; 851 unique/1028 logical restored/hash-checked members, 177 aliases, 30 books/6770880 account cells and 4 original PDFs; 3.1209187s. Complete current research, implementation patch, frozen plan, failed/qualified executed recipes/tests and new sources recover without immutable input/store/old-fit duplication. Prior dated-spot/loan/account/source/store recoveries remain required. Final A/C/D remain open.

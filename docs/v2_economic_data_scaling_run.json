@@ -135,6 +135,10 @@
     "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\custody_fees\\qualification\\report.json",
     "sha256": "df08757b240113cbc64edbe54e5edc2ab298e9ad9ebde77404eb00dfcb9e790b"
   },
+  "custody_fee_recovery": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\custody_fee_recovery.json",
+    "sha256": "e6bb0dac930cf32b597bf3292caae6379edb2f4f6e85a9e0b6acf598f667e41d"
+  },
   "custody_fee_runtime_identity": {
     "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\custody_fees\\runtime_identity.json",
     "sha256": "09d20abedfa427c59aa4b35514fc4395316ef54407e7651017c6c9aa4371e094"
