@@ -1,0 +1,262 @@
+"""Saved fresh-fit account arithmetic and actual unresolved-exposure inventory."""
+
+from collections import defaultdict
+from decimal import Decimal
+import json
+from pathlib import Path
+from time import perf_counter
+
+import numpy as np
+import polars as pl
+
+from brazil_rv.v2.artifacts import sha256_file, write_json_atomic
+from brazil_rv.v2.data_repair import binding, bound_json
+
+PROJECT = Path(__file__).resolve().parents[1]
+
+
+def main():
+    tick = perf_counter()
+    pointer = PROJECT / "docs/v2_economic_data_scaling_run.json"
+    run = json.loads(pointer.read_text())
+    plan = bound_json(run["stage_c_data_replay_plan"])
+    root = Path(run["stage_c_data_replay_plan"]["path"]).parent
+    replays = bound_json(binding(root / "replays.json"))
+    out = root / "qualification"
+    out.mkdir(exist_ok=True)
+    recipe = out / "executed.py"
+    if recipe.exists():
+        assert sha256_file(recipe) == sha256_file(Path(__file__))
+    else:
+        recipe.write_bytes(Path(__file__).read_bytes())
+    store = Path(plan["store"]["root"])
+    names = np.load(store / "isin_index.npy").tolist()
+    dates = np.load(store / "date_index.npy")
+    raw = np.load(store / "raw_close.npy", mmap_mode="r")
+    cash = bound_json(run["cash_calendar"])["panel"]
+    assert sha256_file(Path(cash["path"])) == cash["sha256"]
+    with np.load(cash["path"]) as z:
+        cdi = z["cdi_returns"]
+    tariffs = {
+        c["date"]: c for c in bound_json(run["historical_cost_sources"])["calendar"]
+    }
+    terms = bound_json(plan["terms"])
+    records = []
+    for rec in replays["completed"]:
+        target = out / (rec["key"].replace("/", "_") + ".json")
+        if target.exists():
+            saved = bound_json(binding(target))
+            assert saved["book"] == rec["book"]
+            records.append(binding(target))
+            continue
+        started = perf_counter()
+        book = bound_json(rec["book"])
+        folder = Path(rec["book"]["path"]).parent
+        for name, digest in book["files"].items():
+            assert sha256_file(folder / name) == digest
+        with np.load(folder / "account.npz") as z:
+            a = {k: z[k] for k in z.files}
+        counts, maxima = defaultdict(int), defaultdict(float)
+
+        def check(label, expected, actual, tolerance=1e-6):
+            x, y = np.asarray(expected), np.asarray(actual)
+            error = float(np.max(np.abs(x - y), initial=0))
+            assert np.isfinite(error) and error < tolerance, (rec["key"], label, error)
+            maxima[label] = max(maxima[label], error)
+            counts[label] += int(np.broadcast_arrays(x, y)[0].size)
+
+        days, daily, cfg = (
+            book["state_dates"],
+            book["daily"],
+            book["provenance"]["config"],
+        )
+        indices = np.searchsorted(dates, np.asarray(days, dtype="datetime64[D]"))
+        np.testing.assert_array_equal(dates[indices].astype(str), days)
+        assert a["signed_shares"].shape == (len(days), 933)
+        assert book["provenance"]["policy_inputs"] == plan["inputs"]
+        assert not book["provenance"]["heldout_accessed"]
+        counts["saved_cells"] = sum(v.size for v in a.values())
+        nav = (
+            a["free_cash"]
+            + a["restricted_cash"]
+            + a["hedge_restricted_cash"]
+            + a["unsettled_cash"]
+            + a["receivables"]
+            - a["payables"]
+            + (a["signed_shares"] * np.nan_to_num(a["mark_price"])).sum(1)
+            + a["hedge_signed_shares"] * np.nan_to_num(a["hedge_mark_price"])
+            - a["loan_liability"]
+            - a["custody_liability"]
+        )
+        check("nav_brl", nav, a["nav"], 1e-7)
+        check(
+            "custody_liability",
+            np.r_[0, a["custody_liability"][:-1]]
+            + a["custody_fee"]
+            - a["custody_payment"],
+            a["custody_liability"],
+        )
+        free = np.r_[cfg["initial_capital_brl"], a["free_cash"][:-1]]
+        restricted = np.r_[0, (a["restricted_cash"] + a["hedge_restricted_cash"])[:-1]]
+        scale = a["start_nav"] / 1e4
+        check("cdi", cdi[indices], np.asarray(daily["cdi_bps"]) / 1e4, 1e-15)
+        free_income = np.maximum(free, 0) * cdi[indices]
+        debit = -np.minimum(free, 0) * (
+            cdi[indices] + cfg["annual_debit_spread"] / cfg["annual_sessions"]
+        )
+        proceeds = restricted * cdi[indices] * cfg["short_proceeds_remuneration"]
+        for label, expected in (
+            ("free_cash_income_bps", free_income),
+            ("debit_financing_bps", debit),
+            ("short_proceeds_income_bps", proceeds),
+            ("interest_bps", free_income - debit + proceeds),
+        ):
+            check(label, expected, np.asarray(daily[label]) * scale)
+        fills_path = folder / "fills.parquet"
+        fills = pl.read_parquet(fills_path).to_dicts() if fills_path.exists() else []
+        by_day = defaultdict(list)
+        signed = defaultdict(lambda: Decimal(0))
+        for fill in fills:
+            by_day[fill["fill_session"]].append(fill)
+            if fill["purpose"] != "hedge":
+                signed[fill["fill_session"], fill["security_index"]] += Decimal(
+                    str(fill["quantity"])
+                ) * (1 if fill["side"] == "buy" else -1)
+        counts["fills"] = len(fills)
+        pending = []
+        assert cfg["spot_invoice_convention"] == "unrounded"
+        for day, date in enumerate(days):
+            groups = defaultdict(set)
+            total, flow, cost = Decimal(0), Decimal(0), Decimal(0)
+            for fill in by_day[day]:
+                amount, charge = (
+                    Decimal(str(fill["gross_notional"])),
+                    Decimal(str(fill["cost"])),
+                )
+                total += amount
+                cost += charge
+                flow += amount * (1 if fill["side"] == "sell" else -1) - charge
+                groups[fill["security_index"]].add(fill["side"])
+            assert all(len(sides) == 1 for sides in groups.values()), (
+                rec["key"],
+                date,
+                "opposing spot fills need dated daytrade disposition",
+            )
+            trading = tariffs[date]["trading_bps"]
+            if trading is None:
+                trading = cfg["unrecovered_spot_trading_bps"]
+            assert cfg["spot_execution_phase"] == "regular"
+            rates = [
+                trading,
+                2.75 if date < "2021-02-02" else 2.5,
+                cfg["execution_brokerage_bps"],
+                cfg["execution_shortfall_bps"],
+            ]
+            expected = [
+                0,
+                *[float(total * Decimal(str(rate)) / 10000) for rate in rates],
+            ]
+            check("decimal_spot_components", expected, a["execution_charges"][day])
+            check(
+                "unrounded_invoice_adjustment",
+                np.zeros(2),
+                a["spot_invoice_adjustment"][day],
+            )
+            check("fill_charges", float(cost), sum(expected))
+            pending.append((day + (3 if date < "2019-05-27" else 2), flow))
+            pending = [(d, v) for d, v in pending if d > day]
+            check(
+                "spot_cash_queue",
+                float(sum((v for _, v in pending), Decimal(0))),
+                a["unsettled_cash"][day],
+            )
+            counts["spot_groups"] += len(groups)
+
+        identities = []
+        for event in terms["identity_actions"]:
+            if event["effective_date"] not in days:
+                continue
+            day = days.index(event["effective_date"])
+            source, destination = (
+                names.index(event["predecessor_isin"]),
+                names.index(event["successor_isin"]),
+            )
+            before = (
+                Decimal(str(float(a["signed_shares"][day - 1, source])))
+                if day
+                else Decimal(0)
+            )
+            destination_before = (
+                Decimal(str(float(a["signed_shares"][day - 1, destination])))
+                if day
+                else Decimal(0)
+            )
+            after = Decimal(str(float(a["signed_shares"][day, destination])))
+            check(
+                "identity_arrival",
+                float(before),
+                float(after - destination_before - signed[day, destination]),
+            )
+            check("retired_identity_quantity", 0, a["signed_shares"][day, source])
+            identities.append(
+                dict(
+                    event=event["effective_date"],
+                    source=source,
+                    destination=destination,
+                    held=float(before),
+                )
+            )
+
+        printed = np.isfinite(raw[indices]) & (raw[indices] > 0)
+        ii, jj = np.where((a["signed_shares"] != 0) & ~printed)
+        exposure = []
+        for day, name in zip(ii, jj, strict=True):
+            value = float(a["signed_shares"][day, name] * a["mark_price"][day, name])
+            exposure.append(
+                dict(
+                    date=days[day],
+                    isin=names[name],
+                    axis=int(name),
+                    shares=float(a["signed_shares"][day, name]),
+                    absolute_marked_brl=abs(value) if np.isfinite(value) else None,
+                    terminal=bool(day == len(days) - 1),
+                )
+            )
+        exposure_path = target.with_suffix(".exposures.json")
+        write_json_atomic(exposure_path, exposure)
+        payments = bound_json(rec["loan_cash_payments"])
+        result = dict(
+            passed=True,
+            key=rec["key"],
+            book=rec["book"],
+            counts=dict(counts),
+            maxima=dict(maxima),
+            identities=identities,
+            unquoted_holdings=binding(exposure_path),
+            unquoted_cells=len(exposure),
+            loan_cash_payments=payments,
+            loan_cash_bounds_pending=bool(payments),
+            prior_debit_sessions=int((free < 0).sum()),
+            maximum_overdue_principal=float(np.max(a["loan_overdue_principal"])),
+            economics_unresolved=rec["economics_unresolved"],
+            seconds=perf_counter() - started,
+            limits="Saved independent NAV/funding/spot-cash/fee and unit-identity checks; original loan/corporate mechanics reused. Unquoted holdings are evidence for exposure review, not observed quotes or proof of a new corporate event. No new forecasts or account replay ran in qualification.",
+        )
+        write_json_atomic(target, result)
+        records.append(binding(target))
+    summary = dict(
+        status="complete" if len(records) == plan["planned_books"] else "partial",
+        planned=plan["planned_books"],
+        qualified=len(records),
+        reports=records,
+        plan=run["stage_c_data_replay_plan"],
+        seconds=perf_counter() - tick,
+    )
+    write_json_atomic(out / "manifest.json", summary)
+    run["stage_c_data_replay_qualification"] = binding(out / "manifest.json")
+    write_json_atomic(pointer, run)
+    print(json.dumps({k: v for k, v in summary.items() if k != "reports"}), flush=True)
+
+
+if __name__ == "__main__":
+    main()
