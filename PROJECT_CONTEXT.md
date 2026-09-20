@@ -48,9 +48,13 @@ It restores 7,419 native feature cells without losses. An actual dataset/collato
 audit covers 314 full-population, 60-session samples; raw M1 scalar amendments
 now reach cross-sectional scalar transforms, inherited source ages and the old
 to-close target convention: 1,116 usable feature cells and 78 valid outcomes are
-added, with 90 full-population consumer samples verified. The separate dated
-to-close normalization defect and AERI final-date corporate boundary discrepancy
-remain explicit. See `docs/v2_M1_SCALAR_ASSEMBLY.md` and
+added, with 90 full-population consumer samples verified. Dated to-close
+normalization now reproduces all 89,877 prior admitted outcomes before changing
+88,311 residuals and 12 rank targets, with validity and raw returns exact.
+AERI's final-date boundary is traced to a rejected pre-Round-7 inference;
+a sparse amendment removes that factor from four inherited wealth values and
+one retrospective M1 diagnostic, preserving all existing horizon outcomes.
+See `docs/v2_TO_CLOSE_CLOCK_AERI.md`, `docs/v2_M1_SCALAR_ASSEMBLY.md` and
 `docs/v2_M1_RENAME_HISTORY.md`. These are
 intermediate derived observations, not a replacement model store or permission to attach changed
 coordinates to old fits. Original filing clocks and capital units reconcile

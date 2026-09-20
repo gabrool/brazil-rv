@@ -1,0 +1,85 @@
+{
+  "accepted_store_modified": false,
+  "aeri_source": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\aeri_boundary\\manifest.json",
+    "sha256": "a5397e1f8bbd43181693d625bfc01dec8bf77d629fc82101e51b6aa3b68e4396"
+  },
+  "aeri_wealth": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\aeri_boundary\\wealth_qualification.json",
+    "sha256": "d181d48e8383cd670c6d6d5689e73bc1c20929c1818f3654cf2eed994443c801"
+  },
+  "clock": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\to_close_clock\\manifest.json",
+    "sha256": "70a33de3cd79f9269980f0c1195ee3e3055cffaa10ebb76f400316ca0321548f"
+  },
+  "consumer": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\to_close_clock\\consumer\\manifest.json",
+    "sha256": "db865097a238607db4b9ea7b7e24e7e0108510e6fe32bc382c486cf4296afdc9"
+  },
+  "forecast_scoring": false,
+  "heldout_consumer_access": false,
+  "historical_recipe_resolution": "finalize_m1_scalars now explicitly passes405/345 to reproduce its earlier isolated rename attribution; no prior result was regenerated.",
+  "neural_forward": false,
+  "new_gpu_fit": false,
+  "new_neural_coordinates_admitted": false,
+  "parent": {
+    "manifest_sha256": "61149d43a23fc55fcd92b43aaa4e74d747fbdf62f852bedbbbdb2cf18281f3cc",
+    "root": "C:\\quant-data\\b3\\processed\\v2_data_store_2d59b9d_20260913T211700Z"
+  },
+  "remaining": [
+    "remaining auxiliary histories and source clocks/revisions/units",
+    "other contractual corporate wealth/labels and finite-loan/execution model-book bounds",
+    "complete derived store and actual final tensor/refit contract",
+    "C/D unstarted"
+  ],
+  "report": {
+    "path": "C:\\Brazil-RV\\quant\\b3-quant\\docs\\v2_TO_CLOSE_CLOCK_AERI.md",
+    "sha256": "0ef791e72c99a2ae4823e68e2555885317fda9b91727345478fcb5977317c6c6"
+  },
+  "source_code": {
+    "ops/audit_aeri_boundary.py": {
+      "path": "C:\\Brazil-RV\\quant\\b3-quant\\ops\\audit_aeri_boundary.py",
+      "sha256": "8a2e034c5028f35730a521242ddfc642589a55e4893ee02a20da3a3ae8953e73"
+    },
+    "ops/audit_to_close_clock_inputs.py": {
+      "path": "C:\\Brazil-RV\\quant\\b3-quant\\ops\\audit_to_close_clock_inputs.py",
+      "sha256": "53ce6fed631204fda496aa8c9f04901f67d17e0525f98a640880b2dcb7613f11"
+    },
+    "ops/finalize_m1_scalars.py": {
+      "path": "C:\\Brazil-RV\\quant\\b3-quant\\ops\\finalize_m1_scalars.py",
+      "sha256": "30bb93401aca965d568572be6f368c0ca82b473ea93445f41c07ff721376719c"
+    },
+    "ops/qualify_aeri_wealth.py": {
+      "path": "C:\\Brazil-RV\\quant\\b3-quant\\ops\\qualify_aeri_wealth.py",
+      "sha256": "da7f5e024b59626ab94b302e7e7bf811b2036c4dfa6931776b96ca3003fc295b"
+    },
+    "ops/repair_to_close_clock.py": {
+      "path": "C:\\Brazil-RV\\quant\\b3-quant\\ops\\repair_to_close_clock.py",
+      "sha256": "aa197a6d1d9468b6f7d7a5f5dcb96255f2c64587d74b8158e1a6358102be62d3"
+    },
+    "research/src/brazil_rv/v2/build_store.py": {
+      "path": "C:\\Brazil-RV\\quant\\b3-quant\\research\\src\\brazil_rv\\v2\\build_store.py",
+      "sha256": "ef084a2878717e30465a8dfb81338f004cbc098e015df44d6cf05998b11248ad"
+    },
+    "research/src/brazil_rv/v2/targets.py": {
+      "path": "C:\\Brazil-RV\\quant\\b3-quant\\research\\src\\brazil_rv\\v2\\targets.py",
+      "sha256": "da9bf24dbcd0db5c3fc757398f974263d3528cb23040d665652e3b5d7a92d91b"
+    },
+    "research/tests/test_v2_targets.py": {
+      "path": "C:\\Brazil-RV\\quant\\b3-quant\\research\\tests\\test_v2_targets.py",
+      "sha256": "a15615af96d7924f5581bfa2799858301a34a36a1872005682b2be078a01601b"
+    }
+  },
+  "status": "dated_auxiliary_clock_and_aeri_last_row_verified_full_store_pending",
+  "tests": {
+    "raw_to_store_causal_fixture": {
+      "passed": 1,
+      "seconds": 4.58
+    },
+    "ruff": "passed",
+    "targets_and_store_audits": {
+      "passed": 18,
+      "seconds": 0.41
+    }
+  }
+}

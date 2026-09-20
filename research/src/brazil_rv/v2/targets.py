@@ -6,7 +6,7 @@ import numpy as np
 from numpy.typing import NDArray
 
 from .corporate_actions import AlignedActionTerms, apply_contractual_action
-from .contract import DECISION_MINUTE_INDEX, HORIZONS
+from .contract import HORIZONS
 from .normalization import midrank_unit_interval
 
 
@@ -397,10 +397,14 @@ def build_to_close_target(
     active: NDArray[np.bool_],
     fast_present: NDArray[np.bool_],
     *,
-    session_minutes: int = 405,
-    cutoff: int = DECISION_MINUTE_INDEX,
+    session_minutes: NDArray[np.integer],
+    cutoff: NDArray[np.integer],
 ) -> ToCloseTarget:
-    """Return from the 15:45 entry-bar open to close, normalized by time left."""
+    """Entry-open to close, with dated remaining/full-session normalization.
+
+    The supplied volatility estimator is unchanged; callers must supply the
+    actual session and completed-prefix minute counts on the same date axis.
+    """
 
     entry = np.asarray(entry_open, dtype=np.float64)
     close = np.asarray(session_close, dtype=np.float64)
@@ -411,8 +415,16 @@ def build_to_close_target(
         value.shape != entry.shape for value in (close, sigma, membership, present)
     ):
         raise ValueError("to-close arrays must be aligned [date, name]")
-    remaining = session_minutes - cutoff
-    if remaining <= 0 or cutoff <= 0:
+    minutes = np.asarray(session_minutes, dtype=np.float64)
+    prefix = np.asarray(cutoff, dtype=np.float64)
+    if minutes.shape != (entry.shape[0],) or prefix.shape != minutes.shape:
+        raise ValueError("to-close clocks must align with the date axis")
+    remaining = minutes - prefix
+    if (
+        not np.isfinite(minutes + prefix).all()
+        or np.any(remaining <= 0)
+        or np.any(prefix <= 0)
+    ):
         raise ValueError("cutoff must leave at least one session minute")
     valid = (
         membership
@@ -428,13 +440,13 @@ def build_to_close_target(
     raw[valid] = np.log(close[valid] / entry[valid]).astype(np.float32)
     residual = np.zeros(entry.shape, dtype=np.float32)
     target = np.zeros(entry.shape, dtype=np.float32)
-    scale = np.sqrt(remaining / session_minutes)
+    scale = np.sqrt(remaining / minutes)
     for day in range(entry.shape[0]):
         row_valid = valid[day]
         if not row_valid.any():
             continue
         raw_row = np.log(close[day, row_valid] / entry[day, row_valid])
-        normalized = raw_row / (sigma[day, row_valid] * scale)
+        normalized = raw_row / (sigma[day, row_valid] * scale[day])
         normalized -= np.median(normalized)
         normalized = np.clip(normalized, -5.0, 5.0)
         residual[day, row_valid] = normalized.astype(np.float32)

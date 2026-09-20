@@ -30,6 +30,9 @@ def targets(raw, active):
         raw["realized_daily_vol"],
         active,
         raw["fast_present"] & raw["entry_valid"] & raw["return_consistent"],
+        # This reproducer isolates the earlier rename-only target convention.
+        session_minutes=np.full(len(active), 405),
+        cutoff=np.full(len(active), 345),
     )
     return {
         "target_to_close": out.target,

@@ -2741,6 +2741,22 @@ def build_daily_store(
             realized_daily,
             universe.active,
             fast_present & entry_valid & return_consistent,
+            session_minutes=np.asarray(
+                [
+                    (row.continuous_close.hour - row.continuous_open.hour) * 60
+                    + row.continuous_close.minute
+                    - row.continuous_open.minute
+                    for row in session_schedule
+                ]
+            ),
+            cutoff=np.asarray(
+                [
+                    (row.decision_time.hour - row.continuous_open.hour) * 60
+                    + row.decision_time.minute
+                    - row.continuous_open.minute
+                    for row in session_schedule
+                ]
+            ),
         )
         for name, values in (
             ("target_to_close", to_close.target),
@@ -3508,6 +3524,11 @@ def build_daily_store(
             "activity": "only physical rows certify activity; absent sparse-archive minutes remain unknown",
             "source_age": "sessions since newest observation consumed; independent of feature validity; unknown -1",
             "to_close_target": "exact entry and continuous-close prices both in M1 units",
+            "to_close_normalization": (
+                "dated sqrt((continuous_minutes-prefix_minutes)/continuous_minutes); "
+                "unchanged pre-decision five-minute-return RSS; per-date median, "
+                "clip[-5,5], midrank"
+            ),
         },
         "survivorship_gates": {
             "internally_derived_feature_family_max_gap": 0.05,

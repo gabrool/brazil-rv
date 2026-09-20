@@ -225,8 +225,44 @@ def test_to_close_target_is_cross_sectionally_ranked() -> None:
         np.full_like(entry, 0.02),
         np.ones_like(entry, dtype=bool),
         np.ones_like(entry, dtype=bool),
+        session_minutes=np.array([412]),
+        cutoff=np.array([342]),
     )
     np.testing.assert_array_equal(result.target[0], [0.0, 0.5, 1.0])
+
+
+def test_to_close_dated_clocks_change_clipping_ties_without_future_effects():
+    entry = np.ones((3, 4)) * 100
+    close = entry * np.exp(np.array([0, 0.01, 0.23, 0.25]))
+    sigma = np.full_like(entry, 0.05)
+    active = np.ones_like(entry, dtype=bool)
+    minutes = np.array([405, 472, 292])
+    cutoff = np.array([345, 342, 162])
+    result = build_to_close_target(
+        entry, close, sigma, active, active, session_minutes=minutes, cutoff=cutoff
+    )
+    assert result.target[0, 2] == result.target[0, 3]
+    assert result.target[1, 2] < result.target[1, 3]
+    for t in range(3):
+        raw = np.log(close[t] / entry[t])
+        normalized = raw / (0.05 * np.sqrt((minutes[t] - cutoff[t]) / minutes[t]))
+        expected = np.clip(normalized - np.median(normalized), -5, 5)
+        np.testing.assert_array_equal(
+            result.normalized_residual[t], expected.astype(np.float32)
+        )
+    future = build_to_close_target(
+        entry[:2],
+        close[:2],
+        sigma[:2],
+        active[:2],
+        active[:2],
+        session_minutes=minutes[:2],
+        cutoff=cutoff[:2],
+    )
+    np.testing.assert_array_equal(
+        future.normalized_residual, result.normalized_residual[:2]
+    )
+    np.testing.assert_array_equal(future.target, result.target[:2])
 
 
 def test_residual_is_median_removed_before_name_specific_scaling() -> None:

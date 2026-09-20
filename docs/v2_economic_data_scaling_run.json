@@ -3,6 +3,14 @@
     "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\activity_magnitude_propagation\\manifest.json",
     "sha256": "89c33b64ea052492238e0d1a2dee6fa1130a7ba43d64a36a3442903a11a9622a"
   },
+  "aeri_boundary": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\aeri_boundary\\manifest.json",
+    "sha256": "a5397e1f8bbd43181693d625bfc01dec8bf77d629fc82101e51b6aa3b68e4396"
+  },
+  "aeri_wealth_qualification": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\aeri_boundary\\wealth_qualification.json",
+    "sha256": "d181d48e8383cd670c6d6d5689e73bc1c20929c1818f3654cf2eed994443c801"
+  },
   "auxiliary_tensor_audit": {
     "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\auxiliary_tensor_audit\\report.json",
     "sha256": "ca53993c49424f7383a02064cae6b137c612115d10bbf639549d4820a30337d5"
@@ -403,6 +411,18 @@
     "sha256": "be8a7a157909c5fc8b0ced719efc0e5432bad7e466ad4bb65417bee02c3ec064"
   },
   "status": "accounting_and_deep_data_audit",
+  "to_close_clock": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\to_close_clock\\manifest.json",
+    "sha256": "70a33de3cd79f9269980f0c1195ee3e3055cffaa10ebb76f400316ca0321548f"
+  },
+  "to_close_clock_acceptance": {
+    "path": "C:\\Brazil-RV\\quant\\b3-quant\\docs\\v2_to_close_clock_acceptance.json",
+    "sha256": "569544f83eadc2feb2247068dfcb686be7fe04caafa760bac1bd5ea616f75f03"
+  },
+  "to_close_clock_input_audit": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\to_close_clock\\consumer\\manifest.json",
+    "sha256": "db865097a238607db4b9ea7b7e24e7e0108510e6fe32bc382c486cf4296afdc9"
+  },
   "us_source_audit": {
     "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\us_source_audit.json",
     "sha256": "c5fbdb461303001eadedff388d098ea28c0d8c08038ee97856a0420b5c3424e2"

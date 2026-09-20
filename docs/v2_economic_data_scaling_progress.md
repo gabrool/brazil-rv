@@ -1550,3 +1550,32 @@ duplication. Acceptance SHA
 Attribution source formatting/helper equivalence is explicitly qualified; its
 original hash and unchanged report remain recorded. Prior recovery dependencies
 are preserved. No worker remains active.
+
+### Dated auxiliary normalization and AERI lineage (2026-09-20)
+
+The producer now supplies dated session/prefix clocks to the optional to-close
+target. The current pre-decision RSS estimator and median/clipping/ranking remain
+fixed. Reused 17,817 saved inputs plus 72,060 necessary original-source name/date
+endpoints reproduce all 89,877 existing/rename-admitted outcomes exactly under
+the old convention. Clock-only changes: 88,311 residuals, 12 ranks on four dates,
+zero validity/raw-return changes; clipped residuals65→19. Independent arithmetic
+matches every outcome; actual dataset/collator18samples/all933/full60 checks
+67,176 target cells exactly. Recovery23.68s, total24.37s, consumer6.02s.
+
+AERI's Dec30 inherited diagnostic is a pre-Round-7 U2 inference explicitly
+reclassified as large_move_no_action in the already bound review. It was not a
+missing issuer-confirmed bonus. Exact old-factor arithmetic identifies four
+inherited wealth cells; the sparse q1/cash0 amendment restores the 31.29% raw
+closing loss and one retrospective consistency bit. Existing five-horizon
+outcomes remain exact; the auxiliary target is still unsupported for independent
+prefix-return support. No decision through Dec30 consumes the changed final daily
+wealth row. Original Dec9 debt/Dec10 controlling-shareholder notices were archived
+and visually verified, with no invented equity conversion terms.
+
+18 affected tests pass plus the separate raw-to-store causal fixture; Ruff passes.
+No model forward/fit/scoring. Initial AERI date-schema/renderer-path attempts are
+retained; successful source bytes reused. Resolve to_close_clock/input_audit and
+aeri_boundary/wealth_qualification; see v2_TO_CLOSE_CLOCK_AERI.md. These are
+verified amendments, not a final accepted store. Next finish remaining auxiliary
+histories/joins, contractual wealth/labels and the complete store/tensor/refit
+contract alongside A's remaining adaptive-book bounds. A/B incomplete, C/D unstarted.
