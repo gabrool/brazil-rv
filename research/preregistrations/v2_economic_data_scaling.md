@@ -134,6 +134,19 @@ liquidity-eligibility sessions per converted source while their final wealth/fea
 treatment is resolved. Primary neutral targets remain the store's on-demand
 registered characteristic projection; no new loss or neutralization hypothesis.
 
+Converted-source disposition, frozen before corrected outcomes, 2026-09-20:
+retain all 18 liquidity-based membership cells and their full causal histories.
+The first decision consumes the final pre-effect source OHLC; later unsupported
+return/volatility fields stay missing, while independently supported activity and
+history-age fields remain. Record exact successor closing entitlements separately,
+available at the next decision, without manufacturing source quotes or coherent
+basket OHLC. No claim-close predictor is added. Close new-source entry permission
+from max(effect, knowledge), including Cielo's separately known closed register;
+retain the independent observed-price execution gate and inventory obligations.
+This is a source-bound entry constraint, not a change to liquidity membership.
+Quantity-dependent post-auction, cash remuneration and funded wealth belong to
+the account ledger; unit gross labels retain their explicit pre-auction scope.
+
 ## C. Reassess existing leads under corrected economics
 
 Replay matched full-input attention, wider attention, GRU with early peers and C6

@@ -1,6 +1,6 @@
 # Brazil-RV project context
 
-Last verified: 2026-09-19.
+Last verified: 2026-09-20.
 
 The user now authorizes the [economic/data/scaling program](research/preregistrations/v2_economic_data_scaling.md):
 contractual accounting and stock-borrow investigation/repairs, a deep source-to-model
@@ -18,62 +18,35 @@ Use the local GPU, all eligible names and full history; no forward capture, depl
 or held-out consumers. Follow the registered stages and
 `docs/v2_economic_data_scaling_progress.md`. Earlier foundation outcomes stay sealed.
 
-Stage B now binds a broader FCA identity/financial/event overlay, including the
-earlier C&A recovery and dated MGLU/ABC issuer corrections. It restores issuer
-information on 31,858 already eligible stock-days, adds 179,685 usable financial
-values and 219,291 event values, and loses no valid eligible observations.
-Source-specific corrections retain separate evidence clocks and explicitly bound
-ISINs where external issuer documents resolve missing/conflicting FCA fields.
-Sector, cross-market peer and lending-utilization observations now propagate these
-identities on their original market-input contracts. See
-`docs/v2_FCA_IDENTITY_PROPAGATION.md` and the economic/data run pointer.
-ALLOS/ISA daily history, universe, slow fields, labels and full 60-session input
-routing now propagate under dated source links; monthly peers also inherit prior
-identity history. See `docs/v2_RENAME_HISTORY_PROPAGATION.md`. Dependent-family,
-remaining corporate wealth/label and final store assembly work remains. The
-rename links now also carry exact issuer/class identity and prior-price capital
-barriers through financial/event, sector, physical-magnitude and cross-market
-dependencies. Independently valid activity from the rejected GOLL price row is
-retained without admitting its OHLC prices or changing eligibility. See
-`docs/v2_RENAME_DEPENDENCIES.md`. M1 and remaining auxiliary
-joins require separately attributed propagation. Reconciled lending now
-also propagates through the seven feature fields on the renamed axes, retaining
-the larger original feature-source archive and its exact field-unit exclusions.
-The new qualified economics view leaves rates and eligible availability unchanged
-versus recovered economics. Utilization carries predecessor capital uncertainty;
-126 specifically enumerated ALOS denominators lose support under the existing
-rule. See `docs/v2_LENDING_FEATURE_PROPAGATION.md`. Native M1 predecessor history now propagates at the two renames with separate
-effect/knowledge gates, source-assignment bounds and unchanged support thresholds.
-It restores 7,419 native feature cells without losses. An actual dataset/collator
-audit covers 314 full-population, 60-session samples; raw M1 scalar amendments
-now reach cross-sectional scalar transforms, inherited source ages and the old
-to-close target convention: 1,116 usable feature cells and 78 valid outcomes are
-added, with 90 full-population consumer samples verified. Dated to-close
-normalization now reproduces all 89,877 prior admitted outcomes before changing
-88,311 residuals and 12 rank targets, with validity and raw returns exact.
-AERI's final-date boundary is traced to a rejected pre-Round-7 inference;
-a sparse amendment removes that factor from four inherited wealth values and
-one retrospective M1 diagnostic, preserving all existing horizon outcomes.
-See `docs/v2_TO_CLOSE_CLOCK_AERI.md`, `docs/v2_M1_SCALAR_ASSEMBLY.md` and
-`docs/v2_M1_RENAME_HISTORY.md`. The remaining activity/options/odd-lot
-histories and index-preview composition identities now propagate under those
-same dated links. They add 778 valid auxiliary cells and retire 16 predecessor
-cells, with no loss on still-eligible names; 90 full-population CPU consumer
-samples and all 44 original index portfolios reconcile. See
-`docs/v2_REMAINING_AUXILIARY_HISTORY.md`. Original IN/PR option/cash numbers and
-annual COTAHIST option quantities now reconcile independently. Sourced BRML,
-Dommo and Copel baskets add 63 gross horizon outcomes; the actual virtual
-neutral-target consumer is verified against independent projection arithmetic.
-Keep all successor legs separate and preserve the 18 post-effect source
-eligibility cells pending their wealth/feature disposition. See
-`docs/v2_BVBG_CORPORATE_TARGET_AUDIT.md`. These are
-intermediate derived observations, not a replacement model store or permission to attach changed
-coordinates to old fits. Original filing clocks and capital units reconcile
-separately in `docs/v2_CVM_SOURCE_AUDIT.md`.
-Selected financial numerators, trailing-period formulas and share denominators
-now reconcile independently, including the incremental filings and the actual
-utilization consumer; see `docs/v2_FINANCIAL_FORMULA_AUDIT.md`. This audit changes
-no model inputs and does not resolve single-vintage revision uncertainty.
+The economic program now has a complete, separately accepted development store.
+Resolve `docs/v2_economic_data_inputs.json`; keep `docs/v2_data_inputs.json` and
+all foundation fits sealed. The new store combines source-bound FCA identity,
+financial/event/peer observations, ALLOS/ISA full history and issuer clocks,
+qualified lending, activity-only GOLL data, native/scalar M1 and auxiliary history,
+dated to-close normalization, AERI lineage and sourced corporate basket targets.
+It retains all 3,717 sessions, 933 permanent names, 2009 warmup and full 60-session
+history. See `docs/v2_DERIVED_STORE_ACCEPTANCE.md` and the economic run pointer
+for the constituent evidence and verified recovery dependencies.
+
+The 18 converted-source and six closed-register Cielo liquidity cells remain
+eligible. New-source entry permission closes on the sourced effect/knowledge
+clock; missing source OHLC stays missing. Separate exact closing entitlement
+observations do not become source quotes, candles or a new model feature.
+All remaining active support losses are individually explained by the existing
+capital-unit or three-other-peer support barriers; no threshold is relaxed.
+The primary target is the store's virtual characteristic-neutral view, using
+its actual shareholder returns, sigma and slow risk coordinates.
+
+The unchanged feature schema does not make old fit coordinates compatible.
+New matched P/F fits must use this explicit store contract and newly fitted
+training-only conditioning; old P weights/scalers cannot be inherited. The
+optional to-close loss remains inactive in the foundation recipe. Accounting-only
+and source-only replay must preserve frozen old PolicyData coordinates.
+Source vintage/revision and first-publication limits remain explicit. Completed
+source audits must not be repeated merely to revisit those unknown limits.
+Stage A adaptive-book lifecycle/execution and exposure-ranked event bounds remain,
+followed by registered matched C and conditional D work. No corrected model
+profitability, new GPU fit or final program completion is claimed.
 
 The current accounting code retains unpriced equity/hedge inventory and its cash,
 claims and financing obligations until an observed execution or contractual event.

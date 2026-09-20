@@ -1,0 +1,41 @@
+{
+  "contract": {
+    "path": "C:\\quant\\b3-quant\\docs\\v2_derived_store_contract.json",
+    "sha256": "d29e98c80a15d95b221a525814c928a5d8fd7c44e143ef7547a678397c371652"
+  },
+  "economic_admission": "pending Stage A bounds and matched C comparisons",
+  "evidence": {
+    "corporate_claim_rows": {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\corporate_claim_rows\\manifest.json",
+      "sha256": "b7cdb750a21132dcf33e3bb091c61e18ff9fd6dea88c536ec78304a74d35d89d"
+    },
+    "derived_store_assembly": {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\derived_store_assembly\\manifest.json",
+      "sha256": "540f3c5e3ca838d78bd32af1812571dd33d8180f2dce1eee2a40299d538239e9"
+    },
+    "derived_store_boundaries": {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\derived_store_boundaries\\manifest.json",
+      "sha256": "5cb1d6a22a934baae61109003f5cef2b30befb8d188ed1d3a0e5697d68c8caa6"
+    },
+    "derived_store_input_audit": {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\derived_store_assembly\\qualification\\manifest.json",
+      "sha256": "c7427bf10835fa63444efbe6af45bffda1add2b256b48eee61e40d4ae56951f6"
+    }
+  },
+  "forecast_scoring": false,
+  "heldout_access": false,
+  "old_fits_compatible": false,
+  "parent": {
+    "manifest_sha256": "61149d43a23fc55fcd92b43aaa4e74d747fbdf62f852bedbbbdb2cf18281f3cc",
+    "root": "C:\\quant-data\\b3\\processed\\v2_data_store_2d59b9d_20260913T211700Z"
+  },
+  "report": {
+    "path": "C:\\quant\\b3-quant\\docs\\v2_DERIVED_STORE_ACCEPTANCE.md",
+    "sha256": "46428b35c10dc2bb894c4cc30c0ae79051797ae540396c22dfc17df79b837620"
+  },
+  "status": "accepted_complete_derived_store_requires_new_matched_fits",
+  "store": {
+    "manifest_sha256": "2e16c8d6dfbba8c8eb65330635507b1eac473e9790c573d3329d889692e9b3f2",
+    "root": "C:\\quant-data\\b3\\processed\\v2_economic_data_store_20260920"
+  }
+}

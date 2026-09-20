@@ -1,0 +1,84 @@
+{
+  "schema": "ECONOMIC_DERIVED_STORE_CONTRACT",
+  "frozen_at_utc": "2026-09-20T06:45:53.172614+00:00",
+  "parent": {
+    "manifest_sha256": "61149d43a23fc55fcd92b43aaa4e74d747fbdf62f852bedbbbdb2cf18281f3cc",
+    "root": "C:\\quant-data\\b3\\processed\\v2_data_store_2d59b9d_20260913T211700Z"
+  },
+  "output": "C:/quant-data/b3/processed/v2_economic_data_store_20260920",
+  "evidence_root": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\derived_store_assembly",
+  "amendments": {
+    "rename_history_propagation": {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\rename_history_propagation\\manifest.json",
+      "sha256": "e0ab9e9ad52d5ad0fa56973a709ba1da5db00805379843df700cbecfe40bfd89"
+    },
+    "rename_peer_propagation": {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\rename_peer_history\\manifest.json",
+      "sha256": "e064dfaada8ee6bd8d15d1b61dc226f2db97b3636218ad8c5a10706a14b6b62e"
+    },
+    "rename_issuer_propagation": {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\rename_issuer_propagation\\manifest.json",
+      "sha256": "2b5a9322117c57d00d10472e43335ca35e6ff7af5e4922f949e07f27a2b5cd08"
+    },
+    "rename_dependents": {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\rename_dependents\\manifest.json",
+      "sha256": "83196483828edcc597d1910731e57ec5f96d03fa81f0ea5b0fdd810a96930456"
+    },
+    "activity_magnitude_propagation": {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\activity_magnitude_propagation\\manifest.json",
+      "sha256": "89c33b64ea052492238e0d1a2dee6fa1130a7ba43d64a36a3442903a11a9622a"
+    },
+    "goll_activity_admission": {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\goll_activity_admission\\manifest.json",
+      "sha256": "7868108bdc97e193b7f86a510b2317174171b22629441025d5936069474c6fca"
+    },
+    "lending_feature_propagation": {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\lending_feature_propagation\\manifest.json",
+      "sha256": "864c8fe1dade2ceb9cda76814f12d559bfb39e4b8909f5b5c227d9dd504017ea"
+    },
+    "rename_m1_propagation": {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\rename_m1_propagation\\manifest.json",
+      "sha256": "572efa8926a9578951d9e4202330acb749c8c0af43e5bdfb26863edbc24de765"
+    },
+    "rename_m1_input_audit": {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\rename_m1_propagation\\qualification\\manifest.json",
+      "sha256": "90ddf9cdeddccf4f95271a73166578ce863f7d9683b7402d69a634d3fab95a47"
+    },
+    "m1_scalar_assembly": {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\m1_scalar_assembly\\amendments\\manifest.json",
+      "sha256": "fde1bd464534c825734e933d26273cd6d79821e8f782b502dff90fc12909f1ce"
+    },
+    "to_close_clock": {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\to_close_clock\\manifest.json",
+      "sha256": "70a33de3cd79f9269980f0c1195ee3e3055cffaa10ebb76f400316ca0321548f"
+    },
+    "aeri_wealth_qualification": {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\aeri_boundary\\wealth_qualification.json",
+      "sha256": "d181d48e8383cd670c6d6d5689e73bc1c20929c1818f3654cf2eed994443c801"
+    },
+    "remaining_auxiliary_input_audit": {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\remaining_auxiliaries\\qualified\\qualification\\manifest.json",
+      "sha256": "67ab6d3c6bec2b31d8932fdf1dfcf008a5dc6cc831a61e6f5203743b1547835b"
+    },
+    "corporate_target_propagation": {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\corporate_targets\\qualified\\manifest.json",
+      "sha256": "59237c2ff7ef0c0d2471fe47ea1265baf37e33f90195e0e8c6eb2f280e71bff0"
+    },
+    "corporate_claim_rows": {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\corporate_claim_rows\\manifest.json",
+      "sha256": "b7cdb750a21132dcf33e3bb091c61e18ff9fd6dea88c536ec78304a74d35d89d"
+    }
+  },
+  "axes": "All 3717 development sessions and 933 names; prior 2009 warmup inherited; all eligible names and full 60-session input routing preserved.",
+  "refit_contract": "New P and F fits on these coordinates; preserve registered learning budgets, optimizer, selector, folds and seeds. No parent trained on the old store is coordinate-compatible. Same FeatureSpec definitions, train-only conditioning estimated afresh on each compatible P training split and inherited only by its new F children. Optional to-close head remains inactive in the foundation control.",
+  "attribution": "Accounting-only and source-only replays retain original frozen PolicyData coordinates. This store combines separately verified data layers and requires matched refits before profitability comparisons. No claimed accounting improvement from benchmark-clock corrections.",
+  "corporate_scope": "All 18 converted-source liquidity cells and six closed-register Cielo cells retained. Source entry blocked at max(effect, knowledge), independent quote gate preserved. Claim-close observations are audit-only; coherent source OHLC and missingness remain unchanged. All sourced gross basket target crossing windows precede fraction auctions; quantity-dependent funded wealth stays in the account ledger.",
+  "source_limits": [
+    "Preserved vintages do not measure historical revision share or unselected disclosure completeness.",
+    "B3 XML creation time is not independent proof of first internet availability; existing next-decision and position-date conventions remain.",
+    "Pre-NYSE SUZ observations remain untimed and unsupported.",
+    "Published loan rates and balance availability do not guarantee executable locates or renewal; unresolved 94 old balance cases and three no-table records stay outside newly recovered observations.",
+    "126 ALOS utilization values remain unsupported under the dated capital-unit uncertainty barrier; no split/factor is inferred.",
+    "Stage A exposure-ranked remaining events and adaptive-book lifecycle/execution sensitivities remain required before economic admission."
+  ]
+}

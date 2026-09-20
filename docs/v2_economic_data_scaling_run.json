@@ -73,6 +73,10 @@
     "path": "docs\\v2_copel_replay_acceptance.json",
     "sha256": "f3c79690011a0ca7af3bf252f6ed36f15b4e292c75ef17db3f5cc7b95eec6056"
   },
+  "corporate_claim_rows": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\corporate_claim_rows\\manifest.json",
+    "sha256": "b7cdb750a21132dcf33e3bb091c61e18ff9fd6dea88c536ec78304a74d35d89d"
+  },
   "corporate_loan_sources": {
     "path": "docs\\v2_corporate_loan_sources.json",
     "sha256": "0076c63306393870e2a68595935d581a6284b9ba37efcc33108105225a026b3a",
@@ -127,6 +131,22 @@
   "dependency_update_audit": {
     "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\dependency_update_audit.json",
     "sha256": "87547edf25105b5eb0e22470c60c91bec83294902eb20a4d2e9707ee31050cb5"
+  },
+  "derived_data_inputs": {
+    "path": "C:\\quant\\b3-quant\\docs\\v2_economic_data_inputs.json",
+    "sha256": "9451f6c5ab46c64eadec0ab391aa58b21adf46fe00d60f0237223f69344db739"
+  },
+  "derived_store_assembly": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\derived_store_assembly\\manifest.json",
+    "sha256": "540f3c5e3ca838d78bd32af1812571dd33d8180f2dce1eee2a40299d538239e9"
+  },
+  "derived_store_boundaries": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\derived_store_boundaries\\manifest.json",
+    "sha256": "5cb1d6a22a934baae61109003f5cef2b30befb8d188ed1d3a0e5697d68c8caa6"
+  },
+  "derived_store_input_audit": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\derived_store_assembly\\qualification\\manifest.json",
+    "sha256": "c7427bf10835fa63444efbe6af45bffda1add2b256b48eee61e40d4ae56951f6"
   },
   "dommo_conversion_acceptance": {
     "path": "docs\\v2_dommo_conversion_acceptance.json",

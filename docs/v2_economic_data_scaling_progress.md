@@ -1688,3 +1688,41 @@ exactly; code, patches, source indices and all executed failed/qualified recipes
 recover without immutable inputs or old fits. Source bytes were not rehashed
 during recovery. Acceptance SHA88558de8fde377eac4e00e943406a1b8cbc95214477c3cfd657138cf3360c4ee.
 Prior source/history/feature recovery dependencies remain required and valid.
+
+
+## Complete derived-store assembly and corporate-source disposition, 2026-09-20
+
+The explicit new store resolves the 18 converted-source liquidity cells and six
+closed-register Cielo cells without deleting membership or inventing quotes.
+Eighteen closing entitlement rows reconcile to exact terms/Decimal arithmetic;
+all source wealth/feature masks retain their original meaning. 1,328 full-axis
+entry permissions close causally, including 24 still-eligible cells, all already
+unobserved. Funded/quantity-specific claims stay in the account ledger.
+
+All verified history, issuer/financial/dependent/lending, GOLL, native/scalar M1,
+remaining auxiliary, target-clock/AERI and basket-target amendments compose in
+63.30s. No old source reducer/census or fit was repeated. All3717sessions/933names,
+2009warmup, full60history and original feature schema remain. New P/F conditioning
+and weights are required; explicit old-parent transfer is rejected.
+
+Independent array composition1798674885cells and six-family direct source-row
+arithmetic1040388300cells pass;33 unchanged arrays are hash-exact to parent.
+Actual156 full-population/full60 CPU samples,14pretrain, check1856671832 packed
+cells, including all88 restored eligible dates and corporate/final-date scopes.
+Virtual neutral targets use final sigma/risk coordinates and independent SVD
+arithmetic. All comparisons zero mismatch;74.64s. Five private-runtime future-link
+deletions/future-feature-read guards and revoked-target checks pass in9.05s.
+Ruff passes for four new recipes; no executed reconstruction failure this turn.
+
+Final losses on still-eligible names vs sealed are exactly158:68ALOSutilization
+within the prior126barrier dates and90Embraerpeer fields, all enumerated. Other
+losses belong to retired predecessors. Different overlay baselines explain the
+126-versus68 counts; do not add incremental feature totals together.
+
+Resolve docs/v2_economic_data_inputs.json, docs/v2_derived_store_contract.json,
+corporate_claim_rows, derived_store_assembly, derived_store_input_audit and
+ derived_store_boundaries. Full report docs/v2_DERIVED_STORE_ACCEPTANCE.md.
+Store manifest2e16c8d6dfbba8c8eb65330635507b1eac473e9790c573d3329d889692e9b3f2.
+No old accepted pointer/input or checkpoint changed; no model forward/scoring/GPU.
+A's adaptive-book lifecycle/disposal/rounding/calendar/exposed-event bounds remain
+before C matched economics and D conditional capacity. Program stays active.
