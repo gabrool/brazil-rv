@@ -473,3 +473,17 @@ R10m/1m/5m) ran against six reused saved controls; no repeat parent campaign.
 Existing opposite-direction guard remains pending actual exposure. This closes
 the bounded historical-cost block; two calendar dates, event/data composition
 and integrated StageA admission still precede C/D. Reuse every prior proof.
+
+Event/source composition record, after sparse qualification on2026-09-20:
+the pre-output contract is event_composition/plan.json. Seven qualified distributions,
+Natura and Cielo compose without numerical account changes.72new source-supported
+gross endpoints and entry barriers are separately attributed on accepted Natura
+risk coordinates;33full-name/full60 target consumers qualify. No accepted store or
+old fit changes. Original Elektro528672 plus dated B3 calendar corroborates
+December30 2016 settlement closure; January25 2017 remains. No rent-clock rule is
+inferred from delivery closure. Separately source-admit the surviving-company
+SSBR->ALSO and ARZZ->AZZA identity continuations and propagate only their actual
+bounded dependencies before final data composition/refits. Their missing links
+are distinct from the ALSC/SOMA exchange ratios and B3 index-history methodology;
+no acquired-issuer pooling or loan alias is authorized by that index rule.
+Sparse target controls, completed V31-V41/books/stores and source censuses are reused.

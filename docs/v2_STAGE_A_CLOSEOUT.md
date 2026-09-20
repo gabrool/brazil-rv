@@ -1,6 +1,6 @@
 # Stage A closeout contract
 
-2026-09-20, updated after historical-cost block closeout. This consolidates the remaining
+2026-09-20, updated after event/source composition evidence. This consolidates the remaining
 work following the user's request for a clearer trajectory. It does not change the
 registered economic endpoints, authorize held-out reads, accept Stage A, or start C/D.
 
@@ -13,16 +13,19 @@ checks are evidence to reuse, not a queue to replay.
 | --- | --- | --- |
 | Historical spot costs | Complete for the bounded research contract: dated regimes/global-market rates across all 2,099 development sessions, unrounded primary plus qualified invoice precision hypothesis. Opposite same-security/day fills remain rejected pending actual exposure. | Reuse the 50 qualified monthly originals, 0.2–0.5bp missing-rate bounds and six new invoice variants with six saved controls. No repeated cost/source campaign; an exposed opposite-fill path requires specific daytrade admission. |
 | Historical custody costs | Earlier thresholds/maintenance and exposed corporate physical transitions are implemented and qualified in both accounts. | Reuse the 18 historical-cost and 34 corporate books, including 14 skipped unexposed variants, plus V41 ordinary proofs. Carry the dated fee contract and explicit rights/valuation/payment hypotheses into integrated admission; add a new run only for an untested interaction or actual exposure. |
-| Calendar | Two older equity-clearing ambiguities remain: 2016-12-30 and 2017-01-25. New 131/2015 original lacks an explicit old-equity clearing rule; the recovered 2017 manual is an unapproved draft and the other manual is from 2011. Dated migration plus holiday notices resolve 2017-11-20. | A specific sourced disposition, or separately attributed date hypotheses. The bounded search is complete and is not itself a calendar bound. Do not repeat it or add all monetary-only dates to equity settlement/accrual. |
-| Event/source composition | Compose the qualified primary event terms; retain ALSC unknown physical credit and net cash, ENAT unknown fraction auction, and explicit loan conventions | One bound primary term table and separately named one-factor variants, with no contradictory event clocks, invented receipts, new loan/issuer aliases or overwritten stores. Unknown claims stay locked where required. |
+| Calendar | January25 2017 remains ambiguous. Original Elektro erratum528672 explicitly corroborates no December30 2016 trading/settlement; combined with the dated B3 calendar this supports the closed-day primary. Dated migration plus holiday notices resolve November20 2017.22of23 money-only dates have supported dispositions, without array changes. | A specific sourced January25 disposition, or separately attributed cash/physical delivery and rent hypotheses. Reuse the completed bounded search and new issuer original. Do not import the unapproved2017 draft, assume2011 revision continuity or add all monetary dates. |
+| Event/source composition | Seven distributions, two Natura scalar settlements and Cielo cash now compose with numerically identical actual loader terms. ALSC unknown physical credit/net cash and ENAT unknown fraction auction stay explicit; previous one-factor proofs remain dependencies. | Use composed_primary_event_terms with its identity proof at integrated admission, retaining separate variants and exposure conditions. Surviving-company SSBR/ARZZ identity contracts are a distinct remaining scope; no guessed loan aliases or physical credit. |
 | Cielo held-loan precision | Identify actual loan exposure at the August30 closeout, then apply the already frozen per-share cent variants if that branch is exposed | A held-loan bound requires actual loan cohorts under adaptive decisions. No preference/rate/availability changes to force a holding. An unexposed path may establish zero impact **for that path**, never a general held-loan precision bound. Carry that distinction into the later registered model books. |
-| Remaining succession data implications | Determine whether newly sourced succession changes the accepted model-data contract | Record each actual eligibility/history/wealth/target implication separately. Produce an amendment only for evidenced changes and retain unchanged stores. Account settlement hypotheses do not authorize unrestricted issuer histories or loan aliases. |
+| Remaining succession data implications | NATU/ALSC/SOMA/ENAT sparse attribution adds72 valid gross/neutral outcomes with no losses, preserving24 post-effect eligibility cells.33full933/full60 target consumers pass. SSBR->ALSO and ARZZ->AZZA links are absent; each successor currently has no eligibility during its first60 sessions. | Source-admit the surviving-company identities and propagate actual bounded dependencies, then compose the72 new outcomes with final risks in a new complete store. Do not repeat sparse controls or either accepted store; do not pool acquired-company histories, fabricate source quotes or infer loan aliases. |
 | Integrated admission | Combine the above with existing cash, loan, execution and event mechanics | Verify the remaining interactions and full date/exposure coverage, reconcile components in both accounts, and retain all measured adaptive uncertainty. Publish one acceptance with explicit residual limitations. No model-profit claim from synthetic preferences. |
 
 The rows form three delivery blocks. Historical costs are complete for their
 explicit bounded contract; corporate/calendar/source composition and integrated
 admission remain. They are not seven new experiment campaigns, and this is not
 a completion percentage. See [cost closeout](v2_SPOT_INVOICE_CLOSEOUT.md).
+The current [composition evidence](v2_EVENT_SOURCE_COMPOSITION.md) closes the
+December30 source gap and qualifies the sparse target consequences; this second
+delivery block still has the January25 and surviving-company identity dependencies.
 
 ## Work discipline through admission
 

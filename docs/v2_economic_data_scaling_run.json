@@ -81,6 +81,10 @@
     "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\closeout_calendar_sources\\qualification.json",
     "sha256": "ca450ed93ac8736983fbde9be5fce04b4bddc17b6813d67443253fe999552770"
   },
+  "composed_primary_event_terms": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\event_composition\\primary_terms.json",
+    "sha256": "4da015daa600736bbc23d1dc968e8a533f6dc4b10d70a528cb1e53e1700ba6d3"
+  },
   "conditioned_tensor_audit": {
     "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\fit_conditioning_audit\\tensors.json",
     "sha256": "d01f0711c0f11d08067e6aa67ce062079f213425f0cba05016e399fd8381aca2"
@@ -196,6 +200,10 @@
     "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\cvm_source_audit\\zip_capital.json",
     "sha256": "cf3c4495d894f9047818239f1376d5cdd8f8d32ce490f28b731f2bc45ad1873f"
   },
+  "december_clearing_resolution": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\calendar_issuer_notice\\qualification.json",
+    "sha256": "cb28d1ad79153f281c221a1e9ebc8d29a923d8669fdd78341e0850688edeb789"
+  },
   "dependency_update_audit": {
     "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\dependency_update_audit.json",
     "sha256": "87547edf25105b5eb0e22470c60c91bec83294902eb20a4d2e9707ee31050cb5"
@@ -264,6 +272,22 @@
   "enat_settlement_terms": {
     "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\enat_settlement\\terms.json",
     "sha256": "34e5b9a06e0ab604f6e87dc4e8f1602c2ff3d68035176d0832d05d8f0279073b"
+  },
+  "event_composition_progress": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\event_composition\\progress.json",
+    "sha256": "612b4d65a3841046ea0bfb876feb54686bf4a80af24b1736699f342b7744de66"
+  },
+  "event_composition_qualification": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\event_composition\\qualification\\manifest.json",
+    "sha256": "c0b469f1009017fa074a0e94d9ef2adff677128a6d0a78007f8aca478d2a92f0"
+  },
+  "event_composition_report": {
+    "path": "C:\\quant\\b3-quant\\docs\\v2_EVENT_SOURCE_COMPOSITION.md",
+    "sha256": "1a3d9543ac84529fd90d317bf11a6a190cc5219d84c286e0a9efb1553663ac61"
+  },
+  "event_source_composition": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\event_composition\\manifest.json",
+    "sha256": "9d0746d681fc750d6b38dfd76ca853820624ca03a510696a8aef52f38c4c5b17"
   },
   "ewz_decision_audit": {
     "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\ewz_decision_audit.json",
@@ -856,9 +880,13 @@
   },
   "stage_a_closeout_plan": {
     "path": "C:\\quant\\b3-quant\\docs\\v2_STAGE_A_CLOSEOUT.md",
-    "sha256": "cb03d7532f1b360571b9edafa54ac4ba620b9b90800efdd2f01244e6e8151ede"
+    "sha256": "bb5ddd5782d7f887a571f0ca89e30144a5fa306b9c833041c9f2c12a0df7bb03"
   },
   "status": "accounting_and_deep_data_audit",
+  "succession_identity_dependency_scope": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\event_composition\\identity_scope\\manifest.json",
+    "sha256": "398257fae88c9d6f233a7592851214ba12246c5036678d1a855529abe99e197c"
+  },
   "to_close_clock": {
     "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\to_close_clock\\manifest.json",
     "sha256": "70a33de3cd79f9269980f0c1195ee3e3055cffaa10ebb76f400316ca0321548f"
