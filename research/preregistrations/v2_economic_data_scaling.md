@@ -514,3 +514,17 @@ failed attempts remain; saved reducers and passed consumers were not repeated.
 Continue native M1/scalar, magnitude/cross-market and final target/store composition,
 then January25/integratedStageA before registeredC/D. This does not start a new
 experiment campaign or change any model/economic admission criterion.
+
+
+Remaining surviving-feature composition record, after qualification2026-09-20:
+M1/market pre-output plans and market_progress/planning_resolution.json retain
+the exact prior registration and closeout. Native/scalar/magnitude/cross-market
+layers now qualify; no research runtime or model hypothesis changes. SSBR/ARZZ
+have no accepted predecessor M1 stream; preserve that absence, existing native
+volume history and all933/full60 coordinates. Old-coordinate controls, independent
+arithmetic and877 actual consumers pass. All398 new market-family losses are
+retired predecessor cells; prior live uncertainty losses remain. Failed scalar
+assignment-tail and magnitude inactive-row audit recipes are retained; saved
+reducers reused. Compose final primary targets and a new complete store next,
+then January25 and integratedStageA before C/D. This remains the same delivery
+block and does not change any economic/model gate or activate the to-close loss.

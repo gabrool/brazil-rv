@@ -1,6 +1,6 @@
 # Stage A closeout contract
 
-2026-09-20, updated after surviving-company dependency qualification. This consolidates the remaining
+2026-09-20, updated after all surviving-company feature dependencies qualify. This consolidates the remaining
 work following the user's request for a clearer trajectory. It does not change the
 registered economic endpoints, authorize held-out reads, accept Stage A, or start C/D.
 
@@ -16,7 +16,7 @@ checks are evidence to reuse, not a queue to replay.
 | Calendar | January25 2017 remains ambiguous. Original Elektro erratum528672 explicitly corroborates no December30 2016 trading/settlement; combined with the dated B3 calendar this supports the closed-day primary. Dated migration plus holiday notices resolve November20 2017.22of23 money-only dates have supported dispositions, without array changes. | A specific sourced January25 disposition, or separately attributed cash/physical delivery and rent hypotheses. Reuse the completed bounded search and new issuer original. Do not import the unapproved2017 draft, assume2011 revision continuity or add all monetary dates. |
 | Event/source composition | Seven distributions, two Natura scalar settlements and Cielo cash now compose with numerically identical actual loader terms. ALSC unknown physical credit/net cash and ENAT unknown fraction auction stay explicit; previous one-factor proofs remain dependencies. | Use composed_primary_event_terms with its identity proof at integrated admission, retaining separate variants and exposure conditions. Surviving-company SSBR/ARZZ spot identities are separately source-admitted; no guessed loan aliases or physical credit. |
 | Cielo held-loan precision | Identify actual loan exposure at the August30 closeout, then apply the already frozen per-share cent variants if that branch is exposed | A held-loan bound requires actual loan cohorts under adaptive decisions. No preference/rate/availability changes to force a holding. An unexposed path may establish zero impact **for that path**, never a general held-loan precision bound. Carry that distinction into the later registered model books. |
-| Remaining succession data implications | NATU/ALSC/SOMA/ENAT sparse attribution adds72 valid outcomes; prior33 target consumers are complete. SSBR→ALSO and ARZZ→AZZA add55/60eligible dates. Wealth/daily/risk/peer, common state, issuer/financial/events/sector/lending and microstructure/options/odd-lot/index dependencies now qualify. | Finish native M1/scalars and magnitude/cross-market dependencies; compose new eligibility/same-class targets and the72 outcomes with final risks into a new complete store. Reuse every saved control and both accepted stores. No acquired-company pooling, fabricated source quotes or loan aliases. |
+| Remaining succession data implications | NATU/ALSC/SOMA/ENAT sparse attribution adds72 valid outcomes; prior33 target consumers are complete. SSBR→ALSO and ARZZ→AZZA add55/60eligible dates. Wealth/daily/risk/peer, common state, issuer/financial/events/sector/lending and microstructure/options/odd-lot/index dependencies now qualify. | Native M1/scalars and magnitude/cross-market are now qualified. Compose new eligibility/same-class targets and the72 outcomes with final risks into a new complete store. Reuse every saved control and both accepted stores. No acquired-company pooling, fabricated source quotes or loan aliases. |
 | Integrated admission | Combine the above with existing cash, loan, execution and event mechanics | Verify the remaining interactions and full date/exposure coverage, reconcile components in both accounts, and retain all measured adaptive uncertainty. Publish one acceptance with explicit residual limitations. No model-profit claim from synthetic preferences. |
 
 The rows form three delivery blocks. Historical costs are complete for their
@@ -34,8 +34,9 @@ saved results. Eight further sidecar families and common state now qualify throu
 303 and124 actual full-history consumers. All226 newly lost live sidecar values
 retain evidenced inherited unit uncertainty;47 other losses are retired cells.
 These counts are separate from prior daily peer losses. Remaining dependencies
-are native M1/scalars, magnitude/cross-market and final target/complete-store
-composition. January25 and integratedStageA remain open. This is still work
+are final primary-target/complete-store composition. The remaining four feature
+families now pass877 actual full-history consumers; all398 newly lost market
+fields are retired predecessors. Reuse their saved deltas and controls. January25 and integratedStageA remain open. This is still work
 within the same second delivery block.
 
 ## Work discipline through admission

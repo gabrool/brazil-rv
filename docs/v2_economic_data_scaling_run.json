@@ -884,7 +884,7 @@
   },
   "stage_a_closeout_plan": {
     "path": "C:\\quant\\b3-quant\\docs\\v2_STAGE_A_CLOSEOUT.md",
-    "sha256": "91bc9fb1529e8957755ae20cd247e21fd1ab4b0eee2480c21be21a58b8d8c0d0"
+    "sha256": "4395088bee0bac5a74fa9918dd3b5fd8acbdf41a26f695c5cb2a738c71afb5bd"
   },
   "status": "accounting_and_deep_data_audit",
   "succession_identity_dependency_scope": {
@@ -950,6 +950,22 @@
   "surviving_rename_lineage_recovery": {
     "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\surviving_rename_lineage_recovery.json",
     "sha256": "fcbcb1ed4f5fec91df01f62e98b37cfbc01490b052036adcead01716fcf352b2"
+  },
+  "surviving_rename_m1": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\surviving_renames\\m1\\manifest.json",
+    "sha256": "06302ba1a6bba766471510d52342eb90498e4d7bd3dbea6d3edb64a22201e7e8"
+  },
+  "surviving_rename_market": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\surviving_renames\\market\\manifest.json",
+    "sha256": "b50f5a8e114d4c3ff03bac67403ac40a60e807496c3e3e876cf32a1d49decdcc"
+  },
+  "surviving_rename_market_input_audit": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\surviving_renames\\market_consumer\\manifest.json",
+    "sha256": "403ca3f66289a229c54ecb070742b246b05e53b4fcfeb501924274ca1570aab6"
+  },
+  "surviving_rename_market_progress": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\surviving_renames\\market_progress\\manifest.json",
+    "sha256": "20687b6cc23de3dc93cfdf99f37e18d4ad8eba7210f07fd2adfb6a37bd820f4f"
   },
   "surviving_rename_progress": {
     "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\surviving_renames\\progress.json",

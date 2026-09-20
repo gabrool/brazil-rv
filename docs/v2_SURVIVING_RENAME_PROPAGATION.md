@@ -2,7 +2,8 @@
 
 2026-09-20. This is work within the existing corporate/calendar/source delivery
 block. Stage A and this block remain incomplete; C/D have not started. Resolve
-`surviving_rename_progress`, `surviving_rename_dependency_progress` and their
+`surviving_rename_progress`, `surviving_rename_dependency_progress`,
+`surviving_rename_market_progress` and their
 evidence pointers from the run pointer.
 
 Original issuer notices703585 and1264889, already retrieved and visually qualified,
@@ -148,8 +149,8 @@ Resolve `surviving_rename_dependency_recovery` for the restored/hash-checked
 new evidence archive; it extends the prior rename, source, lending and accepted
 store recovery dependencies without duplicating immutable inputs or old fits.
 
-Next reuse these saved proofs and deltas to finish native M1/scalars and affected
-magnitude/cross-market dependencies. Combine the already-qualified72succession outcomes with
+The remaining M1/scalar/magnitude/cross-market dependencies now qualify below.
+Next combine the already-qualified72succession outcomes with
 final risks and new identity/eligibility target effects into a new complete store.
 January25 2017 clearing still needs its separate cash/delivery/rent disposition,
 followed by integrated Stage A admission. Both earlier complete stores and every
@@ -163,3 +164,67 @@ amendments and the immutable Natura parent.13.7534755seconds. New reducers,
 failed/qualified/executed recipes, source subsets, config, docs and patch recover
 with prior event/Natura/economic/held-source/lending dependencies. No full immutable
 input/store/old-fit copies are included. Resolve `surviving_rename_recovery`.
+
+
+The remaining four feature families now qualify within the same composition
+block. The accepted M1 assignments contain no SSBR or ARZZ stream. ALSO starts
+in July2021; its 55 new 2019 eligibility dates retain no native/scalar/to-close
+support. No predecessor bars, option series or loan references are invented.
+
+Native propagation reads only the affected dated successor source rows through
+2024. Only return/range channels consume the corrected prior-close sigma; all
+other native channels retain their accepted values and complete original
+20-session volume history. The three paths cover 525 ALSO, 264 ALOS and 94 AZZA
+dates, with date overlap across names. The 243,708 original-coordinate controls
+and 119,858 independent block coordinates pass. There are 103,603 numerical
+changes and 2,485 AZZA validity gains, with no losses. Public prebirth coordinates
+remain empty. The actual post-decision mutation check changes the entry bar and
+later bars without changing any native feature.
+
+Scalar reconstruction uses one bounded 2024 window with 45 prior sessions and
+all933 cross-sections. It preserves original feature definitions, observed masks,
+rank support, source ages and dated remaining/full-session to-close scaling.
+The 3,817,836 old-coordinate controls pass. New eligibility adds597 scalar values
+and52 to-close outcomes, with no losses; 59,985 scalar values and857 ages change.
+To-close ranks change5,676 cells and residuals3,999; these counts overlap the
+52 newly supported outcomes. Raw scalar support and M1 consistency are unchanged.
+The optional to-close training loss remains inactive.
+
+Magnitude gains460 fields and cross-market gains7,787. Their14/384 losses are
+all retired ARZZ cells; no additional live loss is introduced. Shared valid
+numerical changes are3,590/57,647. Earlier226 live unit-uncertainty and620 daily
+peer losses remain separately explained. Original oil/non-oil wealth inputs,
+120-session/60-observation regressions, issuer shrinkage, common shocks, foreign
+flow clocks and Float32 panel precision are retained. No ADR identity is inferred.
+All259,954,326 typed controls and67,862,628 raw control comparisons pass.
+
+The actual dataset/collator now verifies877 full933/full60 samples for these four
+families, including every new eligible and changed native date plus boundaries
+and monthly market tails. It checks319,340,926 sample cells and the same cells
+after collation (638,681,852 comparisons). Independent typed/age arithmetic checks
+262,269,406 cells; independent returns, dated clock scaling and tie ranks check
+6,432 to-close outcomes. Scalar future-prefix and consumer future-read guards
+pass. Previously qualified slow history and other sidecar proofs are reused and
+not counted as new proofs. This purpose-limited view is not a complete store,
+primary-target audit, neural forward or model result.
+
+The first scalar attempt emitted rolling diagnostics beyond the final accepted
+RRRP/SEQL assignment date. This harness failure affected17 raw valid cells,
+1,624 transformed values and227 support cells. Exact initial raw/produced arrays,
+recipe and stdout remain. The qualified boundary correction reuses every raw
+reducer and native result, without another source read. Native work took20.5725
+seconds; the scalar resume took0.7739 seconds. Initial full wall time is unknown.
+The first magnitude control compared14 stale inactive raw-family rows without
+applying accepted membership. Correcting the comparison reused saved reducers;
+all six exposure control/corrected regressions ran once. The qualified market
+producer took about162 seconds; final consumer qualification51.1103 seconds.
+Missing-history nanmean warnings do not create observations. Read-only path/rg
+failures are recorded as reconstructed prose, not exact retained shell files.
+These timings are CPU audit timings, not fit estimates. Research runtime remains
+unchanged. Exact frozen planning snapshots, failed/executed recipes and all new
+bounded source subsets are retained for recovery.
+
+Resolve `surviving_rename_market_recovery` for the verified recovery of these new
+artifacts, using prior recovery dependencies instead of copying immutable inputs,
+accepted stores or old fits. Final primary targets/new complete store, January25
+cash/delivery/rent disposition and integrated StageA remain before C/D.

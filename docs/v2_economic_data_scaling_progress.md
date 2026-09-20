@@ -1,5 +1,20 @@
 # Economic accounting, data audit and scaling progress
 
+2026-09-20 latest: all surviving-company feature dependencies now qualify within
+the existing composition block. Resolve `surviving_rename_market_progress`.
+Native scaling adds2,485 usable cells; scalar ranks add597 and to-close labels52,
+with no losses in those families. Magnitude/cross-market add460/7,787 and remove
+14/384 retired ARZZ cells only. Both accepted stores and old fits remain sealed.
+877 actual full933/full60 consumers, independent typed/age/target arithmetic and
+causal guards pass. Exact initial scalar assignment-tail and magnitude inactive-row
+harness failures remain; saved reducers/native results were reused. No research
+runtime, account book, neural forward or fit changed. Final primary-target/new
+complete-store composition, January25 and integratedStageA remain before C/D.
+See [combined evidence](v2_SURVIVING_RENAME_PROPAGATION.md). This completes the
+remaining feature dependencies, not the composition block or StageA.
+
+Earlier same-day dependency qualification:
+
 2026-09-20 latest: eight surviving-company sidecar families and common state now
 qualify within the existing composition block. Resolve
 `surviving_rename_dependency_progress`: 158,241,768 old-coordinate typed control
