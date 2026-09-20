@@ -967,6 +967,10 @@
     "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\surviving_renames\\market_progress\\manifest.json",
     "sha256": "20687b6cc23de3dc93cfdf99f37e18d4ad8eba7210f07fd2adfb6a37bd820f4f"
   },
+  "surviving_rename_market_recovery": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\surviving_rename_market_recovery.json",
+    "sha256": "1575e45e4b18ac0a4d108e18db94d17defc40dbd1ad3def7c0b051e3b2b23879"
+  },
   "surviving_rename_progress": {
     "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\surviving_renames\\progress.json",
     "sha256": "7beb86d0008dad8652e05dba4bd5ac59ff9026a860f57fc9b2faa223b34743e0"

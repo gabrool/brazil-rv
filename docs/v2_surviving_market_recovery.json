@@ -1,0 +1,61 @@
+{
+  "aliases": 11,
+  "archive": {
+    "bytes": 124536378,
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\surviving_market_2fff271.zip",
+    "sha256": "496e3f16f9355637ec7f2338265f77ea721a8cb193401b68e7ba98f3986c566c"
+  },
+  "changed_arrays": 15,
+  "dependencies": {
+    "economic_store_recovery": {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\economic_store_recovery.json",
+      "sha256": "fa010f13f262d20126fc1f3d54fa104b03891b825fc18d3eaa82322eb62cbf39"
+    },
+    "event_composition_recovery": {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\event_composition_recovery.json",
+      "sha256": "852d737ec796377f412f147794b69bbd9d9f8404d54310a1a8355f090e7afc25"
+    },
+    "m1_scalar_recovery": {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\m1_scalar_recovery.json",
+      "sha256": "f20c07fa082b201b800ab5299ba6fa22ecfdf9ba64ad429cba152852fe4f7a77"
+    },
+    "natura_store_recovery": {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\natura_store_recovery.json",
+      "sha256": "3840780a073e6a214ad247530863bff55500114cc340a9953d7492ff927b21a6"
+    },
+    "rename_m1_recovery": {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\rename_m1_recovery.json",
+      "sha256": "e49fffe87c13790cb8f1dbf8d3142fdd1010ce8884350b11f818c5d9c738a583"
+    },
+    "surviving_rename_dependency_recovery": {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\surviving_rename_dependency_recovery.json",
+      "sha256": "fa6deab0c9978e6f5888d663b5c88aa9726325fbefe0ceec505ca3a13ecc4a40"
+    },
+    "surviving_rename_lineage_recovery": {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\surviving_rename_lineage_recovery.json",
+      "sha256": "fcbcb1ed4f5fec91df01f62e98b37cfbc01490b052036adcead01716fcf352b2"
+    },
+    "surviving_rename_recovery": {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\surviving_rename_recovery.json",
+      "sha256": "49dbeba5a2c700d926895811ddddaf547e14a5cc615cfcbf069f8573d398cbd1"
+    }
+  },
+  "immutable_inputs_copied": false,
+  "implementation_commit": "2fff271c9c38e35c37a1bd8593536d8d4bba533e",
+  "limits": "Current new ops/helpers/docs/patch, exact failed/resumed/executed recipes and new evidence recover. Unchanged research runtime and original sources remain prior archive dependencies. Recovery is exact byte reconstruction from sparse amendments, not another source/native/consumer proof. Full accepted inputs/stores/oldfits are not archived.",
+  "logical_members": 275,
+  "parent": {
+    "manifest_sha256": "93f65b11f31979c6eafee0ca7e68afe5bb591a303eb8b5e2148072828e8d04bf",
+    "root": "C:\\quant-data\\b3\\processed\\v2_economic_natura_store_20260920"
+  },
+  "prior_slow_view": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\surviving_renames\\consumer\\slow_view\\manifest.json",
+    "sha256": "97e513d0c49822a1873c971647b1d6744b1cd190913a304c1125c160d8c90ae7"
+  },
+  "prior_view_arrays_reused": 7,
+  "reconstructed_arrays": 27,
+  "reconstructed_cells": 772183163,
+  "seconds": 21.502552999998443,
+  "status": "verified_remaining_feature_recovery",
+  "unique_members": 264
+}
