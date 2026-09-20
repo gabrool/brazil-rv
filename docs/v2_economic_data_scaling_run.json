@@ -1097,6 +1097,10 @@
     "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_economic_matched_20260920\\plan.json",
     "sha256": "4d2ba8050214426df88166f6a9429640e37cf5a408fbe7b1f97689c73a77e464"
   },
+  "stage_c_refit_economics": {
+    "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_economic_matched_20260920\\refit_economics\\manifest.json",
+    "sha256": "5f69343d132bee3ba5218fc4427d5660cac9a53f07ede97e790305c57592adaa"
+  },
   "stage_c_refit_interruption": {
     "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_economic_matched_20260920\\refit_interruption.json",
     "sha256": "e42f5fe54c39ae6254449f26ebc6e13bb8475ce11b9f3de153b6608304d071b5"
