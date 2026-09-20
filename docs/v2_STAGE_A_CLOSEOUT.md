@@ -1,6 +1,6 @@
 # Stage A closeout contract
 
-2026-09-20, updated after complete composed-store acceptance. This consolidates the remaining
+2026-09-20, updated after complete composed-store and bounded calendar acceptance. This consolidates the remaining
 work following the user's request for a clearer trajectory. It does not change the
 registered economic endpoints, authorize held-out reads, accept Stage A, or start C/D.
 
@@ -13,7 +13,7 @@ checks are evidence to reuse, not a queue to replay.
 | --- | --- | --- |
 | Historical spot costs | Complete for the bounded research contract: dated regimes/global-market rates across all 2,099 development sessions, unrounded primary plus qualified invoice precision hypothesis. Opposite same-security/day fills remain rejected pending actual exposure. | Reuse the 50 qualified monthly originals, 0.2–0.5bp missing-rate bounds and six new invoice variants with six saved controls. No repeated cost/source campaign; an exposed opposite-fill path requires specific daytrade admission. |
 | Historical custody costs | Earlier thresholds/maintenance and exposed corporate physical transitions are implemented and qualified in both accounts. | Reuse the 18 historical-cost and 34 corporate books, including 14 skipped unexposed variants, plus V41 ordinary proofs. Carry the dated fee contract and explicit rights/valuation/payment hypotheses into integrated admission; add a new run only for an untested interaction or actual exposure. |
-| Calendar | January25 2017 remains ambiguous. Original Elektro erratum528672 explicitly corroborates no December30 2016 trading/settlement; combined with the dated B3 calendar this supports the closed-day primary. Dated migration plus holiday notices resolve November20 2017.22of23 money-only dates have supported dispositions, without array changes. | A specific sourced January25 disposition, or separately attributed cash/physical delivery and rent hypotheses. Reuse the completed bounded search and new issuer original. Do not import the unapproved2017 draft, assume2011 revision continuity or add all monetary dates. |
+| Calendar | January25 2017 remains historically ambiguous, with separate cash/delivery/extra-accrual hypotheses now implemented and qualified in15new books against3reused controls. Original Elektro erratum528672 explicitly corroborates no December30 2016 trading/settlement; combined with the dated B3 calendar this supports the closed-day primary. Dated migration plus holiday notices resolve November20 2017.22of23 money-only dates have supported dispositions, without array changes. | A specific sourced January25 disposition, or separately attributed cash/physical delivery and rent hypotheses. Reuse the completed bounded search and new issuer original. Do not import the unapproved2017 draft, assume2011 revision continuity or add all monetary dates. |
 | Event/source composition | Seven distributions, two Natura scalar settlements and Cielo cash now compose with numerically identical actual loader terms. ALSC unknown physical credit/net cash and ENAT unknown fraction auction stay explicit; previous one-factor proofs remain dependencies. | Use composed_primary_event_terms with its identity proof at integrated admission, retaining separate variants and exposure conditions. Surviving-company SSBR/ARZZ spot identities are separately source-admitted; no guessed loan aliases or physical credit. |
 | Cielo held-loan precision | Identify actual loan exposure at the August30 closeout, then apply the already frozen per-share cent variants if that branch is exposed | A held-loan bound requires actual loan cohorts under adaptive decisions. No preference/rate/availability changes to force a holding. An unexposed path may establish zero impact **for that path**, never a general held-loan precision bound. Carry that distinction into the later registered model books. |
 | Remaining succession data implications | Complete composed store accepted: all qualified feature layers plus596 newly supported identity/eligibility outcomes and72 reused corporate outcomes. Final virtual primary changes126777 values, gains668/no losses. | Reuse the complete106-array store,19 combined full933/full60 consumer samples and earlier exhaustive per-family proofs. New fits require its explicit coordinate contract. No acquired-company pooling, fabricated quotes or loan aliases. |
@@ -24,8 +24,7 @@ explicit bounded contract; corporate/calendar/source composition and integrated
 admission remain. They are not seven new experiment campaigns, and this is not
 a completion percentage. See [cost closeout](v2_SPOT_INVOICE_CLOSEOUT.md).
 The current [composition evidence](v2_EVENT_SOURCE_COMPOSITION.md) closes the
-December30 source gap and qualifies the sparse target consequences; this second
-delivery block still has the January25 disposition. Surviving-company dependencies
+December30 source gap and qualifies the sparse target consequences; the January25 disposition now has [qualified bounded hypotheses](v2_JANUARY_CALENDAR_ACCEPTANCE.md). Surviving-company dependencies
 and final data composition are accepted separately from economic admission.
 
 The [surviving-company identities and daily history](v2_SURVIVING_RENAME_PROPAGATION.md)
@@ -38,7 +37,7 @@ These counts are separate from prior daily peer losses. Final primary-target and
 complete-store composition are accepted. The remaining four feature
 families now pass877 actual full-history consumers; all398 newly lost market
 fields are retired predecessors. Their deltas and controls now compose in the
-[accepted complete dataset](v2_COMPOSED_DATA_STORE.md). January25 and integratedStageA remain open. This is still work
+[accepted complete dataset](v2_COMPOSED_DATA_STORE.md). January25 bounded disposition qualifies; integratedStageA remains open. This is still work
 within the same second delivery block.
 
 ## Work discipline through admission

@@ -530,3 +530,11 @@ then January25 and integratedStageA before C/D. This remains the same delivery
 block and does not change any economic/model gate or activate the to-close loss.
 
 Complete-composition amendment,2026-09-20: all previously qualified surviving-company feature deltas and final risk coordinates now feed a complete new accepted store. The596 new same-class/eligibility outcomes and72 prior corporate outcomes add668 usable labels without support losses. Preserve the same schema, support, full population/history, optional-loss inactivity and new-P/compatible-F requirement. Accounting-only old forecasts retain OLDPolicyData. Existing source/engineering proofs are reused; this does not change model hypotheses or admit final StageA. The user has paused the one-minute heartbeat and requests continuous implementation without routine checkpoint restarts.
+
+January25 hypothesis qualification,2026-09-20: the frozen pre-output
+docs/v2_JANUARY_CALENDAR_HYPOTHESES.md remains authoritative. Separate cash and
+physical adjacent-close endpoints and one additional contractual loan interval
+qualify at the three registered capitals. Reuse15new/3saved-primary books and
+independent arithmetic; no historical fact is newly inferred, no calendar/model
+arrays change and no interior adaptive extrema are claimed. Carry fixed variants
+to actually intersecting C paths. IntegratedStageA remains open.

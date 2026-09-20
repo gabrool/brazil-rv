@@ -465,6 +465,22 @@
     "path": "docs\\v2_identity_source_admission.json",
     "sha256": "8d3f3d2c04a8bb55cd83d69ddd35541e0049588494b92acc9c03056a741daab8"
   },
+  "january_calendar_acceptance": {
+    "path": "C:\\quant\\b3-quant\\docs\\v2_january_calendar_acceptance.json",
+    "sha256": "ada18dd7ede75f5010cec684aa89278a6449aee80c9acffb3400e679c4ad2650"
+  },
+  "january_calendar_audit": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\january_calendar\\manifest.json",
+    "sha256": "79682d7b55729ed6124d7886d164c1805a12d6699ef7792e2d2d59e7626fccc3"
+  },
+  "january_calendar_qualification": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\january_calendar\\qualification\\manifest.json",
+    "sha256": "564c13633d285405ef5dbade909647d2c7194df3ed713cb1ba5f3763bf03b2ea"
+  },
+  "january_calendar_runtime": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\january_calendar\\runtime_identity.json",
+    "sha256": "8a0ffc82875b8bcc89bf52ddf06e7d66015e9a452635db965ddf598668e23db7"
+  },
   "lending_denominator_audit": {
     "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\lending_denominator_audit\\report.json",
     "sha256": "638516adf383a61ffb1bfe02559206bbf3bc2bff6ffd6caf0f12e292919ef5cb"
@@ -908,7 +924,7 @@
   },
   "stage_a_closeout_plan": {
     "path": "C:\\quant\\b3-quant\\docs\\v2_STAGE_A_CLOSEOUT.md",
-    "sha256": "9d86c6440f7a0a5dc54566ecdbc9eaabff8f882131c90b5b485b7aa25058cf58"
+    "sha256": "6a0d467885901aac694afbe2396121435bc2ab532c8423c941f8e86906402048"
   },
   "status": "accounting_and_deep_data_audit",
   "succession_identity_dependency_scope": {

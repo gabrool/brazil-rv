@@ -182,12 +182,15 @@ def slice_loan_settlements(events, start, stop):
     )
 
 
-def spot_settlement_session(day, session_date):
+def spot_settlement_session(day, session_date, lag_overrides=()):
     """Dated spot value date on the supplied complete trading-session axis.
 
     Spot moved from T+3 to T+2 on 2019-05-27. Same-settlement loan return
     is an execution assumption; broker/cutoff delays require an explicit override.
     """
+    for trade_date, lag in lag_overrides:
+        if np.datetime64(session_date) == np.datetime64(trade_date):
+            return day + lag
     return day + (3 if np.datetime64(session_date) < np.datetime64("2019-05-27") else 2)
 
 
@@ -208,6 +211,9 @@ class LoanContracts:
     bonus_return_floors: dict[int, int] = field(default_factory=dict)
     name: np.ndarray = field(default_factory=lambda: np.empty(0, dtype=np.int64))
     opened: np.ndarray = field(default_factory=lambda: np.empty(0, dtype=np.int64))
+    extra_accrual_days: np.ndarray = field(
+        default_factory=lambda: np.empty(0, dtype=np.int64)
+    )
     value_lag: np.ndarray = field(default_factory=lambda: np.empty(0, dtype=np.int64))
     return_requested: np.ndarray = field(
         default_factory=lambda: np.empty(0, dtype=np.int64)
@@ -300,6 +306,9 @@ class LoanContracts:
         roots = np.arange(len(self.root_name), len(self.root_name) + len(ids))
         self.name = np.r_[self.name, ids]
         self.opened = np.r_[self.opened, np.full(len(ids), day)]
+        self.extra_accrual_days = np.r_[
+            self.extra_accrual_days, np.zeros(len(ids), dtype=np.int64)
+        ]
         registered = np.datetime64(session_date) < np.datetime64(
             "2020-10-26"
         ) or self.modality in ("otc", "compulsory")
@@ -357,7 +366,7 @@ class LoanContracts:
             (self.root_fees, torch.zeros(len(ids), dtype=torch.float64))
         )
 
-    def accrue(self, day, session_date, *, charges=None):
+    def accrue(self, day, session_date, *, charges=None, extra_interval=False):
         """End-of-session recognition after actual fills, returns and renewals.
 
         Registered/D0 rent includes registration and excludes physical return;
@@ -377,7 +386,9 @@ class LoanContracts:
         rent_active = accrues & started & ~((self.value_lag == 0) & physical_end)
         rent_log = np.log1p(self.annual_rate) / self.annual_sessions
         rent = self.principal * _tensor(
-            np.exp(rent_log * (age - self.value_lag)) * np.expm1(rent_log) * rent_active
+            np.exp(rent_log * (age + self.extra_accrual_days - self.value_lag))
+            * np.expm1(rent_log)
+            * rent_active
         )
         # Tariff periods are charged separately; a new schedule must not
         # retrospectively reprice an earlier period's accrued fee.
@@ -396,6 +407,24 @@ class LoanContracts:
             self.fee_growth * daily_fee * self.fee_multiplier * fee_active[:, None]
         )
         self.fee_growth *= 1 + daily_fee * fee_active[:, None]
+        if extra_interval:
+            # A separately frozen nontrading-date accrual hypothesis. Only
+            # cohorts surviving this close accrue; maturity stays on B3 sessions.
+            live = (
+                started
+                & ((self.accrual_end < 0) | (self.accrual_end > day))
+                & ((self.return_day < 0) | (self.return_day > day))
+            )
+            rent = rent + self.principal * _tensor(
+                np.exp(rent_log * (age + self.extra_accrual_days - self.value_lag + 1))
+                * np.expm1(rent_log)
+                * live
+            )
+            fees = fees + self.principal[:, None] * _tensor(
+                self.fee_growth * daily_fee * self.fee_multiplier * live[:, None]
+            )
+            self.fee_growth *= 1 + daily_fee * live[:, None]
+            self.extra_accrual_days += live
         before = self.minimum_provision
         self.started[np.unique(self.root[fee_active])] = True
         self.root_fees = self.root_fees.index_add(
@@ -477,6 +506,7 @@ class LoanContracts:
         for key in (
             "name",
             "opened",
+            "extra_accrual_days",
             "value_lag",
             "accrual_end",
             "return_deadline",
@@ -848,6 +878,7 @@ class LoanContracts:
         for key in (
             "name",
             "opened",
+            "extra_accrual_days",
             "value_lag",
             "return_requested",
             "return_day",
@@ -939,6 +970,7 @@ class LoanContracts:
         self.name = np.r_[self.name, np.full(len(ids), destination)]
         for key in (
             "opened",
+            "extra_accrual_days",
             "value_lag",
             "return_requested",
             "return_day",

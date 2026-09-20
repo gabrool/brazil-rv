@@ -119,6 +119,9 @@ class LedgerConfig:
     approve_loan_renewals: bool = True
     loan_recalls: tuple[LoanRecall, ...] = ()
     electronic_loan_settlement_days: int = 1
+    spot_cash_lag_overrides: tuple[tuple[str, int], ...] = ()
+    spot_delivery_lag_overrides: tuple[tuple[str, int], ...] = ()
+    loan_extra_accrual_after: tuple[str, ...] = ()
     loan_invoice_convention: str = "none"
     loan_minimum_allocation: str = "final"
     volatility_balanced_entries: bool = True
@@ -141,6 +144,16 @@ class LedgerConfig:
     annual_sessions: int = 252
 
     def __post_init__(self) -> None:
+        for overrides in (
+            self.spot_cash_lag_overrides,
+            self.spot_delivery_lag_overrides,
+        ):
+            if len({date for date, _ in overrides}) != len(overrides) or any(
+                lag < 1 for _, lag in overrides
+            ):
+                raise ValueError(
+                    "spot value-date hypotheses require unique trade dates and positive session lags"
+                )
         if self.spot_invoice_convention not in {"unrounded", "security_day_6dp_cent"}:
             raise ValueError("unknown spot invoice convention")
         if (
@@ -3444,7 +3457,9 @@ def simulate_stateful_ledger(
             inputs.dates[day],
             loan_references[day],
             np.r_[rates_today, hedge_rate_today],
-            spot_settlement_session(day, inputs.dates[day]),
+            spot_settlement_session(
+                day, inputs.dates[day], config.spot_delivery_lag_overrides
+            ),
             np.r_[inputs.borrow_rate_imputed[day], False],
             np.r_[
                 inputs.borrow_rate_placeholder[day],
@@ -3990,7 +4005,12 @@ def simulate_stateful_ledger(
             costs += adjustment
             free_cash -= adjustment
         invoice_adjustment_rows.append(invoice_adjustment)
-        spot_day = spot_settlement_session(day, inputs.dates[day])
+        spot_day = spot_settlement_session(
+            day, inputs.dates[day], config.spot_delivery_lag_overrides
+        )
+        cash_day = spot_settlement_session(
+            day, inputs.dates[day], config.spot_cash_lag_overrides
+        )
         for name, due in loans.bonus_return_floors.items():
             if name < name_count and due > spot_day and release_today[name] > 0:
                 retained = np.zeros(name_count + 1)
@@ -4002,20 +4022,30 @@ def simulate_stateful_ledger(
         if np.any(release_today):
             proceeds_releases.append((spot_day, release_today))
         if traded_notional:
-            settlements.append(
-                (
-                    spot_settlement_session(day, inputs.dates[day]),
-                    free_cash - fill_cash_before,
-                    np.r_[restricted_by_name, hedge_restricted_cash]
-                    - fill_restricted_before,
-                )
+            free_flow = free_cash - fill_cash_before
+            restricted_flow = (
+                np.r_[restricted_by_name, hedge_restricted_cash]
+                - fill_restricted_before
             )
+            if cash_day == spot_day:
+                settlements.append((cash_day, free_flow, restricted_flow))
+            else:
+                settlements.append(
+                    (
+                        cash_day,
+                        free_flow - float(release_today.sum()),
+                        restricted_flow + release_today,
+                    )
+                )
+                settlements.append(
+                    (spot_day, float(release_today.sum()), -release_today.copy())
+                )
         custody.fill(
             long_before_fill,
             long_purchases,
             long_sales,
             day,
-            spot_settlement_session(day, inputs.dates[day]),
+            spot_day,
         )
         loans.fill(
             loan_covers, loan_openings, loan_session, full_return=loan_full_returns
@@ -4044,7 +4074,11 @@ def simulate_stateful_ledger(
         )
         loan_overdue_rows.append(float(loans.overdue_principal(day).sum()))
         loan_rent, loan_fees = loans.accrue(
-            day, inputs.dates[day], charges=loan_charges
+            day,
+            inputs.dates[day],
+            charges=loan_charges,
+            extra_interval=str(np.datetime64(inputs.dates[day], "D"))
+            in config.loan_extra_accrual_after,
         )
         rent_paid, fees_paid = loans.pay(day)
         loan_invoice_rows.append(loans.payment_adjustment.sum(0).numpy().copy())

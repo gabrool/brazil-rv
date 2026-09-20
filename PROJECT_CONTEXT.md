@@ -14,7 +14,7 @@ Use the local RTX2060 only. No Lambda, deployment, forward capture, new subagent
 
 ## Admission and canonical inputs
 
-The [three-block closeout](docs/v2_STAGE_A_CLOSEOUT.md) governs remaining work. Historical costs are complete for their bounded contract. All surviving-company feature dependencies, final targets and the complete composed store now qualify. January25 2017 cash/delivery/rent disposition and integrated StageA admission remain. C/D are unstarted; no corrected model profitability or fit exists. No defensible completion percentage or fit ETA follows from CPU audit timings.
+The [three-block closeout](docs/v2_STAGE_A_CLOSEOUT.md) governs remaining work. Historical costs are complete for their bounded contract. All surviving-company feature dependencies, final targets and the complete composed store now qualify. January25 2017 now has qualified separate cash/delivery/rent hypotheses; integrated StageA admission remains. C/D are unstarted; no corrected model profitability or fit exists. No defensible completion percentage or fit ETA follows from CPU audit timings.
 
 Reuse V31-V41, historical-cost, source, feature and consumer proofs. New engineering requires a changed implementation, untested interaction or actual exposure. Freeze contrasts before outcomes; do not repeat passed matrices for a checkpoint. The closeout rows are not new experiment campaigns.
 
@@ -48,7 +48,7 @@ The [loan contract](docs/v2_LOAN_ACCOUNTING.md) preserves original references/ra
 
 Composed event terms contain seven distributions, Natura scalar settlements and Cielo shareholder/loan cash. composed_primary_event_terms remains the integrated-admission candidate; corporate_replay is not silently replaced. ALSC whole claims stay locked while credit/net cash are unknown; ENAT auction stays null. Cielo cents and opposite spot-fill daytrade treatment require actual exposure; never force holdings by changing preferences/rates. Preserve measured adaptive fixed-fee uncertainty. Synthetic book contrasts are not model alpha.
 
-December30 2016 and November20 2017 have source-supported clearing dispositions. January25 2017 is the sole old-equity gap: resolve dated evidence or distinct bounded cash/delivery/rent hypotheses, without fake equity sessions or all-money-date substitution. Corrected CDI already includes all monetary observations.
+December30 2016 and November20 2017 have source-supported clearing dispositions. January25 2017 remains historically uncertain; [qualified calendar hypotheses](docs/v2_JANUARY_CALENDAR_ACCEPTANCE.md) preserve the closed-day primary and separate adjacent-close cash/delivery endpoints plus one extra loan interval. Reuse the15 qualified variants/three saved controls; no fake equity sessions or all-money-date substitution. Corrected CDI already includes all monetary observations.
 
 ## Subsequent work and delivery
 

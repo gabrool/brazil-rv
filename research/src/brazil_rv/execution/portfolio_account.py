@@ -411,13 +411,19 @@ class PortfolioAccount:
         )
         new_long = (signed_quantity - cover).clamp_min(0)
         new_short = (-signed_quantity - sell).clamp_min(0)
+        delivery_day = spot_settlement_session(
+            loan_session.day, loan_session.date, self.config.spot_delivery_lag_overrides
+        )
+        cash_day = spot_settlement_session(
+            loan_session.day, loan_session.date, self.config.spot_cash_lag_overrides
+        )
         if self.config.custody_assessments:
             registered = np.datetime64(loan_session.date) < np.datetime64(
                 "2020-10-26"
             ) or self.config.borrow_fee_modality in ("otc", "compulsory")
             self.custody_fees.fill(
                 loan_session.day,
-                spot_settlement_session(loan_session.day, loan_session.date),
+                delivery_day,
                 signed_quantity,
                 new_short,
                 0 if registered else self.config.electronic_loan_settlement_days,
@@ -427,7 +433,7 @@ class PortfolioAccount:
             new_long,
             sell,
             loan_session.day,
-            spot_settlement_session(loan_session.day, loan_session.date),
+            delivery_day,
         )
         self.loans.fill(
             cover,
@@ -441,7 +447,7 @@ class PortfolioAccount:
             release - cover * price + sell * price - new_long * price
         ).sum() - costs
         restricted_delta = -release + new_short * price
-        spot_day = spot_settlement_session(loan_session.day, loan_session.date)
+        spot_day = delivery_day
         for name, due in self.loans.bonus_return_floors.items():
             if due > spot_day and release[name].detach().item() > 0:
                 retained = torch.zeros_like(release)
@@ -454,13 +460,15 @@ class PortfolioAccount:
             self.proceeds_releases.append((spot_day, release))
         self.trade_cash = self.trade_cash + cash_delta
         self.trade_restricted = self.trade_restricted + restricted_delta
-        self.settlements.append(
-            (
-                spot_settlement_session(loan_session.day, loan_session.date),
-                cash_delta,
-                restricted_delta,
+        if cash_day == delivery_day:
+            self.settlements.append((cash_day, cash_delta, restricted_delta))
+        else:
+            # Spot purchase cash and returned-loan proceeds have independent
+            # value dates. Never release loan proceeds at the earlier cash date.
+            self.settlements.append(
+                (cash_day, cash_delta - release.sum(), restricted_delta + release)
             )
-        )
+            self.settlements.append((delivery_day, release.sum(), -release))
         self.shares = self.shares + signed_quantity
         return costs
 
@@ -678,7 +686,9 @@ class PortfolioAccount:
             session_date,
             np.asarray(loan_reference),
             np.asarray(annual_borrow),
-            spot_settlement_session(day, session_date)
+            spot_settlement_session(
+                day, session_date, self.config.spot_delivery_lag_overrides
+            )
             if loan_return_session is None
             else loan_return_session,
         )
@@ -966,7 +976,9 @@ class PortfolioAccount:
             self.trade_cash = self.trade_cash - adjustment
             self.settlements.append(
                 (
-                    spot_settlement_session(day, session_date),
+                    spot_settlement_session(
+                        day, session_date, self.config.spot_cash_lag_overrides
+                    ),
                     -adjustment,
                     torch.zeros_like(self.trade_restricted),
                 )
@@ -983,7 +995,12 @@ class PortfolioAccount:
             approved=self.config.approve_loan_renewals,
         )
         overdue_principal = self.loans.overdue_principal(day).sum()
-        loan_rent, loan_fee = self.loans.accrue(day, session_date)
+        loan_rent, loan_fee = self.loans.accrue(
+            day,
+            session_date,
+            extra_interval=str(np.datetime64(session_date, "D"))
+            in config.loan_extra_accrual_after,
+        )
         rent_paid, fees_paid = self.loans.pay(day)
         borrow = loan_rent.sum() + loan_fee.sum() + self.loans.payment_adjustment.sum()
         self.trade_cash = self.trade_cash - rent_paid.sum() - fees_paid.sum()
