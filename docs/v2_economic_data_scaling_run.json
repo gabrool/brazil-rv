@@ -281,6 +281,10 @@
     "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\event_composition\\qualification\\manifest.json",
     "sha256": "c0b469f1009017fa074a0e94d9ef2adff677128a6d0a78007f8aca478d2a92f0"
   },
+  "event_composition_recovery": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\event_composition_recovery.json",
+    "sha256": "852d737ec796377f412f147794b69bbd9d9f8404d54310a1a8355f090e7afc25"
+  },
   "event_composition_report": {
     "path": "C:\\quant\\b3-quant\\docs\\v2_EVENT_SOURCE_COMPOSITION.md",
     "sha256": "1a3d9543ac84529fd90d317bf11a6a190cc5219d84c286e0a9efb1553663ac61"
