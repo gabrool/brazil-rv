@@ -1,0 +1,188 @@
+{
+  "account": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\integrated_admission\\qualified\\account.json",
+    "sha256": "31af19459c9e94fe6d8d8bb4bef6c4e01994b19b694e91ad9af34bed27a051fb"
+  },
+  "coverage": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\integrated_admission\\qualified\\coverage.json",
+    "sha256": "28bee8d8f7cddab8db04dddeca5f8fd4cb28f79a5fdaa3efe312e5e481b18459"
+  },
+  "dated_spot_sessions": 2099,
+  "evidence": {
+    "composed_data_inputs": {
+      "path": "C:\\quant\\b3-quant\\docs\\v2_composed_data_inputs.json",
+      "sha256": "bba9df8c53feeb131b788a3cd83013e12753fa64bad8aeaed9d2b8d5e1e25604"
+    },
+    "composed_store_recovery": {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\composed_store_recovery.json",
+      "sha256": "c629bdcb5ba1034e5337d30df7a8a3adb37f95b02c1b3e370572b22ac706cd4f"
+    },
+    "copel_loan_bounds_acceptance": {
+      "path": "C:\\quant\\b3-quant\\docs\\v2_copel_loan_bounds_acceptance.json",
+      "sha256": "049f9b06a502b38de1e9a1ebe68d9c16f6db827fc27ce9c090d3964fdc8fb263"
+    },
+    "custody_fee_acceptance": {
+      "path": "C:\\Brazil-RV\\quant\\b3-quant\\docs\\v2_custody_fee_acceptance.json",
+      "sha256": "15c72f33c1c93b5dad41eca868220383340cec366462c1af28a9a8ff8ffca2b2"
+    },
+    "enat_settlement_acceptance": {
+      "path": "C:\\quant\\b3-quant\\docs\\v2_enat_settlement_acceptance.json",
+      "sha256": "f2bd9d273867d094de7d38b3c12334e3e893d8f49db93e47dff64d80064ad913"
+    },
+    "event_composition_qualification": {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\event_composition\\qualification\\manifest.json",
+      "sha256": "c0b469f1009017fa074a0e94d9ef2adff677128a6d0a78007f8aca478d2a92f0"
+    },
+    "historical_cost_acceptance": {
+      "path": "C:\\quant\\b3-quant\\docs\\v2_historical_cost_coverage_acceptance.json",
+      "sha256": "a8f21494aad6a070106f9b39e876349f3a334c5f6247d0abca0bef8ffd6f3c5a"
+    },
+    "historical_spot_acceptance": {
+      "path": "C:\\Brazil-RV\\quant\\b3-quant\\docs\\v2_historical_spot_acceptance.json",
+      "sha256": "06c8445b2e62f247745b9e339d9ce2adce05e9792ac618fb61cb9d4976600e60"
+    },
+    "identity_source_admission": {
+      "path": "docs\\v2_identity_source_admission.json",
+      "sha256": "8d3f3d2c04a8bb55cd83d69ddd35541e0049588494b92acc9c03056a741daab8"
+    },
+    "january_calendar_acceptance": {
+      "path": "C:\\quant\\b3-quant\\docs\\v2_january_calendar_acceptance.json",
+      "sha256": "ada18dd7ede75f5010cec684aa89278a6449aee80c9acffb3400e679c4ad2650"
+    },
+    "january_calendar_recovery": {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\january_calendar_recovery.json",
+      "sha256": "670498c54e3908d38c7bba10ffb6d413f8fd0665b84033270234599b296066d1"
+    },
+    "loan_accrual_acceptance": {
+      "path": "docs\\v2_loan_accrual_acceptance.json",
+      "sha256": "7b66c3cea7e3664bb459bbb306c934b45fc1ccec87a820592fa5282ab07f37ba"
+    },
+    "loan_allocation_acceptance": {
+      "path": "docs\\v2_loan_allocation_acceptance.json",
+      "sha256": "3245e35dafc8ed0e3d24b7f3367690ef47cc129d7c5d1e9b2de7b0755b72491d"
+    },
+    "loan_cash_acceptance": {
+      "path": "docs\\v2_loan_cash_acceptance.json",
+      "sha256": "8b4dfe34f095db94a37431b30edf38296efcea914ecd96e85448a55c9bc8dad9"
+    },
+    "loan_contract_acceptance": {
+      "path": "docs\\v2_loan_contract_acceptance.json",
+      "sha256": "58db32e966dfe4108a1c6f5101eefe2158a5ba37cd9402ee5f74c4b29fc8a2cf"
+    },
+    "loan_invoice_acceptance": {
+      "path": "C:\\quant\\b3-quant\\docs\\v2_loan_invoice_acceptance.json",
+      "sha256": "5685da905621250536bfcb84fcdec349ba433e10d5a6bd0e02dd827030183be9"
+    },
+    "loan_renewal_acceptance": {
+      "path": "docs\\v2_loan_renewal_acceptance.json",
+      "sha256": "c5e8263e84b932565ba9f1d9331806d49d826aa185daa79aa4f0d5be2bc29a65"
+    },
+    "loan_return_notice_acceptance": {
+      "path": "C:\\quant\\b3-quant\\docs\\v2_loan_return_notice_acceptance.json",
+      "sha256": "c265a296b86a31632c31f7412c24bb6f0e6ce95d0ad8accb889259e93bcbdd18"
+    },
+    "natura_settlement_acceptance": {
+      "path": "C:\\quant\\b3-quant\\docs\\v2_natura_settlement_acceptance.json",
+      "sha256": "eb6a96325d950ff449ebd72f8ce68b9629c9162ae74e734b366af7fdc9e39afc"
+    },
+    "opening_claim_acceptance": {
+      "path": "C:\\quant\\b3-quant\\docs\\v2_opening_claim_acceptance.json",
+      "sha256": "e0bc46d7acb25723b7e1e0d6365c6811492cbe3238f212123ee46c6149b908ba"
+    },
+    "payment_bounds_acceptance": {
+      "path": "C:\\quant\\b3-quant\\docs\\v2_payment_bounds_acceptance.json",
+      "sha256": "aea3d8b96cea1cc0d54d4c9ccc8110dec20bcf14f41bb10be0877fb351547e33"
+    },
+    "precredit_disposal_acceptance": {
+      "path": "C:\\quant\\b3-quant\\docs\\v2_precredit_disposal_acceptance.json",
+      "sha256": "bf4d4ecf980a16c5dfbf3521b77bc2c70f77a2795c4ff9fda971fac8203917a6"
+    },
+    "share_custody_acceptance": {
+      "path": "docs\\v2_share_custody_acceptance.json",
+      "sha256": "e8ef32f90f97ed6f55d716c7bc706bed922d330106801d03c284c0315de498ff"
+    },
+    "spot_invoice_acceptance": {
+      "path": "C:\\quant\\b3-quant\\docs\\v2_spot_invoice_acceptance.json",
+      "sha256": "02deb94c7fc70d69d69ba26ff4d2b455e97a0865e40ce8715756c320015c8868"
+    },
+    "spot_settlement_acceptance": {
+      "path": "docs\\v2_spot_settlement_acceptance.json",
+      "sha256": "be8a7a157909c5fc8b0ced719efc0e5432bad7e466ad4bb65417bee02c3ec064"
+    },
+    "surviving_rename_admission": {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\surviving_renames\\manifest.json",
+      "sha256": "7502ee6ea97c7e1dfda2ea2ef3bac7096f3a60b891c059359c9f5562b91234da"
+    }
+  },
+  "identity_actions": [
+    {
+      "destination": "BRALOSACNOR5",
+      "effect": "2023-10-25",
+      "source": "BRALSOACNOR5",
+      "source_index": 34,
+      "successor_index": 29
+    },
+    {
+      "destination": "BRISAEACNPR9",
+      "effect": "2024-11-18",
+      "source": "BRTRPLACNPR1",
+      "source_index": 858,
+      "successor_index": 481
+    },
+    {
+      "destination": "BRISAEACNOR2",
+      "effect": "2024-11-18",
+      "source": "BRTRPLACNOR4",
+      "source_index": 857,
+      "successor_index": 480
+    },
+    {
+      "destination": "BRALSOACNOR5",
+      "effect": "2019-08-06",
+      "source": "BRSSBRACNOR1",
+      "source_index": 778,
+      "successor_index": 34
+    },
+    {
+      "destination": "BRAZZAACNOR9",
+      "effect": "2024-08-01",
+      "source": "BRARZZACNOR3",
+      "source_index": 60,
+      "successor_index": 82
+    }
+  ],
+  "model_scoring_or_fitting": false,
+  "monthly_assessments": 102,
+  "new_historical_books": 0,
+  "plan": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\integrated_admission\\plan.json",
+    "sha256": "69d7133ab5c09dc2c76f203b44ab446bb5a28544bc40761cf77e8704bbd39ecd"
+  },
+  "preserved_input_objects": [
+    "scores",
+    "score_mask",
+    "active",
+    "raw_close",
+    "prior_feature_values",
+    "scaled_midrank_targets",
+    "shareholder_simple_returns",
+    "target_scale_sigma",
+    "annual_borrow_rate_by_name",
+    "shortable_by_borrow_source",
+    "loan_reference_prices"
+  ],
+  "reused_proofs": "V31-V41, historical tariffs/corporate custody/invoices, calendar15books, complete composed store and all family/source proofs",
+  "seconds": 0.6003686000185553,
+  "source_fact_uncertainties": [
+    "ALSC physical credit/exact net cash unknown: whole signed claim remains locked",
+    "ENAT fraction auction unknown: signed residual retained and lot-dependent unit labels unsupported",
+    "Cielo held-loan cent, opposing same-security/day spot fills and new actual untested corporate interactions require exposure-specific qualification",
+    "Same-class held-loan identity is a bookkeeping hypothesis, not a new published-rate or borrow-balance alias; conditional actual-path interpretation retained",
+    "January25 closed-day primary with separately qualified cash/delivery/accrual hypotheses; historical clearing fact remains unknown"
+  ],
+  "status": "integrated_stage_a_admitted_with_explicit_conditional_exposure_limits",
+  "tests": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\integrated_admission\\identity_axis_qualified_tests\\stdout.txt",
+    "sha256": "f9e686105a47b0da69c0126a4539503841b5216f875f58c12c3dabb54e20937d"
+  }
+}

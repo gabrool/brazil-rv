@@ -1,5 +1,10 @@
 # Stage A closeout contract
 
+2026-09-20 integrated closeout: all three delivery blocks are accepted for their explicit research contracts. Resolve `economic_account_acceptance` and [the integrated report](v2_ECONOMIC_ACCOUNT_ACCEPTANCE.md). Historical January25 uncertainty, lender/account hypotheses and actual-exposure Cielo/daytrade limits remain explicit. The registered Stage C comparisons may now begin; C/D are not complete and no corrected profitability follows from engineering books.
+
+The earlier row-level plan below is preserved as the frozen work scope. Its statements that integrated admission remains open are superseded by this acceptance. Its conditional-exposure limits and reuse requirements remain binding.
+
+
 2026-09-20, updated after complete composed-store and bounded calendar acceptance. This consolidates the remaining
 work following the user's request for a clearer trajectory. It does not change the
 registered economic endpoints, authorize held-out reads, accept Stage A, or start C/D.

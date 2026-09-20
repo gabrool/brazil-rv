@@ -155,6 +155,119 @@ def test_loader_binds_original_sources_and_calendar(tmp_path):
         load_corporate_replay(path, digest)
 
 
+def test_same_class_identity_has_separate_clock_and_preserves_frozen_objects():
+    data, _, calendar = fixture()
+    terms = dict(
+        cash_cancellations=[],
+        loan_cash_settlements=[],
+        identity_actions=[
+            dict(
+                predecessor_isin=data.inputs.security_ids[0],
+                successor_isin=data.inputs.security_ids[1],
+                effective_date=str(calendar[2]),
+                available_date=str(calendar[1]),
+            )
+        ],
+    )
+    revised = apply_corporate_replay(data.inputs, terms, calendar, "a" * 64)
+    assert revised.action_successor_index[2, 0] == 1
+    assert revised.action_shares_per_prior_share[2, 0] == 1
+    assert revised.action_cash_per_prior_share[2, 0] == 0
+    np.testing.assert_array_equal(
+        revised.action_successor_index[:2], data.inputs.action_successor_index[:2]
+    )
+    for key in (
+        "scores",
+        "active",
+        "raw_close",
+        "prior_feature_values",
+        "scaled_midrank_targets",
+        "annual_borrow_rate_by_name",
+        "shortable_by_borrow_source",
+        "loan_reference_prices",
+    ):
+        assert getattr(revised, key) is getattr(data.inputs, key)
+    terms["identity_actions"][0]["available_date"] = str(calendar[3])
+    with pytest.raises(ValueError, match="source availability"):
+        apply_corporate_replay(data.inputs, terms, calendar, "b" * 64)
+
+
+@pytest.mark.parametrize("case", ["held_long", "pending_owned", "pending_return"])
+def test_same_class_identity_preserves_pending_receipts_and_original_loans(case):
+    from brazil_rv.execution.custody_fees import CustodyAssessment
+
+    original = policy_fixture()
+    calendar = np.asarray(original.inputs.dates, dtype="datetime64[D]")
+    n = len(original.inputs.security_ids)
+    inputs = replace(
+        original.inputs,
+        session_indices=np.arange(len(calendar)),
+        raw_close=np.full((len(calendar), n), 100.0),
+        cdi_returns=np.zeros(len(calendar)),
+        annual_borrow_rate_by_name=np.full((len(calendar), n), 0.1),
+        loan_reference_prices=np.full((len(calendar), n + 1), 100.0),
+    )
+    terms = dict(
+        cash_cancellations=[],
+        loan_cash_settlements=[],
+        identity_actions=[
+            dict(
+                predecessor_isin=inputs.security_ids[0],
+                successor_isin=inputs.security_ids[1],
+                effective_date=str(calendar[2]),
+                available_date=str(calendar[1]),
+            )
+        ],
+    )
+    data = copy(original)
+    data.inputs = apply_corporate_replay(inputs, terms, calendar, "a" * 64)
+    config = policy_ledger_config(
+        initial_capital_brl=1000,
+        annual_borrow_rate=0.1,
+        borrow_source="uniform",
+        cost_bps_per_side=0,
+        hedge_cost_bps_per_side=0,
+        planned_absolute_net_cap=1.5,
+        planned_absolute_beta_cap=1.5,
+        planned_name_weight_cap=0.5,
+        custody_assessments=(CustodyAssessment("2024-12-30", "2024-12-30"),),
+    )
+    targets = np.zeros((10, n + 1))
+    if case == "pending_return":
+        targets[0, 0] = -0.4
+    else:
+        targets[0 if case == "held_long" else 1 : 3, 0] = 0.4
+        targets[3:8, 1] = 0.4
+    account = data.initial_account(0, config)
+    records = []
+    before = None
+    for day, t in enumerate(targets):
+        records.append(data.step(account, tensor(t), day, terminal=day == 9))
+        if case == "pending_return" and day == 1:
+            before = {
+                k: getattr(account.loans, k).copy()
+                if isinstance(getattr(account.loans, k), np.ndarray)
+                else getattr(account.loans, k).clone()
+                for k in ("principal", "annual_rate", "opened", "return_day", "minimum")
+            }
+        if case == "pending_return" and day == 2:
+            assert account.loans.name.tolist() == [1]
+            for k, v in before.items():
+                np.testing.assert_array_equal(getattr(account.loans, k), v)
+        if case == "pending_owned" and day == 2:
+            assert records[-1]["physical_custody"][1].item() == 0
+        if case == "pending_owned" and day == 3:
+            assert records[-1]["physical_custody"][1].item() == pytest.approx(4)
+    exact, _, _ = exact_replay(data, None, 0, 10, config=config, targets=targets)
+    np.testing.assert_allclose([x["nav"].item() for x in records], exact.nav, atol=1e-9)
+    np.testing.assert_allclose(
+        [x["physical_custody"].numpy() for x in records],
+        exact.physical_custody,
+        atol=1e-12,
+    )
+    assert np.all(exact.signed_shares[2:, 0] == 0)
+
+
 def test_sliced_axis_keeps_payment_dates_and_prior_loan_prohibition():
     data, terms, calendar = fixture()
     original = data.inputs

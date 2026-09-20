@@ -538,3 +538,16 @@ qualify at the three registered capitals. Reuse15new/3saved-primary books and
 independent arithmetic; no historical fact is newly inferred, no calendar/model
 arrays change and no interior adaptive extrema are claimed. Carry fixed variants
 to actually intersecting C paths. IntegratedStageA remains open.
+
+
+Integrated Stage A admission, September20 2026, before corrected model outcomes:
+The composed primary now binds all qualified account/cost/calendar/source evidence.
+Five sourced same-class unit/no-cash identities use the existing account transfer,
+retaining pending receipts and original held-loan terms under an explicit
+bookkeeping hypothesis, without loan-source aliases or new delivery permission.
+Full development coverage includes102monthly assessments using dated calendar
+metadata beyond the last development close, not held-out observations.
+Existing ALSC/ENAT/January uncertainties and exposure-conditional Cielo/daytrade
+limits remain. Reuse completed proofs; new actual-path interactions require only
+necessary targeted qualification. Registered C may proceed, with accounting/source
+attribution on frozen old coordinates separate from new-data conditioning/refits.

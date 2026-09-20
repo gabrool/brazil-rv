@@ -74,6 +74,29 @@ def apply_corporate_replay(inputs, terms, calendar, manifest_sha256):
             raise ValueError(f"corporate date {value} absent from bound calendar")
         return position - int(indices[0])
 
+    for event in terms.get("identity_actions", ()):
+        if event["predecessor_isin"] not in names:
+            continue
+        name = names[event["predecessor_isin"]]
+        destination = names[event["successor_isin"]]
+        effective = session(event["effective_date"])
+        known = session(event["available_date"])
+        if known > effective:
+            raise ValueError("identity action cannot precede source availability")
+        if effective >= len(indices):
+            continue
+        changed["action_session_resolved"][max(0, effective) :, name] = True
+        if effective < 0:
+            initial[name] = False
+            continue
+        if "action_successor_index" not in changed:
+            changed["action_successor_index"] = inputs.action_successor_index.copy()
+        changed["action_successor_index"][effective, name] = destination
+        changed["action_shares_per_prior_share"][effective, name] = 1.0
+        changed["action_cash_per_prior_share"][effective, name] = 0.0
+        changed["action_has_action"][effective, name] = True
+        changed["action_payment_session"][effective, name] = -1
+
     action_settlements = list(inputs.action_settlements)
     seen = set()
     for event in terms.get("scalar_actions", ()):

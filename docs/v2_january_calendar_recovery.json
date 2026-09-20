@@ -1,0 +1,67 @@
+{
+  "acceptance": {
+    "path": "C:\\quant\\b3-quant\\docs\\v2_january_calendar_acceptance.json",
+    "sha256": "ada18dd7ede75f5010cec684aa89278a6449aee80c9acffb3400e679c4ad2650"
+  },
+  "aliases": 236,
+  "archive": {
+    "bytes": 8343177,
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\january_calendar_f434b56.zip",
+    "sha256": "320222118d030993facd24130cb47738b98601f5b74b5210e86ff0d84058555b"
+  },
+  "dependencies": {
+    "bova_loan_reference_audit": {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\bova_loan_reference_audit\\manifest.json",
+      "sha256": "589c5d2011e8e1f1092bda6571c45dd172b2c58a3f88801d87f68edef42b27ff",
+      "status": "recovered_not_admitted"
+    },
+    "cash_calendar": {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\cash_calendar\\manifest.json",
+      "sha256": "687cd4d999bdb39867b5cd59c9972293a1b5748b811f264b66ae4e78905c862c",
+      "status": "cash_calendar_defect_quantified_corrected_explicit_amendment_not_yet_scored"
+    },
+    "composed_store_recovery": {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\composed_store_recovery.json",
+      "sha256": "c629bdcb5ba1034e5337d30df7a8a3adb37f95b02c1b3e370572b22ac706cd4f"
+    },
+    "enat_settlement_terms": {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\enat_settlement\\terms.json",
+      "sha256": "34e5b9a06e0ab604f6e87dc4e8f1602c2ff3d68035176d0832d05d8f0279073b"
+    },
+    "event_composition_recovery": {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\event_composition_recovery.json",
+      "sha256": "852d737ec796377f412f147794b69bbd9d9f8404d54310a1a8355f090e7afc25"
+    },
+    "historical_cost_recovery": {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\historical_cost_recovery.json",
+      "sha256": "d76475d01e4177b5946de23148e6b456413eb26c25f901a573db1d33ef166d50"
+    },
+    "lending_feature_recovery": {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\lending_feature_recovery.json",
+      "sha256": "95b255ca651f4dce93767d4e06a4088e4610a9ede879ac6491d6c0cd5cc5f8bb"
+    },
+    "loan_return_notice_recovery": {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\loan_return_notice_recovery.json",
+      "sha256": "f066a79d0bea44a44baa6cd3c6fd07dd801202cac974c4486ab4dc5319438546"
+    },
+    "loan_source_panels": {
+      "bytes": 3553,
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\loan_source_panels\\manifest.json",
+      "sha256": "a6741a98d505a049c543cb0c8ed45934b5eadfd6fd2e344fbc916db8ff46cf02",
+      "status": "source_panels_bound_event_overrides_pending"
+    },
+    "spot_invoice_recovery": {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\spot_invoice_recovery.json",
+      "sha256": "577901fec8ba99ba2259efc4e4b7ddfa6729f52dfe2cac16327573a89291d4b0"
+    }
+  },
+  "implementation_commit": "f434b56a0f6ded356f1c29787666482219d55e38",
+  "logical_members": 920,
+  "no_immutable_input_store_or_old_fit_copies": true,
+  "restored_account_cells": 5154165,
+  "restored_books": 15,
+  "restored_root": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\january_calendar_recovery_f434b56",
+  "seconds": 1.5732939000008628,
+  "status": "verified",
+  "unique_members": 684
+}

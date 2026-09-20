@@ -155,9 +155,8 @@
     "status": "source_rules_recovered_historical_axis_admission_pending"
   },
   "corporate_replay": {
-    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\corporate_replay\\dommo_manifest.json",
-    "sha256": "b4dcc7467a5eaafe70c2d57b55217deaafe6fb6dc3e711d7fce91ffc13f91ff9",
-    "status": "default_dommo_pna_admitted_with_explicit_fraction_and_custody_bounds"
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\integrated_admission\\qualified\\primary_terms.json",
+    "sha256": "1c2fbfd0b33a8ee9abdadfd7a7904118c6c66dc79ea279bdb60dfa83315f3cd4"
   },
   "corporate_replay_acceptance": {
     "path": "docs\\v2_corporate_replay_acceptance.json",
@@ -268,6 +267,14 @@
   "dommo_source_terms": {
     "path": "docs\\v2_dommo_source_terms.json",
     "sha256": "feb7483d455f9c77093814c1fdfc52725acabfbaa6c8f9d6e6c183777932ae50"
+  },
+  "economic_account": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\integrated_admission\\qualified\\account.json",
+    "sha256": "31af19459c9e94fe6d8d8bb4bef6c4e01994b19b694e91ad9af34bed27a051fb"
+  },
+  "economic_account_acceptance": {
+    "path": "C:\\quant\\b3-quant\\docs\\v2_economic_account_acceptance.json",
+    "sha256": "3c1160338ee66a7eb05814856d4b4601034f83144fc76f30fe444509281566cb"
   },
   "economic_refit_inputs": {
     "path": "C:\\quant\\b3-quant\\docs\\v2_composed_data_inputs.json",
@@ -465,6 +472,14 @@
     "path": "docs\\v2_identity_source_admission.json",
     "sha256": "8d3f3d2c04a8bb55cd83d69ddd35541e0049588494b92acc9c03056a741daab8"
   },
+  "integrated_account_qualification": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\integrated_admission\\qualified\\manifest.json",
+    "sha256": "3c1160338ee66a7eb05814856d4b4601034f83144fc76f30fe444509281566cb"
+  },
+  "integrated_account_runtime": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\integrated_admission\\runtime.json",
+    "sha256": "1f894c5271ddf3040342b97544b2599b175ae93d03631b2d5dd86b802f3789f0"
+  },
   "january_calendar_acceptance": {
     "path": "C:\\quant\\b3-quant\\docs\\v2_january_calendar_acceptance.json",
     "sha256": "ada18dd7ede75f5010cec684aa89278a6449aee80c9acffb3400e679c4ad2650"
@@ -476,6 +491,10 @@
   "january_calendar_qualification": {
     "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\january_calendar\\qualification\\manifest.json",
     "sha256": "564c13633d285405ef5dbade909647d2c7194df3ed713cb1ba5f3763bf03b2ea"
+  },
+  "january_calendar_recovery": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\january_calendar_recovery.json",
+    "sha256": "670498c54e3908d38c7bba10ffb6d413f8fd0665b84033270234599b296066d1"
   },
   "january_calendar_runtime": {
     "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\january_calendar\\runtime_identity.json",
@@ -923,10 +942,10 @@
     "sha256": "be8a7a157909c5fc8b0ced719efc0e5432bad7e466ad4bb65417bee02c3ec064"
   },
   "stage_a_closeout_plan": {
-    "path": "C:\\quant\\b3-quant\\docs\\v2_STAGE_A_CLOSEOUT.md",
-    "sha256": "6a0d467885901aac694afbe2396121435bc2ab532c8423c941f8e86906402048"
+    "path": "docs\\v2_STAGE_A_CLOSEOUT.md",
+    "sha256": "a0a630c1d3ee70156518950b5f82f44e46da1178a7c35deb5142cecf86398b77"
   },
-  "status": "accounting_and_deep_data_audit",
+  "status": "stage_a_and_composed_data_accepted_stage_c_preparation",
   "succession_identity_dependency_scope": {
     "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\event_composition\\identity_scope\\manifest.json",
     "sha256": "398257fae88c9d6f233a7592851214ba12246c5036678d1a855529abe99e197c"

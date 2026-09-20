@@ -1,5 +1,12 @@
 # Economic accounting, data audit and scaling progress
 
+2026-09-20 current: Stage A integrated admission is accepted with explicit source/account hypotheses and conditional actual-exposure limits. All three complete data stores remain sealed; composed_data_inputs is the new-refit contract. Registered C preparation begins next; D remains conditional, no corrected model scoring/profitability yet. See [integrated account](v2_ECONOMIC_ACCOUNT_ACCEPTANCE.md). The one-minute heartbeat is paused; work continues directly.
+
+Admission's first invocation verifies2,099 dated spot sessions,102custody assessments, five same-class account actions and11unchanged input-object identities in0.600369s. Four new focused cases plus seven existing cases pass after fixture-only dimension corrections. No engineering books or completed source/feature matrices rerun. All attempts are retained. January calendar recovery verifies684unique/920logical members,236aliases,15books/5,154,165cells in1.573294s: january_calendar_f434b56.zip SHA320222118d030993facd24130cb47738b98601f5b74b5210e86ff0d84058555b,8,343,177bytes.
+
+Earlier progress is historical; superseded pending queues are not new work.
+
+
 2026-09-20 latest: all surviving-company feature dependencies now qualify within
 the existing composition block. Resolve `surviving_rename_market_progress`.
 Native scaling adds2,485 usable cells; scalar ranks add597 and to-close labels52,
@@ -2155,6 +2162,6 @@ The new store manifest is fab704fccbd7ceed0624bcfcc67178327f392e43d124242caf8d77
 
 Recovery verified for implementation9ab678f: composed_store_9ab678f.zip, SHA cfc392cf99f1ede98c6d9f942e3c886c205327879640b8af239b707560a5cc4e,34,777,391bytes.621unique/631logical members and10aliases restore/hash-check. All67changed arrays reconstruct2,519,791,470cells to exact accepted hashes;39arrays, unchanged tables and both indices inherit their verified parent dependencies. Full106-array/48-table/2-index recovery takes55.3385seconds. One-array scratch is on C and removed after each reconstruction; no accepted arrays/immutable sources/oldfits enter the ZIP. Current research, new ops, complete former context, frozen plans, exact failed/executed recipes, target rows and changed tables are recoverable. This is byte recovery, not another model-history proof. StageA/C/D remain open; heartbeat stays paused and implementation continues.
 
-## 2026-09-20 — January calendar disposition
+## 2026-09-20 ï¿½ January calendar disposition
 
 [Qualified bounded hypotheses](v2_JANUARY_CALENDAR_ACCEPTANCE.md) separate cash settlement, physical delivery/loan return and contractual accrual for the remaining uncertain January25 date. Primary unchanged;15new73-session/all933books reuse3saved primary controls. All first invocation. Independent1095NAV/5154165cells/12180fills and3492cohort checks pass; nine new tests plus44affected existing cases pass. A fixture derivative error and wrong test path are retained; no production numerical failure/book rerun. Audit38.039s/qualification.819s. R10m final effects cash-early+.081749bp/cash-late+.004512bp/delivery+.011185bp/extra-accrual-.568629bp are synthetic total paths, not model profit; all prior larger adaptive uncertainty remains. Three stores and oldfits unchanged. Calendar bounded disposition is complete; integratedStageA andC/Dremain. Continuous work proceeds with heartbeat paused.
