@@ -1107,3 +1107,11 @@ global causal identity check, propagate C&A/ALLOS/ISA and other supported repair
 through dependent families/wealth/labels into a separately accepted store; complete
 remaining upstream account/denominator clocks and Stage A execution bounds. Preserve
 all names/history and separate accounting-only replay from new coordinates/refits.
+
+Recovery: implementation `44f797d`; `cvm_sources_identity_44f797d.zip` SHA-256
+`cf7466cb78b307f79354e2b9944e7fc4f52c93d53dc22d484d5deb1814408efc`.
+All 335 members were restored and hash-checked, including complete current research
+source, exact captured reproducer bytes, the prior parser snapshot, source indices,
+attempt evidence and C&A parquet overlays. Fifty-two newly recovered original
+source files were verified; the earlier 109,777-file audit was not rerun. Immutable
+inputs and old fits were not duplicated. Resolve cvm_source_identity_recovery.

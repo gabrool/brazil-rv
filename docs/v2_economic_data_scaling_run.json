@@ -76,6 +76,10 @@
     "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\cvm_source_audit\\report.json",
     "sha256": "b2c3a2399d1b41195ea17f46a62a1d376448c3a9fa2397215d6fe224b41a4c28"
   },
+  "cvm_source_identity_recovery": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\cvm_source_identity_recovery.json",
+    "sha256": "81b1fdae4ba563b2d2d2e201b80dcacffc021cdeb0b6f240fae9203247093648"
+  },
   "cvm_zip_capital_audit": {
     "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\cvm_source_audit\\zip_capital.json",
     "sha256": "cf3c4495d894f9047818239f1376d5cdd8f8d32ce490f28b731f2bc45ad1873f"
