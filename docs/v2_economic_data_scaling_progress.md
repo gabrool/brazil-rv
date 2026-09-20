@@ -1538,3 +1538,15 @@ These are still intermediate new data. See v2_M1_SCALAR_ASSEMBLY.md and resolve
 m1_scalar_assembly/input_audit/attribution/target_oracle/acceptance. A/B incomplete,
 C/D unstarted. Next correct the auxiliary target clock and finish remaining
 auxiliary/corporate wealth/label and full derived-store acceptance, alongside A.
+
+Recovery closeout for2cb6c36: m1_scalar_recovery verifies312 unique/318 logical
+members with6 deduplicated aliases. m1_scalars_2cb6c36.zip is8,424,288bytes, SHA
+`ae45f0b9ba7cb49287fd0b0c0a7a2c90a2a934071cce63a952762de0566fa5a7`.
+Restored sparse amendments reproduce16,495,440 scalar/target audit-view cells
+exactly. Current research source, patch, initial/qualified executed recipes and
+raw scalar cross-sections are recoverable without immutable-input or old-fit
+duplication. Acceptance SHA
+`d02c4400927f6cdb1521a64acbc0a3935b1b5056417e48ffe194b765b03c4623`.
+Attribution source formatting/helper equivalence is explicitly qualified; its
+original hash and unchanged report remain recorded. Prior recovery dependencies
+are preserved. No worker remains active.

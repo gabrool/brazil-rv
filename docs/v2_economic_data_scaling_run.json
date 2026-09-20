@@ -300,6 +300,10 @@
     "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\m1_scalar_assembly\\input_audit\\manifest.json",
     "sha256": "c1f04e982e4710cbc06ec581ccb6d41ee1190946affbebe768cdd9c14237b984"
   },
+  "m1_scalar_recovery": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\m1_scalar_recovery.json",
+    "sha256": "f20c07fa082b201b800ab5299ba6fa22ecfdf9ba64ad429cba152852fe4f7a77"
+  },
   "m1_scalar_target_oracle": {
     "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\m1_scalar_assembly\\target_oracle.json",
     "sha256": "ba51bc8eeeec6336b43f28b60e3ec89fc2703973119737f8ac827df3cc7f0072"
