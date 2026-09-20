@@ -472,6 +472,48 @@ def test_history_age_is_not_listing_age_and_flat_close_location_is_valid() -> No
     np.testing.assert_array_equal(result.values[64, :, 26], [1.0, 0.0])
 
 
+def test_monthly_cluster_rename_retains_assignment_and_prior_observations() -> None:
+    from brazil_rv.v2.features import monthly_cluster_labels
+
+    dates = np.arange(np.datetime64("2023-12-01"), np.datetime64("2024-03-01"))
+    rng = np.random.default_rng(21)
+    values = rng.normal(size=(len(dates), 5))
+    values[:, 4] = values[:, 0]
+    baseline_active = np.ones(values.shape, bool)
+    baseline_active[:, 4] = False
+    boundary = int(np.searchsorted(dates, np.datetime64("2024-01-20")))
+    active = baseline_active.copy()
+    active[boundary:, 0] = False
+    active[boundary:, 4] = True
+    link = {
+        "predecessor_index": 0,
+        "successor_index": 4,
+        "effective_index": boundary,
+        "known_index": boundary - 1,
+    }
+    kwargs = {"lookback": 20, "minimum_observed": 15, "cluster_count": 1}
+    original = monthly_cluster_labels(
+        dates, values, baseline_active, baseline_active, **kwargs
+    )
+    corrected = monthly_cluster_labels(
+        dates, values, active, active, history_links=[link], **kwargs
+    )
+    np.testing.assert_array_equal(corrected[:boundary], original[:boundary])
+    np.testing.assert_array_equal(corrected[boundary:, 4], original[boundary:, 0])
+    assert (corrected[boundary:, 4] >= 0).all()
+    assert (corrected[boundary:, 0] == -1).all()
+    late = monthly_cluster_labels(
+        dates,
+        values,
+        active,
+        active,
+        history_links=[{**link, "known_index": boundary + 2}],
+        **kwargs,
+    )
+    assert (late[boundary : boundary + 2, 4] == -1).all()
+    assert late[boundary + 2, 4] == original[boundary + 2, 0]
+
+
 def test_monthly_cluster_labels_are_end_to_end_causal() -> None:
     days, names = 180, 14
     dates = np.arange(

@@ -853,6 +853,8 @@ class V2DailyDataset(Dataset[dict[str, object]]):
         self,
         end_index: int,
         name_indices: NDArray[np.int64] | None = None,
+        *,
+        decision_index: int,
     ) -> tuple[
         NDArray[np.float32],
         NDArray[np.bool_],
@@ -863,20 +865,50 @@ class V2DailyDataset(Dataset[dict[str, object]]):
 
         start = max(0, end_index - self.lookback + 1)
         indices = np.arange(start, end_index + 1, dtype=np.int64)
+        routed = None
+        source_names = name_indices
+        if "slow_history_links" in self.store.manifest.get("tables", {}):
+            links = self.store.read_table("slow_history_links", decision_index)
+            if links.height:
+                selected = (
+                    np.arange(len(self.store.isins), dtype=np.int64)
+                    if name_indices is None
+                    else name_indices
+                )
+                routed = np.broadcast_to(selected, (indices.size, selected.size)).copy()
+                # Walk backwards through successive renames. Every link has
+                # already passed the current decision's knowledge/effect gates;
+                # no prior decision's stored features or membership is rewritten.
+                for row in links.sort("effective_index", descending=True).iter_rows(
+                    named=True
+                ):
+                    earlier = indices[:, None] < row["effective_index"]
+                    routed[earlier & (routed == row["successor_index"])] = row[
+                        "predecessor_index"
+                    ]
+                source_names, inverse = np.unique(routed, return_inverse=True)
+                routed = inverse.reshape(routed.shape)
         view = read_scalar_feature_view(
             self.store,
             indices,
             ("slow",),
-            name_indices=name_indices,
+            name_indices=source_names,
         )
         timesteps = self.store.read("slow_timestep_valid", indices)
-        if name_indices is not None:
-            timesteps = timesteps[:, name_indices]
+        if source_names is not None:
+            timesteps = timesteps[:, source_names]
+        values, valid, ages = view.values, view.valid, view.age_sessions
+        if routed is not None:
+            rows = np.arange(indices.size)[:, None]
+            values, valid, ages = (
+                array[rows, routed] for array in (values, valid, ages)
+            )
+            timesteps = timesteps[rows, routed]
         return lazy_slow_window(
-            view.values,
-            view.valid,
+            values,
+            valid,
             timesteps,
-            view.age_sessions,
+            ages,
             end_index=len(indices) - 1,
             lookback=self.lookback,
         )
@@ -1057,7 +1089,7 @@ class V2DailyDataset(Dataset[dict[str, object]]):
         active = np.asarray(self.store.read("active", date_index), dtype=np.bool_)
         name_indices = np.flatnonzero(active) if self.compact_names else None
         history, feature_mask, history_mask, feature_age = self._slow_window(
-            slow_end, name_indices
+            slow_end, name_indices, decision_index=date_index
         )
         fast_present = np.zeros(active.shape, dtype=np.bool_)
         sample: dict[str, object] = {

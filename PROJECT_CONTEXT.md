@@ -27,8 +27,11 @@ ISINs where external issuer documents resolve missing/conflicting FCA fields.
 Sector, cross-market peer and lending-utilization observations now propagate these
 identities on their original market-input contracts. See
 `docs/v2_FCA_IDENTITY_PROPAGATION.md` and the economic/data run pointer.
-Full history/wealth/label and changed-store tensor propagation remain. These are intermediate derived
-observations, not a replacement model store or permission to attach changed
+ALLOS/ISA daily history, universe, slow fields, labels and full 60-session input
+routing now propagate under dated source links; monthly peers also inherit prior
+identity history. See `docs/v2_RENAME_HISTORY_PROPAGATION.md`. Dependent-family,
+remaining corporate wealth/label and final store assembly work remains. These are
+intermediate derived observations, not a replacement model store or permission to attach changed
 coordinates to old fits. Original filing clocks and capital units reconcile
 separately in `docs/v2_CVM_SOURCE_AUDIT.md`.
 Selected financial numerators, trailing-period formulas and share denominators

@@ -3,7 +3,7 @@ from __future__ import annotations
 import hashlib
 import re
 from dataclasses import dataclass, replace
-from datetime import date
+from datetime import date, datetime
 from pathlib import Path
 from typing import Iterable, Sequence
 
@@ -27,6 +27,60 @@ ISIN_LINK_ALLOWLIST_COLUMNS = (
     "source",
     "evidence_sha256",
 )
+
+
+def slow_history_links(
+    links: pl.DataFrame,
+    dates: Sequence[date | np.datetime64],
+    isins: Sequence[str],
+    decision_timestamps: Sequence[datetime],
+) -> pl.DataFrame:
+    """Bind unit/no-cash identity history to its effect and knowledge clocks.
+
+    Other contractual conversions require their own feature-history semantics;
+    a multi-asset or cash merger cannot inherit an arbitrary predecessor stream.
+    """
+    calendar = np.asarray(dates, dtype="datetime64[D]")
+    lookup = {isin: j for j, isin in enumerate(isins)}
+    rows = []
+    for row in links.iter_rows(named=True):
+        if (
+            row["shares_received_per_prior_share"] != 1.0
+            or row["cash_entitlement_per_prior_share"] != 0.0
+        ):
+            continue
+        effective = int(np.searchsorted(calendar, np.datetime64(row["effective_date"])))
+        known = next(
+            (
+                t
+                for t, stamp in enumerate(decision_timestamps)
+                if stamp >= row["first_known_at"]
+            ),
+            len(calendar),
+        )
+        if effective >= len(calendar) or known >= len(calendar):
+            continue
+        rows.append(
+            {
+                "predecessor_index": lookup[row["predecessor_isin"]],
+                "successor_index": lookup[row["successor_isin"]],
+                "effective_index": effective,
+                "known_index": known,
+                "source": row["source"],
+                "evidence_sha256": row["evidence_sha256"],
+            }
+        )
+    return pl.DataFrame(
+        rows,
+        schema={
+            "predecessor_index": pl.Int64,
+            "successor_index": pl.Int64,
+            "effective_index": pl.Int64,
+            "known_index": pl.Int64,
+            "source": pl.String,
+            "evidence_sha256": pl.String,
+        },
+    )
 
 
 @dataclass(frozen=True)

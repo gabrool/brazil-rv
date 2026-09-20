@@ -1,0 +1,130 @@
+{
+  "base_commit": "edc6c16b89918595d0f70ffbb53c423713121f15",
+  "changes": {
+    "all_losses_explained_by_unchanged_minimum_other_peer_count": true,
+    "eligible_added": 88,
+    "eligible_names_dropped": 0,
+    "lost_still_eligible": 90,
+    "shared_values_changed_vs_sealed": 642975,
+    "stale_predecessor_entries_retired": 12,
+    "valid_added_vs_sealed": 5453,
+    "valid_label_outcomes_added": 461,
+    "valid_label_outcomes_lost": 0,
+    "valid_removed_vs_sealed": 214
+  },
+  "evidence": {
+    "actual_tensors": {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\rename_peer_history\\input_audit.json",
+      "sha256": "dd0239b33c2a99657e7b00a154260ff2bbcd841772f4f08ef75c32243ccf18d1"
+    },
+    "daily_arrays": {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\rename_history_propagation\\manifest.json",
+      "sha256": "e0ab9e9ad52d5ad0fa56973a709ba1da5db00805379843df700cbecfe40bfd89"
+    },
+    "field_deltas": {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\rename_peer_history\\field_deltas.json",
+      "sha256": "577a9023960899a3149316d17d48bde45cf3a8d0eede41f214469a41fe1d7e16"
+    },
+    "goll_activity_boundary": {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\rename_history_propagation\\goll_activity_boundary.json",
+      "sha256": "e662f0a9290112cef85a339ab97f5cf8ae046cbf6a54838e7b72e1acba282b23"
+    },
+    "initial_actual_tensors": {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\rename_history_propagation\\input_audit.json",
+      "sha256": "e2c227d8141c606b63e193097f52a1919a98d6173043f2e6b86559282f811676"
+    },
+    "peer_arrays": {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\rename_peer_history\\manifest.json",
+      "sha256": "e064dfaada8ee6bd8d15d1b61dc226f2db97b3636218ad8c5a10706a14b6b62e"
+    },
+    "source_links": {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\rename_history_propagation\\isin_succession_links.parquet",
+      "sha256": "1d2a0159878fcc700d7c635d946e5aab77215fffc477a5d8d9655c220d5d07ef"
+    }
+  },
+  "heldout_access": false,
+  "historical_code_resolutions": [
+    {
+      "historical": {
+        "path": "C:\\Brazil-RV\\quant\\b3-quant\\ops\\propagate_rename_history.py",
+        "sha256": "67ae26f12e8797d42135a4a559e313027d02ec0c88917261a107bccd126286b4"
+      },
+      "recovered_exact_bytes": {
+        "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\rename_history_propagation\\executed_finalization.py",
+        "sha256": "67ae26f12e8797d42135a4a559e313027d02ec0c88917261a107bccd126286b4"
+      }
+    },
+    {
+      "historical": {
+        "path": "C:\\Brazil-RV\\quant\\b3-quant\\ops\\audit_rename_inputs.py",
+        "sha256": "6184751977bf368bbc9a23061ddfb908c5df79fb837d0513267c46084ce6d2e5"
+      },
+      "recovered_exact_bytes": {
+        "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\rename_history_propagation\\executed_input_audit.py",
+        "sha256": "6184751977bf368bbc9a23061ddfb908c5df79fb837d0513267c46084ce6d2e5"
+      }
+    }
+  ],
+  "implementation": [
+    {
+      "path": "C:\\Brazil-RV\\quant\\b3-quant\\research\\src\\brazil_rv\\v2\\build_store.py",
+      "sha256": "c452ab56b9101173c3c1738642c56f3dd95513f2c1e40ae1394618d90cc80f6f"
+    },
+    {
+      "path": "C:\\Brazil-RV\\quant\\b3-quant\\research\\src\\brazil_rv\\v2\\data.py",
+      "sha256": "51b060d2437c1c7ba83763322eda1db8765cc8d09e6277e102bc6fb303af1180"
+    },
+    {
+      "path": "C:\\Brazil-RV\\quant\\b3-quant\\research\\src\\brazil_rv\\v2\\data_foundation.py",
+      "sha256": "78f31f140eb0576c89fb379a89c51e70b79b430a68b62758788b4e33fbc8f91e"
+    },
+    {
+      "path": "C:\\Brazil-RV\\quant\\b3-quant\\research\\src\\brazil_rv\\v2\\store.py",
+      "sha256": "f454c9010bb030c77fe344618222ae0dc67e619c26019b0bdcaa8a29e0048e16"
+    },
+    {
+      "path": "C:\\Brazil-RV\\quant\\b3-quant\\research\\src\\brazil_rv\\v2\\features.py",
+      "sha256": "c6553b497520f39a7aabd04f23bd3761f1d309c00dfe7002e257451ff33677f0"
+    },
+    {
+      "path": "C:\\Brazil-RV\\quant\\b3-quant\\ops\\propagate_rename_history.py",
+      "sha256": "58abe0474b214bae264bdffb91650557a6eb8bf9acb432db869082a648039bb7"
+    },
+    {
+      "path": "C:\\Brazil-RV\\quant\\b3-quant\\ops\\propagate_rename_peers.py",
+      "sha256": "9eacd193b83b63baf263334001f04a4068fc4d7fc81d27358463c779f9b2b129"
+    },
+    {
+      "path": "C:\\Brazil-RV\\quant\\b3-quant\\ops\\audit_rename_inputs.py",
+      "sha256": "2a753f5240dd8f74b0ac6ac8f9213e8dc657ac4bf7b0f6b7abecec0e88d58fcc"
+    }
+  ],
+  "neural_forward": false,
+  "profitability_claim": false,
+  "remaining": [
+    "source-specific GOLL activity versus invalid OHLC",
+    "ISAE4 and first ALOS issuer dependency propagation",
+    "all changed-history auxiliary/M1 dependencies and recovered lending attribution",
+    "remaining corporate wealth/label terms and A execution/loan bounds",
+    "accepted derived store/refits and registered C/D"
+  ],
+  "source_guard": "Original stores, raw quotes, old fits, 2009 warmup and all 933 axes preserved. No BDI alias assumed. Public successor coordinates remain empty before birth; predecessor history is selected only by an effect/knowledge-admitted decision.",
+  "stages": {
+    "A": "incomplete",
+    "B": "incomplete",
+    "C": "not_started",
+    "D": "not_started"
+  },
+  "status": "passed_daily_rename_and_peer_history_intermediates_full_AB_incomplete",
+  "tests": {
+    "affected_store_and_foundation_batch": {
+      "failed_then_fixed": 1,
+      "passed": 65
+    },
+    "counts_overlap": true,
+    "final_cluster_history_and_store_batch": 8,
+    "final_store_causality_batch": 6,
+    "new_history_fixtures": 3,
+    "ruff": "passed"
+  }
+}

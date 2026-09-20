@@ -1636,7 +1636,7 @@ class V2Store:
             | None
         ) = None,
     ) -> pl.DataFrame:
-        """Read only the two runtime mapping tables within this capability.
+        """Read runtime mappings within this date capability.
 
         Audit and coverage tables remain immutable artifacts, but are not
         exposed through a date-bounded training/evaluation store handle.
@@ -1646,6 +1646,16 @@ class V2Store:
             record = self.manifest.get("tables", {})[name]
         except KeyError as error:
             raise KeyError(f"v2 store does not contain table {name}") from error
+        if name == "slow_history_links":
+            if date_selector is None:
+                raise PermissionError("history links require an authorized decision")
+            indices = np.atleast_1d(self._checked_date_selector(date_selector))
+            if indices.size != 1:
+                raise ValueError("history links require one decision at a time")
+            return pl.read_parquet(self.root / record["path"]).filter(
+                (pl.col("effective_index") <= int(indices[0]))
+                & (pl.col("known_index") <= int(indices[0]))
+            )
         if name in {"v1_fast_isin_mapping", "native_fast_security_mapping"}:
             if date_selector is not None:
                 raise ValueError("the static ISIN mapping has no date selector")

@@ -95,9 +95,9 @@ def wealth_return_validity(
         if ambiguous.shape != close.shape:
             raise ValueError("ambiguous_action must align with close")
         boundaries |= ambiguous
-    valid[horizon:] = endpoints & _ambiguous_interval_clear(
-        boundaries, horizon
-    )[horizon:]
+    valid[horizon:] = (
+        endpoints & _ambiguous_interval_clear(boundaries, horizon)[horizon:]
+    )
     return valid
 
 
@@ -120,9 +120,12 @@ def exact_log_return(
         if shareholder_wealth_valid is None
         else np.asarray(shareholder_wealth_valid, dtype=np.bool_)
     )
-    mask = np.isfinite(candidate) & wealth_return_validity(
-        values, source_valid, horizon, ambiguous_action
-    )[horizon:]
+    mask = (
+        np.isfinite(candidate)
+        & wealth_return_validity(values, source_valid, horizon, ambiguous_action)[
+            horizon:
+        ]
+    )
     output[horizon:] = np.where(mask, candidate, np.nan)
     valid[horizon:] = mask
     return output, valid
@@ -312,6 +315,7 @@ def monthly_cluster_labels(
     lookback: int = 126,
     minimum_observed: int = 101,
     cluster_count: int = 12,
+    history_links: Sequence[dict[str, int]] = (),
 ) -> NDArray[np.int16]:
     """Freeze each month's clusters from information through the prior session."""
 
@@ -327,6 +331,10 @@ def monthly_cluster_labels(
     current = np.full(returns.shape[1], -1, dtype=np.int16)
     prior_month: str | None = None
     for day in range(returns.shape[0]):
+        for link in history_links:
+            if day == max(link["known_index"], link["effective_index"]):
+                current[link["successor_index"]] = current[link["predecessor_index"]]
+                current[link["predecessor_index"]] = -1
         month = str(date_values[day].astype("datetime64[M]"))
         if month != prior_month:
             prior_month = month
@@ -334,9 +342,26 @@ def monthly_cluster_labels(
             start = max(0, day - lookback)
             sample = returns[start:day]
             sample_valid = available[start:day]
-            eligible = (sample_valid.sum(axis=0) >= minimum_observed) & (
-                membership[day - 1] if day else False
+            prior_active = (
+                membership[day - 1].copy() if day else np.zeros(returns.shape[1], bool)
             )
+            admitted = [
+                r
+                for r in history_links
+                if max(r["known_index"], r["effective_index"]) <= day
+            ]
+            if admitted:
+                sample, sample_valid = sample.copy(), sample_valid.copy()
+                for link in sorted(admitted, key=lambda r: r["effective_index"]):
+                    a, b = link["predecessor_index"], link["successor_index"]
+                    before = np.arange(start, day) < link["effective_index"]
+                    sample[before, b], sample_valid[before, b] = (
+                        sample[before, a],
+                        sample_valid[before, a],
+                    )
+                    prior_active[b] |= prior_active[a]
+                    prior_active[a] = False
+            eligible = (sample_valid.sum(axis=0) >= minimum_observed) & prior_active
             slots = np.flatnonzero(eligible)
             if slots.size >= cluster_count:
                 correlations = pairwise_masked_correlation(
@@ -575,6 +600,7 @@ def build_slow_features_into(
     consume: Callable[[int, NDArray[np.floating], NDArray[np.bool_]], None],
     cluster_labels: NDArray[np.integer] | None = None,
     ambiguous_action: NDArray[np.bool_] | None = None,
+    history_links: Sequence[dict[str, int]] = (),
 ) -> NDArray[np.int16]:
     """Compute one slow field at a time and immediately hand it to ``consume``.
 
@@ -755,9 +781,7 @@ def build_slow_features_into(
         np.abs(retained_returns[1][0][amihud_source_valid])
         / volume[amihud_source_valid]
     )
-    amihud, amihud_valid = _rolling_stat(
-        amihud_daily, 20, "mean", minimum=20
-    )
+    amihud, amihud_valid = _rolling_stat(amihud_daily, 20, "mean", minimum=20)
     assign(
         19,
         amihud,
@@ -815,7 +839,12 @@ def build_slow_features_into(
             daily_residual[day, mask] -= np.median(daily_residual[day, mask])
     labels = (
         monthly_cluster_labels(
-            dates, daily_residual, residual_valid, membership, cluster_count=12
+            dates,
+            daily_residual,
+            residual_valid,
+            membership,
+            cluster_count=12,
+            history_links=history_links,
         )
         if cluster_labels is None
         else np.asarray(cluster_labels, dtype=np.int16)
@@ -830,6 +859,12 @@ def build_slow_features_into(
         labels,
         membership,
     )
+    for link in history_links:
+        before = link["effective_index"] - 1
+        if before >= 0 and link["known_index"] <= link["effective_index"]:
+            a, b = link["predecessor_index"], link["successor_index"]
+            peer_values[before, b] = peer_values[before, a]
+            peer_valid[before, b] = peer_valid[before, a]
     for offset in range(5):
         assign(27 + offset, peer_values[..., offset], peer_valid[..., offset])
     return labels

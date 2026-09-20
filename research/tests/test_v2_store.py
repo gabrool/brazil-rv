@@ -490,6 +490,101 @@ def _sample_support_arrays(
     }
 
 
+@pytest.mark.parametrize("compact", [False, True])
+def test_rename_history_routes_prior_features_only_after_effect_and_knowledge(
+    tmp_path, compact
+):
+    days, names, boundary, known = 25, 3, 18, 20
+    activity = np.ones((days, names), bool)
+    activity[:boundary, 1] = False
+    activity[boundary:, 0] = False
+    raw = np.broadcast_to(
+        np.arange(days, dtype=np.float32)[:, None, None], (days, names, 2)
+    ).copy()
+    raw += np.arange(names, dtype=np.float32)[None, :, None] * 100
+    valid = np.broadcast_to(activity[..., None], raw.shape).copy()
+    age = np.where(valid, 3.0, -1.0).astype(np.float32)
+    links = pl.DataFrame(
+        {
+            "predecessor_index": [0],
+            "successor_index": [1],
+            "effective_index": [boundary],
+            "known_index": [known],
+        }
+    )
+    path = _base_store(
+        tmp_path,
+        extra_arrays={
+            "active": activity,
+            "slow_values": np.where(valid, raw, 0.0),
+            "slow_valid": valid,
+            "slow_age_sessions": age,
+        },
+        extra_tables={"slow_history_links": links},
+    )
+    dataset = V2DailyDataset(
+        path,
+        [19, 20],
+        stage="finetune",
+        lookback=20,
+        compact_names=compact,
+        include_fast=False,
+        include_intraday=False,
+    )
+    earlier, later = dataset[0], dataset[1]
+    # Compact routing must retain the successor's permanent output index, even
+    # though most history was read from an inactive predecessor's store column.
+    slot = 0 if compact else 1
+    assert not earlier["slow_feature_mask"][slot, :18].any()
+    assert later["slow_feature_mask"][slot].all()
+    np.testing.assert_array_equal(
+        later["slow_features"][slot, :17, 0], np.arange(1, 18)
+    )
+    np.testing.assert_array_equal(
+        later["slow_features"][slot, 17:, 0], np.arange(118, 121)
+    )
+    assert (later["slow_feature_age_sessions"][slot] == 3).all()
+    if compact:
+        np.testing.assert_array_equal(later["name_index"], [1, 2])
+    # The unrelated security retains exactly the unmodified 20 calendar rows.
+    other = 1 if compact else 2
+    np.testing.assert_array_equal(
+        later["slow_features"][other, :, 0], np.arange(201, 221)
+    )
+    with pytest.raises(PermissionError):
+        dataset.store.read_table("slow_history_links", 24)
+    dataset.store.close()
+
+
+def test_rename_history_mapping_uses_announcement_timestamp_and_skips_future_links():
+    from brazil_rv.v2.data_foundation import slow_history_links
+
+    dates = [date(2024, 1, 1) + timedelta(days=i) for i in range(5)]
+    decisions = [datetime.combine(d, time(18), timezone.utc) for d in dates]
+    rows = pl.DataFrame(
+        {
+            "predecessor_isin": ["A", "B"],
+            "successor_isin": ["B", "C"],
+            "effective_date": [dates[2], dates[4]],
+            "first_known_at": [
+                decisions[2] + timedelta(minutes=1),
+                decisions[4] + timedelta(minutes=1),
+            ],
+            "shares_received_per_prior_share": [1.0, 1.0],
+            "cash_entitlement_per_prior_share": [0.0, 0.0],
+            "source": ["dated issuer notice"] * 2,
+            "evidence_sha256": ["a" * 64] * 2,
+        }
+    )
+    result = slow_history_links(rows, dates, ["A", "B", "C"], decisions)
+    assert result.height == 1
+    assert result["effective_index"].to_list() == [2]
+    assert result["known_index"].to_list() == [3]
+    assert slow_history_links(
+        rows, dates[:2], ["A", "B", "C"], decisions[:2]
+    ).is_empty()
+
+
 def _feature_age(valid: np.ndarray) -> np.ndarray:
     return np.where(valid, 0.0, -1.0).astype(np.float32)
 
@@ -2117,8 +2212,10 @@ def test_store_to_close_uses_m1_units_and_causal_return_validation(tmp_path) -> 
     assert "corporate_actions_verified_terms" in manifest["tables"]
 
 
+@pytest.mark.parametrize("cash", [0.0, 1.0])
 def test_store_routes_a_verified_isin_conversion_without_restart_or_double_count(
     tmp_path: Path,
+    cash: float,
 ) -> None:
     dates = [date(2023, 1, 2) + timedelta(days=index) for index in range(75)]
     predecessor = "BRTESTACNOR1"
@@ -2131,7 +2228,7 @@ def test_store_routes_a_verified_isin_conversion_without_restart_or_double_count
         price[day_index] = price[day_index - 1] * 1.001
         if day_index == split_day:
             price[day_index] /= 2.0
-    price[boundary] = price[boundary - 1] - 1.0
+    price[boundary] = price[boundary - 1] - cash
     for day_index in range(boundary + 1, len(dates)):
         price[day_index] = price[day_index - 1] * 1.001
     daily = pl.DataFrame(
@@ -2188,7 +2285,7 @@ def test_store_routes_a_verified_isin_conversion_without_restart_or_double_count
         "shares_received_per_prior_share,cash_entitlement_per_prior_share,"
         "currency,source,evidence_sha256\n"
         f"TEST3,{predecessor},{successor},{dates[boundary].isoformat()},"
-        f"{dates[boundary - 1].isoformat()}T12:00:00Z,1.0,1.0,BRL,"
+        f"{dates[boundary - 1].isoformat()}T12:00:00Z,1.0,{cash},BRL,"
         f"issuer_notice,{'a' * 64}\n",
         encoding="utf-8",
     )
@@ -2238,7 +2335,7 @@ def test_store_routes_a_verified_isin_conversion_without_restart_or_double_count
     )
     np.testing.assert_allclose(
         price_return[boundary - 1, predecessor_index, 0],
-        -1.0 / price[boundary - 1],
+        -cash / price[boundary - 1],
         rtol=1e-5,
     )
     slow_timestep_valid = np.load(root / "slow_timestep_valid.npy", allow_pickle=False)
@@ -2246,6 +2343,26 @@ def test_store_routes_a_verified_isin_conversion_without_restart_or_double_count
     manifest = json.loads((root / "manifest.json").read_text(encoding="utf-8"))
     assert manifest["metadata"]["isin_succession_link_count"] == 1
     assert "corporate_action_alignment_roles" in manifest["tables"]
+    if cash == 0:
+        wealth = np.load(root / "shareholder_wealth_close.npy")
+        assert np.isnan(wealth[:boundary, successor_index]).all()
+        assert not slow_timestep_valid[:boundary, successor_index].any()
+        dataset = V2DailyDataset(
+            root,
+            [boundary],
+            stage="finetune",
+            lookback=60,
+            include_fast=False,
+            include_intraday=False,
+        )
+        sample = dataset[0]
+        assert sample["slow_history_mask"][successor_index].all()
+        stored_valid = np.load(root / "slow_valid.npy")
+        np.testing.assert_array_equal(
+            sample["slow_feature_mask"][successor_index, :-1],
+            stored_valid[boundary - 59 : boundary, predecessor_index],
+        )
+        dataset.store.close()
 
 
 def test_raw_to_feature_store_build_is_causal_through_cutoff(tmp_path) -> None:

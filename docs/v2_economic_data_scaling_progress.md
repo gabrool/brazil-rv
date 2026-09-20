@@ -1291,3 +1291,56 @@ It binds22,317 original-source receipts already verified by these new audits;
 recovery does not reparse or rehash that source census. The earlier issuer/peer
 recovery archive is verified and retained. Immutable inputs and old fits were
 not duplicated. Canonical pointers are updated; the heartbeat remains active.
+
+### ALLOS/ISA daily and peer-history propagation (2026-09-20)
+
+- The three sourced rename links now propagate on all3,717 sessions/all933
+  permanent axes with2009 warmup: +60ALOS/+28ISAE4 eligible days,12 stale
+  predecessor entries retired, no other eligibility change. Raw quotes remain
+  unchanged. This is an intermediate daily-array contract, not a replacement
+  accepted store or permission to score old fits on new coordinates.
+- The actual consumer had still read the successor's empty earlier column.
+  Dated unit/no-cash mappings now route predecessor values/masks/ages into later
+  60-session windows, including compact names, while preserving permanent output
+  indices. Effect and announcement clocks both gate routing. Public pre-birth
+  successor wealth/risk/history coordinates stay empty; the producer's internal
+  history basis is separate.
+- The first full pass rebuilt32 slow fields in195.63s. Its loss census exposed
+  a second gap: monthly clustering ignored predecessor history. The narrow
+  five-field repair carries the current cluster and uses the predecessor's
+  prior126 sessions at monthly fitting, with101 observations still required.
+  Its1/5/21-session return inputs reproduce exactly, the other27 fields and
+  pre-event prefix stay exact, and it runs in14.99s. Combined slow masks gain
+  5,453 values/lose214:124 belong to retired predecessor entries,90 still-active
+  cases have only two other valid peers under the unchanged three-peer rule.
+  Every loss is enumerated; no difficult security is excluded. Shared valid
+  slow values change642,975, including legitimate cross-sectional effects.
+- Labels gain461 valid name/horizon outcomes, none lost. All arrays are exact
+  before the ten-equity-session window that can cross the first rename.
+  The first label attempt used stored float32 prices and disturbed ties; the
+  archived Round-7 decimal-cent precision is now reproduced. A calendar-day
+  rather than session-count qualification bound was fixed without repeating
+  the passed slow build. Exact initial code/output attempts remain onD.
+- The final actual input audit covers12 dates,933 names/full60 sessions and
+  65,171,916 array/packed-CPU-tensor cells withzero mismatches. The pre-rename
+  tensor is exact against the sealed store. Final audit19.67s; no neural
+  forward/scoring/GPU fit and no alpha claim. Three new routing tests passed;
+  a65-pass affected batch caught one read-only scratch-write error, fixed by
+  changing only the new published copies. Subsequent six- and eight-test
+  affected/causality batches pass (overlapping), including cluster history.
+  Ruff passes. The registration was reread.
+- Source-specific remaining boundaries are recorded. GOLL2011-02-16 has invalid
+  OHLC bounds but useful printed activity. Rename-only attribution retains the
+  sealed mask so it does not silently remove20 unrelated eligible sessions;
+  separate activity/price-mask admission remains. The current FCA overlay has
+  noISAE4 issuer rows and misses the first twoALOS days; source-bound identity
+  inheritance must propagate these, rather than fuzzy matching or loan aliases.
+- Read `v2_RENAME_HISTORY_PROPAGATION.md` and
+  `v2_rename_history_acceptance.json` (SHA
+  `0f0c277c4297c8a309983beb74b258506ad284d803297fcea29381bf71b2a6cd`).
+  Resolve `rename_history_propagation`, `rename_peer_propagation` and
+  `rename_input_audit`. A/B remain incomplete andC/D unstarted. Next propagate
+  dependent issuer/auxiliary/M1/lending families, remaining contractual
+  wealth/labels and accept the complete new store. A's execution/lifecycle
+  sensitivities remain required. Do not repeat the completed32-field build,
+  five-field qualification, actual tensor checks or prior source censuses.

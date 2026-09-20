@@ -62,6 +62,7 @@ from .data_foundation import (
     continuation_identity_axis,
     detect_isin_successions,
     load_isin_link_allowlist,
+    slow_history_links,
     load_cotahist,
     panel_from_daily,
     prepare_cash_equities,
@@ -2311,6 +2312,9 @@ def build_daily_store(
         activity_valid=decision_continuation.activity_valid,
         consume=consume_slow_feature,
         ambiguous_action=linked_slow_inputs[7],
+        history_links=slow_history_links(
+            isin_successions, panel.dates, panel.isins, decision_timestamps
+        ).to_dicts(),
     )
     target_scale_sigma = _workspace_array(
         workspace,
@@ -2813,6 +2817,34 @@ def build_daily_store(
         }
     )
     arrays.update(target_arrays)
+    history_links = slow_history_links(
+        isin_successions,
+        kept_dates,
+        panel.isins,
+        [session_schedule[int(t)].decision_at for t in kept_rows],
+    )
+    # Clear only the new published copies, retaining the internal history basis
+    # needed by downstream producers. These are owned temporary workspace files.
+    if history_links.height:
+        for name in (
+            "shareholder_wealth_open",
+            "shareholder_wealth_high",
+            "shareholder_wealth_low",
+            "shareholder_wealth_close",
+            "shareholder_wealth_valid",
+            "prior_reference_close",
+            "target_scale_sigma",
+            "slow_timestep_valid",
+        ):
+            path = Path(arrays[name].filename)
+            close_memmap(arrays[name])
+            values = np.load(path, mmap_mode="r+")
+            for link in history_links.iter_rows(named=True):
+                values[: link["effective_index"], link["successor_index"]] = (
+                    False if values.dtype == np.bool_ else np.nan
+                )
+            close_memmap(values)
+            arrays[name] = np.load(path, mmap_mode="r")
     del target_arrays
     gc.collect()
     arrays.update(to_close_arrays)
@@ -3022,6 +3054,7 @@ def build_daily_store(
         ),
         "isin_succession_candidates": proposed_isin_successions,
         "isin_succession_links": isin_successions,
+        "slow_history_links": history_links,
         "b3_session_schedule": schedule_frame(session_schedule),
         "calendar_completeness": calendar_completeness_table(
             session_schedule, archive_dates
@@ -3299,7 +3332,9 @@ def build_daily_store(
         "feature_history_identity": (
             "permanent ISIN; verified conversions known by the effective-session "
             "decision route contractual shareholder wealth and separately rebase "
-            "price/liquidity/history inputs by their units"
+            "price/liquidity/history inputs by their units; unit/no-cash renames "
+            "leave public pre-birth coordinates empty and route prior scalar "
+            "history only at an effect/knowledge-authorized sampling decision"
         ),
         "calendar_contract": {
             "schema": "BRAZIL_RV_B3_EQUITY_SESSION_SCHEDULE_V1",
