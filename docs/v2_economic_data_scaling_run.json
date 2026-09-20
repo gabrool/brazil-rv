@@ -101,6 +101,10 @@
     "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\surviving_store\\qualification\\manifest.json",
     "sha256": "5c25e99e79c06574e3e5a9d60a38b533b6dd8a008030ab98422eaca18e5c3f14"
   },
+  "composed_store_recovery": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\composed_store_recovery.json",
+    "sha256": "c629bdcb5ba1034e5337d30df7a8a3adb37f95b02c1b3e370572b22ac706cd4f"
+  },
   "composed_target_qualification": {
     "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\surviving_store\\target_qualification.json",
     "sha256": "20fa81b15a189fb0800af9e6946d4c23b15f0639582b257dd367f46670fa4591"
