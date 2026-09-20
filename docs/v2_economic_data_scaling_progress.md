@@ -2039,3 +2039,6 @@ The [loan invoice checkpoint](docs/v2_LOAN_INVOICES.md) qualifies V39 cent/payme
 Independentadaptive maxpath .010282502409070731/.00000816549058072269/.000022326227277517318bp atR10m/R1m/R5m. Preserve larger V32-V38 fixed-fee uncertainty. Many2019R10m path signs are below this bound. Total synthetic paths, not dailyalpha/modelprofit or an all-interior adaptive extremum proof.
 
 14distinctnewtests,9existingloancontracttests,6existingfractionpaymenttests pass; overlapping batches not summed. Ruff passes. Engineering74.986028s/qualification1.087650s; all36 first-pass, no oldbook/source/store rerun.
+
+
+Recovery verified: `loan_invoice_5e1c5b0.zip`, SHA `07dcd80eb46025c661fa790a342b885543aa7a87f3b6c09991dc01b201a51d1c`, 15741455 bytes. 820 unique/1006 logical restored/hash-checked members, 186 aliases; 36 complete books/8660736 account cells, 1.655622s. Complete current research, implementation patch, frozen plan, failed/qualified executed recipes and new books recover without immutable-input/store/old-fit duplication. Prior payment/Copel/precredit/ENAT/Natura/lifecycle/lending/economic/Natura-store recoveries remain required. All workers finished; final A/C/D remain open.

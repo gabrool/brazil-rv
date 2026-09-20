@@ -74,3 +74,6 @@ Post-book evaluation report now states chosen invoice/minimum hypothesis instead
 14distinctnewtests,9existingloancontracttests,6existingfractionpaymenttests pass; overlapping batches not summed. Ruff passes. Engineering 74.986028s (sumcases 73.683735s); saved qualification 1.087650s. These are CPU audit runtimes, not fit ETAs.
 
 Actual-held-Cielo cent bound; final historical B3 spot/custody/rent-intermediation/brokerage/shortfall/cash/debit separation and negotiated sensitivities; three older clearing ambiguities; held source/succession data admission; then registeredC/D. ALSC credit/exactnet/actualreceipt and ENATfractionauction remainunknown. Both acceptedstores/oldfits and all prior books are sealed; no newfit/modelprofit.
+
+
+Recovery verified: `loan_invoice_5e1c5b0.zip`, SHA `07dcd80eb46025c661fa790a342b885543aa7a87f3b6c09991dc01b201a51d1c`, 15741455 bytes. 820 unique/1006 logical restored/hash-checked members, 186 aliases; 36 complete books/8660736 account cells, 1.655622s. Complete current research, implementation patch, frozen plan, failed/qualified executed recipes and new books recover without immutable-input/store/old-fit duplication. Prior payment/Copel/precredit/ENAT/Natura/lifecycle/lending/economic/Natura-store recoveries remain required. All workers finished; final A/C/D remain open.

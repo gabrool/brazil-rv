@@ -394,6 +394,10 @@
     "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\loan_invoices\\qualification_qualified\\manifest.json",
     "sha256": "bbf83654471fccd06035687789ba534242a9c7908681c2e7fbd642ea9a259caf"
   },
+  "loan_invoice_recovery": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\loan_invoice_recovery.json",
+    "sha256": "1c1aee091d2beb43779a7ca32b53b4f17b959857ab6a60202f24ab908a6685d0"
+  },
   "loan_renewal_acceptance": {
     "path": "docs\\v2_loan_renewal_acceptance.json",
     "sha256": "c5e8263e84b932565ba9f1d9331806d49d826aa185daa79aa4f0d5be2bc29a65"
