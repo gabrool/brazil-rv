@@ -460,6 +460,10 @@
     "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\natura_settlement\\qualification\\manifest.json",
     "sha256": "8146b64092b041b6108c4f12001a9ded2d2fb3f499badf6f71539202dac69402"
   },
+  "natura_settlement_recovery": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\natura_settlement_recovery.json",
+    "sha256": "425fd9f1a666a4b80be45608bf3b7391b102a22864a3bb2d49ffb3c31a41d42f"
+  },
   "natura_settlement_runtime_qualification": {
     "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\natura_settlement\\runtime_qualification\\manifest.json",
     "sha256": "3043332a7cdc350e8bebffbd12c73303e592d05efbc834bd45c3ad4114345c1b"

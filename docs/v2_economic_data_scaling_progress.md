@@ -1986,3 +1986,13 @@ Next: still-missing ALSC credit/auction and event-specific loan/fraction evidenc
 ENAT original receipts by held exposure, BRML/DMMO/Copel adaptive pre-custody disposal,
 remaining allocation/rounding/grouping/oldminimum/clearing and separatedcorporatecosts.
 Do not repeat the Natura source/data/opening/settlement books. FinalA/C/D remain pending.
+
+Verified Natura settlement recovery for implementation8262c0b006782076a2a09adee845c81d4fd84fcc:
+851unique/1227logicalmembers,376aliases restored/hashchecked;
+42completebooks/13701888accountcells. Archive
+natura_settlement_8262c0b.zip,23675270bytes,SHA
+564e41252e0220178be927b6e0f52de71c92fcc9868e28b8424c375306965db1. Recovery1.9166s.
+Acceptance SHAeb6a96325d950ff449ebd72f8ce68b9629c9162ae74e734b366af7fdc9e39afc. Complete currentresearch/patch,
+executed historical recipes, source hypotheses, tests/qualification and newbooks
+recover without immutable sources/stores/oldfit duplication. Prior opening/source/
+loan/economic/Natura-store recoveries remain required. All workers finished.
