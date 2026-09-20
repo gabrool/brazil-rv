@@ -931,6 +931,10 @@
     "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\surviving_renames\\dependency_progress\\manifest.json",
     "sha256": "0a94b76218adbd7397d7ff8260038b0900b45a550b2d2c16e08f2748e091ddcd"
   },
+  "surviving_rename_dependency_recovery": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\surviving_rename_dependency_recovery.json",
+    "sha256": "fa6deab0c9978e6f5888d663b5c88aa9726325fbefe0ceec505ca3a13ecc4a40"
+  },
   "surviving_rename_documentation": {
     "path": "C:\\quant\\b3-quant\\docs\\v2_SURVIVING_RENAME_PROPAGATION.md",
     "sha256": "4665e06200dfd6ad93141a898f5a9c0fe699a2434435a9b6f17812853227e3f6"

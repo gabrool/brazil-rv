@@ -1,0 +1,57 @@
+{
+  "aliases": 20,
+  "archive": {
+    "bytes": 75723303,
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\surviving_dependencies_6c42fa1.zip",
+    "sha256": "09c9d85fc8b26367bc56e414966f045b93aa1ab6ea7d643dec3be9753e91e13c"
+  },
+  "changed_arrays": 25,
+  "dependencies": {
+    "economic_store_recovery": {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\economic_store_recovery.json",
+      "sha256": "fa010f13f262d20126fc1f3d54fa104b03891b825fc18d3eaa82322eb62cbf39"
+    },
+    "event_composition_recovery": {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\event_composition_recovery.json",
+      "sha256": "852d737ec796377f412f147794b69bbd9d9f8404d54310a1a8355f090e7afc25"
+    },
+    "lending_feature_recovery": {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\lending_feature_recovery.json",
+      "sha256": "95b255ca651f4dce93767d4e06a4088e4610a9ede879ac6491d6c0cd5cc5f8bb"
+    },
+    "natura_store_recovery": {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\natura_store_recovery.json",
+      "sha256": "3840780a073e6a214ad247530863bff55500114cc340a9953d7492ff927b21a6"
+    },
+    "remaining_auxiliary_recovery": {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\remaining_auxiliary_recovery.json",
+      "sha256": "50d728f8f039f19d1cc23fb8b0ba687f303003255bcc33ca4f1dc3866af6b0d2"
+    },
+    "surviving_rename_lineage_recovery": {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\surviving_rename_lineage_recovery.json",
+      "sha256": "fcbcb1ed4f5fec91df01f62e98b37cfbc01490b052036adcead01716fcf352b2"
+    },
+    "surviving_rename_recovery": {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\surviving_rename_recovery.json",
+      "sha256": "49dbeba5a2c700d926895811ddddaf547e14a5cc615cfcbf069f8573d398cbd1"
+    }
+  },
+  "immutable_inputs_copied": false,
+  "implementation_commit": "6c42fa14290d6e06a792cb644f677fcc026dfc3a",
+  "limits": "Current new ops/helpers/docs/patch, exact failed/resumed/executed recipes and new evidence recover. Unchanged research runtime and original sources remain prior archive dependencies. Array counts include overlapping audit views; recovery is byte verification, not another daily/native/model audit.",
+  "logical_members": 216,
+  "parent": {
+    "manifest_sha256": "93f65b11f31979c6eafee0ca7e68afe5bb591a303eb8b5e2148072828e8d04bf",
+    "root": "C:\\quant-data\\b3\\processed\\v2_economic_natura_store_20260920"
+  },
+  "prior_slow_view": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\surviving_renames\\consumer\\slow_view\\manifest.json",
+    "sha256": "97e513d0c49822a1873c971647b1d6744b1cd190913a304c1125c160d8c90ae7"
+  },
+  "prior_view_arrays_reused": 14,
+  "reconstructed_arrays": 40,
+  "reconstructed_cells": 430282858,
+  "seconds": 13.305552000005264,
+  "status": "verified_sparse_dependency_recovery",
+  "unique_members": 196
+}
