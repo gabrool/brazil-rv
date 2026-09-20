@@ -205,6 +205,10 @@
     "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\lending_feature_propagation\\manifest.json",
     "sha256": "864c8fe1dade2ceb9cda76814f12d559bfb39e4b8909f5b5c227d9dd504017ea"
   },
+  "lending_feature_recovery": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\lending_feature_recovery.json",
+    "sha256": "95b255ca651f4dce93767d4e06a4088e4610a9ede879ac6491d6c0cd5cc5f8bb"
+  },
   "lending_source_admission": {
     "bytes": 7260,
     "path": "docs\\v2_lending_source_admission.json",

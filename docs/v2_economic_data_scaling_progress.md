@@ -1457,3 +1457,13 @@ The heartbeat remains active until the complete A-D program is finished.
   native M1 predecessor windows, remaining auxiliary histories, contractual
   wealth/labels and full derived-store/refit tensors; StageA execution/lifecycle
   bounds remain. A/B incomplete, C/D unstarted, no GPU fit or profitability result.
+
+Recovery closeout for `eca5b6b`: `lending_feature_recovery.json` binds268 unique
+archive members and277 restored logical members, including nine deduplicated
+new-artifact aliases. The12,797,344-byte `lending_features_eca5b6b.zip` has SHA-256
+`18cd2df0ff4c93f629ed9d93402cfe491d2895f72531dc61e9bac9869d100969`.
+The restored actual archive loader reproduces all six loan arrays. Existing
+recovered rate bytes remain an explicit external dependency of the earlier
+lending-source recovery; no immutable dataset or old fit was duplicated. The
+current research source, binary patch, initial attempts and final qualification
+are recoverable. A/B remain incomplete; heartbeat stays active.
