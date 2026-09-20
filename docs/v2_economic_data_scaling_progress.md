@@ -1852,3 +1852,14 @@ Preserve all V31/V32 mechanics and measured independent-adaptive minimum-fee
 uncertainty. Adaptive disposal/timing/fraction/rounding/grouping/old-minimum/clearing
 bounds, final corporate pricing, C matched replays/refits and conditional D remain.
 No new neural forward or profitability is claimed.
+
+Verified held_event_source_recovery for implementation
+fbdf4d9dc43d037419640ddf4b2d5f46c6275adc restores684unique/697logicalmembers,
+13aliases,17newPDFs and the actual two-term loader. Sparse reconstruction verifies
+1129040target-attribution cells and256wealth-view cells. ZIP
+held_event_sources_fbdf4d9.zip,17273050bytes,SHA
+01dbc59678f7bd4b45c256da61c3a601a0bcacad9b588b1efaf227803f5a129d.
+Recovery1.7444s; complete current research/patch and initial/qualified recipes
+retained without immutable input, accepted store or old-fit duplication. Earlier
+dependencies remain required. This is source/intermediate acceptance, not A/C
+economic admission or final Natura dependency acceptance.

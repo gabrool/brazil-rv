@@ -164,3 +164,18 @@ Preserve V32's measured independent-adaptive fixed-fee uncertainty. Final corpor
 cost attribution, registered C replays/refits and conditional D capacity waves
 remain. No completed source census, accepted-store baseline assembly or 24-case
 lifecycle engineering book needs to be repeated.
+
+## Verified recovery
+
+Implementation `fbdf4d9dc43d037419640ddf4b2d5f46c6275adc` is recoverable from
+`held_event_sources_fbdf4d9.zip` on D, 17,273,050 bytes, SHA256
+`01dbc59678f7bd4b45c256da61c3a601a0bcacad9b588b1efaf227803f5a129d`.
+All 684 unique/697 logical members, including 13 deduplicated aliases, restore
+and match hashes. The actual term loader restores both qualified source terms;
+sparse patches reconstruct 1,129,040 target-attribution cells and 256 wealth-view
+cells exactly against the explicit accepted baseline. The 17 new original PDFs,
+complete current research source, patch and initial/qualified recipes are included.
+Prior recovery dependencies supply immutable inputs and the accepted store; neither
+those nor old fits are duplicated. Verification took 1.7444s. Resolve
+`held_event_source_recovery`; this verifies intermediate recovery, not final model
+or account admission.

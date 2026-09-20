@@ -261,6 +261,10 @@
     "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\held_event_sources\\clock_qualification\\manifest.json",
     "sha256": "e40a4200dea0ceb86a6766c790aa23c2f7d6fe9b58d9c49861aa15bb3f90ba7d"
   },
+  "held_event_source_recovery": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\held_event_source_recovery.json",
+    "sha256": "48ee32e02ba647b3e59e966c07c3e35f78b61fb85adc500ec54bc2a23dc62409"
+  },
   "identity_source_admission": {
     "path": "docs\\v2_identity_source_admission.json",
     "sha256": "8d3f3d2c04a8bb55cd83d69ddd35541e0049588494b92acc9c03056a741daab8"
