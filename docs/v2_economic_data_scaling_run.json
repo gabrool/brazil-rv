@@ -369,6 +369,10 @@
     "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\tariff_coverage\\runtime_qualification\\ordinary_report.json",
     "sha256": "1e7117976210e53850767b5ba73c2f284548488f044dc92eee9d472a14c94d5c"
   },
+  "historical_cost_recovery": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\historical_cost_recovery.json",
+    "sha256": "d76475d01e4177b5946de23148e6b456413eb26c25f901a573db1d33ef166d50"
+  },
   "historical_cost_runtime": {
     "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\tariff_coverage\\runtime_qualification\\report.json",
     "sha256": "7c18ef6f8a2194cfbfa70fca2c2335eb5e07fc82bd40e82473014eac55d210d6"
