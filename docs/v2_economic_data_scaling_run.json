@@ -476,6 +476,10 @@
     "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\integrated_admission\\qualified\\manifest.json",
     "sha256": "3c1160338ee66a7eb05814856d4b4601034f83144fc76f30fe444509281566cb"
   },
+  "integrated_account_recovery": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\integrated_account_recovery.json",
+    "sha256": "4fde4a71620aa19ab728e666b82961282423405378a19d26053258b5313ac5cf"
+  },
   "integrated_account_runtime": {
     "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\integrated_admission\\runtime.json",
     "sha256": "1f894c5271ddf3040342b97544b2599b175ae93d03631b2d5dd86b802f3789f0"
