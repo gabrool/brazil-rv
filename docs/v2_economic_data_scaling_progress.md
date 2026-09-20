@@ -1579,3 +1579,14 @@ aeri_boundary/wealth_qualification; see v2_TO_CLOSE_CLOCK_AERI.md. These are
 verified amendments, not a final accepted store. Next finish remaining auxiliary
 histories/joins, contractual wealth/labels and the complete store/tensor/refit
 contract alongside A's remaining adaptive-book bounds. A/B incomplete, C/D unstarted.
+
+Recovery for0fe77e9 verifies335 unique/356 logical restored members, including21
+deduplicated aliases and both new original CVM notices. Archive
+to_close_clock_aeri_0fe77e9.zip is4,345,604bytes, SHA
+`75d18056132788e96cfb5d51ed536fc8ed8fb6416e85a864cd5855dc19b7ffe4`.
+Restored sparse changes reproduce2,015,280 actual target audit-view cells and
+all five AERI wealth/diagnostic changes exactly. Complete current research source,
+source patch, initial/qualified executed recipes and new target inputs recover;
+immutable inputs and old fits were not duplicated. Acceptance SHA
+`569544f83eadc2feb2247068dfcb686be7fe04caafa760bac1bd5ea616f75f03`.
+Prior M1/native/history/dependency/lending recoveries remain explicit dependencies.

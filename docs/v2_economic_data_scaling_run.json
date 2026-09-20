@@ -423,6 +423,10 @@
     "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\to_close_clock\\consumer\\manifest.json",
     "sha256": "db865097a238607db4b9ea7b7e24e7e0108510e6fe32bc382c486cf4296afdc9"
   },
+  "to_close_clock_recovery": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\to_close_clock_recovery.json",
+    "sha256": "6b8754974bd4e8fe32ef900e9e5f4d4b6b2839b145bcc84fcc64d304315b8e10"
+  },
   "us_source_audit": {
     "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\us_source_audit.json",
     "sha256": "c5fbdb461303001eadedff388d098ea28c0d8c08038ee97856a0420b5c3424e2"
