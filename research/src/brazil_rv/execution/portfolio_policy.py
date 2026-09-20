@@ -12,7 +12,12 @@ from torch import nn
 from .allocation import AllocationConfig, allocate
 from .portfolio_account import PortfolioAccount, tensor
 from .action_settlement import slice_action_settlements
-from .share_distributions import slice_distributions, basket_betas, basket_prices
+from .share_distributions import (
+    slice_distributions,
+    basket_betas,
+    basket_prices,
+    claim_delivery_session,
+)
 from .loan_contracts import slice_loan_settlements
 from .stateful_ledger import (
     LedgerConfig,
@@ -389,7 +394,13 @@ def decide(
             legs = [
                 leg
                 for leg in event.legs
-                if leg.delivery_session is None or leg.delivery_session > day
+                if (
+                    due := claim_delivery_session(
+                        leg, borrowed=stock[event.source_index].detach().item() < 0
+                    )
+                )
+                is None
+                or due > day
             ]
             if legs and stock[event.source_index].detach().item() != 0:
                 sectors = data.sectors[day, [leg.successor_index for leg in legs]]

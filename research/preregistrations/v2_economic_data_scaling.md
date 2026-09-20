@@ -213,6 +213,26 @@ is +/-4 before effect and reverses thereafter, with opposite successor preferenc
 from effect; fixed risks and old4bp bridge remain, no model scores or new fits.
 Keep final economic admission/corporate costs and later fraction-payment bounds open.
 
+Copel allocation/conversion amendment, frozen 2026-09-20 before new books:
+compare original-principal ON allocations K0/.2/1, with .2 primary and complementary
+PN allocation. Separately compare conversion of a net borrowed unit claim on
+December27/28/29 2023, with December28 primary. Positive shareholder inventory
+retains sourced December28 credit in all variants. Conversion preserves original
+principal/rate/accrued charges and moves the negative claim to successor loan
+quantities; an offset uses actual owned successor custody before physical return
+and proceeds release. This is an explicit loan timing hypothesis, not a recovered
+event-specific instruction or an advance of shareholder custody. Flat/positive
+source inventory with pending old loan returns retains the original convention;
+the new timing endpoint does not qualify that separate gross-offset case.
+Freeze30 thirty-session/all933 adaptive engineering books: six pre-effect plus24
+effect/following, both source signs, R10m/R1m/R5m and five one-factor variants.
+Synthetic source preference is +/-4 before effect, opposite afterward; ON becomes
+opposite at effect, PN keeps the source sign until credit+2, then reverses. Other
+sinusoidal preferences, fixed risks, original calibration and old bundled4bp bridge
+remain frozen. Verify original-cohort principal/quantity/rate/fee conservation and
+independent daily rent arithmetic, cash NAV and saved book prefixes. No model
+outcomes, store amendment, new alias, or repetition of completed V36 books.
+
 ## B. Deep source-to-model data audit
 
 Revisit the actual sources and builders, not just finite-value/coverage summaries.

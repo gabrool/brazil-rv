@@ -154,6 +154,9 @@ def apply_corporate_replay(inputs, terms, calendar, manifest_sha256):
                         disposal_session=None
                         if leg.get("disposal_date") is None
                         else session(leg["disposal_date"]),
+                        loan_conversion_session=None
+                        if leg.get("loan_conversion_date") is None
+                        else session(leg["loan_conversion_date"]),
                     )
                 )
             distributions.append(

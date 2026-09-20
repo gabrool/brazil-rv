@@ -15,6 +15,7 @@ from .share_distributions import (
     ShareClaimPosition,
     basket_prices,
     basket_betas,
+    claim_delivery_session,
     recognize_distribution,
 )
 from .loan_fees import LoanModality, loan_fee_rates
@@ -1953,7 +1954,8 @@ def simulate_stateful_ledger(
                     and shares[name] > 0
                     and not (loans.name == name).any()
                 )
-                if leg.delivery_session != day and not early:
+                due = claim_delivery_session(leg, borrowed=shares[name] < 0)
+                if due != day and not early:
                     continue
                 prices = basket_prices(legs, last_observed)
                 values = [
@@ -3768,7 +3770,7 @@ def simulate_stateful_ledger(
                     leg.successor_index,
                     float(shares[name]) * leg.shares_per_prior_share,
                     float(price),
-                    leg.delivery_session,
+                    claim_delivery_session(leg, borrowed=shares[name] < 0),
                 )
                 for leg, price in zip(legs, prices)
             )

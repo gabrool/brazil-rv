@@ -14,7 +14,11 @@ import torch
 from torch import Tensor
 
 from .stateful_ledger import LedgerConfig
-from .share_distributions import basket_prices, recognize_distribution
+from .share_distributions import (
+    basket_prices,
+    claim_delivery_session,
+    recognize_distribution,
+)
 from .loan_contracts import LoanContracts, LoanSession, spot_settlement_session
 from .share_custody import ShareCustody
 
@@ -221,7 +225,10 @@ class PortfolioAccount:
                     and self.shares[name].detach().item() > 0
                     and not (self.loans.name == name).any()
                 )
-                if leg.delivery_session != day and not early:
+                due = claim_delivery_session(
+                    leg, borrowed=self.shares[name].detach().item() < 0
+                )
+                if due != day and not early:
                     continue
                 prices = basket_prices(legs, self.marks.detach().numpy())
                 values = [

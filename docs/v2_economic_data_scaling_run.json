@@ -69,6 +69,18 @@
     "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\copel_allocation_recovery.json",
     "sha256": "0eb836ce0417748faf7d3227d49bda0c1b670a226767ba2b1b33669c4ca8dce7"
   },
+  "copel_loan_bounds_acceptance": {
+    "path": "C:\\quant\\b3-quant\\docs\\v2_copel_loan_bounds_acceptance.json",
+    "sha256": "049f9b06a502b38de1e9a1ebe68d9c16f6db827fc27ce9c090d3964fdc8fb263"
+  },
+  "copel_loan_bounds_audit": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\copel_loan_bounds\\manifest.json",
+    "sha256": "ad4afe60bf7f08434dc432c21ee7817acfb3213750e28ab92107c62cffbf5fb2"
+  },
+  "copel_loan_bounds_qualification": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\copel_loan_bounds\\qualification\\manifest.json",
+    "sha256": "c33a31d55acd81090f2570eb146dde16b9f5993a9437919357295ebc9034d731"
+  },
   "copel_replay_acceptance": {
     "path": "docs\\v2_copel_replay_acceptance.json",
     "sha256": "f3c79690011a0ca7af3bf252f6ed36f15b4e292c75ef17db3f5cc7b95eec6056"

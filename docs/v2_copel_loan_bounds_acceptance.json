@@ -1,0 +1,278 @@
+{
+  "account_array_cells": 3380400,
+  "adaptive_target_max": 2.6492040085951407e-08,
+  "attempts": "All30 historical books and saved qualification completed on first invocation. Extra pending-owned fixture initially requested40% of current NAV after rent, buying fewer units than original loan; fixed only test sizing to exact held units. Exact initial9-case and failed expanded test files retained. Read-only Polars pretty-print hit cp1252 after successful schema/sample reads; no research artifact changed.",
+  "audit": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\copel_loan_bounds\\manifest.json",
+    "sha256": "ad4afe60bf7f08434dc432c21ee7817acfb3213750e28ab92107c62cffbf5fb2"
+  },
+  "books": 30,
+  "contrasts": [
+    {
+      "capital": 10000000,
+      "final_bps": 0.0,
+      "max_path_bps": 0.0,
+      "scenario": "k0",
+      "sign": 1,
+      "source_rent_delta_brl": 0.0
+    },
+    {
+      "capital": 10000000,
+      "final_bps": 0.0,
+      "max_path_bps": 0.0,
+      "scenario": "k1",
+      "sign": 1,
+      "source_rent_delta_brl": 0.0
+    },
+    {
+      "capital": 10000000,
+      "final_bps": 0.0,
+      "max_path_bps": 0.0,
+      "scenario": "loan_early",
+      "sign": 1,
+      "source_rent_delta_brl": 0.0
+    },
+    {
+      "capital": 10000000,
+      "final_bps": 0.0,
+      "max_path_bps": 0.0,
+      "scenario": "loan_late",
+      "sign": 1,
+      "source_rent_delta_brl": 0.0
+    },
+    {
+      "capital": 1000000,
+      "final_bps": 0.0,
+      "max_path_bps": 0.0,
+      "scenario": "k0",
+      "sign": 1,
+      "source_rent_delta_brl": 0.0
+    },
+    {
+      "capital": 1000000,
+      "final_bps": 0.0,
+      "max_path_bps": 0.0,
+      "scenario": "k1",
+      "sign": 1,
+      "source_rent_delta_brl": 0.0
+    },
+    {
+      "capital": 1000000,
+      "final_bps": 0.0,
+      "max_path_bps": 0.0,
+      "scenario": "loan_early",
+      "sign": 1,
+      "source_rent_delta_brl": 0.0
+    },
+    {
+      "capital": 1000000,
+      "final_bps": 0.0,
+      "max_path_bps": 0.0,
+      "scenario": "loan_late",
+      "sign": 1,
+      "source_rent_delta_brl": 0.0
+    },
+    {
+      "capital": 5000000,
+      "final_bps": 0.0,
+      "max_path_bps": 0.0,
+      "scenario": "k0",
+      "sign": 1,
+      "source_rent_delta_brl": 0.0
+    },
+    {
+      "capital": 5000000,
+      "final_bps": 0.0,
+      "max_path_bps": 0.0,
+      "scenario": "k1",
+      "sign": 1,
+      "source_rent_delta_brl": 0.0
+    },
+    {
+      "capital": 5000000,
+      "final_bps": 0.0,
+      "max_path_bps": 0.0,
+      "scenario": "loan_early",
+      "sign": 1,
+      "source_rent_delta_brl": 0.0
+    },
+    {
+      "capital": 5000000,
+      "final_bps": 0.0,
+      "max_path_bps": 0.0,
+      "scenario": "loan_late",
+      "sign": 1,
+      "source_rent_delta_brl": 0.0
+    },
+    {
+      "capital": 10000000,
+      "final_bps": -0.0004350607804954052,
+      "max_path_bps": 0.0004350607804954052,
+      "scenario": "k0",
+      "sign": -1,
+      "source_rent_delta_brl": 0.1935519471730638
+    },
+    {
+      "capital": 10000000,
+      "final_bps": 0.001740256804972887,
+      "max_path_bps": 0.001740256804972887,
+      "scenario": "k1",
+      "sign": -1,
+      "source_rent_delta_brl": -0.774208196591323
+    },
+    {
+      "capital": 10000000,
+      "final_bps": -3.9995012322198598,
+      "max_path_bps": 7.449071840833873,
+      "scenario": "loan_early",
+      "sign": -1,
+      "source_rent_delta_brl": -0.15660743866475624
+    },
+    {
+      "capital": 10000000,
+      "final_bps": -3.9499728621914985,
+      "max_path_bps": 4.839939995942638,
+      "scenario": "loan_late",
+      "sign": -1,
+      "source_rent_delta_brl": 0.1527636220336337
+    },
+    {
+      "capital": 1000000,
+      "final_bps": -0.00043507566791959105,
+      "max_path_bps": 0.00043507566791959105,
+      "scenario": "k0",
+      "sign": -1,
+      "source_rent_delta_brl": 0.019355194714494817
+    },
+    {
+      "capital": 1000000,
+      "final_bps": 0.0017402510438114405,
+      "max_path_bps": 0.0017402510438114405,
+      "scenario": "k1",
+      "sign": -1,
+      "source_rent_delta_brl": -0.07742081964839953
+    },
+    {
+      "capital": 1000000,
+      "final_bps": -3.999502372123534,
+      "max_path_bps": 7.449071661655325,
+      "scenario": "loan_early",
+      "sign": -1,
+      "source_rent_delta_brl": -0.015660743891596496
+    },
+    {
+      "capital": 1000000,
+      "final_bps": -3.9499737020698373,
+      "max_path_bps": 4.839940277065616,
+      "scenario": "loan_late",
+      "sign": -1,
+      "source_rent_delta_brl": 0.015276362079271133
+    },
+    {
+      "capital": 5000000,
+      "final_bps": -0.0004350607804954052,
+      "max_path_bps": 0.0004350607804954052,
+      "scenario": "k0",
+      "sign": -1,
+      "source_rent_delta_brl": 0.0967759735865319
+    },
+    {
+      "capital": 5000000,
+      "final_bps": 0.001740256804972887,
+      "max_path_bps": 0.001740256804972887,
+      "scenario": "k1",
+      "sign": -1,
+      "source_rent_delta_brl": -0.3871040982956615
+    },
+    {
+      "capital": 5000000,
+      "final_bps": -3.9995012322198598,
+      "max_path_bps": 7.449071840833873,
+      "scenario": "loan_early",
+      "sign": -1,
+      "source_rent_delta_brl": -0.07830371933237812
+    },
+    {
+      "capital": 5000000,
+      "final_bps": -3.9499728621914985,
+      "max_path_bps": 4.839939995942638,
+      "scenario": "loan_late",
+      "sign": -1,
+      "source_rent_delta_brl": 0.07638181101681685
+    }
+  ],
+  "daily_navs": 900,
+  "decimal_cohort_max_error": 5.7e-11,
+  "decimal_fee_max_error": 5.359740182121749e-16,
+  "decimal_rent_max_error": 5.289731300870007e-16,
+  "decimal_share_max_error": 1.13e-11,
+  "executed_runtime": {
+    "execution/portfolio_account.py": {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\copel_loan_bounds\\executed_execution_portfolio_account.py",
+      "sha256": "03b8237ac2d3fcb981cae1d0e9395a6faa85228b80841358a6ac8e06462dd44f"
+    },
+    "execution/portfolio_policy.py": {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\copel_loan_bounds\\executed_execution_portfolio_policy.py",
+      "sha256": "eda32b0f2844c8326e20cb58934dc1d000d9ff10d5029aa5950d1038eaefbf97"
+    },
+    "execution/share_distributions.py": {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\copel_loan_bounds\\executed_execution_share_distributions.py",
+      "sha256": "cddcefba2dbc9293661fa6d4e4be78620847a0eb97b427cf670fd627fc498da4"
+    },
+    "execution/stateful_ledger.py": {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\copel_loan_bounds\\executed_execution_stateful_ledger.py",
+      "sha256": "cc69ee67d142d246a8256b53e4dceac7ff7c9e045cd49414fd47e7197953ad63"
+    },
+    "v2/corporate_replay.py": {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\copel_loan_bounds\\executed_v2_corporate_replay.py",
+      "sha256": "a870daa3b22bcdebb2367295542619e042ab876b807cd6da9333df756aec8d7b"
+    },
+    "v2/evaluate.py": {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\copel_loan_bounds\\executed_v2_evaluate.py",
+      "sha256": "cfb703af87a39b757ad0f4e29d3f7389682b2253b790b09fcbf9b7db01ba40dc"
+    }
+  },
+  "identical_intention_max_brl": 1.1175870895385742e-08,
+  "independent_adaptive_max_path_bps": {
+    "1000000": 2.4427147582173346e-06,
+    "10000000": 6.877599284052849e-06,
+    "5000000": 6.877599284052849e-06
+  },
+  "independent_nav_identity_max_brl": 3.725290298461914e-09,
+  "limitations": "Synthetic30-session/full933, OLD frozen PolicyData, old4bp bridge. Net borrowed timing only; flat/positive source pending returns retain primary. Long custody fixed; K unknown. No old books/store/source audits repeated, no model scores/fit/profitability, no final corporate pricing/admission.",
+  "qualification": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\copel_loan_bounds\\qualification\\manifest.json",
+    "sha256": "c33a31d55acd81090f2570eb146dde16b9f5993a9437919357295ebc9034d731"
+  },
+  "remaining": "Cash/fraction receipt sweeps and precision/invoice/security-day grouping/old minimum; dated B3 spot/custody and other corporate components; three older clearing dates; held-source admission and separately attributed succession data implications; final A then C/D. Timing for flat/positive source positions with pending old loans remains outside this net-borrowed bound.",
+  "source_loan_daily_checks": 660,
+  "source_loan_nonzero_day_checks": 102,
+  "status": "copel_net_borrowed_timing_and_principal_engineering_accepted_final_A_pending",
+  "terms": {
+    "terms_CPLE_k0": {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\copel_loan_bounds\\terms_CPLE_k0.json",
+      "sha256": "28330a5329fde99180d5215188a4c8a89a5296f601eae775b8633d5be5f56eb5"
+    },
+    "terms_CPLE_k1": {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\copel_loan_bounds\\terms_CPLE_k1.json",
+      "sha256": "cdb524c8e236a7163ea0b93405edf66e3eb09341b0858bac0d50e1ff6a1d9a41"
+    },
+    "terms_CPLE_loan_early": {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\copel_loan_bounds\\terms_CPLE_loan_early.json",
+      "sha256": "40843226a1e08e76b378f252ababe769359334fdd16ed1acf1da68883ebeec0a"
+    },
+    "terms_CPLE_loan_late": {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\copel_loan_bounds\\terms_CPLE_loan_late.json",
+      "sha256": "08c669d9ca3fc78446bba6828ae6138f88d24da4a566ee6b6e216dc552389d2f"
+    },
+    "terms_CPLE_primary": {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\copel_loan_bounds\\terms_CPLE_primary.json",
+      "sha256": "5cbece8b1c27b950168e0e9eb6864c5e61bd34907aee75e74a6f1020fad7dd42"
+    }
+  },
+  "timings_seconds": {
+    "engineering": 27.535422599990852,
+    "saved_qualification": 0.4958640999975614
+  },
+  "validation": "11 distinct new cases pass in focused batches (initial9, added partial-cover and pending-owned-receipt cases);7 affected precredit cases pass. Ruff passes. Overlapping receipt retry not additive."
+}
