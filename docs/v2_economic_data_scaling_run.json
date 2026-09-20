@@ -949,7 +949,24 @@
     "path": "docs\\v2_STAGE_A_CLOSEOUT.md",
     "sha256": "a0a630c1d3ee70156518950b5f82f44e46da1178a7c35deb5142cecf86398b77"
   },
-  "status": "stage_a_and_composed_data_accepted_stage_c_preparation",
+  "stage_c_control": {
+    "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_economic_matched_20260920\\baseline_control\\manifest.json",
+    "sha256": "28236aff6f4eb9d6b8c978aee2b648a5bb00de0a892f41b7d68691edbd36385e"
+  },
+  "stage_c_plan": {
+    "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_economic_matched_20260920\\plan.json",
+    "sha256": "4d2ba8050214426df88166f6a9429640e37cf5a408fbe7b1f97689c73a77e464"
+  },
+  "stage_c_refit_plan": {
+    "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_economic_matched_20260920\\refit_plan.json",
+    "sha256": "fd4f7c365656107cfb661c1d5dfe2fbbed291d09a70faf243c1f4a49d6d9fa03"
+  },
+  "stage_c_replays": {
+    "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_economic_matched_20260920\\replays.json",
+    "sha256": "962597c8b3e9f209876a561e13790d478be462f1c8fe76ad831e865e00162586"
+  },
+  "stage_c_root": "C:\\quant-data\\b3\\processed\\model_runs\\v2_economic_matched_20260920",
+  "status": "stage_c_replays_complete_refits_frozen_qualification_in_progress",
   "succession_identity_dependency_scope": {
     "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\event_composition\\identity_scope\\manifest.json",
     "sha256": "398257fae88c9d6f233a7592851214ba12246c5036678d1a855529abe99e197c"
