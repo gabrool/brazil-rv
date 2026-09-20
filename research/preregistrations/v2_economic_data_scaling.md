@@ -487,3 +487,16 @@ bounded dependencies before final data composition/refits. Their missing links
 are distinct from the ALSC/SOMA exchange ratios and B3 index-history methodology;
 no acquired-issuer pooling or loan alias is authorized by that index rule.
 Sparse target controls, completed V31-V41/books/stores and source censuses are reused.
+
+Surviving-company dependency record, after qualification on2026-09-20: the
+pre-output contracts are surviving_renames/plan.json and wealth/daily plan files,
+with exact prior registration/closeout snapshots retained. SSBR→ALSO and
+ARZZ→AZZA unit/no-cash spot identities have original minute-end public clocks;
+the code allowlist now has five links, with no loan alias or acquired-company
+history pooling.55/60eligible sessions, both original-precision wealth chains,
+full-name daily/risk/peer fields and185actualfull60slow consumers are qualified.
+Source-mask/activity reconstruction failures remain preserved; saved expensive
+reducers were reused and only four activity fields recalculated. The same
+composition block still requires common-state, issuer/financial/lending-denominator,
+native/scalar/auxiliary and final target/complete-store composition. January25
+and integratedStageA remain; neither C nor D starts on these intermediate arrays.

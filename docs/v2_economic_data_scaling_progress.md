@@ -1,5 +1,17 @@
 # Economic accounting, data audit and scaling progress
 
+2026-09-20 latest: [surviving-company propagation](v2_SURVIVING_RENAME_PROPAGATION.md)
+admits SSBR→ALSO/ARZZ→AZZA original-clock spot identities and qualifies their
+liquidity/wealth/daily/risk/peer dependencies.55/60eligible gains;6retired ARZZcells;
+83,150,470control and2,009,467,410actualfull933/full60consumer cells pass.705,221slow
+values change;5,176valid gains/682losses, with620still-active peer-field losses
+explicit under unchanged support. Both accepted stores/oldfits remain immutable.
+Failed source-mask/activity harness attempts and qualified outputs are retained;
+all expensive saved reducers reused, only four activity fields recalculated.
+Common-state, issuer/financial/lending-denominator, native/scalar/auxiliary,
+final target/new-store composition, January25 and integratedStageA remain.
+This advances the existing composition block; C/D unstarted, no model profit.
+
 2026-09-19: user authorized accounting repairs, a deep source-to-model audit,
 additional historical B3 retrieval and economic-primary attention/GRU capacity
 follow-ups. Read `research/preregistrations/v2_economic_data_scaling.md` after each

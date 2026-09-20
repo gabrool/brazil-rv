@@ -27,6 +27,14 @@ The current [composition evidence](v2_EVENT_SOURCE_COMPOSITION.md) closes the
 December30 source gap and qualifies the sparse target consequences; this second
 delivery block still has the January25 and surviving-company identity dependencies.
 
+The [surviving-company identities and daily history](v2_SURVIVING_RENAME_PROPAGATION.md)
+are now source-admitted and qualified:55ALSO/60AZZAeligible gains, both wealth
+chains, full-name daily/risk/peer fields and185actualfull60consumers. Reuse these
+saved results. Remaining dependencies are common state, issuer/financial,
+lending-denominator, native/scalar/auxiliary and final target/complete-store
+composition; earlier absent-link/source-admission wording is superseded only for
+these completed portions. January25 and integratedStageA remain open.
+
 ## Work discipline through admission
 
 - Reuse V31–V41 and historical-cost/corporate books, source receipts, Decimal oracles, accepted stores and recovery
