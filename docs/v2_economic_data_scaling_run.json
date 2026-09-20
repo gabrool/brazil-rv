@@ -149,6 +149,10 @@
     "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\financial_account_audit\\report.json",
     "sha256": "9aae6333d03dccff3a0d3fdf2cbfa525b33d5bef48518ab2420d1021a17ea373"
   },
+  "financial_audit_recovery": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\financial_audit_recovery.json",
+    "sha256": "928f713f9c31894f1598a522f2363ae7471e3d9bf435d220a19c2de3383704fe"
+  },
   "financial_formula_acceptance": {
     "path": "C:\\Brazil-RV\\quant\\b3-quant\\docs\\v2_financial_formula_acceptance.json",
     "sha256": "2bae10a2fd7b6d9a49c3578a7ca857194ce2cd89dc075d6cf099062396ba2e76"

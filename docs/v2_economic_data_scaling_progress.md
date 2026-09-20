@@ -1281,3 +1281,13 @@ or GPU job is active. The heartbeat remains active for the remaining A-D work.
   separately propagate recovered lending, then accept the derived store and
   actual tensors. A still needs denied-renewal/recall, presettlement disposal and
   adaptive-book bounds. Do not repeat these completed financial audits.
+
+Recovery closeout for `01702ca`: `financial_audit_recovery.json` binds293
+restored/hash-checked members, all new audits and executed code, including the
+initial Camil failure and its narrow qualification. The5,408,623-byte archive
+`financial_audits_01702ca.zip` has SHA-256
+`37aae93be7ba035c911ba3fd595588e9fd3afd0bcafd352b3e522154a1ae7e2a`.
+It binds22,317 original-source receipts already verified by these new audits;
+recovery does not reparse or rehash that source census. The earlier issuer/peer
+recovery archive is verified and retained. Immutable inputs and old fits were
+not duplicated. Canonical pointers are updated; the heartbeat remains active.
