@@ -1400,3 +1400,12 @@ inputs or old fits were archived again. Canonical recovery pointer updated.
   M1/auxiliary families, finish contractual wealth/labels and remaining source
   clocks/revisions, then accept full derived tensors/refits. Stage A execution
   bounds remain required. No changed coordinates may enter old checkpoints.
+
+Recovery closeout for `b8dfd19`: `rename_dependency_recovery.json` binds289
+restored/hash-checked members, including16 new derived parquet files, all current
+research source, the source patch, initial attempts and four historical artifact
+resolutions. The188,533,587-byte `rename_dependencies_b8dfd19.zip` has SHA-256
+`8c39f0ad6d78612d99a83ea161ffc2b48c45e791498534d501e1bb5f651fbb2b`.
+Recovery reused prior source/rename/FCA/financial receipts without another census;
+no immutable source dataset or old fit was copied. Canonical pointer updated.
+The heartbeat remains active until the complete A-D program is finished.

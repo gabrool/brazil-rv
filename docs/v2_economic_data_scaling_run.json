@@ -293,6 +293,10 @@
     "path": "C:\\quant\\b3-quant\\docs\\v2_rename_dependency_acceptance.json",
     "sha256": "b856e9e0ba8e0bd1afca877e33125077a59c8a6e2d48adf17a642aa01a0fb52a"
   },
+  "rename_dependency_recovery": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\rename_dependency_recovery.json",
+    "sha256": "ee8d361accd7624dddce5936f1cf4829d27ba9690f4f57987565ef4a07284a08"
+  },
   "rename_dependents": {
     "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\rename_dependents\\manifest.json",
     "sha256": "83196483828edcc597d1910731e57ec5f96d03fa81f0ea5b0fdd810a96930456"
