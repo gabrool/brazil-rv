@@ -249,6 +249,18 @@
     "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\goll_activity_admission\\manifest.json",
     "sha256": "7868108bdc97e193b7f86a510b2317174171b22629441025d5936069474c6fca"
   },
+  "held_event_source_acceptance": {
+    "path": "C:\\quant\\b3-quant\\docs\\v2_held_event_source_acceptance.json",
+    "sha256": "742f1f8b9e6f77ef6f1077fdf686d15bf6fe871c5718c76b49e6b9540d0d6e46"
+  },
+  "held_event_source_audit": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\held_event_sources\\qualification\\manifest.json",
+    "sha256": "0bc84fcc1f2ec8065dab33c69c7dbc8680bcf230953eda0a292c3bc7204c91ff"
+  },
+  "held_event_source_qualification": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\held_event_sources\\clock_qualification\\manifest.json",
+    "sha256": "e40a4200dea0ceb86a6766c790aa23c2f7d6fe9b58d9c49861aa15bb3f90ba7d"
+  },
   "identity_source_admission": {
     "path": "docs\\v2_identity_source_admission.json",
     "sha256": "8d3f3d2c04a8bb55cd83d69ddd35541e0049588494b92acc9c03056a741daab8"
@@ -387,6 +399,33 @@
   "m1_scalar_target_oracle": {
     "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\m1_scalar_assembly\\target_oracle.json",
     "sha256": "ba51bc8eeeec6336b43f28b60e3ec89fc2703973119737f8ac827df3cc7f0072"
+  },
+  "natura_gross_action_amendments": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\held_event_sources\\clock_qualification\\natura_gross_action_amendments.parquet",
+    "sha256": "00e4ce6c0cf35fba27a0fa8a63f86d2438ec8ce084a3c4a8477b94f848b40174"
+  },
+  "natura_gross_target_attribution": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\natura_gross_targets\\qualified_endpoints\\manifest.json",
+    "sha256": "730d3643bca66929f0a58114fd621fbf90d23a0bdda66b1fb3b8b6c4666a9a4c"
+  },
+  "natura_wealth_amendment": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\natura_wealth\\manifest.json",
+    "sha256": "02c5861adf2ea2f8e435fee08149d70cb09e9199c80d840472c42360a3e429c6"
+  },
+  "new_source_amendment_readiness": {
+    "accepted_store_preserved": {
+      "manifest_sha256": "2e16c8d6dfbba8c8eb65330635507b1eac473e9790c573d3329d889692e9b3f2",
+      "root": "C:\\quant-data\\b3\\processed\\v2_economic_data_store_20260920"
+    },
+    "evidence": {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\held_event_sources\\qualification\\manifest.json",
+      "sha256": "0bc84fcc1f2ec8065dab33c69c7dbc8680bcf230953eda0a292c3bc7204c91ff"
+    },
+    "qualification": {
+      "path": "C:\\quant\\b3-quant\\docs\\v2_held_event_source_acceptance.json",
+      "sha256": "742f1f8b9e6f77ef6f1077fdf686d15bf6fe871c5718c76b49e6b9540d0d6e46"
+    },
+    "status": "separate_propagation_required_before_new_economic_refits"
   },
   "oddlot_tensor_audit": {
     "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\auxiliary_tensor_audit\\oddlot.json",

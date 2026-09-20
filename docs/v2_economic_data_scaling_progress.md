@@ -1793,3 +1793,62 @@ recipes and evidence recover; prior dependencies reused without raw/store/fit co
 Acceptance SHA c265a296b86a31632c31f7412c24bb6f0e6ce95d0ad8accb889259e93bcbdd18.
 All workers finished. This completes the lifecycle engineering checkpoint, not A
 economic admission or the program.
+
+### 2026-09-20 — held-event originals and evidenced Natura gross-data amendments
+
+The user-named held NATU/ALSC/SOMA investigations now bind 17 original PDFs,
+216 bounded RAD issuer/year records and 20 original normalized quote rows. Exact
+shareholder conversion ratios are 1 NTCO per NATU, .787808369 successor ordinary
+per ALSC and .121695988348 AZZA per SOMA. NATU effect December18/creditDecember20
+2019 and SOMA effectAugust1/creditAugust5 2024 are separately sourced. ALSC effect
+August6 2019 is confirmed; physical credit and fraction-auction receipts remain
+unestablished. Original SOMA auction terms firstknownAugust23/paybyAugust26 retain
+printed approximate-price/invoice uncertainty. B3 index circulars do not prove loan
+conversion, fraction or rent terms. All three first successor prior references
+remain missing; a causal valuation bridge must precede account admission.
+
+Original Natura notices prove two defects in both accepted stores: September18
+2019 q1.977869987487793 should be q2 (September20 custody); November7
+q.9102639555931091/cash0 should be q1/grossJCP.12784527353, payableFebruary26 2020.
+Use September17 17:41UTC and November4 00:55UTC minute-end receipt clocks; the
+later document date/accounting credit never backdates knowledge/payment. Issuer
+15% withholding, any supported tax credit and lender compensation stay separate.
+Both accepted stores/old fits remain sealed; a new full dependency acceptance is
+now required before economic-data refits. This is new evidence, not a reason to
+repeat the completed StageB baseline assembly or other source censuses.
+
+Canonical term-loader/clock qualification checks50 actual control cells, two
+future-deletion prefixes, two delayed clocks, four minute-boundaries and signed
+Decimal entitlements. The initial minute-start metadata is preserved with its
+explicit minute-end resolution; actual event-date arrays remain exact.
+
+The bounded target producer matches1129040 control cells on22dates/all933 names.
+Forty-two existing gross horizon outcomes change; independent Decimal arithmetic
+and1159832 future-endpoint prefix cells pass, no support gains/losses. Accepted
+sigma remains fixed for attribution: physical ranks2326, residuals3402,
+shareholder ranks2289 and price ranks2251 change. Final virtual primary targets
+still require the corrected actual risk coordinates; physical arrays are not
+silently substituted. Two target harness failures (index inventory, 2D/3D selector)
+are retained; no raw recovery was repeated.
+
+Only64 original Natura quotes September17–December17 are read for the necessary
+wealth tail (overlapping initial quote rows). The shared pre-effect Float32 seed
+and unchanged recurrence reproduce256 controls exactly. Four wealth values change
+on63days,252cells; masks/raw quotes unchanged. Event Decimal arithmetic and two
+future-term prefixes pass. No successor mark/history or executable fill invented.
+These action/wealth/target outputs are intermediates; daily/native/auxiliary/risk
+propagation, same-ISIN bonus custody and the three conversion accounts remain.
+
+Successful source/clock/target/wealth qualification times .2501/.07465/.76984/
+.10418s exclude retrieval/rendering and failed attempts; not fit ETAs. Ruff passes.
+Resolve held_event_source_audit, held_event_source_qualification,
+natura_gross_action_amendments, natura_gross_target_attribution,
+natura_wealth_amendment and held_event_source_acceptance. Full report
+`docs/v2_HELD_EVENT_SOURCE_AUDIT.md`; acceptance SHA
+742f1f8b9e6f77ef6f1077fdf686d15bf6fe871c5718c76b49e6b9540d0d6e46.
+
+ENAT's R$35513.8717 held missing-quote exposure is next after the user-named three.
+Preserve all V31/V32 mechanics and measured independent-adaptive minimum-fee
+uncertainty. Adaptive disposal/timing/fraction/rounding/grouping/old-minimum/clearing
+bounds, final corporate pricing, C matched replays/refits and conditional D remain.
+No new neural forward or profitability is claimed.

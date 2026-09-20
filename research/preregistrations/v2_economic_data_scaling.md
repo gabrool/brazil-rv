@@ -179,6 +179,21 @@ This is a source-bound entry constraint, not a change to liquidity membership.
 Quantity-dependent post-auction, cash remuneration and funded wealth belong to
 the account ledger; unit gross labels retain their explicit pre-auction scope.
 
+Natura original-source amendment, 2026-09-20, before corrected model outcomes:
+replace the source-disproved September18 2019 approximate bonus with q2/cash0,
+and November7 inferred reverse split with q1/gross JCP .12784527353. Use original
+minute-end receipts, September20 bonus custody and February26 2020 JCP payment
+as distinct clocks. Preserve gross model-label and daily-wealth definitions;
+withholding, any supported tax-credit realization and lender compensation belong
+to separately attributed account treatment. Existing accepted stores remain sealed.
+Bounded target attribution first holds accepted risk coordinates fixed; new final
+neutral targets and P/F fits require all affected wealth/feature/native/auxiliary
+dependencies and an explicit derived acceptance. Newly sourced NATU/ALSC/SOMA
+succession does not itself establish physical loan conversion, fractional-loan rules
+or an executable opening reference. Admit these from source or labelled one-factor
+bounds before final economic acceptance; never replace a missing reference with
+the later first successor close.
+
 ## C. Reassess existing leads under corrected economics
 
 Replay matched full-input attention, wider attention, GRU with early peers and C6

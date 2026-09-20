@@ -48,6 +48,20 @@ Stage A adaptive-book lifecycle/execution and exposure-ranked event bounds remai
 followed by registered matched C and conditional D work. No corrected model
 profitability, new GPU fit or final program completion is claimed.
 
+Exposure-ranked original notices now prove two 2019 Natura scalar defects in
+both accepted stores: the September18 bonus is q2 (credit September20), and
+November7 is gross JCP .12784527353/share, not an inferred share reduction.
+The JCP pays February26 2020; withholding/tax-credit and loan compensation remain
+separate. `docs/v2_HELD_EVENT_SOURCE_AUDIT.md` and the run pointer bind minute-end
+source clocks, bounded wealth corrections and gross-target attribution with
+accepted risks held fixed. Neither accepted store is overwritten. New economic
+refits require this separately attributed correction's remaining feature/risk/native
+dependencies and final input acceptance; do not repeat the completed baseline build.
+Original NATU/ALSC/SOMA conversions are now evidenced, but their account valuation,
+custody/loan/fraction admission is incomplete. This source milestone is not final
+economic admission. Previously passed source audits and lifecycle books remain valid
+for their explicitly recorded contracts.
+
 Denied-renewal and ordinary-recall stress now reaches both adaptive accounts,
 including hedge loans, morning custody identity and independent training copies.
 Called loans preserve original terms until actual physical return; missing fills
@@ -57,7 +71,7 @@ full covers no longer renew floating-point loan residues; mandatory closures byp
 ordinary order deadbands and strict optimizer faces are polished. Identical-intention
 money agrees closely, while independently adaptive paths retain measured fixed-fee
 uncertainty. These synthetic-preference books do not establish model profitability.
-Exposure-ranked NATU/ALSC/SOMA source disposition and the remaining execution/source
+Exposure-ranked NATU/ALSC/SOMA accounting admission and the remaining execution/source
 sensitivities still precede final Stage A admission. Neither accepted store changed.
 
 The current accounting code retains unpriced equity/hedge inventory and its cash,
@@ -86,8 +100,8 @@ broker quotes. Loan cohorts now distinguish registered/D0 rent and B3 fee endpoi
 from electronic D1; expense is recognized after actual fills and renewals, with
 source-specific corporate stopped-accrual dates retained. Pre-platform D0 and
 post-platform electronic D1 are explicit modality hypotheses, not observed invoices.
-Denied renewal/ordinary recall and remaining clearing/event boundaries are still
-open. SAM restarts independently copy
+Denied renewal/ordinary recall engineering is now qualified as described above;
+remaining clearing/event and economic sensitivity boundaries stay open. SAM restarts independently copy
 the whole account state, including pending settlements. See
 `docs/v2_LOAN_ACCOUNTING.md`. This is an
 implemented accounting repair, not completion of the contractual-event/source audit

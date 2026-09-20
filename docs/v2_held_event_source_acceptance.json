@@ -1,0 +1,222 @@
+{
+  "accepted_baseline_preserved": {
+    "manifest_sha256": "2e16c8d6dfbba8c8eb65330635507b1eac473e9790c573d3329d889692e9b3f2",
+    "root": "C:\\quant-data\\b3\\processed\\v2_economic_data_store_20260920"
+  },
+  "action_corrections": [
+    {
+      "available_at": "2019-09-17T17:40:00+00:00",
+      "date": "2019-09-18",
+      "old_and_accepted_derived": {
+        "action_cash_per_prior_share": 0.0,
+        "action_payment_session": -1,
+        "action_shares_per_prior_share": 1.977869987487793,
+        "inferred_action_c1_mask": false,
+        "inferred_action_u1_mask": true,
+        "inferred_action_u2_mask": false
+      },
+      "source_gross_cash": 0.0,
+      "source_q": 2.0
+    },
+    {
+      "available_at": "2019-11-04T00:54:00+00:00",
+      "date": "2019-11-07",
+      "old_and_accepted_derived": {
+        "action_cash_per_prior_share": 0.0,
+        "action_payment_session": -1,
+        "action_shares_per_prior_share": 0.9102639555931091,
+        "inferred_action_c1_mask": false,
+        "inferred_action_u1_mask": true,
+        "inferred_action_u2_mask": false
+      },
+      "source_gross_cash": 0.12784527353,
+      "source_q": 1.0
+    }
+  ],
+  "available_at_resolution": [
+    {
+      "actual_dates": [
+        "2019-09-16",
+        "2019-09-17",
+        "2019-09-18",
+        "2019-09-19",
+        "2019-09-20"
+      ],
+      "decision_cutoffs": [
+        "2019-09-16T15:45:00-03:00",
+        "2019-09-17T15:45:00-03:00",
+        "2019-09-18T15:45:00-03:00",
+        "2019-09-19T15:45:00-03:00",
+        "2019-09-20T15:45:00-03:00"
+      ],
+      "ex_date": "2019-09-18",
+      "initial_available_at": "2019-09-17T17:40:00+00:00",
+      "qualified_available_at": "2019-09-17T17:41:00+00:00"
+    },
+    {
+      "actual_dates": [
+        "2019-11-05",
+        "2019-11-06",
+        "2019-11-07",
+        "2019-11-08",
+        "2019-11-11"
+      ],
+      "decision_cutoffs": [
+        "2019-11-05T15:45:00-03:00",
+        "2019-11-06T15:45:00-03:00",
+        "2019-11-07T15:45:00-03:00",
+        "2019-11-08T15:45:00-03:00",
+        "2019-11-11T15:45:00-03:00"
+      ],
+      "ex_date": "2019-11-07",
+      "initial_available_at": "2019-11-04T00:54:00+00:00",
+      "qualified_available_at": "2019-11-04T00:55:00+00:00"
+    }
+  ],
+  "evidence": {
+    "held_event_source_audit": {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\held_event_sources\\qualification\\manifest.json",
+      "sha256": "0bc84fcc1f2ec8065dab33c69c7dbc8680bcf230953eda0a292c3bc7204c91ff"
+    },
+    "held_event_source_qualification": {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\held_event_sources\\clock_qualification\\manifest.json",
+      "sha256": "e40a4200dea0ceb86a6766c790aa23c2f7d6fe9b58d9c49861aa15bb3f90ba7d"
+    },
+    "natura_gross_target_attribution": {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\natura_gross_targets\\qualified_endpoints\\manifest.json",
+      "sha256": "730d3643bca66929f0a58114fd621fbf90d23a0bdda66b1fb3b8b6c4666a9a4c"
+    },
+    "natura_wealth_amendment": {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\natura_wealth\\manifest.json",
+      "sha256": "02c5861adf2ea2f8e435fee08149d70cb09e9199c80d840472c42360a3e429c6"
+    }
+  },
+  "failed_attempts": {
+    "clock_metadata": "Initial rows used the start of each minute. The existing conservative minute-end clock adds one minute. All actual five-session q/cash/mask/successor controls remain exact; event effects are on later sessions. Initial rows and executed source audit remain preserved.",
+    "initial_target": "Index files were incorrectly looked up under manifest arrays; failure before target construction.",
+    "second_target": "2D normalized-cross-section validity was indexed as 3D in future-prefix audit. Old control and Decimal endpoints passed before this harness failure. Target results had not been persisted; only the short calculation was repeated.",
+    "source_index": "Index write completed; default-encoding read failed. UTF8 fix reused successful index, exact first executed code preserved.",
+    "wealth_inspection": "A read-only search for an invalid prior Natura wealth row found none; the explicit common prior close seeds the successful recurrence. No historical wealth reconstruction failed."
+  },
+  "no_old_store_fit_or_production_research_mutation": true,
+  "qualified_gross_terms": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\held_event_sources\\clock_qualification\\natura_gross_action_amendments.parquet",
+    "sha256": "00e4ce6c0cf35fba27a0fa8a63f86d2438ec8ce084a3c4a8477b94f848b40174"
+  },
+  "remaining_data": "Newly evidenced scalar and succession propagation through daily/native/auxiliary history/risk coordinates and final virtual neutral targets/actual tensors requires separate complete acceptance before new P/F fits. The previous full store remains its sealed baseline, not a substitute for these amendments.",
+  "remaining_program": "ENAT next by held exposure; adaptive pre-custody disposal, allocation/timing/sweep/fraction/invoice/grouping/old-minimum and older clearing bounds, final corporate costs, C matched economics/data refits and conditional D waves.",
+  "scope": "Original NATU/ALSC/SOMA shareholder source contracts; two source-proven Natura q/cash replacements, clock/signed-entitlement qualification, bounded gross targets at fixed accepted risk and daily Float32 wealth. No final features/store, account treatment or model result.",
+  "source_contract_gaps": [
+    "ALSC physical credit and auction terms",
+    "NATU/ALSC/SOMA loan event clocks, fraction/rent treatment and causal opening valuation",
+    "Natura same-ISIN bonus custody; JCP withholding, supported tax-credit and lender compensation"
+  ],
+  "source_counts": {
+    "bounded_issuer_records": 216,
+    "initial_quote_rows": 20,
+    "new_original_pdfs": 17,
+    "wealth_quote_rows_overlapping_initial": 64
+  },
+  "source_limits": "not established by preserved receipts or document dates",
+  "status": "original_sources_and_bounded_gross_data_amendments_verified_A_and_new_dependency_admission_incomplete",
+  "targets": {
+    "control_cells": 1129040,
+    "dates": 22,
+    "effects": {
+      "target_normalized_cross_section_valid": {
+        "changed": 0,
+        "gains": 0,
+        "losses": 0
+      },
+      "target_normalized_residual": {
+        "changed": 3402
+      },
+      "target_price_midrank": {
+        "changed": 2251
+      },
+      "target_price_simple_return": {
+        "changed": 42
+      },
+      "target_price_valid": {
+        "changed": 0,
+        "gains": 0,
+        "losses": 0
+      },
+      "target_primary": {
+        "changed": 2326
+      },
+      "target_shareholder_midrank": {
+        "changed": 2289
+      },
+      "target_shareholder_simple_return": {
+        "changed": 42
+      },
+      "target_shareholder_valid": {
+        "changed": 0,
+        "gains": 0,
+        "losses": 0
+      },
+      "target_terminal_loss": {
+        "changed": 0,
+        "gains": 0,
+        "losses": 0
+      },
+      "target_terminal_wealth": {
+        "changed": 42
+      },
+      "target_valid": {
+        "changed": 0,
+        "gains": 0,
+        "losses": 0
+      }
+    },
+    "future_endpoint_prefix_cells": 1159832,
+    "names": 933,
+    "original_endpoint_oracles": 42
+  },
+  "timing_seconds_excluding_retrieval_and_failed_attempts": {
+    "held_event_source_audit": 0.2501127000141423,
+    "held_event_source_qualification": 0.07464959999197163,
+    "natura_gross_target_attribution": 0.769839199987473,
+    "natura_wealth_amendment": 0.10418249998474494
+  },
+  "validation": "Canonical term loader/alignment/payment/gross arithmetic; actual target producer/old controls and independent Decimal endpoints; bounded original wealth recurrence/control and future deletion. Ruff passes. No old lifecycle suite or source census repeated; no neural input acceptance claimed.",
+  "wealth": {
+    "control_cells": 256,
+    "effects": {
+      "close": 63,
+      "high": 63,
+      "low": 63,
+      "open": 63
+    },
+    "event_decimal_checks": [
+      {
+        "date": "2019-09-18",
+        "gross_cash": 0.0,
+        "gross_close_factor": "0.9993089149965445749827228749",
+        "new_wealth_close": 109.79298400878906,
+        "old_wealth_close": 108.578125,
+        "q": 2.0
+      },
+      {
+        "date": "2019-11-07",
+        "gross_cash": 0.12784527353,
+        "gross_close_factor": "1.082816996948117684277127491",
+        "new_wealth_close": 103.95510864257812,
+        "old_wealth_close": 93.23001098632812,
+        "q": 1.0
+      }
+    ],
+    "quote_rows": 64,
+    "seed": {
+      "contract": "Last shared pre-effect wealth close; no earlier recurrence, source census or unrelated family is rebuilt.",
+      "date": "2019-09-17",
+      "values": [
+        107.56067657470703,
+        110.21818542480469,
+        107.39363861083984,
+        109.86891174316406
+      ]
+    }
+  }
+}
