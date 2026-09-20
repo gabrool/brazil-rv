@@ -1501,3 +1501,14 @@ see v2_M1_RENAME_HISTORY.md. Next finish scalar/auxiliary histories, remaining
 upstream clocks and contractual wealth/labels, then accept the complete derived
 store/refit contract. A execution/lifecycle bounds remain. A/B incomplete,
 C/D unstarted; heartbeat remains active.
+
+Recovery closeout for b59b869: rename_m1_recovery.json verifies283 unique archive
+members/297 restored logical members, including14 deduplicated aliases. ZIP
+rename_m1_b59b869.zip is1,966,223 bytes, SHA-256
+`cd366eaedd4fc54f3bebd2ab2c15ced8e1504c2cde18af4c7c776a029edbb8af`.
+Restored sparse amendments reconstruct82,102,962 actual audit-view native cells
+exactly against the sealed dependency. Complete current research source, source
+patch, exact initial/final reproducers and initial outputs are recoverable;
+immutable inputs, original sources and old fits are not duplicated. Acceptance
+SHA `ea75bfca068c741a01624532dfbcd2e902fcebf96965406cb4fb5706bc3c123b`.
+Prior source/rename/lending recovery receipts remain valid.
