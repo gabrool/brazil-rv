@@ -197,6 +197,7 @@ class LoanContracts:
     fee_multiplier: float = 1.0
     annual_sessions: int = 252
     electronic_settlement_days: int = 1
+    bonus_return_floors: dict[int, int] = field(default_factory=dict)
     name: np.ndarray = field(default_factory=lambda: np.empty(0, dtype=np.int64))
     opened: np.ndarray = field(default_factory=lambda: np.empty(0, dtype=np.int64))
     value_lag: np.ndarray = field(default_factory=lambda: np.empty(0, dtype=np.int64))
@@ -476,7 +477,18 @@ class LoanContracts:
         ):
             value = getattr(self, key)
             setattr(self, key, np.concatenate((value, value[ids])))
-        self.return_day = np.r_[self.return_day, np.full(len(ids), settlement_day)]
+        self.return_day = np.r_[
+            self.return_day,
+            np.asarray(
+                [
+                    max(
+                        settlement_day,
+                        self.bonus_return_floors.get(int(self.name[i]), settlement_day),
+                    )
+                    for i in ids
+                ]
+            ),
+        ]
         self.return_requested = np.r_[
             self.return_requested,
             np.full(len(ids), -1 if request_day is None else request_day),
@@ -746,11 +758,18 @@ class LoanContracts:
         ):
             setattr(self, key, getattr(self, key)[keep])
 
-    def split(self, name, shares_per_prior_share):
+    def split(self, name, shares_per_prior_share, *, bonus_delivery=None):
         """Same-security split changes deliverable shares, not loan principal."""
         self.quantity = self.quantity * _tensor(
             np.where(self.name == name, shares_per_prior_share, 1.0)
         )
+
+        if bonus_delivery is not None:
+            self.bonus_return_floors[name] = bonus_delivery
+            pending = (self.name == name) & (self.return_day >= 0)
+            self.return_day[pending] = np.maximum(
+                self.return_day[pending], bonus_delivery
+            )
 
     def provision_fractions(self, name, ratio, day, auction):
         """Truncate each remaining original contract, preserving its principal.
@@ -852,7 +871,7 @@ class LoanContracts:
                     (event, quantity.detach().clone(), mark)
                     for event, quantity, mark in value
                 ]
-            elif item.name in ("renewals", "return_notices"):
+            elif item.name in ("renewals", "return_notices", "bonus_return_floors"):
                 value = value.copy()
             values[item.name] = value
         return LoanContracts(**values)

@@ -20,6 +20,7 @@ def compare(
     payments=None,
     fractions=None,
     config=None,
+    action_settlements=(),
     share_distributions=(),
     loan_cash_settlements=(),
 ):
@@ -39,6 +40,7 @@ def compare(
         payment_session=payments,
         fill_fraction=fractions,
         config=config,
+        action_settlements=action_settlements,
         share_distributions=share_distributions,
         loan_cash_settlements=loan_cash_settlements,
     )
@@ -68,6 +70,7 @@ def compare(
             payment_session=None if payments is None else np.r_[payments[day], -1],
             fill_fraction=None if fractions is None else np.r_[fractions[day], 1.0],
             terminal=day == days - 1,
+            action_settlements=action_settlements,
             share_distributions=share_distributions,
             loan_cash_settlements=loan_cash_settlements,
         )

@@ -11,6 +11,7 @@ from torch import nn
 
 from .allocation import AllocationConfig, allocate
 from .portfolio_account import PortfolioAccount, tensor
+from .action_settlement import slice_action_settlements
 from .share_distributions import slice_distributions, basket_betas, basket_prices
 from .loan_contracts import slice_loan_settlements
 from .stateful_ledger import (
@@ -160,6 +161,7 @@ class PolicyData:
             action_resolved=np.r_[inputs.action_session_resolved[day], True],
             successor=np.r_[inputs.action_successor_index[day], n],
             payment_session=np.r_[inputs.action_payment_session[day], -1],
+            action_settlements=inputs.action_settlements,
             share_distributions=inputs.share_distributions,
             loan_cash_settlements=inputs.loan_cash_settlements,
             entry_fill_allowed=None
@@ -299,6 +301,7 @@ def decide(
     effective_beta=None,
     claim_exposure=None,
     loan_short_blocked=None,
+    reserved_weights=None,
 ):
     """Compact exactly to available or held names, preserving all real inventory."""
     if model is None:
@@ -306,6 +309,8 @@ def decide(
         result = torch.zeros_like(weights)
         if locked is not None:
             result[:-1] = torch.where(torch.as_tensor(locked), weights[:-1], 0.0)
+        if reserved_weights is not None:
+            result[:-1] += reserved_weights[:-1]
         return result
     stock = weights[:-1]
     beta = data.beta[day] if effective_beta is None else effective_beta
@@ -343,6 +348,12 @@ def decide(
             torch.where(fixed, previous, lower),
             torch.where(fixed, previous, upper),
         )
+    if reserved_weights is not None:
+        reserve = reserved_weights[ids]
+        lower = torch.where(reserve > 0, torch.maximum(lower, reserve), lower)
+        upper = torch.where(reserve < 0, torch.minimum(upper, reserve), upper)
+        upper = torch.where(reserve > 0, torch.maximum(upper, lower), upper)
+        lower = torch.where(reserve < 0, torch.minimum(lower, upper), lower)
     features = state_features(
         weights,
         cash,
@@ -457,6 +468,7 @@ def account_decision(data, model, account, day, *, allocation=AllocationConfig()
         required[:-1],
         allocation=allocation,
         locked=locked,
+        reserved_weights=account.reserved_weights,
         effective_beta=basket_betas(
             account.distributions, account.marks.detach().numpy(), data.beta[day]
         ),
@@ -515,6 +527,9 @@ def ledger_arguments(data, start, stop):
     payments = inputs.action_payment_session[start:stop].copy()
     payments[payments >= 0] -= start
     arguments["action_payment_session"] = payments
+    arguments["action_settlements"] = slice_action_settlements(
+        inputs.action_settlements, start, stop
+    )
     arguments["share_distributions"] = slice_distributions(
         inputs.share_distributions, start, stop
     )
@@ -578,6 +593,7 @@ def exact_replay(
                     state.required_exit,
                     allocation=allocation,
                     locked=state.locked,
+                    reserved_weights=tensor(np.r_[state.reserved_weights, 0.0]),
                     effective_beta=state.effective_beta,
                     claim_exposure=tensor(state.claim_exposure),
                     loan_short_blocked=state.loan_short_blocked,

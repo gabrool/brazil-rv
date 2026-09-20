@@ -35,6 +35,10 @@ class PortfolioAccount:
     entry_day: np.ndarray
     missing_sessions: np.ndarray
     ineligible_sessions: np.ndarray
+    proceeds_releases: list[tuple[int, Tensor]]
+    bonus_proceeds: list[tuple[int, Tensor]]
+    bonus_shares: Tensor
+    bonus_delivery: np.ndarray
     payments: list[tuple[int, Tensor]]
     distributions: dict
     retired_sources: set[int]
@@ -66,6 +70,10 @@ class PortfolioAccount:
             entry_day=np.full(n, -1, dtype=np.int64),
             missing_sessions=np.zeros(n, dtype=np.int64),
             ineligible_sessions=np.zeros(n, dtype=np.int64),
+            proceeds_releases=[],
+            bonus_proceeds=[],
+            bonus_shares=zero.clone(),
+            bonus_delivery=np.full(n, -1, dtype=np.int64),
             payments=[],
             distributions={},
             retired_sources=set(),
@@ -85,6 +93,10 @@ class PortfolioAccount:
             funding_restricted=tensor(0.0),
             prepared_loan_cash_payment=tensor(0.0),
         )
+
+    @property
+    def reserved_weights(self):
+        return self.bonus_shares * self.marks / self.nav
 
     def settled_balances(self):
         pending_free = sum((free for _, free, _ in self.settlements), tensor(0.0))
@@ -146,6 +158,17 @@ class PortfolioAccount:
             self.funding_restricted = restricted.sum()
             self.funding_day = day
             self._pay_claims(day)
+            self.proceeds_releases = [
+                (due, value) for due, value in self.proceeds_releases if due >= day
+            ]
+            held_proceeds = []
+            for due, value in self.bonus_proceeds:
+                if due <= day:
+                    self.trade_cash = self.trade_cash + value.sum()
+                    self.trade_restricted = self.trade_restricted - value
+                else:
+                    held_proceeds.append((due, value))
+            self.bonus_proceeds = held_proceeds
             # A previously valued liability pays with the same known arrival
             # that releases its proceeds; do not expose spendable proceeds to
             # today's policy while hiding the simultaneous principal debit.
@@ -154,6 +177,9 @@ class PortfolioAccount:
             ).sum()
             self.trade_cash = self.trade_cash - self.prepared_loan_cash_payment
             self.custody.settle(day)
+            self.bonus_shares = torch.where(
+                torch.as_tensor(self.bonus_delivery > day), self.bonus_shares, 0.0
+            )
             # Value-date obligations settle within this session. Close-to-close
             # interest below belongs to balances carried from the previous close.
             self.settlements = [
@@ -302,6 +328,7 @@ class PortfolioAccount:
             "marks",
             "trade_restricted",
             "claims",
+            "bonus_shares",
             "trade_cash",
             "cost_basis",
             "pending_exit",
@@ -310,7 +337,12 @@ class PortfolioAccount:
             "prepared_loan_cash_payment",
         ):
             setattr(self, name, getattr(self, name).detach())
-        self.payments = [(day, amount.detach()) for day, amount in self.payments]
+        for key in ("payments", "proceeds_releases", "bonus_proceeds"):
+            setattr(
+                self,
+                key,
+                [(day, amount.detach()) for day, amount in getattr(self, key)],
+            )
         self.loans.detach()
         self.custody.detach()
         self.settlements = [(d, f.detach(), r.detach()) for d, f, r in self.settlements]
@@ -342,7 +374,15 @@ class PortfolioAccount:
         short_shares = (-self.shares).clamp_min(0)
         cover = torch.minimum(signed_quantity.clamp_min(0), short_shares)
         sell = torch.minimum((-signed_quantity).clamp_min(0), self.shares.clamp_min(0))
-        release = self.trade_restricted * cover / short_shares.clamp_min(1e-30)
+        held_proceeds = sum(
+            (value for _, value in self.bonus_proceeds),
+            torch.zeros_like(self.trade_restricted),
+        )
+        release = (
+            (self.trade_restricted - held_proceeds)
+            * cover
+            / short_shares.clamp_min(1e-30)
+        )
         new_long = (signed_quantity - cover).clamp_min(0)
         new_short = (-signed_quantity - sell).clamp_min(0)
         self.custody.fill(
@@ -364,6 +404,17 @@ class PortfolioAccount:
             release - cover * price + sell * price - new_long * price
         ).sum() - costs
         restricted_delta = -release + new_short * price
+        spot_day = spot_settlement_session(loan_session.day, loan_session.date)
+        for name, due in self.loans.bonus_return_floors.items():
+            if due > spot_day and release[name].detach().item() > 0:
+                retained = torch.zeros_like(release)
+                retained[name] = release[name]
+                cash_delta = cash_delta - retained.sum()
+                restricted_delta = restricted_delta + retained
+                self.bonus_proceeds.append((due, retained))
+                release = release - retained
+        if bool((release.detach() > 0).any()):
+            self.proceeds_releases.append((spot_day, release))
         self.trade_cash = self.trade_cash + cash_delta
         self.trade_restricted = self.trade_restricted + restricted_delta
         self.settlements.append(
@@ -551,6 +602,7 @@ class PortfolioAccount:
         action_resolved=None,
         successor=None,
         payment_session=None,
+        action_settlements=(),
         share_distributions=(),
         loan_cash_settlements=(),
         fill_fraction=None,
@@ -580,7 +632,13 @@ class PortfolioAccount:
         loan_blocked = self.loans.short_blocked(day, self.config.loan_recalls)
         if self.distributions:
             loan_blocked[list(self.distributions)] = False
-        if np.any(loan_blocked & (target.detach().numpy() < -2e-6)):
+        if np.any(
+            loan_blocked
+            & (
+                target.detach().numpy()
+                < np.minimum(0, self.reserved_weights.detach().numpy()) - 2e-6
+            )
+        ):
             raise ValueError("portfolio retains a called or unavailable loan")
         reverse = before * target < 0
         reduction = torch.where(
@@ -620,6 +678,13 @@ class PortfolioAccount:
             np.arange(n) if successor is None else np.asarray(successor, dtype=np.int64)
         )
         changed |= resolved & (mapping != np.arange(n))
+        settlements_today = {
+            event.security_index: event
+            for event in action_settlements
+            if event.effective_session == day
+        }
+        withholding_accrual = tensor(0.0)
+        lender_compensation = tensor(0.0)
         for name in np.flatnonzero(changed):
             name = int(name)
             if name in self.distributions or any(
@@ -631,7 +696,43 @@ class PortfolioAccount:
                     "an action on an outstanding basket needs explicit claim terms"
                 )
             amount = torch.zeros(n, dtype=torch.float64)
-            amount[name] = self.shares[name] * d[name]
+            event = settlements_today.get(name)
+            bonus_delivery = None if event is None else event.bonus_delivery_session
+            if event is not None:
+                event.validate_action(q[name], d[name], mapping[name])
+            if self.bonus_shares[name].detach().item() != 0:
+                raise ValueError(
+                    "an action on an undelivered bonus needs explicit terms"
+                )
+            gross = self.shares[name] * d[name]
+            withheld = gross.clamp_min(0) * (
+                0.0 if event is None else event.withholding_rate
+            )
+            compensation = -gross.clamp_max(0) * (
+                1.0 if event is None else event.short_cash_fraction
+            )
+            amount[name] = gross.clamp_min(0) - withheld - compensation
+            withholding_accrual = withholding_accrual + withheld
+            lender_compensation = lender_compensation + compensation
+            if bonus_delivery is not None and bonus_delivery > day:
+                bonus = self.bonus_shares.clone()
+                bonus[name] = self.shares[name] * (q[name] - 1)
+                self.bonus_shares = bonus
+                self.bonus_delivery[name] = bonus_delivery
+            if bonus_delivery is not None:
+                shifted = []
+                for due, release in self.proceeds_releases:
+                    if due < bonus_delivery and release[name].detach().item() > 0:
+                        retained = torch.zeros_like(release)
+                        retained[name] = release[name]
+                        self.trade_cash = self.trade_cash - retained.sum()
+                        self.trade_restricted = self.trade_restricted + retained
+                        if due > day:
+                            self.settlements.append((due, -retained.sum(), retained))
+                        self.bonus_proceeds.append((bonus_delivery, retained))
+                        release = release - retained
+                    shifted.append((due, release))
+                self.proceeds_releases = shifted
             self.claims = self.claims + amount
             if d[name] != 0:
                 pay = int(payment_session[name]) if payment_session is not None else -1
@@ -639,8 +740,8 @@ class PortfolioAccount:
             shares, marks = self.shares.clone(), self.marks.clone()
             shares[name] = self.shares[name] * q[name]
             if q[name] > 0 and mapping[name] == name:
-                self.loans.split(name, q[name])
-                self.custody.split(name, q[name])
+                self.loans.split(name, q[name], bonus_delivery=bonus_delivery)
+                self.custody.split(name, q[name], bonus_delivery=bonus_delivery)
             elif (
                 q[name] == 0
                 and payment_session is not None
@@ -743,7 +844,10 @@ class PortfolioAccount:
         )
         cost_rate[-1] = config.hedge_cost_bps_per_side / 1e4
         shares_before_fill = self.shares
-        used = exit_fraction * fractions
+        available = (self.shares.abs() - self.bonus_shares.abs()).clamp_min(0)
+        used = torch.minimum(
+            exit_fraction * fractions, available / self.shares.abs().clamp_min(1e-30)
+        )
         costs = self._fill(-self.shares * used, prices, cost_rate, loan_session)
         self.cost_basis = self.cost_basis * (1 - used)
         remaining_exit = (exit_fraction - used) / (1 - used).clamp_min(1e-30)
@@ -828,6 +932,8 @@ class PortfolioAccount:
             "net_excess": nav / start_nav - 1 - cdi,
             "interest": interest,
             "borrow": borrow,
+            "withholding_accrual": withholding_accrual,
+            "lender_compensation": lender_compensation,
             "borrow_paid": rent_paid.sum() + fees_paid.sum(),
             "borrow_liability": self.loans.liability,
             "loan_redemption_liability": self.loans.cash_liability,
@@ -849,5 +955,6 @@ class PortfolioAccount:
             "undelivered_share_notional": sum(
                 (self.shares[name] * self.marks[name]).abs()
                 for name in self.distributions
-            ),
+            )
+            + (self.bonus_shares * self.marks).abs().sum(),
         }

@@ -1947,3 +1947,42 @@ Recovery1.0097s; complete research/patch, failed/qualified executed recipes,
 source-bound hypotheses and acceptance recover without immutable inputs/stores or
 old-fit copies. Prior source/lifecycle/economic-store recoveries remain dependencies.
 Acceptance SHAe0bc46d7acb25723b7e1e0d6365c6811492cbe3238f212123ee46c6149b908ba.
+
+
+## 2026-09-20: Natura bonus custody and JCP account engineering
+
+V34 supplements gross scalar actions with explicit settlement terms in both actual
+accounts. September18 q2 reserves only the incremental signed bonus to September20;
+original inventory remains reducible. Owned purchases retain separate base/bonus
+custody clocks. Original loan principal/rate/minimum stay; whole-return deferral to
+credit is explicitly hypothetical. Pending/new covered-loan proceeds stay restricted
+until return while spot purchase money retains its original settlement date.
+November7 gross JCP remains .12784527353; long15%withholding is separate from gross
+price/labels, February26 payment and gross-versus85%net lender compensation. No
+ordinary-CNPJ exemption, tax-credit asset, observed quote or loan alias is invented.
+
+Resolve natura_settlement_audit/qualification/runtime_qualification/terms/acceptance,
+natura_bonus_disposal_audit and docs/v2_NATURA_ACCOUNT_SETTLEMENT.md. Thirty116-session
+all933-name books plus twelve14-session reversal probes use actual adaptive allocation,
+frozen synthetic preferences/fixed risks, shallow-copied old PolicyData, correctedCDI
+and qualifiedloans. Oldbundled4bp bridge has no added B3spot; final corporate pricing
+and model profitability remain unestablished. Identical-intention maxNAVerror
+R3.91155481338501e-8; independent3648daily component identities maxR3.725290298461914e-9.
+Savedaccountcells13701888. Independentadaptive maxpath.019685697574168444/.19440065797418357/
+.0392659758310765bp atR10m/R1m/R5m; targetdistance7.048151527220409e-7. Preserve earlier
+V32/V33uncertainty. Decimal entitlements and actual bonus-plus-fill conservation pass;
+actual reversal probes retain the signed bonus until credit. Separate source/withholding/
+custody/lender contrasts and allcase scopes are bound; no daily-alpha interpretation.
+
+14distinct new settlement cases and3affected existing cases passed in focused batches;
+overlap not summed. A bitwise prefix fixture differed by2.22e-16 classification roundoff
+and uses narrow1e-15arithmetic tolerance. A new called-bonus fixture corrected the
+independent zero-target admission guard; runtime qualification proves all42historical
+books unaffected and reuses them. No historical book failure/rerun. Ruff passes.
+Audits104.6855s and5.8583s, savedqualification.4278s/runtime.0525s; not GPUfit ETAs.
+Both accepted stores/oldfits remain immutable, no neural scoring/fit or heldoutconsumer.
+
+Next: still-missing ALSC credit/auction and event-specific loan/fraction evidence,
+ENAT original receipts by held exposure, BRML/DMMO/Copel adaptive pre-custody disposal,
+remaining allocation/rounding/grouping/oldminimum/clearing and separatedcorporatecosts.
+Do not repeat the Natura source/data/opening/settlement books. FinalA/C/D remain pending.

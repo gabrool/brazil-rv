@@ -26,7 +26,7 @@ def clone_account(account):
             value = value.detach().clone()
         elif isinstance(value, np.ndarray):
             value = value.copy()
-        elif field.name == "payments":
+        elif field.name in {"payments", "proceeds_releases", "bonus_proceeds"}:
             value = [(day, amount.detach().clone()) for day, amount in value]
         elif field.name == "settlements":
             value = [

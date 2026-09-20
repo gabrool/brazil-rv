@@ -70,9 +70,16 @@ quote, loan reference or custody date. Both actual accounts and independent trai
 copies preserve that distinction. Thirty bounded adaptive engineering books cover
 NATU/ALSC/SOMA and stated SOMA fraction/precision hypotheses; unknown ALSC custody
 remains a locked claim. These separately selected terms do not replace the canonical
-corporate replay or resolve Natura bonus/JCP, event-specific loan terms or final
-corporate pricing. This source milestone is not final
-economic admission. Previously passed source audits and lifecycle books remain valid
+corporate replay or resolve event-specific loan terms or final corporate pricing.
+Natura bonus/JCP accounting now has separate V34 engineering acceptance under
+`docs/v2_NATURA_ACCOUNT_SETTLEMENT.md`: incremental signed bonus inventory is reserved
+to sourced credit; owned-purchase clocks, loan-return obligations and restricted
+proceeds remain explicit. Gross JCP price/label terms are separate from source-stated
+long withholding, payment and bounded lender compensation; no tax credit is invented.
+Thirty116-session entitlement/payment books and twelve14-session adaptive reversal
+probes preserve frozen old PolicyData. Resolve `natura_settlement_terms` explicitly;
+canonical corporate replay stays unchanged pending final admission. Independent
+adaptive minimum-fee uncertainty remains measured. This is not final economic admission. Previously passed source audits and lifecycle books remain valid
 for their explicitly recorded contracts.
 
 Denied-renewal and ordinary-recall stress now reaches both adaptive accounts,

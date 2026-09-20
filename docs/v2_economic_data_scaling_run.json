@@ -416,6 +416,10 @@
     "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\natura_auxiliary\\qualified\\manifest.json",
     "sha256": "dafdd43e773f454c55065c24ad0a7ec9baf357b6daf07d174a4d5791644a748d"
   },
+  "natura_bonus_disposal_audit": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\natura_settlement\\disposal\\manifest.json",
+    "sha256": "bc21ba881f0d286d7d31cd9601c340d8ae0d8fd46d7854f312c636a2de2ea8c4"
+  },
   "natura_daily_input_audit": {
     "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\natura_daily\\qualified\\manifest.json",
     "sha256": "783ca4ac34aa91f0e5e5374e3d4cf950b9d65d4d06d96057cb31206e29e48cde"
@@ -443,6 +447,26 @@
   "natura_gross_target_attribution": {
     "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\natura_gross_targets\\qualified_endpoints\\manifest.json",
     "sha256": "730d3643bca66929f0a58114fd621fbf90d23a0bdda66b1fb3b8b6c4666a9a4c"
+  },
+  "natura_settlement_acceptance": {
+    "path": "C:\\quant\\b3-quant\\docs\\v2_natura_settlement_acceptance.json",
+    "sha256": "eb6a96325d950ff449ebd72f8ce68b9629c9162ae74e734b366af7fdc9e39afc"
+  },
+  "natura_settlement_audit": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\natura_settlement\\initial\\manifest.json",
+    "sha256": "8f73cd71326c1781355d36a094fc3900cb66bc054ddc86aaf7b9d32d86455293"
+  },
+  "natura_settlement_qualification": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\natura_settlement\\qualification\\manifest.json",
+    "sha256": "8146b64092b041b6108c4f12001a9ded2d2fb3f499badf6f71539202dac69402"
+  },
+  "natura_settlement_runtime_qualification": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\natura_settlement\\runtime_qualification\\manifest.json",
+    "sha256": "3043332a7cdc350e8bebffbd12c73303e592d05efbc834bd45c3ad4114345c1b"
+  },
+  "natura_settlement_terms": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\natura_settlement\\initial\\terms.json",
+    "sha256": "5adcbc09d6a00832df7b094a23a339e7b1263dbdac4a63b6cad9b8b21becd6b6"
   },
   "natura_store_assembly": {
     "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\natura_store\\manifest.json",

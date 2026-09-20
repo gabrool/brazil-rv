@@ -9,6 +9,7 @@ from numpy.typing import NDArray
 
 from brazil_rv.v2.corporate_actions import AlignedActionTerms, apply_contractual_action
 from brazil_rv.v2.hedge_beta import resolve_hedge_beta
+from .action_settlement import ActionSettlement
 from .share_distributions import (
     ShareDistribution,
     ShareClaimPosition,
@@ -351,6 +352,8 @@ class StatefulLedgerResult:
     mark_price: NDArray[np.float64]
     free_cash: NDArray[np.float64]
     restricted_cash: NDArray[np.float64]
+    withholding_accrual: NDArray[np.float64]
+    lender_compensation: NDArray[np.float64]
     undelivered_share_notional: NDArray[np.float64]
     share_claim_positions: tuple[ShareClaimPosition, ...]
     hedge_restricted_cash: NDArray[np.float64]
@@ -1236,6 +1239,7 @@ def _book_fill(
     loan_name: int,
     long_purchases: NDArray[np.float64],
     long_sales: NDArray[np.float64],
+    restricted_hold: float = 0.0,
 ) -> tuple[float, float]:
     old_shares = float(shares[name])
     remaining = quantity
@@ -1243,7 +1247,7 @@ def _book_fill(
         cover = min(remaining, -old_shares)
         loan_covers[loan_name] += cover
         loan_full_returns[loan_name] |= cover == -old_shares
-        release = restricted_by_name[name] * cover / -old_shares
+        release = (restricted_by_name[name] - restricted_hold) * cover / -old_shares
         restricted_by_name[name] -= release
         free_cash += release - cover * price
         shares[name] += cover
@@ -1289,6 +1293,7 @@ class PortfolioDecisionState:
     effective_beta: NDArray[np.float64]
     claim_exposure: NDArray[np.float64]
     loan_short_blocked: NDArray[np.bool_]
+    reserved_weights: NDArray[np.float64]
 
 
 @dataclass(frozen=True)
@@ -1308,6 +1313,7 @@ def simulate_stateful_ledger(
     action_terms: AlignedActionTerms,
     action_payment_session: NDArray[np.integer],
     cdi_returns: NDArray[np.floating],
+    action_settlements: Sequence[ActionSettlement] = (),
     share_distributions: Sequence[ShareDistribution] = (),
     loan_cash_settlements: Sequence[LoanCashSettlement] = (),
     config: LedgerConfig = LedgerConfig(),
@@ -1489,6 +1495,24 @@ def simulate_stateful_ledger(
     pending_exits: dict[int, _PendingOrder] = {}
     pending_claims: list[_PendingClaim] = []
     pending_distributions = {}
+    bonus_proceeds = []
+    proceeds_releases = []
+    bonus_shares = np.zeros(name_count)
+    bonus_delivery = np.full(name_count, -1)
+    withholding_rows = []
+    compensation_rows = []
+    settlement_by_day_name = {
+        (e.effective_session, e.security_index): e for e in action_settlements
+    }
+    for e in action_settlements:
+        if e.security_index >= name_count or not 0 <= e.effective_session < day_count:
+            raise ValueError("action settlement is outside replay axes")
+        d, n = e.effective_session, e.security_index
+        if not inputs.has_action[d, n] or not inputs.action_resolved[d, n]:
+            raise ValueError("action settlement requires a resolved gross action")
+        e.validate_action(
+            inputs.action_q[d, n], inputs.action_d[d, n], inputs.action_successor[d, n]
+        )
     share_claim_positions = []
     retired_sources = {
         event.source_index
@@ -2015,6 +2039,17 @@ def simulate_stateful_ledger(
             free_cash, np.r_[restricted_by_name, hedge_restricted_cash], settlements
         )
         pay_claims(day)
+        proceeds_releases = [
+            (due, value) for due, value in proceeds_releases if due >= day
+        ]
+        held_proceeds = []
+        for due, value in bonus_proceeds:
+            if due <= day:
+                free_cash += float(value.sum())
+                restricted_by_name -= value[:-1]
+            else:
+                held_proceeds.append((due, value))
+        bonus_proceeds = held_proceeds
         free_cash -= float(
             loans.settle_cash_claims(
                 day, payments=loan_cash_payments, pay_only=True
@@ -2023,6 +2058,7 @@ def simulate_stateful_ledger(
         settlements = [item for item in settlements if item[0] is None or item[0] > day]
         cancelled_today = 0
         custody.settle(day)
+        bonus_shares[bonus_delivery <= day] = 0
         deliver_due(day)
         loans.observe_recalls(day, config.loan_recalls)
         loan_blocked = loans.short_blocked(day, config.loan_recalls)
@@ -2144,6 +2180,7 @@ def simulate_stateful_ledger(
                 effective_beta=decision_beta,
                 claim_exposure=claim_exposure,
                 loan_short_blocked=loan_blocked.copy(),
+                reserved_weights=bonus_shares * np.nan_to_num(marks) / start_nav,
             )
             target = (
                 portfolio_policy(decision_state)
@@ -2166,7 +2203,13 @@ def simulate_stateful_ledger(
                 opening_short & ~decision_shortable
             ):
                 raise ValueError("portfolio requests an unavailable opening trade")
-            if np.any(required_exit & (np.abs(desired) > tol)):
+            if np.any(
+                required_exit
+                & (
+                    (np.abs(desired) > np.abs(decision_state.reserved_weights) + tol)
+                    | (desired * decision_state.reserved_weights < -tol)
+                )
+            ):
                 raise ValueError("portfolio retains required exits")
             if loan_blocked[-1] and target.hedge_weight < -tol:
                 raise ValueError("portfolio retains a called or unavailable hedge loan")
@@ -3291,6 +3334,8 @@ def simulate_stateful_ledger(
         )
         # Apply contractual terms to shares held before the session. Cash terms
         # become claims; only the later payment mask transfers them to cash.
+        withholding_accrual = 0.0
+        lender_compensation = 0.0
         for name in np.flatnonzero(inputs.has_action[day]):
             if name in pending_distributions or any(
                 int(name) == leg.successor_index
@@ -3312,9 +3357,32 @@ def simulate_stateful_ledger(
             q = float(inputs.action_q[day, name])
             d = float(inputs.action_d[day, name])
             old_shares = float(shares[name])
+            event = settlement_by_day_name.get((day, int(name)))
+            delivery = None if event is None else event.bonus_delivery_session
+            if bonus_shares[name] != 0:
+                raise ValueError(
+                    "an action on an undelivered bonus needs explicit terms"
+                )
+            if delivery is not None and delivery > day:
+                bonus_shares[name] = old_shares * (q - 1)
+                bonus_delivery[name] = delivery
+            if delivery is not None:
+                shifted = []
+                for due, release in proceeds_releases:
+                    if due < delivery and release[name] > 0:
+                        retained = np.zeros(name_count + 1)
+                        retained[name] = release[name]
+                        free_cash -= float(retained.sum())
+                        restricted_by_name += retained[:-1]
+                        if due > day:
+                            settlements.append((due, -float(retained.sum()), retained))
+                        bonus_proceeds.append((delivery, retained))
+                        release = release - retained
+                    shifted.append((due, release))
+                proceeds_releases = shifted
             if q > 0 and successor == name:
-                loans.split(int(name), q)
-                custody.split(int(name), q)
+                loans.split(int(name), q, bonus_delivery=delivery)
+                custody.split(int(name), q, bonus_delivery=delivery)
             elif q == 0 and inputs.action_payment_session[day, name] >= day:
                 returns = np.zeros(name_count + 1)
                 returns[name] = float(loans.active_quantity[name])
@@ -3331,7 +3399,14 @@ def simulate_stateful_ledger(
                 shares_per_prior_share=q,
                 cash_per_prior_share=d,
             )
-            claim = float(signed_claim)
+            gross = float(signed_claim)
+            withheld = max(gross, 0) * (0 if event is None else event.withholding_rate)
+            compensation = -min(gross, 0) * (
+                1 if event is None else event.short_cash_fraction
+            )
+            withholding_accrual += withheld
+            lender_compensation += compensation
+            claim = max(gross, 0) - withheld - compensation
             if claim >= 0.0:
                 receivable_by_name[name] += claim
             else:
@@ -3405,6 +3480,8 @@ def simulate_stateful_ledger(
                 entry_cost_basis[name] = 0.0
                 submission_nav[name] = 0.0
 
+        withholding_rows.append(withholding_accrual)
+        compensation_rows.append(lender_compensation)
         # Recognize a non-tradable basket at its economic effective date. The
         # current source quote can no longer sell the cancelled predecessor.
         for event in distributions_by_day.get(day, ()):
@@ -3484,6 +3561,7 @@ def simulate_stateful_ledger(
             printed[list(retired_sources)] = False
         if day == day_count - 1:
             terminal_printed = printed.copy()
+        release_today = np.zeros(name_count + 1)
         loan_covers = np.zeros(name_count + 1)
         loan_openings = np.zeros(name_count + 1)
         loan_full_returns = np.zeros(name_count + 1, dtype=bool)
@@ -3525,9 +3603,21 @@ def simulate_stateful_ledger(
                     if entries
                     else used_size * abs(float(shares[name]))
                 )
+                if not entries:
+                    quantity = min(
+                        quantity, max(0.0, abs(shares[name]) - abs(bonus_shares[name]))
+                    )
+                    used_size = quantity / abs(shares[name])
                 if quantity <= 0.0:
                     continue
                 before = float(shares[name])
+                held_proceeds = sum(value[name] for _, value in bonus_proceeds)
+                if pending.order.side == "buy" and before < 0:
+                    release_today[name] += (
+                        (restricted_by_name[name] - held_proceeds)
+                        * min(quantity, -before)
+                        / -before
+                    )
                 free_cash, notional = _book_fill(
                     name=name,
                     side=pending.order.side,
@@ -3542,6 +3632,7 @@ def simulate_stateful_ledger(
                     loan_openings=loan_openings,
                     loan_full_returns=loan_full_returns,
                     loan_name=name,
+                    restricted_hold=held_proceeds,
                     long_purchases=long_purchases,
                     long_sales=long_sales,
                 )
@@ -3661,8 +3752,20 @@ def simulate_stateful_ledger(
                 )
                 for leg, price in zip(legs, prices)
             )
+        share_claim_positions.extend(
+            ShareClaimPosition(
+                day,
+                int(name),
+                int(name),
+                float(bonus_shares[name]),
+                float(marks[name]),
+                int(bonus_delivery[name]),
+            )
+            for name in np.flatnonzero(bonus_shares)
+        )
         undelivered_rows.append(
             sum(abs(shares[name] * marks[name]) for name in pending_distributions)
+            + float(np.abs(bonus_shares * np.nan_to_num(marks)).sum())
         )
         stale = int(np.sum((shares != 0.0) & ~valued))
 
@@ -3738,6 +3841,17 @@ def simulate_stateful_ledger(
         # Every name has at most one new-entry fill after reductions; contract
         # terms are shared within this session. Apply those actual quantities in
         # one vector operation, avoiding a whole-cohort scan for every fill.
+        spot_day = spot_settlement_session(day, inputs.dates[day])
+        for name, due in loans.bonus_return_floors.items():
+            if name < name_count and due > spot_day and release_today[name] > 0:
+                retained = np.zeros(name_count + 1)
+                retained[name] = release_today[name]
+                free_cash -= float(retained.sum())
+                restricted_by_name += retained[:-1]
+                bonus_proceeds.append((due, retained))
+                release_today -= retained
+        if np.any(release_today):
+            proceeds_releases.append((spot_day, release_today))
         if traded_notional:
             settlements.append(
                 (
@@ -4141,6 +4255,7 @@ def simulate_stateful_ledger(
         or receivable_by_name.any()
         or payable_by_name.any()
         or bool(pending_distributions)
+        or bool(np.any(bonus_shares))
         or hedge_shares != 0.0
         or terminal_boundary_unpriced_inventory_notional > 0.0
         or terminal_unpriced_hedge_notional > 0.0
@@ -4265,6 +4380,8 @@ def simulate_stateful_ledger(
         loan_return_notices=tuple(loans.return_notices),
         loan_overdue_principal=np.asarray(loan_overdue_rows, dtype=np.float64),
         loan_cash_payments=tuple(loan_cash_payments),
+        withholding_accrual=np.asarray(withholding_rows),
+        lender_compensation=np.asarray(compensation_rows),
         equity_borrow_raw_bps=np.asarray(equity_borrow_raw_rows, dtype=np.float64),
         equity_borrow_fee_bps=np.asarray(equity_borrow_fee_rows, dtype=np.float64),
         cdi_benchmark_bps=np.asarray(cdi_benchmark_rows, dtype=np.float64),

@@ -20,6 +20,7 @@ from brazil_rv.execution.stateful_ledger import (
     simulate_stateful_ledger,
 )
 from brazil_rv.modeling.metrics import average_ranks, moving_block_bootstrap
+from brazil_rv.execution.action_settlement import ActionSettlement
 from brazil_rv.execution.share_distributions import ShareDistribution
 from brazil_rv.execution.loan_contracts import LoanCashSettlement
 from brazil_rv.execution.loan_fees import LOAN_FEE_CONVENTION
@@ -49,7 +50,7 @@ MIN_CROSS_SECTION = 20
 BOOTSTRAP_SEED = 20260903
 ECONOMICS_COSTS_BPS = (2.0, 4.0, 7.0)
 ECONOMICS_HEADLINE = (4.0, 0.02)
-EVALUATION_SCHEMA = "BRAZIL_RV_V2_EVALUATION_V33"
+EVALUATION_SCHEMA = "BRAZIL_RV_V2_EVALUATION_V34"
 PRIOR_EVALUATION_SCHEMA = "BRAZIL_RV_V2_EVALUATION_V15"
 PAIRED_COMPARISON_SCHEMA = "BRAZIL_RV_V2_PAIRED_COMPARISON_V3"
 
@@ -148,6 +149,7 @@ class EvaluationInputs:
     neutral_target_fallback_flags: NDArray[np.bool_] | None = None
     execution_policy: ExecutionPolicy | None = None
     entry_fill_allowed: NDArray[np.bool_] | None = None
+    action_settlements: tuple[ActionSettlement, ...] = ()
     share_distributions: tuple[ShareDistribution, ...] = ()
     loan_cash_settlements: tuple[LoanCashSettlement, ...] = ()
 
@@ -859,6 +861,7 @@ def _ledger_inputs(
         "raw_close": inputs.raw_close,
         "action_terms": _aligned_action_terms(inputs),
         "action_payment_session": inputs.action_payment_session,
+        "action_settlements": inputs.action_settlements,
         "share_distributions": inputs.share_distributions,
         "loan_cash_settlements": inputs.loan_cash_settlements,
         "cdi_returns": inputs.cdi_returns,
@@ -1334,6 +1337,9 @@ def _action_attribution(
         "loan_cash_settlement_terms": [
             asdict(event) for event in inputs.loan_cash_settlements
         ],
+        "action_settlements": [asdict(event) for event in inputs.action_settlements],
+        "withholding_accrual": result.withholding_accrual.tolist(),
+        "lender_compensation": result.lender_compensation.tolist(),
         "loan_cash_payments": [
             asdict(payment) for payment in result.loan_cash_payments
         ],
@@ -1611,6 +1617,11 @@ def _input_hashes(inputs: EvaluationInputs) -> dict[str, str]:
             ).encode()
         ).hexdigest(),
         "dates": _dates_sha256(inputs.dates),
+        "action_settlements": hashlib.sha256(
+            json.dumps(
+                [asdict(event) for event in inputs.action_settlements], sort_keys=True
+            ).encode()
+        ).hexdigest(),
         "share_distributions": hashlib.sha256(
             json.dumps(
                 [asdict(event) for event in inputs.share_distributions],
@@ -3050,6 +3061,7 @@ _PAIRED_INPUT_KEYS = (
     "action_has_action",
     "action_successor_index",
     "action_payment_session",
+    "action_settlements",
     "share_distributions",
     "loan_cash_settlements",
     "security_ids",

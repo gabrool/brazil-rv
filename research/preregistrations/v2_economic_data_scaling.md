@@ -143,6 +143,30 @@ event-specific B3 instructions. ALSC custody and fraction liquidation remain
 unknown, without guessed dates or zero proceeds. Same-ISIN Natura bonus custody
 and JCP withholding/payment remain separate account work.
 
+Same-security Natura settlement amendment, frozen 2026-09-20 before new books:
+September18's sourced q2 creates economic shares immediately, while only the
+incremental signed bonus quantity remains unavailable for disposal until September20.
+Original shares may be reduced; same-name reversals cannot consume the reserved
+bonus. Pending purchases retain their original custody clock with bonus units no
+earlier than credit. Loan quantity adjusts at effect with unchanged total principal,
+rate and historical minimum; all affected same-name returns are deferred at least to
+credit as an explicit conservative whole-return hypothesis. Immediate credit is a
+separate engineering timing bound, not an alternative source fact. No new loan or
+proceeds release is created by the bonus. Existing pending returns retain obligations.
+November7's gross JCP remains .12784527353 in gross labels/price adjustment. The
+account recognizes long cash net of the source-stated15% withholding and pays only
+February26 2020; no tax credit asset or immediate spendable cash is inferred. Short
+compensation is bounded by gross100% versus source-net85%, with the gross endpoint
+primary and both explicitly hypothetical pending event-specific lender evidence.
+Withholding accrual and lender compensation are reported separately from loan rent,
+execution charges and financing. These engineering bounds do not admit final model
+economics or alter either accepted data store. Supplement the constant-focus
+entitlement/payment books with a separately frozen adaptive disposal probe: reverse
+NATU's synthetic preference from bonus effect through two sessions after credit,
+comparing sourced credit against immediate-credit engineering at the same three
+capital sizes and both starting sides. This tests whether the quantity boundary
+binds under actual allocator decisions; no model outcome selects the probe.
+
 ## B. Deep source-to-model data audit
 
 Revisit the actual sources and builders, not just finite-value/coverage summaries.

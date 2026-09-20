@@ -1,0 +1,51 @@
+{
+  "books": 42,
+  "daily_identities": 3648,
+  "evidence": {
+    "held_event_source_audit": {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\held_event_sources\\qualification\\manifest.json",
+      "sha256": "0bc84fcc1f2ec8065dab33c69c7dbc8680bcf230953eda0a292c3bc7204c91ff"
+    },
+    "held_event_source_qualification": {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\held_event_sources\\clock_qualification\\manifest.json",
+      "sha256": "e40a4200dea0ceb86a6766c790aa23c2f7d6fe9b58d9c49861aa15bb3f90ba7d"
+    },
+    "natura_bonus_disposal_audit": {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\natura_settlement\\disposal\\manifest.json",
+      "sha256": "bc21ba881f0d286d7d31cd9601c340d8ae0d8fd46d7854f312c636a2de2ea8c4"
+    },
+    "natura_gross_action_amendments": {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\held_event_sources\\clock_qualification\\natura_gross_action_amendments.parquet",
+      "sha256": "00e4ce6c0cf35fba27a0fa8a63f86d2438ec8ce084a3c4a8477b94f848b40174"
+    },
+    "natura_settlement_audit": {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\natura_settlement\\initial\\manifest.json",
+      "sha256": "8f73cd71326c1781355d36a094fc3900cb66bc054ddc86aaf7b9d32d86455293"
+    },
+    "natura_settlement_qualification": {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\natura_settlement\\qualification\\manifest.json",
+      "sha256": "8146b64092b041b6108c4f12001a9ded2d2fb3f499badf6f71539202dac69402"
+    },
+    "natura_settlement_runtime_qualification": {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\natura_settlement\\runtime_qualification\\manifest.json",
+      "sha256": "3043332a7cdc350e8bebffbd12c73303e592d05efbc834bd45c3ad4114345c1b"
+    },
+    "natura_settlement_terms": {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\natura_settlement\\initial\\terms.json",
+      "sha256": "5adcbc09d6a00832df7b094a23a339e7b1263dbdac4a63b6cad9b8b21becd6b6"
+    },
+    "opening_claim_terms": {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\opening_claims\\qualified\\terms.json",
+      "sha256": "778f413e29346809450b53babaf25f4b49417c289a17ecd9c404580880a71c82"
+    }
+  },
+  "limitations": "Trade-date entitlement; no event-specific lender instruction or tax-credit value. Synthetic fixed-risk books/oldbundled4bp bridge only. Preserve all measured adaptive fixed-minimum uncertainty. Remaining NATU/ALSC/SOMA custody/loan/fraction evidence, ENAT, BRML/DMMO/Copel disposal and fee/clearing bounds; final A and C/D incomplete.",
+  "primary": "Source q2/effectSep18/creditSep20; grossJCP.12784527353 Nov7/payFeb26, long15%withholding/no taxcredit; gross lender compensation and whole-loan-return deferral are explicit hypotheses.",
+  "report": {
+    "path": "C:\\quant\\b3-quant\\docs\\v2_NATURA_ACCOUNT_SETTLEMENT.md",
+    "sha256": "5aa2025fc13278e37e5a85d78bbbb552da652d71762810c135f1056b516cdde6"
+  },
+  "schema": "BRAZIL_RV_V2_EVALUATION_V34",
+  "status": "natura_settlement_engineering_accepted_stage_A_incomplete",
+  "unchanged": "Both accepted stores, original sources/fits, frozen old PolicyData coordinates and full933-name axes; no model scoring, new fit, held-out consumer, history change or corporate_replay pointer replacement."
+}

@@ -139,6 +139,8 @@ def book_summary(data, result, previous, start, first):
         "loan_liability": result.loan_liability[selection],
         "loan_overdue_principal": result.loan_overdue_principal[selection],
         "loan_payment": result.loan_payment[selection],
+        "withholding_accrual": result.withholding_accrual[selection],
+        "lender_compensation": result.lender_compensation[selection],
         "loan_outstanding_principal": result.loan_outstanding_principal[selection],
         "loan_rent_bps": (result.equity_borrow_raw_bps + result.hedge_borrow_raw_bps)[
             selection
@@ -240,6 +242,8 @@ def save_book(output, data, result, targets, previous, start, first, provenance)
         "pending_entry_count",
         "unpriced_inventory_notional",
         "undelivered_share_notional",
+        "withholding_accrual",
+        "lender_compensation",
         "unpriced_haircut_scenario_nav",
     )
     state = {k: getattr(result, k) for k in fields}

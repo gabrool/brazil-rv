@@ -55,13 +55,21 @@ class ShareCustody:
         self.consume(held, torch.minimum(sales, held), day)
         self.add(due, (purchases - (sales - held).clamp_min(0)).clamp_min(0))
 
-    def split(self, name, ratio):
+    def split(self, name, ratio, *, bonus_delivery=None):
         adjusted = []
+        bonus = []
         for due, quantity in self.receipts:
             changed = quantity.clone()
-            changed[name] = quantity[name] * ratio
+            if bonus_delivery is None:
+                changed[name] = quantity[name] * ratio
+            else:
+                increment = torch.zeros_like(quantity)
+                increment[name] = quantity[name] * (ratio - 1)
+                bonus.append((max(due, bonus_delivery), increment))
             adjusted.append((due, changed))
         self.receipts = adjusted
+        for due, increment in bonus:
+            self.add(due, increment)
 
     def deliver(self, source, destination, ratio, incoming, existing, day, *, final):
         """Carry purchase value dates through succession, then reserve netted shares."""

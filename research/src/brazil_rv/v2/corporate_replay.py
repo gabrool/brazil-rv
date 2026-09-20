@@ -6,6 +6,7 @@ from pathlib import Path
 
 import numpy as np
 
+from brazil_rv.execution.action_settlement import ActionSettlement
 from brazil_rv.execution.loan_contracts import LoanCashSettlement, LoanCashValue
 from brazil_rv.execution.share_distributions import (
     FractionAuction,
@@ -72,6 +73,43 @@ def apply_corporate_replay(inputs, terms, calendar, manifest_sha256):
         if position >= len(calendar) or calendar[position] != day:
             raise ValueError(f"corporate date {value} absent from bound calendar")
         return position - int(indices[0])
+
+    action_settlements = list(inputs.action_settlements)
+    seen = set()
+    for event in terms.get("scalar_actions", ()):
+        if event["isin"] not in names:
+            continue
+        name = names[event["isin"]]
+        effective = session(event["effective_date"])
+        if not 0 <= effective < len(indices):
+            continue
+        key = effective, name
+        if key in seen:
+            raise ValueError("duplicate scalar settlement")
+        seen.add(key)
+        settlement = ActionSettlement(
+            name,
+            effective,
+            session(event["available_date"]),
+            source,
+            None
+            if event.get("bonus_delivery_date") is None
+            else session(event["bonus_delivery_date"]),
+            event.get("withholding_rate", 0.0),
+            event.get("short_cash_fraction", 1.0),
+        )
+        q, cash = event["shares_per_prior_share"], event["gross_cash_per_prior_share"]
+        settlement.validate_action(
+            q, cash, inputs.action_successor_index[effective, name]
+        )
+        changed["action_shares_per_prior_share"][effective, name] = q
+        changed["action_cash_per_prior_share"][effective, name] = cash
+        changed["action_session_resolved"][effective, name] = True
+        changed["action_has_action"][effective, name] = True
+        changed["action_payment_session"][effective, name] = (
+            -1 if not cash else session(event["payment_date"])
+        )
+        action_settlements.append(settlement)
 
     distributions = list(inputs.share_distributions)
     for event in terms.get("share_distributions", ()):
@@ -187,6 +225,7 @@ def apply_corporate_replay(inputs, terms, calendar, manifest_sha256):
         **changed,
         initial_unresolved_action=initial,
         loan_cash_settlements=tuple(loans),
+        action_settlements=tuple(action_settlements),
         share_distributions=tuple(distributions),
         source_artifact_hashes=provenance,
         action_terms_source=f"{inputs.action_terms_source};{source}",
