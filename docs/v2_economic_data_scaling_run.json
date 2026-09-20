@@ -1085,6 +1085,10 @@
     "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_economic_matched_20260920\\refit_plan.json",
     "sha256": "fd4f7c365656107cfb661c1d5dfe2fbbed291d09a70faf243c1f4a49d6d9fa03"
   },
+  "stage_c_matched_store_recovery": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\matched_store_recovery.json",
+    "sha256": "b588d487a718682606fb8163ebd279a0ceb7c8d790abd224b368e25d0a6fef23"
+  },
   "stage_c_neutral_attribution": {
     "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_economic_matched_20260920\\event_data\\composition\\neutral_attribution.json",
     "sha256": "8fd7ede72df3795201f5fe5639ef11742c6c5a6efb3ae09fd9c07b7b5367d945"

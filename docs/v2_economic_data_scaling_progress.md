@@ -8,6 +8,8 @@ Fresh training is frozen in the `data_refits` directory selected by `stage_c_ref
 
 Admission's first invocation verifies2,099 dated spot sessions,102custody assessments, five same-class account actions and11unchanged input-object identities in0.600369s. Four new focused cases plus seven existing cases pass after fixture-only dimension corrections. No engineering books or completed source/feature matrices rerun. All attempts are retained. January calendar recovery verifies684unique/920logical members,236aliases,15books/5,154,165cells in1.573294s: january_calendar_f434b56.zip SHA320222118d030993facd24130cb47738b98601f5b74b5210e86ff0d84058555b,8,343,177bytes.
 
+Incremental recovery `matched_store_eb0d407.zip` is verified: SHA a952bcfb6d234a75f0e3fb2cabe6d36817e1190060a82f496258b91711b6bbe1,199,031,076bytes,452unique/472logical members/20aliases,942unchanged members reused from the prior verified account archive. Seventy arrays/2,596,086,612cells reconstruct to exact complete-store byte hashes;36arrays and unchanged tables/indices remain parent dependencies. Recovery took68.5462s after8.5653s archiving. No immutable input/store/old-fit copies. The clean-commit retry is running the first fresh parent; no completed epoch or fit is reported yet.
+
 Earlier progress is historical; superseded pending queues are not new work.
 
 
