@@ -123,10 +123,30 @@
     "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\corporate_targets\\qualified\\manifest.json",
     "sha256": "59237c2ff7ef0c0d2471fe47ea1265baf37e33f90195e0e8c6eb2f280e71bff0"
   },
+  "custody_fee_acceptance": {
+    "path": "C:\\Brazil-RV\\quant\\b3-quant\\docs\\v2_custody_fee_acceptance.json",
+    "sha256": "15c72f33c1c93b5dad41eca868220383340cec366462c1af28a9a8ff8ffca2b2"
+  },
+  "custody_fee_audit": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\custody_fees\\manifest.json",
+    "sha256": "d61c258784db209eed78f27eda059c57c16a508e942118b1767c119c84aaf827"
+  },
+  "custody_fee_qualification": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\custody_fees\\qualification\\report.json",
+    "sha256": "df08757b240113cbc64edbe54e5edc2ab298e9ad9ebde77404eb00dfcb9e790b"
+  },
+  "custody_fee_runtime_identity": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\custody_fees\\runtime_identity.json",
+    "sha256": "09d20abedfa427c59aa4b35514fc4395316ef54407e7651017c6c9aa4371e094"
+  },
   "custody_runtime_acceptance": {
     "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\custody_acceptance\\result.json",
     "reproducer_sha256": "93b1616d1eac81ed5507f2432b7984430a2d71c703af5ec5b23056d34045ded8",
     "sha256": "788fce91bce7c1f0b7035e9b8ee1bd1b1e93047b4f68332f4f0c1fb19792de3d"
+  },
+  "custody_tariff_sources": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\custody_tariff_sources\\boundary_qualification.json",
+    "sha256": "ba30fbf3a1698dffa3bcf1d4b1ec82e02c1a5dec136816d15356ebb9602cdb7f"
   },
   "cvm_capital_admission": {
     "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\cvm_capital_admission\\manifest.json",

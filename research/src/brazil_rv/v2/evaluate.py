@@ -1895,6 +1895,9 @@ def _economics_contract(inputs: EvaluationInputs) -> dict[str, object]:
         "execution_brokerage_bps": config.execution_brokerage_bps,
         "execution_shortfall_bps": config.execution_shortfall_bps,
         "execution_charges_columns": list(EXECUTION_COMPONENTS),
+        "custody_assessments": [asdict(a) for a in config.custody_assessments],
+        "custody_base": config.custody_base,
+        "custody_contract": "ordinary physical stock; explicit monthly assessment and client close-payment hypotheses; corporate physical transitions require separate admission",
         "loan_return_assumption": (
             "prearranged return on covering spot settlement: T+3 before 2019-05-27, "
             "T+2 thereafter; corporate offsets wait for actual purchase custody, "

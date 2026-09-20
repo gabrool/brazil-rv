@@ -437,3 +437,25 @@ LLM-ready report; hash/archive recoverable new artifacts on D without duplicatin
 immutable inputs. This program is complete only when each stage is executed or its
 explicit conditional stop is documented. An unresolved external broker term remains
 a stated limitation with sensitivity bounds, not a reason to invent an answer.
+
+
+Ordinary monthly custody amendment, frozen 2026-09-20 before new books: use
+2023/2024 dated exemptions23084.39/24164.73 and the sourced annual progressive
+brackets divided by12, on last-equity-session month-end holdings from the full
+accepted calendar. One domestic own-account CNPJ/custodian, active maintenance
+exempt, no fund/DR discount. Ordinary physical stock is economic signed shares
+plus all outstanding contract loan quantities, less undelivered new-loan receipts
+and signed unsettled spot obligations.
+Renewal creates no physical transfer; partial/delayed returns retain actual stock.
+Own observed closing/last available own marks are a valuation hypothesis. No
+physical corporate succession/delayed bonus/loan-redemption admission is implied;
+actual exposed cases fail pending their separately sourced custody contract.
+Primary client debit is at assessment close, with +3/+10 equity-session payment
+hypotheses and separately economic-long base. Recognition is at assessment,
+liability persists through terminal boundaries, funding stays prior-close.
+Freeze30new48-session/all933 books May2 2023/2024, R10m/1m/5m, no-custody
+control/primary/payment3/payment10/economic-long. Preferences sin(axis*.31+
+localday*.07+head*.2), beta1/idio.0004/market.0001, original calibration; shallow
+OLDPolicyData, correctedCDI/qualifiedloans/strictpriorrefs and V40 regular spot
+components replacing4bp. These are synthetic accounting contrasts, not model
+profit or final StageA admission. Reuse prior completed books unchanged.

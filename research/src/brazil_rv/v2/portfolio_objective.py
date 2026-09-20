@@ -33,7 +33,7 @@ def clone_account(account):
                 (day, free.detach().clone(), restricted.detach().clone())
                 for day, free, restricted in value
             ]
-        elif field.name in {"loans", "custody"}:
+        elif field.name in {"loans", "custody", "custody_fees"}:
             value = value.detached_copy()
         elif isinstance(value, (dict, set)):
             value = deepcopy(value)

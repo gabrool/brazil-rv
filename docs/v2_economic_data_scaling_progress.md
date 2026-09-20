@@ -2052,3 +2052,6 @@ All30books first-pass, seven new and32existing tests pass. 960NAVs/3613440cells,
 
 
 Recovery verified: `historical_spot_2c79cec.zip`, SHA `9d222b264c8d498d1070d7ac8a8131bf52619c79552b766184f07d1d50a6cee5`, 9444339 bytes; 786 unique/1009 logical restored/hash-checked members, 223 aliases,30books/3613440cells and3original PDFs; 1.3285189s. Complete current research, implementation patch, frozen plan, executed recipes/tests and sources recover without immutable input/store/old-fit duplication. Prior recovery dependencies remain required. Final A/C/D still open.
+
+
+2026-09-20 V41 ordinary monthly custody bounded acceptance. The [ordinary custody checkpoint](docs/v2_CUSTODY_FEES.md) qualifies explicit monthly physical-stock fees in both actual accounts for2023/2024, with sourced progressive brackets/exemptions and separate client-payment/base hypotheses. Thirty48-session/all933 synthetic adaptive books and independent1440NAV/21870fill-flow/48monthly-assessment checks pass; no model score/fit. Pending owned sales/new loans/covers and unpaid terminal invoices remain explicit. Corporate physical transitions still require separate custody admission; earlier tariffs and finalA/C/D remain open. Both accepted stores and old fits stay sealed. Do not repeat these or earlier completed engineering/source/store audits. Recovery sealing follows; finalA/C/D still open.

@@ -21,6 +21,7 @@ from .share_distributions import (
 )
 from .loan_contracts import LoanContracts, LoanSession, spot_settlement_session
 from .share_custody import ShareCustody
+from .custody_fees import CustodyFees
 from .spot_costs import execution_bps
 
 
@@ -50,6 +51,7 @@ class PortfolioAccount:
     unquoted_deliveries: set[int]
     loans: LoanContracts
     custody: ShareCustody
+    custody_fees: CustodyFees
     config: LedgerConfig
     settlements: list[tuple[int | None, Tensor, Tensor]]
     funding_day: int
@@ -93,6 +95,7 @@ class PortfolioAccount:
                 minimum_allocation=config.loan_minimum_allocation,
             ),
             custody=ShareCustody(n),
+            custody_fees=CustodyFees(n),
             config=config,
             settlements=[],
             funding_day=-1,
@@ -136,6 +139,7 @@ class PortfolioAccount:
             + self.claims.sum()
             + (self.shares * self.marks).sum()
             - self.loans.liability
+            - self.custody_fees.liability
         )
 
     @property
@@ -366,6 +370,7 @@ class PortfolioAccount:
             )
         self.loans.detach()
         self.custody.detach()
+        self.custody_fees.detach()
         self.settlements = [(d, f.detach(), r.detach()) for d, f, r in self.settlements]
 
     def eligibility(self, active_score, prior_unresolved):
@@ -406,6 +411,17 @@ class PortfolioAccount:
         )
         new_long = (signed_quantity - cover).clamp_min(0)
         new_short = (-signed_quantity - sell).clamp_min(0)
+        if self.config.custody_assessments:
+            registered = np.datetime64(loan_session.date) < np.datetime64(
+                "2020-10-26"
+            ) or self.config.borrow_fee_modality in ("otc", "compulsory")
+            self.custody_fees.fill(
+                loan_session.day,
+                spot_settlement_session(loan_session.day, loan_session.date),
+                signed_quantity,
+                new_short,
+                0 if registered else self.config.electronic_loan_settlement_days,
+            )
         self.custody.fill(
             self.shares.clamp_min(0),
             new_long,
@@ -465,6 +481,8 @@ class PortfolioAccount:
         receipt_day=None,
     ):
         shares, marks = self.shares.clone(), self.marks.clone()
+        if self.config.custody_assessments:
+            self.custody_fees.require_ordinary(name, self.shares[name], self.loans)
         transferred_restricted = self.trade_restricted[name] * allocation
         adjusted = []
         for due, free, restricted in self.settlements:
@@ -573,6 +591,8 @@ class PortfolioAccount:
 
     def convert_loan_cash(self, event, day):
         name = event.security_index
+        if self.config.custody_assessments:
+            self.custody_fees.require_ordinary(name, self.shares[name], self.loans)
         active = self.loans.active_quantity[name]
         if not event.unreturned_only:
             for due in np.unique(self.loans.return_day[self.loans.name == name]):
@@ -769,6 +789,12 @@ class PortfolioAccount:
             shares, marks = self.shares.clone(), self.marks.clone()
             shares[name] = self.shares[name] * q[name]
             if q[name] > 0 and mapping[name] == name:
+                if self.config.custody_assessments:
+                    if bonus_delivery is not None:
+                        self.custody_fees.require_ordinary(
+                            name, self.shares[name], self.loans
+                        )
+                    self.custody_fees.split(name, q[name])
                 self.loans.split(name, q[name], bonus_delivery=bonus_delivery)
                 self.custody.split(name, q[name], bonus_delivery=bonus_delivery)
             elif (
@@ -783,6 +809,10 @@ class PortfolioAccount:
                 )
             marks[name] = (self.marks[name] - d[name]) / q[name] if q[name] > 0 else 0
             if q[name] == 0:
+                if self.config.custody_assessments:
+                    self.custody_fees.require_ordinary(
+                        name, self.shares[name], self.loans
+                    )
                 self.custody.split(name, 0.0)
                 release = self.trade_restricted[name]
                 release_vector = torch.zeros_like(self.trade_restricted)
@@ -967,6 +997,23 @@ class PortfolioAccount:
         )
         self.ineligible_sessions[~held_after] = 0
         self.missing_sessions[~held_after] = 0
+        custody_base, custody_fee, custody_paid = tensor(0.0), tensor(0.0), tensor(0.0)
+        physical_custody = torch.zeros_like(self.shares)
+        if config.custody_assessments:
+            for name in self.distributions:
+                self.custody_fees.require_ordinary(name, self.shares[name], self.loans)
+            custody_base, custody_fee, custody_paid, physical_custody = (
+                self.custody_fees.close(
+                    day,
+                    session_date,
+                    self.shares,
+                    self.loans,
+                    self.marks,
+                    config.custody_assessments,
+                    economic=config.custody_base == "economic_long",
+                )
+            )
+            self.trade_cash = self.trade_cash - custody_paid
         nav = self.nav
         if not torch.isfinite(nav) or nav.detach().item() <= 0:
             raise FloatingPointError("non-finite or insolvent policy account")
@@ -998,6 +1045,11 @@ class PortfolioAccount:
             * config.short_proceeds_remuneration,
             "cost": costs,
             "execution_charges": execution_charges,
+            "custody_base": custody_base,
+            "custody_fee": custody_fee,
+            "custody_payment": custody_paid,
+            "custody_liability": self.custody_fees.liability,
+            "physical_custody": physical_custody,
             "unpriced_inventory_notional": unpriced_notional,
             "undelivered_share_notional": sum(
                 (self.shares[name] * self.marks[name]).abs()

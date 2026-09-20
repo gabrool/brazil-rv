@@ -20,6 +20,7 @@ from .share_distributions import (
 )
 from .loan_fees import LoanModality, loan_fee_rates
 from .share_custody import ShareCustody
+from .custody_fees import CustodyAssessment, CustodyFees
 from .spot_costs import execution_bps
 from .loan_contracts import (
     LoanCharge,
@@ -104,6 +105,8 @@ class LedgerConfig:
     spot_execution_phase: str = "regular"
     execution_brokerage_bps: float = 0.0
     execution_shortfall_bps: float = 1.0
+    custody_assessments: tuple[CustodyAssessment, ...] = ()
+    custody_base: str = "physical"
     annual_borrow_rate: float = 0.02
     borrow_source: BorrowSource = "borrow_balance"
     borrow_fee_modality: LoanModality = "normal"
@@ -134,6 +137,12 @@ class LedgerConfig:
     annual_sessions: int = 252
 
     def __post_init__(self) -> None:
+        if self.custody_base not in {"physical", "economic_long"}:
+            raise ValueError("unknown custody base hypothesis")
+        if len({a.date for a in self.custody_assessments}) != len(
+            self.custody_assessments
+        ):
+            raise ValueError("duplicate custody assessment date")
         if self.spot_cost_model not in {"bundled", "b3_spot_2021"}:
             raise ValueError("unknown spot cost contract")
         if self.spot_execution_phase not in {"regular", "auction"}:
@@ -351,6 +360,11 @@ class StatefulLedgerResult:
     debit_financing_bps: NDArray[np.float64]
     cost_bps: NDArray[np.float64]
     execution_charges: NDArray[np.float64]
+    custody_base: NDArray[np.float64]
+    custody_fee: NDArray[np.float64]
+    custody_payment: NDArray[np.float64]
+    custody_liability: NDArray[np.float64]
+    physical_custody: NDArray[np.float64]
     borrow_bps: NDArray[np.float64]
     unsettled_cash: NDArray[np.float64]
     loan_liability: NDArray[np.float64]
@@ -1525,6 +1539,7 @@ def simulate_stateful_ledger(
     # balances below subtract those claims until their value date.
     settlements: list[tuple[int | None, float, NDArray[np.float64]]] = []
     custody = ShareCustody(name_count + 1)
+    custody_fees = CustodyFees(name_count + 1)
     previous_nav = config.initial_capital_brl
     all_cash = config.initial_capital_brl
     pending_entries: dict[int, _PendingOrder] = {}
@@ -1578,6 +1593,8 @@ def simulate_stateful_ledger(
     debit_financing_rows: list[float] = []
     cost_rows: list[float] = []
     execution_rows: list[NDArray[np.float64]] = []
+    custody_rows = []
+    physical_custody_rows = []
     borrow_rows: list[float] = []
     loan_liability_rows: list[float] = []
     loan_overdue_rows: list[float] = []
@@ -1793,6 +1810,8 @@ def simulate_stateful_ledger(
         receipt_day=None,
     ):
         nonlocal free_cash, cancelled_today
+        if config.custody_assessments:
+            custody_fees.require_ordinary(name, shares[name], loans)
         transferred_restricted = restricted_by_name[name] * allocation
         for _, _, restricted_flow in settlements:
             transferred_pending = restricted_flow[name] * allocation
@@ -2154,6 +2173,7 @@ def simulate_stateful_ledger(
                 raise RuntimeError("open BOVA11 hedge has no finite mark")
             start_identity += hedge_restricted_cash + hedge_shares * hedge_mark
         start_identity -= float(loans.liability)
+        start_identity -= float(custody_fees.liability)
         if not np.isclose(start_identity, start_nav, rtol=1e-12, atol=1e-12):
             raise RuntimeError("opening ledger identity does not reconcile")
         held_start_long_rows.append(int((shares > 0.0).sum()))
@@ -3328,6 +3348,8 @@ def simulate_stateful_ledger(
         def convert_loan_cash(event):
             nonlocal free_cash
             name = event.security_index
+            if config.custody_assessments:
+                custody_fees.require_ordinary(name, shares[name], loans)
             active = float(loans.active_quantity[name])
             if not event.unreturned_only:
                 for due in np.unique(loans.return_day[loans.name == name]):
@@ -3442,9 +3464,15 @@ def simulate_stateful_ledger(
                     shifted.append((due, release))
                 proceeds_releases = shifted
             if q > 0 and successor == name:
+                if config.custody_assessments:
+                    if delivery is not None:
+                        custody_fees.require_ordinary(int(name), shares[name], loans)
+                    custody_fees.split(int(name), q)
                 loans.split(int(name), q, bonus_delivery=delivery)
                 custody.split(int(name), q, bonus_delivery=delivery)
             elif q == 0 and inputs.action_payment_session[day, name] >= day:
+                if config.custody_assessments:
+                    custody_fees.require_ordinary(int(name), shares[name], loans)
                 returns = np.zeros(name_count + 1)
                 returns[name] = float(loans.active_quantity[name])
                 loans.request_return(
@@ -3940,6 +3968,17 @@ def simulate_stateful_ledger(
         loans.fill(
             loan_covers, loan_openings, loan_session, full_return=loan_full_returns
         )
+        if config.custody_assessments:
+            registered = np.datetime64(inputs.dates[day]) < np.datetime64(
+                "2020-10-26"
+            ) or config.borrow_fee_modality in ("otc", "compulsory")
+            custody_fees.fill(
+                day,
+                spot_day,
+                long_purchases + loan_covers - long_sales - loan_openings,
+                loan_openings,
+                0 if registered else config.electronic_loan_settlement_days,
+            )
         for event in loan_cash_settlements:
             if event.effective_session == day and event.unreturned_only:
                 convert_loan_cash(event)
@@ -3973,6 +4012,32 @@ def simulate_stateful_ledger(
         loan_redemption_rows.append(float(loans.cash_liability))
         loan_payment_rows.append(loan_paid)
         loan_principal_rows.append(float(loans.principal[loans.accrual_end < 0].sum()))
+        custody_base = custody_fee = custody_paid = 0.0
+        physical_custody = np.zeros(name_count + 1)
+        if config.custody_assessments:
+            for name in pending_distributions:
+                custody_fees.require_ordinary(name, shares[name], loans)
+            base, charge, paid, physical = custody_fees.close(
+                day,
+                inputs.dates[day],
+                np.r_[shares, hedge_shares],
+                loans,
+                np.r_[last_observed, hedge_mark],
+                config.custody_assessments,
+                economic=config.custody_base == "economic_long",
+            )
+            custody_base, custody_fee, custody_paid = (
+                float(base),
+                float(charge),
+                float(paid),
+            )
+            physical_custody = physical.numpy().copy()
+            free_cash -= custody_paid
+        custody_liability = float(custody_fees.liability)
+        custody_rows.append(
+            (custody_base, custody_fee, custody_paid, custody_liability)
+        )
+        physical_custody_rows.append(physical_custody)
         held_now = shares != 0.0
         marked_holdings = float(np.sum(shares[held_now] * marks[held_now]))
         current_nav = (
@@ -3987,6 +4052,7 @@ def simulate_stateful_ledger(
             + hedge_restricted_cash
             + (hedge_shares * hedge_mark if hedge_shares != 0.0 else 0.0)
             - loan_liability
+            - custody_liability
         )
         settled_cash, settled_restricted = _settled_balances(
             free_cash, np.r_[restricted_by_name, hedge_restricted_cash], settlements
@@ -4001,6 +4067,7 @@ def simulate_stateful_ledger(
             + receivable_by_name.sum()
             - payable_by_name.sum()
             - loan_liability
+            - custody_liability
         )
         reconciliation = current_nav - identity
         all_cash *= 1.0 + inputs.cdi[day]
@@ -4155,7 +4222,7 @@ def simulate_stateful_ledger(
                 unclassified_occupancy
             ) = np.nan
 
-        economic_pnl = current_nav - start_nav - interest + borrow + costs
+        economic_pnl = current_nav - start_nav - interest + borrow + costs + custody_fee
         equity_gross_pnl = economic_pnl - hedge_gross_pnl
         daily_return = current_nav / start_nav - 1.0
         start_nav_rows.append(start_nav)
@@ -4450,6 +4517,11 @@ def simulate_stateful_ledger(
         debit_financing_bps=np.asarray(debit_financing_rows, dtype=np.float64),
         cost_bps=np.asarray(cost_rows, dtype=np.float64),
         execution_charges=np.asarray(execution_rows, dtype=np.float64),
+        custody_base=np.asarray(custody_rows)[:, 0],
+        custody_fee=np.asarray(custody_rows)[:, 1],
+        custody_payment=np.asarray(custody_rows)[:, 2],
+        custody_liability=np.asarray(custody_rows)[:, 3],
+        physical_custody=np.asarray(physical_custody_rows),
         borrow_bps=np.asarray(borrow_rows, dtype=np.float64),
         unsettled_cash=np.asarray(unsettled_cash_rows, dtype=np.float64),
         loan_liability=np.asarray(loan_liability_rows, dtype=np.float64),
