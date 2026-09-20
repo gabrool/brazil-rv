@@ -1,0 +1,395 @@
+{
+  "account_array_cells": 2839536,
+  "adaptive_target_max": 1.2126216412944313e-08,
+  "audit": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\precredit_disposal\\qualified\\manifest.json",
+    "sha256": "4a63bd526be46de12f8fd92b4df6848fcaf99e88de5e14727dc15915b4d6a0e5"
+  },
+  "books": 54,
+  "contrasts": [
+    {
+      "capital": 10000000,
+      "event": "BRML",
+      "final_bps": -0.0001441148854792118,
+      "identical_nav_prefix": 6,
+      "max_absolute_path_bps": 0.0001441148854792118,
+      "scenario": "effect",
+      "sign": 1
+    },
+    {
+      "capital": 10000000,
+      "event": "BRML",
+      "final_bps": -0.0001441148854792118,
+      "identical_nav_prefix": 7,
+      "max_absolute_path_bps": 0.0001441148854792118,
+      "scenario": "next",
+      "sign": 1
+    },
+    {
+      "capital": 1000000,
+      "event": "BRML",
+      "final_bps": -0.000144064596388489,
+      "identical_nav_prefix": 6,
+      "max_absolute_path_bps": 0.000144064596388489,
+      "scenario": "effect",
+      "sign": 1
+    },
+    {
+      "capital": 1000000,
+      "event": "BRML",
+      "final_bps": -0.000144064596388489,
+      "identical_nav_prefix": 7,
+      "max_absolute_path_bps": 0.000144064596388489,
+      "scenario": "next",
+      "sign": 1
+    },
+    {
+      "capital": 5000000,
+      "event": "BRML",
+      "final_bps": -0.00014409065060317516,
+      "identical_nav_prefix": 6,
+      "max_absolute_path_bps": 0.00014409065060317516,
+      "scenario": "effect",
+      "sign": 1
+    },
+    {
+      "capital": 5000000,
+      "event": "BRML",
+      "final_bps": -0.00014409065060317516,
+      "identical_nav_prefix": 7,
+      "max_absolute_path_bps": 0.00014409065060317516,
+      "scenario": "next",
+      "sign": 1
+    },
+    {
+      "capital": 10000000,
+      "event": "BRML",
+      "final_bps": 0.0,
+      "identical_nav_prefix": 6,
+      "max_absolute_path_bps": 0.0,
+      "scenario": "effect",
+      "sign": -1
+    },
+    {
+      "capital": 10000000,
+      "event": "BRML",
+      "final_bps": 0.0,
+      "identical_nav_prefix": 7,
+      "max_absolute_path_bps": 0.0,
+      "scenario": "next",
+      "sign": -1
+    },
+    {
+      "capital": 1000000,
+      "event": "BRML",
+      "final_bps": 0.0,
+      "identical_nav_prefix": 6,
+      "max_absolute_path_bps": 0.0,
+      "scenario": "effect",
+      "sign": -1
+    },
+    {
+      "capital": 1000000,
+      "event": "BRML",
+      "final_bps": 0.0,
+      "identical_nav_prefix": 7,
+      "max_absolute_path_bps": 0.0,
+      "scenario": "next",
+      "sign": -1
+    },
+    {
+      "capital": 5000000,
+      "event": "BRML",
+      "final_bps": 0.0,
+      "identical_nav_prefix": 6,
+      "max_absolute_path_bps": 0.0,
+      "scenario": "effect",
+      "sign": -1
+    },
+    {
+      "capital": 5000000,
+      "event": "BRML",
+      "final_bps": 0.0,
+      "identical_nav_prefix": 7,
+      "max_absolute_path_bps": 0.0,
+      "scenario": "next",
+      "sign": -1
+    },
+    {
+      "capital": 10000000,
+      "event": "CPLE",
+      "final_bps": -0.33039835300296544,
+      "identical_nav_prefix": 6,
+      "max_absolute_path_bps": 0.33039835300296544,
+      "scenario": "effect",
+      "sign": 1
+    },
+    {
+      "capital": 10000000,
+      "event": "CPLE",
+      "final_bps": -0.11146421138197184,
+      "identical_nav_prefix": 7,
+      "max_absolute_path_bps": 0.34838706883043047,
+      "scenario": "next",
+      "sign": 1
+    },
+    {
+      "capital": 1000000,
+      "event": "CPLE",
+      "final_bps": -0.3303982473665383,
+      "identical_nav_prefix": 6,
+      "max_absolute_path_bps": 0.3303982473665383,
+      "scenario": "effect",
+      "sign": 1
+    },
+    {
+      "capital": 1000000,
+      "event": "CPLE",
+      "final_bps": -0.11146408508298919,
+      "identical_nav_prefix": 7,
+      "max_absolute_path_bps": 0.3483870684565045,
+      "scenario": "next",
+      "sign": 1
+    },
+    {
+      "capital": 5000000,
+      "event": "CPLE",
+      "final_bps": -0.33039835300296544,
+      "identical_nav_prefix": 6,
+      "max_absolute_path_bps": 0.33039835300296544,
+      "scenario": "effect",
+      "sign": 1
+    },
+    {
+      "capital": 5000000,
+      "event": "CPLE",
+      "final_bps": -0.11146421138197184,
+      "identical_nav_prefix": 7,
+      "max_absolute_path_bps": 0.34838706883043047,
+      "scenario": "next",
+      "sign": 1
+    },
+    {
+      "capital": 10000000,
+      "event": "CPLE",
+      "final_bps": 0.0,
+      "identical_nav_prefix": 6,
+      "max_absolute_path_bps": 0.0,
+      "scenario": "effect",
+      "sign": -1
+    },
+    {
+      "capital": 10000000,
+      "event": "CPLE",
+      "final_bps": 0.0,
+      "identical_nav_prefix": 7,
+      "max_absolute_path_bps": 0.0,
+      "scenario": "next",
+      "sign": -1
+    },
+    {
+      "capital": 1000000,
+      "event": "CPLE",
+      "final_bps": 0.0,
+      "identical_nav_prefix": 6,
+      "max_absolute_path_bps": 0.0,
+      "scenario": "effect",
+      "sign": -1
+    },
+    {
+      "capital": 1000000,
+      "event": "CPLE",
+      "final_bps": 0.0,
+      "identical_nav_prefix": 7,
+      "max_absolute_path_bps": 0.0,
+      "scenario": "next",
+      "sign": -1
+    },
+    {
+      "capital": 5000000,
+      "event": "CPLE",
+      "final_bps": 0.0,
+      "identical_nav_prefix": 6,
+      "max_absolute_path_bps": 0.0,
+      "scenario": "effect",
+      "sign": -1
+    },
+    {
+      "capital": 5000000,
+      "event": "CPLE",
+      "final_bps": 0.0,
+      "identical_nav_prefix": 7,
+      "max_absolute_path_bps": 0.0,
+      "scenario": "next",
+      "sign": -1
+    },
+    {
+      "capital": 10000000,
+      "event": "DMMO",
+      "final_bps": -5.8462632981557405,
+      "identical_nav_prefix": 6,
+      "max_absolute_path_bps": 5.8462632981557405,
+      "scenario": "effect",
+      "sign": 1
+    },
+    {
+      "capital": 10000000,
+      "event": "DMMO",
+      "final_bps": -5.238982105109841,
+      "identical_nav_prefix": 7,
+      "max_absolute_path_bps": 5.238982105109841,
+      "scenario": "next",
+      "sign": 1
+    },
+    {
+      "capital": 1000000,
+      "event": "DMMO",
+      "final_bps": -5.829387739672093,
+      "identical_nav_prefix": 6,
+      "max_absolute_path_bps": 5.829387739672093,
+      "scenario": "effect",
+      "sign": 1
+    },
+    {
+      "capital": 1000000,
+      "event": "DMMO",
+      "final_bps": -5.2230253009044105,
+      "identical_nav_prefix": 7,
+      "max_absolute_path_bps": 5.2230253009044105,
+      "scenario": "next",
+      "sign": 1
+    },
+    {
+      "capital": 5000000,
+      "event": "DMMO",
+      "final_bps": -5.842899404110387,
+      "identical_nav_prefix": 6,
+      "max_absolute_path_bps": 5.842899404110387,
+      "scenario": "effect",
+      "sign": 1
+    },
+    {
+      "capital": 5000000,
+      "event": "DMMO",
+      "final_bps": -5.2358041302524505,
+      "identical_nav_prefix": 7,
+      "max_absolute_path_bps": 5.2358041302524505,
+      "scenario": "next",
+      "sign": 1
+    },
+    {
+      "capital": 10000000,
+      "event": "DMMO",
+      "final_bps": 0.0,
+      "identical_nav_prefix": 6,
+      "max_absolute_path_bps": 0.0,
+      "scenario": "effect",
+      "sign": -1
+    },
+    {
+      "capital": 10000000,
+      "event": "DMMO",
+      "final_bps": 0.0,
+      "identical_nav_prefix": 7,
+      "max_absolute_path_bps": 0.0,
+      "scenario": "next",
+      "sign": -1
+    },
+    {
+      "capital": 1000000,
+      "event": "DMMO",
+      "final_bps": 0.0,
+      "identical_nav_prefix": 6,
+      "max_absolute_path_bps": 0.0,
+      "scenario": "effect",
+      "sign": -1
+    },
+    {
+      "capital": 1000000,
+      "event": "DMMO",
+      "final_bps": 0.0,
+      "identical_nav_prefix": 7,
+      "max_absolute_path_bps": 0.0,
+      "scenario": "next",
+      "sign": -1
+    },
+    {
+      "capital": 5000000,
+      "event": "DMMO",
+      "final_bps": 0.0,
+      "identical_nav_prefix": 6,
+      "max_absolute_path_bps": 0.0,
+      "scenario": "effect",
+      "sign": -1
+    },
+    {
+      "capital": 5000000,
+      "event": "DMMO",
+      "final_bps": 0.0,
+      "identical_nav_prefix": 7,
+      "max_absolute_path_bps": 0.0,
+      "scenario": "next",
+      "sign": -1
+    }
+  ],
+  "daily_navs": 756,
+  "decimal_quantity_max_error": 5e-12,
+  "failed_attempts": "Initial Dommo selector used incorrect ISIN suffix before any book/plan output; canonical terms resolved BRDMMOACNOR0. Exact initial recipe and sources retained, qualified invocation completes all54books without retry.",
+  "identical_intention_max_brl": 1.1175870895385742e-08,
+  "independent_adaptive_max_path_bps": {
+    "1000000": 3.972449339926243e-06,
+    "10000000": 3.116857260465622e-06,
+    "5000000": 5.297878757119179e-06
+  },
+  "independent_nav_identity_max_brl": 3.725290298461914e-09,
+  "limitations": "Synthetic14-session books/full933, frozen OLDPolicyData/old4bp bridge. Early permission for unencumbered positive holdings only; source loans stay at sourced credit. Existing successor purchases/offsets keep custody clocks. Known-source liquidation/rounding/payment/cost/clearing and actual-model final admission remain. No source retrieval, store amendment, neural scoring or fit.",
+  "qualification": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\precredit_disposal\\qualified\\qualification\\manifest.json",
+    "sha256": "1ceae52207e48e73ad749f4b6bcc7020765b4be34281cb351c39186969c54615"
+  },
+  "remaining": "Final corporate costs; allocation/timing/sweep/invoice/security-day grouping/old-minimum/older-clearing bounds; other held source admission and separately attributed succession data effects. ALSC physical credit/exact net fees/payment, ENAT fraction auction remain unknown. Actual-model A acceptance/C/D unstarted.",
+  "status": "precredit_owned_disposal_engineering_accepted_final_A_pending",
+  "terms": {
+    "terms_BRML_custody": {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\precredit_disposal\\qualified\\terms_BRML_custody.json",
+      "sha256": "80da61579e149cf2aa85de8167d48ffcc532d89c0742770512800e0be78761a7"
+    },
+    "terms_BRML_effect": {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\precredit_disposal\\qualified\\terms_BRML_effect.json",
+      "sha256": "10a4db606add22a2fedab4b385723464413af9ad372767868005f7853b7a1f02"
+    },
+    "terms_BRML_next": {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\precredit_disposal\\qualified\\terms_BRML_next.json",
+      "sha256": "746a7e7d3d14a7149949bb31ec13b6340dbd1f38a869e9d57927a21c8ed85862"
+    },
+    "terms_CPLE_custody": {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\precredit_disposal\\qualified\\terms_CPLE_custody.json",
+      "sha256": "80da61579e149cf2aa85de8167d48ffcc532d89c0742770512800e0be78761a7"
+    },
+    "terms_CPLE_effect": {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\precredit_disposal\\qualified\\terms_CPLE_effect.json",
+      "sha256": "b756d6764e98927ab0cbbac14678472a6c33a6a06e5e8c8178d753da3e375b39"
+    },
+    "terms_CPLE_next": {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\precredit_disposal\\qualified\\terms_CPLE_next.json",
+      "sha256": "5e90796550b0155fce8276c560109d5b9bcc76ad908df3b59f2249751119be43"
+    },
+    "terms_DMMO_custody": {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\precredit_disposal\\qualified\\terms_DMMO_custody.json",
+      "sha256": "80da61579e149cf2aa85de8167d48ffcc532d89c0742770512800e0be78761a7"
+    },
+    "terms_DMMO_effect": {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\precredit_disposal\\qualified\\terms_DMMO_effect.json",
+      "sha256": "64ee47e3b8f7641d66d6c1e5b475ccf5d8dea1e04dd0ca31f6ef96ff9dab34e3"
+    },
+    "terms_DMMO_next": {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\precredit_disposal\\qualified\\terms_DMMO_next.json",
+      "sha256": "915e5579b458ee212a571bd54d33bc5bd9b491dc1bd41b96d9f49a8c0671f258"
+    }
+  },
+  "timings_seconds": {
+    "engineering": 27.262728600006085,
+    "saved_qualification": 0.44896489998791367
+  },
+  "validation": "7 new tests and17 existing share-custody/undated-fraction cases pass; three focused existing bonus custody/disposal cases pass. Ruff passes. No prior engineering books repeated."
+}

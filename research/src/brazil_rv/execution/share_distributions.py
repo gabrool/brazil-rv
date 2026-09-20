@@ -45,6 +45,7 @@ class ShareDelivery:
     fractional_auction: FractionAuction | None = None
     loan_principal_fraction: float = 1.0
     opening_mark: float | None = None
+    disposal_session: int | None = None
 
 
 @dataclass(frozen=True)
@@ -94,6 +95,15 @@ class ShareDistribution:
         ):
             raise ValueError("cash payment cannot precede economic succession")
         for leg in self.legs:
+            if leg.disposal_session is not None and (
+                leg.delivery_session is None
+                or not self.effective_session
+                <= leg.disposal_session
+                < leg.delivery_session
+            ):
+                raise ValueError(
+                    "prearranged disposal needs a later known custody date"
+                )
             if leg.fractional_auction is not None and (
                 len(self.legs) != 1
                 or leg.delivery_session is None
@@ -140,6 +150,9 @@ def slice_distributions(distributions, start, stop):
                     delivery_session=None
                     if leg.delivery_session is None
                     else leg.delivery_session - start,
+                    disposal_session=None
+                    if leg.disposal_session is None
+                    else leg.disposal_session - start,
                     fractional_auction=None
                     if leg.fractional_auction is None
                     else replace(

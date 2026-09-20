@@ -29,7 +29,7 @@ class ShareCustody:
         self.receipts.append((day, quantity))
         self.receipts.sort(key=lambda item: item[0])
 
-    def consume(self, held, quantity, day):
+    def consume(self, held, quantity, day, *, latest_delivery=None):
         """Remove owned shares, returning their actual custody-availability dates."""
         held = torch.as_tensor(held, dtype=torch.float64)
         quantity = torch.as_tensor(quantity, dtype=torch.float64)
@@ -40,6 +40,12 @@ class ShareCustody:
         receipts = []
         for due, receipt in self.receipts:
             take = torch.minimum(remaining, receipt)
+            if (
+                latest_delivery is not None
+                and due > latest_delivery
+                and bool((take.detach() > 0).any())
+            ):
+                raise ValueError("sale settlement precedes its owned share receipt")
             used.append((due, take))
             remaining = (remaining - take).clamp_min(0)
             remainder = (receipt - take).clamp_min(0)
@@ -52,7 +58,7 @@ class ShareCustody:
         held = torch.as_tensor(held, dtype=torch.float64)
         sales = torch.as_tensor(sales, dtype=torch.float64)
         purchases = torch.as_tensor(purchases, dtype=torch.float64)
-        self.consume(held, torch.minimum(sales, held), day)
+        self.consume(held, torch.minimum(sales, held), day, latest_delivery=due)
         self.add(due, (purchases - (sales - held).clamp_min(0)).clamp_min(0))
 
     def split(self, name, ratio, *, bonus_delivery=None):
@@ -71,18 +77,36 @@ class ShareCustody:
         for due, increment in bonus:
             self.add(due, increment)
 
-    def deliver(self, source, destination, ratio, incoming, existing, day, *, final):
+    def deliver(
+        self,
+        source,
+        destination,
+        ratio,
+        incoming,
+        existing,
+        day,
+        *,
+        final,
+        receipt_day=None,
+    ):
         """Carry purchase value dates through succession, then reserve netted shares."""
         adjusted = []
         for due, quantity in self.receipts:
             changed = quantity.clone()
-            changed[destination] = quantity[destination] + quantity[source] * ratio
+            if receipt_day is None:
+                changed[destination] = quantity[destination] + quantity[source] * ratio
+            elif due > receipt_day and quantity[source].detach().item() > 0:
+                raise ValueError("source purchase settles after prearranged credit")
             if final:
                 changed[source] = 0
             adjusted.append((due, changed))
         self.receipts = adjusted
         incoming = torch.as_tensor(incoming, dtype=torch.float64)
         existing = torch.as_tensor(existing, dtype=torch.float64)
+        if receipt_day is not None:
+            receipt = torch.zeros(self.names, dtype=torch.float64)
+            receipt[destination] = incoming.clamp_min(0)
+            self.add(receipt_day, receipt)
         held = torch.zeros(self.names, dtype=torch.float64)
         offset = torch.zeros_like(held)
         held[destination] = incoming.clamp_min(0) + existing.clamp_min(0)

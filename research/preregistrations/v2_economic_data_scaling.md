@@ -193,6 +193,26 @@ seven following accepted sessions, not an observed cash receipt. Physical share
 credit and exact net proceeds remain unknown. Preserve the earlier locked ALSC
 books and do not backdate this notice to the auction or invent net fees/custody.
 
+Prearranged owned-disposal amendment, frozen 2026-09-20 before new books:
+keep custody-first primary and compare permission from effect or one session later
+for BRML/DMMO January9-10 and Copel December26-27. This is an explicit execution
+hypothesis, not an obtained custodian agreement. Only positive source inventory
+without outstanding source loans enters early successor inventory. Encumbered or
+short source claims retain original conversion/credit mechanics; existing purchases
+of the successor can still offset them at actual credit. Whole shareholder shares
+become saleable economic inventory while receipt remains at sourced custody.
+Original source purchases must settle no later than that credit; every subsequent
+sale must settle no earlier than its own incoming receipt. Fractions stay locked,
+cash legs/payments stay separate, and an offset against existing successor loans
+returns physically and releases proceeds no earlier than receipt. Missing or partial
+fills preserve unsold inventory/receipts, without invented sales or locates.
+Freeze54 fourteen-session/full933 adaptive engineering books: three events, both
+focus sides, R10m/R1m/R5m and custody/effect/effect-plus-one permissions. Six pre-effect
+sessions and eight following sessions isolate these dates. Synthetic source focus
+is +/-4 before effect and reverses thereafter, with opposite successor preference
+from effect; fixed risks and old4bp bridge remain, no model scores or new fits.
+Keep final economic admission/corporate costs and later fraction-payment bounds open.
+
 ## B. Deep source-to-model data audit
 
 Revisit the actual sources and builders, not just finite-value/coverage summaries.

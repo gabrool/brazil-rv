@@ -544,6 +544,18 @@
     "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\option_quantity_sources\\manifest.json",
     "sha256": "856f44fed515b516c46fff6a15cf1ac49e39250f5ccd6c21851febd2cb2df6a5"
   },
+  "precredit_disposal_acceptance": {
+    "path": "C:\\quant\\b3-quant\\docs\\v2_precredit_disposal_acceptance.json",
+    "sha256": "bf4d4ecf980a16c5dfbf3521b77bc2c70f77a2795c4ff9fda971fac8203917a6"
+  },
+  "precredit_disposal_audit": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\precredit_disposal\\qualified\\manifest.json",
+    "sha256": "4a63bd526be46de12f8fd92b4df6848fcaf99e88de5e14727dc15915b4d6a0e5"
+  },
+  "precredit_disposal_qualification": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\precredit_disposal\\qualified\\qualification\\manifest.json",
+    "sha256": "1ceae52207e48e73ad749f4b6bcc7020765b4be34281cb351c39186969c54615"
+  },
   "qualified_lending": {
     "balances_sha256": "b50feb75dcde9168eaa1eb53916de67bde565e1c0164037f29e1adc87d45bc6e",
     "manifest_sha256": "4f07b607e206eb90b95e184d966daeb4d0f89792621f09dac3fcc9ca1bca7c87",

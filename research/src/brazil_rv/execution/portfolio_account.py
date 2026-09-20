@@ -216,7 +216,12 @@ class PortfolioAccount:
                     self.entry_day[name] = -1
                     legs.remove(leg)
                     continue
-                if leg.delivery_session != day:
+                early = (
+                    leg.disposal_session == day
+                    and self.shares[name].detach().item() > 0
+                    and not (self.loans.name == name).any()
+                )
+                if leg.delivery_session != day and not early:
                     continue
                 prices = basket_prices(legs, self.marks.detach().numpy())
                 values = [
@@ -229,7 +234,7 @@ class PortfolioAccount:
                 fraction = tensor(0.0)
                 fraction_basis = tensor(0.0)
                 if auction is not None and auction.provision_loan_fractions:
-                    if any(
+                    if not early and any(
                         float(q[name].detach()) > 1e-12
                         for _, q in self.custody.receipts
                     ):
@@ -251,7 +256,7 @@ class PortfolioAccount:
                 if auction is not None and incoming.detach().item() > 0:
                     # Shareholder fractions remain a non-tradable claim. Loan
                     # quantities retain all fractions under the separate B3 rule.
-                    if any(
+                    if not early and any(
                         float(q[name].detach()) > 1e-12
                         for _, q in self.custody.receipts
                     ):
@@ -280,6 +285,7 @@ class PortfolioAccount:
                     final=len(legs) == 1,
                     day=day,
                     ratio=leg.shares_per_prior_share,
+                    receipt_day=leg.delivery_session if early else None,
                     loan_allocation=(
                         leg.loan_principal_fraction
                         / sum(item.loan_principal_fraction for item in legs)
@@ -293,7 +299,9 @@ class PortfolioAccount:
                     basis[name] = fraction_basis
                     self.shares, self.cost_basis = shares, basis
                     self.entry_day[name] = source_entry_day
-                    legs[legs.index(leg)] = replace(leg, delivery_session=None)
+                    legs[legs.index(leg)] = replace(
+                        leg, delivery_session=None, disposal_session=None
+                    )
                 else:
                     legs.remove(leg)
             if legs:
@@ -441,6 +449,7 @@ class PortfolioAccount:
         day,
         ratio,
         loan_allocation=1.0,
+        receipt_day=None,
     ):
         shares, marks = self.shares.clone(), self.marks.clone()
         transferred_restricted = self.trade_restricted[name] * allocation
@@ -457,7 +466,14 @@ class PortfolioAccount:
         combined = incoming + existing
         self.loans.deliver(name, destination, ratio, loan_allocation, final=final)
         custody_dates = self.custody.deliver(
-            name, destination, ratio, incoming, existing, day, final=final
+            name,
+            destination,
+            ratio,
+            incoming,
+            existing,
+            day,
+            final=final,
+            receipt_day=receipt_day,
         )
         remaining_short = (-combined).clamp_min(0)
         excess = torch.zeros_like(self.shares)

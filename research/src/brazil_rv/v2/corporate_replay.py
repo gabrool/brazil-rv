@@ -151,6 +151,9 @@ def apply_corporate_replay(inputs, terms, calendar, manifest_sha256):
                             auction.get("zero_quantity_rent_through_payment", False),
                         ),
                         leg["loan_principal_fraction"],
+                        disposal_session=None
+                        if leg.get("disposal_date") is None
+                        else session(leg["disposal_date"]),
                     )
                 )
             distributions.append(

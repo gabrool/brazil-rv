@@ -1751,6 +1751,7 @@ def simulate_stateful_ledger(
         final,
         ratio,
         loan_allocation=1.0,
+        receipt_day=None,
     ):
         nonlocal free_cash, cancelled_today
         transferred_restricted = restricted_by_name[name] * allocation
@@ -1763,7 +1764,14 @@ def simulate_stateful_ledger(
         combined = prior_destination + float(new_shares)
         loans.deliver(name, successor, ratio, loan_allocation, final=final)
         custody_dates = custody.deliver(
-            name, successor, ratio, new_shares, prior_destination, day, final=final
+            name,
+            successor,
+            ratio,
+            new_shares,
+            prior_destination,
+            day,
+            final=final,
+            receipt_day=receipt_day,
         )
         returns = np.zeros(name_count + 1)
         returns[successor] = max(
@@ -1940,7 +1948,12 @@ def simulate_stateful_ledger(
                     pending_exits.pop(name, None)
                     legs.remove(leg)
                     continue
-                if leg.delivery_session != day:
+                early = (
+                    leg.disposal_session == day
+                    and shares[name] > 0
+                    and not (loans.name == name).any()
+                )
+                if leg.delivery_session != day and not early:
                     continue
                 prices = basket_prices(legs, last_observed)
                 values = [
@@ -1953,7 +1966,9 @@ def simulate_stateful_ledger(
                 incoming = float(shares[name]) * leg.shares_per_prior_share
                 fraction = fraction_basis = 0.0
                 if auction is not None and auction.provision_loan_fractions:
-                    if any(float(q[name]) > 1e-12 for _, q in custody.receipts):
+                    if not early and any(
+                        float(q[name]) > 1e-12 for _, q in custody.receipts
+                    ):
                         raise ValueError(
                             "provisioned fractions require settled source purchases"
                         )
@@ -1972,7 +1987,9 @@ def simulate_stateful_ledger(
                         allocation = (incoming - fraction) / incoming
                         incoming -= fraction
                 if auction is not None and incoming > 0:
-                    if any(float(q[name]) > 1e-12 for _, q in custody.receipts):
+                    if not early and any(
+                        float(q[name]) > 1e-12 for _, q in custody.receipts
+                    ):
                         raise ValueError(
                             "fraction auction requires settled source purchases"
                         )
@@ -1990,6 +2007,7 @@ def simulate_stateful_ledger(
                     float(last_observed[destination]),
                     final=len(legs) == 1,
                     ratio=leg.shares_per_prior_share,
+                    receipt_day=leg.delivery_session if early else None,
                     loan_allocation=(
                         leg.loan_principal_fraction
                         / sum(item.loan_principal_fraction for item in legs)
@@ -2003,7 +2021,9 @@ def simulate_stateful_ledger(
                         fraction_basis,
                         source_entry,
                     )
-                    legs[legs.index(leg)] = replace(leg, delivery_session=None)
+                    legs[legs.index(leg)] = replace(
+                        leg, delivery_session=None, disposal_session=None
+                    )
                 else:
                     legs.remove(leg)
             if legs:
