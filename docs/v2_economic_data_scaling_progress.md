@@ -1344,3 +1344,13 @@ not duplicated. Canonical pointers are updated; the heartbeat remains active.
   wealth/labels and accept the complete new store. A's execution/lifecycle
   sensitivities remain required. Do not repeat the completed32-field build,
   five-field qualification, actual tensor checks or prior source censuses.
+
+Recovery closeout for `6b7f83a`: `rename_history_recovery.json` binds345
+restored/hash-checked members and66 arrays actually reconstructed from sparse
+deltas against the sealed parent, including initial attempts and history bases.
+The46,562,448-byte `rename_history_6b7f83a.zip` has SHA-256
+`70b0021f505f04af4b5e24a903d3da65b99cc443a9c5d4595f59e7f5b599a0cb`.
+Exact runtime code, source patch, audits and historical-code resolutions verify.
+The two input-audit stores are rebuildable from the same arrays/axes and their
+archived manifest/table bytes; duplicate data copies are omitted. No immutable
+inputs or old fits were archived again. Canonical recovery pointer updated.

@@ -285,6 +285,10 @@
     "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\rename_history_propagation\\manifest.json",
     "sha256": "e0ab9e9ad52d5ad0fa56973a709ba1da5db00805379843df700cbecfe40bfd89"
   },
+  "rename_history_recovery": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\rename_history_recovery.json",
+    "sha256": "98e8f3f13a1f101d43d78eb914aef047c264743c34c964f22fe0f43f793bc101"
+  },
   "rename_input_audit": {
     "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\rename_peer_history\\input_audit.json",
     "sha256": "dd0239b33c2a99657e7b00a154260ff2bbcd841772f4f08ef75c32243ccf18d1"
