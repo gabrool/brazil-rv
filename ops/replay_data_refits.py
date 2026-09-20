@@ -18,7 +18,7 @@ from brazil_rv.v2.artifacts import sha256_file, write_json_atomic
 from brazil_rv.v2.data_repair import binding, bound_json
 from brazil_rv.v2.evaluate import _holding_audit
 from brazil_rv.v2.foundation_readouts import new_panel
-from brazil_rv.v2.objective_readouts import calibration, rank_view
+from brazil_rv.v2.objective_readouts import calibration, forecast_readout, rank_view
 from brazil_rv.v2.opportunity_research import benchmark_for
 from brazil_rv.v2.performance import performance
 from brazil_rv.v2.portfolio_readouts import save_book
@@ -32,6 +32,11 @@ def freeze(run):
     source = bound_json(run["stage_c_plan"])
     refits = bound_json(run["stage_c_refit_plan"])
     inputs = bound_json(run["stage_c_refit_economics"])
+    qualification = bound_json(run["stage_c_refit_economics_qualification"])
+    assert (
+        qualification["passed"]
+        and qualification["inputs"] == run["stage_c_refit_economics"]
+    )
     out = Path(run["stage_c_root"]) / "data_refit_replays"
     out.mkdir(exist_ok=False)
     plan = dict(
@@ -47,6 +52,7 @@ def freeze(run):
         policy="original frozen neutral equal-rank calibration and constrained allocator; no new policy training, scaling, deadband or selector",
         attribution="Corrected data plus required matched refits versus the saved corrected-account/source old-coordinate books. Neither isolated pure-data attribution nor new accounting terms are inferred.",
         inputs=run["stage_c_refit_economics"],
+        input_qualification=run["stage_c_refit_economics_qualification"],
         economic_account=run["economic_account"],
         terms=run["stage_c_event_candidate_terms"],
         refits=run["stage_c_refit_plan"],
@@ -133,6 +139,7 @@ def execute(run):
         json.loads(progress.read_text())["completed"] if progress.exists() else []
     )
     done = {r["key"] for r in completed}
+    pending = []
     for fold in plan["folds"]:
         rows = windows(prior, data, fold)["evaluation"]
         start, stop = int(rows[0]), int(rows[-1]) + 1
@@ -144,6 +151,29 @@ def execute(run):
         mapping_path = prior / "phase3/mappings" / f"{fold}.json"
         mappings = json.loads(mapping_path.read_text())
         for arm in plan["arms"]:
+            keys = {
+                f"data_refit/{capital}/{arm}/{fold}/{member}"
+                for capital in plan["capitals"]
+                for member in (
+                    [*map(str, plan["seeds"]), "ensemble"]
+                    if capital == 10000000
+                    else ["ensemble"]
+                )
+            }
+            if keys <= done:
+                continue
+            fits = [
+                Path(plan["fit_root"]) / "fits" / arm / f"{fold}_seed_{seed}"
+                for seed in plan["seeds"]
+            ]
+            if not all(
+                (fit / "run_manifest.json").exists()
+                and bound_json(binding(fit / "run_manifest.json"))["status"]
+                == "completed"
+                for fit in fits
+            ):
+                pending.append(dict(arm=arm, fold=fold))
+                continue
             panels, valid, sources = new_panel(
                 Path(plan["fit_root"]), data, arm, fold, rows, "raw"
             )
@@ -215,6 +245,10 @@ def execute(run):
                         target / "loan_cash_payments.json",
                         [asdict(p) for p in result.loan_cash_payments],
                     )
+                    write_json_atomic(
+                        target / "forecast_readout.json",
+                        forecast_readout(data, rows, panels[member], valid, mapping),
+                    )
                     completed.append(
                         dict(
                             key=key,
@@ -225,6 +259,7 @@ def execute(run):
                             loan_cash_payments=binding(
                                 target / "loan_cash_payments.json"
                             ),
+                            forecast=binding(target / "forecast_readout.json"),
                             seconds=perf_counter() - tick,
                             economics_unresolved=bool(result.economics_unresolved),
                             net_excess_bps=book["summary"]["mean"]["net_excess_bps"],
@@ -243,6 +278,18 @@ def execute(run):
                         ),
                     )
                     print(json.dumps(completed[-1]), flush=True)
+    write_json_atomic(
+        progress,
+        dict(
+            status="complete"
+            if len(completed) == plan["planned_books"]
+            else "waiting_for_fits",
+            plan=ref,
+            completed=completed,
+            planned=plan["planned_books"],
+            pending_groups=pending,
+        ),
+    )
 
 
 if __name__ == "__main__":
