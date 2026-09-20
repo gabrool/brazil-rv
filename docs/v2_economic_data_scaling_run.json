@@ -177,6 +177,22 @@
     "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\economic_store_recovery.json",
     "sha256": "fa010f13f262d20126fc1f3d54fa104b03891b825fc18d3eaa82322eb62cbf39"
   },
+  "enat_settlement_acceptance": {
+    "path": "C:\\quant\\b3-quant\\docs\\v2_enat_settlement_acceptance.json",
+    "sha256": "f2bd9d273867d094de7d38b3c12334e3e893d8f49db93e47dff64d80064ad913"
+  },
+  "enat_settlement_audit": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\enat_settlement\\manifest.json",
+    "sha256": "747aca5c07bd08c9159861644fd405a9707940c9f17a4d37dae38f4f9f40d06a"
+  },
+  "enat_settlement_qualification": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\enat_settlement\\qualification\\manifest.json",
+    "sha256": "b1bc0f483a2f1e43ff776b98ca5373fb5e52b2de6e4b6fe0919b14f1735fafe8"
+  },
+  "enat_settlement_terms": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\enat_settlement\\terms.json",
+    "sha256": "34e5b9a06e0ab604f6e87dc4e8f1602c2ff3d68035176d0832d05d8f0279073b"
+  },
   "ewz_decision_audit": {
     "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\ewz_decision_audit.json",
     "sha256": "92ebff9b4fb27d939d803ebcf43b14ac3946709482c997c65424589bf15d188d"
@@ -563,6 +579,10 @@
   "remaining_auxiliary_source_audit": {
     "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\remaining_auxiliaries\\qualified\\source_audit\\manifest.json",
     "sha256": "bcb105fb23d60d45a44062fbbf1f93bc97712cffdc1adc342c7a244e8b9827f9"
+  },
+  "remaining_held_source_audit": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\enat_settlement\\qualification\\sources.json",
+    "sha256": "7c0564287e218f65fc7ef38dc324a42e105a98a6115fd66e1ee9bbf4f36eae28"
   },
   "rename_dependency_acceptance": {
     "path": "C:\\quant\\b3-quant\\docs\\v2_rename_dependency_acceptance.json",

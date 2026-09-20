@@ -140,9 +140,13 @@ def apply_corporate_replay(inputs, terms, calendar, manifest_sha256):
                         None
                         if auction is None
                         else FractionAuction(
-                            session(auction["available_date"]),
+                            None
+                            if auction["available_date"] is None
+                            else session(auction["available_date"]),
                             auction["cash_per_share"],
-                            session(auction["payment_date"]),
+                            None
+                            if auction["payment_date"] is None
+                            else session(auction["payment_date"]),
                             auction.get("provision_loan_fractions", False),
                             auction.get("zero_quantity_rent_through_payment", False),
                         ),

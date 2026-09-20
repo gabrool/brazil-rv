@@ -1,0 +1,190 @@
+{
+  "account_array_cells": 2028240,
+  "adaptive_target_max": 6.275163269217621e-09,
+  "alsc_auction": {
+    "account_admission": "No ALSC books changed. Whole claim stays locked while physical credit is unknown; exact net fraction proceeds remain unresolved.",
+    "auction_date": "2020-01-15",
+    "available_at": "2020-01-30T21:34:00+00:00",
+    "available_decision": "2020-01-31",
+    "deadline_convention": "Seven following accepted B3 sessions after Jan30 notice, not observed payment receipt.",
+    "derived_deadline": "2020-02-10",
+    "payment_deadline_business_days": 7,
+    "pdf": {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\remaining_held_sources\\732740.pdf",
+      "sha256": "9618d1f7eb8277c6109e7838e1cf1e95ce4d58fdac1ce68ca60288acddeee972"
+    },
+    "physical_share_credit": null,
+    "price_semantics": "Auction proceeds stated; distribution net of unspecified fees. Do not silently treat printed proceeds as exact net investor cash.",
+    "printed_per_share": "54.26688776859",
+    "protocol": "732740",
+    "receipt": {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\remaining_held_sources\\732740_receipt.json",
+      "sha256": "280bba160ba47d8bba0851f8a37432a691d1d0c4bec30a07c1958a25a066daa3"
+    },
+    "shares": 2076,
+    "text": {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\remaining_held_sources\\732740.txt",
+      "sha256": "5e92d59fc57be771d8f52e58addbf4ff69c5ccc7877efb716423825bfc732362"
+    }
+  },
+  "books": 18,
+  "contrasts": [
+    {
+      "capital": 10000000,
+      "contrast": "source",
+      "final_bps": 4.800484027065337,
+      "identical_prefix_sessions": 6,
+      "lhs": "primary",
+      "max_absolute_path_bps": 5.488813967986033,
+      "rhs": "unresolved_source",
+      "sign": 1
+    },
+    {
+      "capital": 10000000,
+      "contrast": "loan_fraction",
+      "final_bps": 0.0,
+      "identical_prefix_sessions": 8,
+      "lhs": "provisioned_loan",
+      "max_absolute_path_bps": 0.0,
+      "rhs": "primary",
+      "sign": 1
+    },
+    {
+      "capital": 1000000,
+      "contrast": "source",
+      "final_bps": 4.784153056084178,
+      "identical_prefix_sessions": 6,
+      "lhs": "primary",
+      "max_absolute_path_bps": 5.488519788760459,
+      "rhs": "unresolved_source",
+      "sign": 1
+    },
+    {
+      "capital": 1000000,
+      "contrast": "loan_fraction",
+      "final_bps": 0.0,
+      "identical_prefix_sessions": 8,
+      "lhs": "provisioned_loan",
+      "max_absolute_path_bps": 0.0,
+      "rhs": "primary",
+      "sign": 1
+    },
+    {
+      "capital": 5000000,
+      "contrast": "source",
+      "final_bps": 4.800484027065337,
+      "identical_prefix_sessions": 6,
+      "lhs": "primary",
+      "max_absolute_path_bps": 5.488813967986033,
+      "rhs": "unresolved_source",
+      "sign": 1
+    },
+    {
+      "capital": 5000000,
+      "contrast": "loan_fraction",
+      "final_bps": 0.0,
+      "identical_prefix_sessions": 8,
+      "lhs": "provisioned_loan",
+      "max_absolute_path_bps": 0.0,
+      "rhs": "primary",
+      "sign": 1
+    },
+    {
+      "capital": 10000000,
+      "contrast": "source",
+      "final_bps": -7.523933209188282,
+      "identical_prefix_sessions": 6,
+      "lhs": "primary",
+      "max_absolute_path_bps": 14.417765517573804,
+      "rhs": "unresolved_source",
+      "sign": -1
+    },
+    {
+      "capital": 10000000,
+      "contrast": "loan_fraction",
+      "final_bps": 0.004402512056753039,
+      "identical_prefix_sessions": 8,
+      "lhs": "provisioned_loan",
+      "max_absolute_path_bps": 0.004402512056753039,
+      "rhs": "primary",
+      "sign": -1
+    },
+    {
+      "capital": 1000000,
+      "contrast": "source",
+      "final_bps": -7.523931098736356,
+      "identical_prefix_sessions": 6,
+      "lhs": "primary",
+      "max_absolute_path_bps": 14.41776523160632,
+      "rhs": "unresolved_source",
+      "sign": -1
+    },
+    {
+      "capital": 1000000,
+      "contrast": "loan_fraction",
+      "final_bps": 0.0412636587000452,
+      "identical_prefix_sessions": 8,
+      "lhs": "provisioned_loan",
+      "max_absolute_path_bps": 0.0412636587000452,
+      "rhs": "primary",
+      "sign": -1
+    },
+    {
+      "capital": 5000000,
+      "contrast": "source",
+      "final_bps": -7.523933209188282,
+      "identical_prefix_sessions": 6,
+      "lhs": "primary",
+      "max_absolute_path_bps": 14.417765517573804,
+      "rhs": "unresolved_source",
+      "sign": -1
+    },
+    {
+      "capital": 5000000,
+      "contrast": "loan_fraction",
+      "final_bps": 0.006862685544416308,
+      "identical_prefix_sessions": 8,
+      "lhs": "provisioned_loan",
+      "max_absolute_path_bps": 0.006862685544416308,
+      "rhs": "primary",
+      "sign": -1
+    }
+  ],
+  "daily_navs": 540,
+  "evidence": {
+    "enat_settlement_audit": {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\enat_settlement\\manifest.json",
+      "sha256": "747aca5c07bd08c9159861644fd405a9707940c9f17a4d37dae38f4f9f40d06a"
+    },
+    "enat_settlement_qualification": {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\enat_settlement\\qualification\\manifest.json",
+      "sha256": "b1bc0f483a2f1e43ff776b98ca5373fb5e52b2de6e4b6fe0919b14f1735fafe8"
+    },
+    "remaining_held_source_audit": {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\enat_settlement\\qualification\\sources.json",
+      "sha256": "7c0564287e218f65fc7ef38dc324a42e105a98a6115fd66e1ee9bbf4f36eae28"
+    }
+  },
+  "failed_attempts": "One ALSC2020 issuer-index selection shadowed a list with a boolean, before index/PDF output; exact failed bytes preserved. Five original PDFs and18 books completed without numerical/rerun failure. Poppler emitted display-font warnings; eight relevant pages are legible and visually qualified.",
+  "identical_intention_max_brl": 9.313225746154785e-09,
+  "independent_adaptive_max_path_bps": {
+    "1000000": 3.0045432504266503e-06,
+    "10000000": 2.9669292271137237e-06,
+    "5000000": 2.9669292271137237e-06
+  },
+  "independent_nav_identity_max_brl": 3.725290298461914e-09,
+  "limitations": "Synthetic30-session full933 books, old4bp bridge, frozen old policy coordinates; no neural forward/model alpha/new fit. Earlier V32-V34 path uncertainties persist. Source loan/fraction hypotheses and final corporate pricing still open. New ENAT model-target/history propagation is not inferred from account admission; both accepted stores remain immutable.",
+  "new_issuer_records": 194,
+  "new_original_pdfs": 5,
+  "remaining": "ALSC physical credit/exact net fraction cash; ENAT auction and event-specific loans; prior source-specific loan hypotheses, pre-custody disposal, corporate cost/rounding/grouping/minimum/calendar bounds, final StageA, C/D. New succession model-target/history propagation remains separate; no accepted store reassembly merely for source revision uncertainty.",
+  "status": "ENAT_undated_fraction_engineering_and_ALSC_auction_sources_accepted_stage_A_incomplete",
+  "terms": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\enat_settlement\\terms.json",
+    "sha256": "34e5b9a06e0ab604f6e87dc4e8f1602c2ff3d68035176d0832d05d8f0279073b"
+  },
+  "timings_seconds": {
+    "engineering": 16.813481799996225,
+    "saved_qualification": 0.20472000000881962
+  },
+  "validation": "7 new unknown-fraction/loader/gradient/copy cases,7 affected loan-fraction cases and16 target cases pass. Earlier five new cases repeated within the final seven are not additional tests. Ruff passes; no earlier engineering books or source censuses rerun."
+}

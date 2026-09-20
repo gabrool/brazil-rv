@@ -1996,3 +1996,10 @@ Acceptance SHAeb6a96325d950ff449ebd72f8ce68b9629c9162ae74e734b366af7fdc9e39afc. 
 executed historical recipes, source hypotheses, tests/qualification and newbooks
 recover without immutable sources/stores/oldfit duplication. Prior opening/source/
 loan/economic/Natura-store recoveries remain required. All workers finished.
+
+
+## 2026-09-20 — ENAT undated fraction engineering / ALSC auction source
+
+V35's unknown auction uses null date/price/payment: whole shares deliver, residuals stay signed/locked, no cash invented. Original ENAT finalratio.805012676, July31legalclose/August1effect/August5credit; continuousloan primary and per-contract provision separate hypotheses.18x30/all933 actual adaptive syntheticbooks complete, identical-intention maxR9.313225746154785e-9; independent540dailyNAVs maxR3.725290298461914e-9,2028240accountcells. Decimalcohort/entitlement, no-source-fill and exactprefix checks pass. Independentadaptive maxpath~.000003005bp/target6.275163269217621e-9; preserve larger priorV32–V34 uncertainties.7newcases,7affectedloan-fraction and16targetcases pass, focusedrepeats overlap; Ruffpasses. Engineering16.8134818s/qualification.20472s, not fitETAs. No earlierbooks repeated.
+
+New5originalPDFs/8visualpages,153ENAT2024+41issuer223572020 savedRADrows. ALSC original732740 reports Jan15 2020 auction/2076shares/R54.26688776859proceeds, distributednetunspecifiedfees within7businessdays ofJan30notice. KnownJan31/deriveddeadlineFeb10, noobservedpayment/physicalcredit. Earlier2019receipt search could not reveal this laternotice; oldwholeclaim stayslocked. One new2020 indexselection localvariable shadow failed beforeoutputs, preserved/fixed; allretrievals/books saved. Both acceptedstores/oldfits immutable; noforward/scoring/GPU. StageA finaladmission andC/D remainincomplete. See v2_ENAT_FRACTION_SETTLEMENT.md and enat_settlement/remaining_held_source pointers.

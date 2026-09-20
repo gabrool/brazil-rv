@@ -68,7 +68,14 @@ def _basket_endpoint(
             if event is not None:
                 if any(
                     leg.fractional_auction is not None
-                    and leg.fractional_auction.available_session <= end
+                    and (
+                        # An undated auction cannot justify post-delivery unit
+                        # labels: the lot-dependent cash endpoint is unresolved.
+                        leg.delivery_session
+                        if leg.fractional_auction.available_session is None
+                        else leg.fractional_auction.available_session
+                    )
+                    <= end
                     for leg in event.legs
                 ):
                     return None

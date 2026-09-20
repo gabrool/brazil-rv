@@ -13,13 +13,24 @@ import numpy as np
 
 @dataclass(frozen=True)
 class FractionAuction:
-    available_session: int
-    cash_per_share: float
-    payment_session: int
+    available_session: int | None
+    cash_per_share: float | None
+    payment_session: int | None
     provision_loan_fractions: bool = False
     zero_quantity_rent_through_payment: bool = False
 
     def __post_init__(self):
+        terms = (self.available_session, self.cash_per_share, self.payment_session)
+        if all(value is None for value in terms):
+            if self.zero_quantity_rent_through_payment:
+                raise ValueError(
+                    "continued fraction rent requires a known payment date"
+                )
+            return
+        if any(value is None for value in terms):
+            raise ValueError(
+                "fraction auction must be fully sourced or explicitly unknown"
+            )
         if self.payment_session < self.available_session:
             raise ValueError("fraction payment cannot precede known auction terms")
         if not math.isfinite(self.cash_per_share) or self.cash_per_share <= 0:
@@ -86,7 +97,10 @@ class ShareDistribution:
             if leg.fractional_auction is not None and (
                 len(self.legs) != 1
                 or leg.delivery_session is None
-                or leg.fractional_auction.available_session < leg.delivery_session
+                or (
+                    leg.fractional_auction.available_session is not None
+                    and leg.fractional_auction.available_session < leg.delivery_session
+                )
             ):
                 raise ValueError(
                     "fraction auction requires a prior single-leg delivery"
@@ -130,9 +144,12 @@ def slice_distributions(distributions, start, stop):
                     if leg.fractional_auction is None
                     else replace(
                         leg.fractional_auction,
-                        available_session=leg.fractional_auction.available_session
-                        - start,
-                        payment_session=leg.fractional_auction.payment_session - start,
+                        available_session=None
+                        if leg.fractional_auction.available_session is None
+                        else leg.fractional_auction.available_session - start,
+                        payment_session=None
+                        if leg.fractional_auction.payment_session is None
+                        else leg.fractional_auction.payment_session - start,
                     ),
                 )
                 for leg in event.legs

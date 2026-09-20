@@ -167,6 +167,32 @@ comparing sourced credit against immediate-credit engineering at the same three
 capital sizes and both starting sides. This tests whether the quantity boundary
 binds under actual allocator decisions; no model outcome selects the probe.
 
+Undated-fraction amendment, frozen 2026-09-20 before ENAT engineering books:
+use original ENAT/3R notices' final .805012676 ratio, August1 2024 effect and
+August5 physical credit. Long whole shares may be delivered while the fractional
+entitlement remains locked and marked from the successor; no auction date, cash
+amount or payment is invented. Retain original loan principal/rate/fees at credit
+under an explicit conversion hypothesis. Continuous loan quantity is the primary
+hypothesis; per-original-contract whole quantities with a signed residual claim
+are a separate bound. Tiny zero-deliverable loans stop rent at delivery under the
+existing explicit convention; do not invent a continued-rent payment date.
+Compare with the earlier unresolved-source book at R10m/R1m/R5m and both focus
+sides, six pre-effect plus twenty-four following sessions, full933 synthetic
+preferences and fixed engineering risks. These are accounting/source contrasts,
+not model profit or accepted-store amendments. Unknown auction timing cannot
+justify post-delivery gross unit labels; final data propagation remains separate.
+ALSC's custody and fraction receipts remain unresolved after the bounded existing
+index and original-source search; its entire claim stays locked.
+
+Subsequent source qualification, after the frozen ENAT books: the existing2020 RAD
+index supplies original732740, received January30 2020 18:33 local. It reports an
+ALSC-merger fraction auction on January15,2076 shares and54.26688776859 per share,
+with distribution net of unspecified fees within seven business days. The source
+becomes usable January31; February10 is the derived latest payment date using the
+seven following accepted sessions, not an observed cash receipt. Physical share
+credit and exact net proceeds remain unknown. Preserve the earlier locked ALSC
+books and do not backdate this notice to the auction or invent net fees/custody.
+
 ## B. Deep source-to-model data audit
 
 Revisit the actual sources and builders, not just finite-value/coverage summaries.

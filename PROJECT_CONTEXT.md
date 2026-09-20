@@ -2,6 +2,8 @@
 
 Last verified: 2026-09-20.
 
+The [ENAT fraction/source checkpoint](docs/v2_ENAT_FRACTION_SETTLEMENT.md) is bounded-engineering accepted via `enat_settlement_acceptance` and explicit `enat_settlement_terms`; canonical corporate replay/finalStageA remain pending. V35 preserves undated fraction auctions as null knowledge/price/payment, delivers whole shares in both accounts and retains locked signed residuals. Original ENAT finalratio.805012676, legalJuly31/effectAugust1/creditAugust5 2024 is source-bound; continuous loans and per-contract fraction provisions remain separate hypotheses. Eighteen30-session/full933 synthetic adaptive books and independent540dailyNAV/Decimalcohort qualification pass, no neural/model-profit result. The existing2020 RAD index recovered ALSC original732740: January15auction,2076shares,54.26688776859per-share proceeds, net unspecifiedfees within7businessdays ofJanuary30notice; firstknownJanuary31/deriveddeadlineFebruary10, not observed payment. ALSC physical credit stillunknown and oldclaimslocked. Both acceptedStageBstores/oldfits/fullhistory remainsealed; do not rerun previousNatura/opening/lifecycle books or source/store audits. Remaining source/custody/loan and corporatecost/bounds precede C/D.
+
 The user now authorizes the [economic/data/scaling program](research/preregistrations/v2_economic_data_scaling.md):
 contractual accounting and stock-borrow investigation/repairs, a deep source-to-model
 data audit with additional historical B3 retrieval, and economic-primary replication
