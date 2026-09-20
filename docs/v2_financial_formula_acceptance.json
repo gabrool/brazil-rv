@@ -1,0 +1,65 @@
+{
+  "attempts": [
+    "Initial independent prior-year arithmetic did not preserve February month-end across leap years; 1896 Camil differences retained. The production code was correct. Only its complete 1406-row issuer history was rechecked after the audit repair.",
+    "Reviewed-unit qualification makes the exact corrected after-state mandatory; 90 dispositions agree and an uncorrected-state mutation is rejected. Original source rows were not reparsed.",
+    "A preliminary console-only unit diagnostic required explicit UTF8 decoding; no source or model result was changed."
+  ],
+  "base_commit": "cc5ade2c2c4ef127390aab014be1475cb390d0d5",
+  "evidence": {
+    "financial_account_audit": {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\financial_account_audit\\report.json",
+      "sha256": "9aae6333d03dccff3a0d3fdf2cbfa525b33d5bef48518ab2420d1021a17ea373"
+    },
+    "financial_formula_audit": {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\financial_formula_audit\\report.json",
+      "sha256": "84dbf3eab7254be47b73477a53fc3a22ad46d0a108b3300d58478764ecc6a4f3"
+    },
+    "financial_formula_camil_qualification": {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\financial_formula_audit\\camil\\report.json",
+      "sha256": "7902b779b4ff2b441df1c9713b890ad6050349d7ef4f2aebda0abfce4adc22ec"
+    },
+    "financial_share_source_audit": {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\financial_share_source_audit\\report.json",
+      "sha256": "ebd5486ca694a27db7c1ef755673c212ee5edd9083746288b828127a1959c4fd"
+    },
+    "financial_unit_qualification": {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\financial_account_audit\\unit_qualification.json",
+      "sha256": "9efc6c59ee9390a4030d1176ed000f6eba688c76eadd6a2efd5533205e6e892e"
+    },
+    "lending_denominator_audit": {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\lending_denominator_audit\\report.json",
+      "sha256": "638516adf383a61ffb1bfe02559206bbf3bc2bff6ffd6caf0f12e292919ef5cb"
+    }
+  },
+  "financial_overlay_rows": 949539,
+  "formula_recheck_rows": 1406,
+  "free_float_source_rows": 8991,
+  "initial_full_formula_comparisons": 19451154,
+  "limits": [
+    "Verifies selected source accounts and their registered formulas, not completeness of every useful non-selected accounting disclosure.",
+    "Single preserved source vintages cannot establish historical revision fidelity or executable short-locate capacity.",
+    "Audited family overlays retain their original market/wealth and loan-balance contracts; further source/history changes need explicit propagation into a separate store.",
+    "A/B remain incomplete, C/D unstarted; no corrected profitability or new GPU fit."
+  ],
+  "model_or_source_values_changed": 0,
+  "new_capital_tables": 427,
+  "new_store_or_gpu_fit": false,
+  "own_version_filings": 22210,
+  "qualified_unresolved_differences": 0,
+  "reviewed_currency_unit_dispositions": 90,
+  "schema": "FINANCIAL_FORMULA_ACCEPTANCE_V1",
+  "selected_account_rows": 273625,
+  "source_lf_sha256": {
+    "ops/audit_cvm_sources.py": "ffc0f33a6b800cd7b53f67385ccd5eb2e67d1cdedd619bca5c61fbc786e2bc01",
+    "ops/audit_financial_accounts.py": "df499f9f04f98b24324223fa73bbc50185646e3e187fdda72d675f764bfa0114",
+    "ops/audit_financial_formulas.py": "cd9f10ba09c79545fdaee73f8bc5864c2b4facc4f56c969979535e2e4533af67",
+    "ops/audit_financial_share_sources.py": "8023aec22cc99e737e9c8d35327bc4e882df2fe582084d1418abce61ed6a55e5",
+    "ops/audit_lending_denominator.py": "2e0773d3f433eefba5a25d8f23ba15ea03aacdaefce631bc4c72023a53174bd5",
+    "research/src/brazil_rv/v2/round5_b3.py": "b43ad9b2c92800753e36531a9bdca07495af4059cc850cd3843e5f784a4bfb36",
+    "research/src/brazil_rv/v2/round5_cvm.py": "d76ea155ef5aac69117c8152ff30c2a92c6ebd1afe549a95eb14c903fc46b978"
+  },
+  "status": "selected_financial_sources_formulas_and_denominators_verified",
+  "utilization_rows_exact": 29943,
+  "validation": "Four completed source/formula/consumer audits; narrow reviewed-unit and Camil month-end qualifications; Ruff passed. No unchanged model tests repeated.",
+  "verified_utc": "2026-09-20T01:39:38.462912+00:00"
+}

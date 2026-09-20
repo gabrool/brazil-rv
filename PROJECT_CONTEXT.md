@@ -31,6 +31,10 @@ Full history/wealth/label and changed-store tensor propagation remain. These are
 observations, not a replacement model store or permission to attach changed
 coordinates to old fits. Original filing clocks and capital units reconcile
 separately in `docs/v2_CVM_SOURCE_AUDIT.md`.
+Selected financial numerators, trailing-period formulas and share denominators
+now reconcile independently, including the incremental filings and the actual
+utilization consumer; see `docs/v2_FINANCIAL_FORMULA_AUDIT.md`. This audit changes
+no model inputs and does not resolve single-vintage revision uncertainty.
 
 The current accounting code retains unpriced equity/hedge inventory and its cash,
 claims and financing obligations until an observed execution or contractual event.

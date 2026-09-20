@@ -1240,3 +1240,44 @@ duplicating immutable sources or old fits. Acceptance SHA-256 is
 The canonical pointer binds this recovery; earlier receipts remain valid for their
 recorded source commits. All CPU work is complete at this checkpoint; no worker
 or GPU job is active. The heartbeat remains active for the remaining A-D work.
+
+## Financial numerator, formula and denominator audit — 2026-09-20
+
+- Independent original-row extraction checks all22,210 own-version filings,
+  including the427 incremental filings:273,625 selected account values, periods,
+  basis, descriptions and BRL scales reconcile. Channels are240,434 annual-CSV,
+  33,086 own-version HTML and105 ZIP/XML account rows.21,431 consumed file hashes
+  match;81.05s. This is the previously untested account-value boundary, not a repeat
+  of the completed capital/header census.90 reviewed unit after-states also
+  reconcile; a narrow mutation check rejects a missed correction.
+- Independent as-of formulas check949,539 financial-overlay rows,7,596,312
+  value/missingness comparisons and their dependency/update ages:19,451,154
+  initial comparisons,33,084 state recalculations,482.60s. The initial1896
+  differences all concern Camil's February fiscal year. The audit's date function
+  missed leap-year month-end preservation; production was correct. Only Camil's
+  full1406-row history was rerun after correcting the audit (15.22s), with zero
+  remaining mismatches; max independent SUE arithmetic difference8.89e-16. The
+  passed remainder was not repeated. Original failed output/source are preserved.
+- All427 additional capital tables and8991 FRE float rows reconcile in1.89s.
+  The float includes4104 exact-minute receipts; seven source rows have a future
+  measurement date, retained as printed. An independent actual-consumer audit
+  checks242,232 balance candidates and reproduces all29,943 valid utilization
+  ratios/ages exactly in4.98s. Four relevant future-measurement candidates are
+  excluded; no selected denominator is below10,000 shares. Capital events, class
+  identity and observed unit boundaries remain effective guards.
+- No production financial/lending implementation, raw source, stored value,
+  eligibility, model coordinate or forecast changed. These results increase
+  confidence in the earlier issuer-recovery propagation; they are not alpha.
+  Selected-account agreement does not certify completeness of all potentially
+  useful disclosures or single-vintage historical revision fidelity. Peer/financial
+  contracts still hold original wealth and lending inputs fixed.
+- `v2_FINANCIAL_FORMULA_AUDIT.md` and `v2_financial_formula_acceptance.json`
+  bind the full and narrowly qualified evidence. Acceptance SHA-256:
+  `2bae10a2fd7b6d9a49c3578a7ca857194ce2cd89dc075d6cf099062396ba2e76`.
+  Four new audit reproducers pass Ruff. No passed model test suite was repeated.
+  The registration was reread; all CPU workers have finished and no GPU fit ran.
+- A/B remain incomplete, C/D unstarted. Continue remaining upstream-family
+  clocks/revisions/units and ALLOS/ISA full history/universe/warm-up/wealth/labels,
+  separately propagate recovered lending, then accept the derived store and
+  actual tensors. A still needs denied-renewal/recall, presettlement disposal and
+  adaptive-book bounds. Do not repeat these completed financial audits.

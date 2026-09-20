@@ -145,6 +145,30 @@
     "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\fca_peer_propagation\\manifest.json",
     "sha256": "b99a5d17342a3d197a15311d11f3294f53af6d0dc5a2036b83362c80bdb0ff36"
   },
+  "financial_account_audit": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\financial_account_audit\\report.json",
+    "sha256": "9aae6333d03dccff3a0d3fdf2cbfa525b33d5bef48518ab2420d1021a17ea373"
+  },
+  "financial_formula_acceptance": {
+    "path": "C:\\Brazil-RV\\quant\\b3-quant\\docs\\v2_financial_formula_acceptance.json",
+    "sha256": "2bae10a2fd7b6d9a49c3578a7ca857194ce2cd89dc075d6cf099062396ba2e76"
+  },
+  "financial_formula_audit": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\financial_formula_audit\\report.json",
+    "sha256": "84dbf3eab7254be47b73477a53fc3a22ad46d0a108b3300d58478764ecc6a4f3"
+  },
+  "financial_formula_camil_qualification": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\financial_formula_audit\\camil\\report.json",
+    "sha256": "7902b779b4ff2b441df1c9713b890ad6050349d7ef4f2aebda0abfce4adc22ec"
+  },
+  "financial_share_source_audit": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\financial_share_source_audit\\report.json",
+    "sha256": "ebd5486ca694a27db7c1ef755673c212ee5edd9083746288b828127a1959c4fd"
+  },
+  "financial_unit_qualification": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\financial_account_audit\\unit_qualification.json",
+    "sha256": "9efc6c59ee9390a4030d1176ed000f6eba688c76eadd6a2efd5533205e6e892e"
+  },
   "fit_conditioning_audit": {
     "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\fit_conditioning_audit\\report.json",
     "sha256": "814a0a846feea64b0694859fc90924e9dd42bafbc84f1ea64807415c237e181d"
@@ -152,6 +176,10 @@
   "identity_source_admission": {
     "path": "docs\\v2_identity_source_admission.json",
     "sha256": "8d3f3d2c04a8bb55cd83d69ddd35541e0049588494b92acc9c03056a741daab8"
+  },
+  "lending_denominator_audit": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\lending_denominator_audit\\report.json",
+    "sha256": "638516adf383a61ffb1bfe02559206bbf3bc2bff6ffd6caf0f12e292919ef5cb"
   },
   "lending_source_admission": {
     "bytes": 7260,
