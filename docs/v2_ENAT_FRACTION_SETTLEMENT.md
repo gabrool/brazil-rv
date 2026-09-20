@@ -50,3 +50,7 @@ Seven new cases cover signed unknown fractions, loader preservation, unit-endpoi
 ## Remaining admission
 
 ALSC physical credit and exact net fraction deductions remain unresolved. ENAT auction and source-specific loan rules remain unknown; NATU/SOMA loan conventions retain their prior hypothesis status. Next resolve the pre-custody disposal and allocation/timing/sweep/fraction/invoice/security-day/minimum/clearing bounds, then separated corporate costs and final StageA. C matched economic/source replays, separately accepted new-data refits and conditionalD remain unstarted. New succession target/history implications must be attributed separately before future data acceptance; do not rerun the completed scalar/store/source work to revisit unknown vintages.
+
+## Recovery
+
+The verified archive `enat_settlement_1a68f36.zip` is 7,553,887 bytes, SHA256 `1edd704ea68353e5a8d6d48257b21ddeceb4a488626ec8a87abfc2a5578c8a28`. It restores and hash-checks 706 unique / 899 logical members with 193 aliases, all18 new books/2,028,240 account cells and five new original PDFs against their retrieval receipts. Recovery took1.029293s. Complete current research, implementation patch, exact failed/qualified recipes, frozen plan, source hypotheses and acceptance are recoverable. Immutable raw/accepted stores/old fits are dependencies, not copied. Earlier recovery archives remain required.

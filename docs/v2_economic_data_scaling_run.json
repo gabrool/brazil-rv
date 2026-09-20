@@ -189,6 +189,10 @@
     "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\enat_settlement\\qualification\\manifest.json",
     "sha256": "b1bc0f483a2f1e43ff776b98ca5373fb5e52b2de6e4b6fe0919b14f1735fafe8"
   },
+  "enat_settlement_recovery": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\enat_settlement_recovery.json",
+    "sha256": "b808078286ea1c79c9a47039f1e8f0e4989ccb59e83f8be783caf10a0c626e74"
+  },
   "enat_settlement_terms": {
     "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\enat_settlement\\terms.json",
     "sha256": "34e5b9a06e0ab604f6e87dc4e8f1602c2ff3d68035176d0832d05d8f0279073b"
