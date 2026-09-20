@@ -382,6 +382,18 @@
     "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\loan_fraction_unchanged\\result.json",
     "sha256": "1013c343994bcbb7ebdb47cb9483a882ef738701cc4b7c9dda08a30712b7428e"
   },
+  "loan_invoice_acceptance": {
+    "path": "C:\\quant\\b3-quant\\docs\\v2_loan_invoice_acceptance.json",
+    "sha256": "5685da905621250536bfcb84fcdec349ba433e10d5a6bd0e02dd827030183be9"
+  },
+  "loan_invoice_audit": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\loan_invoices\\manifest.json",
+    "sha256": "696b2edd3b8127bb0aaf148131951e6040f2b38b4d59585e4eb26cfb376c0406"
+  },
+  "loan_invoice_qualification": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\loan_invoices\\qualification_qualified\\manifest.json",
+    "sha256": "bbf83654471fccd06035687789ba534242a9c7908681c2e7fbd642ea9a259caf"
+  },
   "loan_renewal_acceptance": {
     "path": "docs\\v2_loan_renewal_acceptance.json",
     "sha256": "c5e8263e84b932565ba9f1d9331806d49d826aa185daa79aa4f0d5be2bc29a65"

@@ -7,6 +7,7 @@ have no autograd graph in NumPy replay. Rates and dates are historical constants
 """
 
 from dataclasses import dataclass, field, fields, replace
+from copy import deepcopy
 import math
 
 import numpy as np
@@ -197,6 +198,13 @@ class LoanContracts:
     fee_multiplier: float = 1.0
     annual_sessions: int = 252
     electronic_settlement_days: int = 1
+    invoice_convention: str = "none"
+    minimum_allocation: str = "final"
+    record_payments: bool = False
+    last_payment: dict = field(default_factory=dict)
+    payment_adjustment: torch.Tensor = field(
+        default_factory=lambda: torch.empty((0, 2), dtype=torch.float64)
+    )
     bonus_return_floors: dict[int, int] = field(default_factory=dict)
     name: np.ndarray = field(default_factory=lambda: np.empty(0, dtype=np.int64))
     opened: np.ndarray = field(default_factory=lambda: np.empty(0, dtype=np.int64))
@@ -227,6 +235,7 @@ class LoanContracts:
     minimum: np.ndarray = field(default_factory=lambda: np.empty(0))
     started: np.ndarray = field(default_factory=lambda: np.empty(0, dtype=bool))
     root_fees: torch.Tensor = field(default_factory=lambda: _tensor([]))
+    minimum_credit: torch.Tensor = field(default_factory=lambda: _tensor([]))
     cash_claims: list[tuple[LoanCashSettlement, torch.Tensor, float]] = field(
         default_factory=list
     )
@@ -248,6 +257,7 @@ class LoanContracts:
             self.rent_due.sum()
             + self.fees_due.sum()
             + self.minimum_provision.sum()
+            - self.minimum_credit.sum()
             + self.cash_liability
         )
 
@@ -340,6 +350,9 @@ class LoanContracts:
             np.full(len(ids), 10.0 * self.fee_multiplier if old_voluntary else 0.0),
         ]
         self.started = np.r_[self.started, np.zeros(len(ids), dtype=bool)]
+        self.minimum_credit = torch.cat(
+            (self.minimum_credit, _tensor(np.zeros(len(ids))))
+        )
         self.root_fees = torch.cat(
             (self.root_fees, torch.zeros(len(ids), dtype=torch.float64))
         )
@@ -659,6 +672,8 @@ class LoanContracts:
         The historical minimum is provisioned once per original contract and any
         residual is paid on its final return, never once per partial fill.
         """
+        self.payment_adjustment = torch.zeros((self.names, 2), dtype=torch.float64)
+        self.last_payment = {}
         due = self.return_day == day
         if not np.any(due):
             zero = torch.zeros(self.names, dtype=torch.float64)
@@ -671,6 +686,14 @@ class LoanContracts:
         fees = fees + self._by_name(
             self.minimum_provision * _tensor(completed), self.root_name
         )
+        if (
+            self.invoice_convention != "none"
+            or self.minimum_allocation != "final"
+            or self.record_payments
+        ):
+            invoice_rent, invoice_fees = self._invoice(day, due, completed)
+            if self.invoice_convention != "none" or self.minimum_allocation != "final":
+                rent, fees = invoice_rent, invoice_fees
         self._keep(~due)
         # Keep tensor work proportional to open contracts, not the whole run.
         self.root_name = self.root_name[live_roots]
@@ -678,8 +701,94 @@ class LoanContracts:
         self.minimum = self.minimum[live_roots]
         self.started = self.started[live_roots]
         self.root_fees = self.root_fees[live_roots]
+        self.minimum_credit = self.minimum_credit[live_roots]
         self.root = np.searchsorted(live_roots, self.root)
         return rent, fees
+
+    def _invoice(self, day, due, completed):
+        """Hypothetical payment precision and residual-minimum allocation.
+
+        Grouping uses original loan security, preserving every rate/principal/root.
+        Rent and total B3 fees round separately, only on their physical pay date.
+        An early minimum allocation is a credit against future fees, not another fee.
+        """
+        index = torch.as_tensor(self.root)
+
+        def by_root(value):
+            return torch.zeros_like(self.root_fees).index_add(0, index, value)
+
+        returned = by_root(self.principal * _tensor(due))
+        principal = by_root(self.principal)
+        rent = by_root(self.rent_due * _tensor(due))
+        accrued = by_root(self.fees_due.sum(-1) * _tensor(due))
+        credit_before = self.minimum_credit
+        used = torch.minimum(credit_before, accrued)
+        credit = credit_before - used
+        provision = self.minimum_provision
+        if self.minimum_allocation == "pro_rata":
+            fraction = returned / torch.where(principal > 0, principal, 1.0)
+            allocated = (provision - credit).clamp_min(0) * fraction
+            credit = (credit + allocated) * _tensor(~completed)
+        else:
+            allocated = provision * _tensor(completed)
+        raw = torch.stack((rent, accrued - used + allocated), dim=1)
+        self.minimum_credit = credit
+        roots = np.unique(self.root[due])
+        group_names = self.root_name[roots]
+        unrounded = raw[roots]
+        if self.invoice_convention == "security_day_nearest":
+            group_names, groups = np.unique(group_names, return_inverse=True)
+            unrounded = torch.zeros(
+                (len(group_names), 2), dtype=torch.float64
+            ).index_add(0, torch.as_tensor(groups), unrounded)
+        convention = self.invoice_convention
+        if convention == "none":
+            paid = unrounded
+        elif convention.endswith("nearest"):
+            paid = torch.floor(unrounded * 100 + 0.5) / 100
+        elif convention.endswith("down"):
+            paid = torch.floor(unrounded * 100) / 100
+        else:
+            paid = torch.ceil(unrounded * 100) / 100
+        self.payment_adjustment = self.payment_adjustment.index_add(
+            0, torch.as_tensor(group_names), paid - unrounded
+        )
+        if self.record_payments:
+            self.last_payment = dict(
+                session=day,
+                roots=[
+                    dict(
+                        root=int(i),
+                        security=int(self.root_name[i]),
+                        opening=int(self.root_opened[i]),
+                        principal=float(principal[i].detach()),
+                        returned_principal=float(returned[i].detach()),
+                        rent=float(rent[i].detach()),
+                        fee_due=float(accrued[i].detach()),
+                        minimum=float(provision[i].detach()),
+                        credit_before=float(credit_before[i].detach()),
+                        credit_used=float(used[i].detach()),
+                        allocated=float(allocated[i].detach()),
+                        credit_after=float(credit[i].detach()),
+                        completed=bool(completed[i]),
+                        raw_fee=float(raw[i, 1].detach()),
+                    )
+                    for i in roots
+                ],
+                invoices=[
+                    dict(
+                        security=int(name),
+                        rent=float(unrounded[i, 0].detach()),
+                        fee=float(unrounded[i, 1].detach()),
+                        paid_rent=float(paid[i, 0].detach()),
+                        paid_fee=float(paid[i, 1].detach()),
+                    )
+                    for i, name in enumerate(group_names)
+                ],
+            )
+        return self._by_name(paid[:, 0], group_names), self._by_name(
+            paid[:, 1], group_names
+        )
 
     def cash_settle(self, event, day):
         """Extinguish all outstanding shares, including later requested returns.
@@ -851,7 +960,15 @@ class LoanContracts:
         )
 
     def detach(self):
-        for key in ("quantity", "principal", "rent_due", "fees_due", "root_fees"):
+        for key in (
+            "quantity",
+            "principal",
+            "rent_due",
+            "fees_due",
+            "root_fees",
+            "minimum_credit",
+            "payment_adjustment",
+        ):
             setattr(self, key, getattr(self, key).detach())
         self.cash_claims = [
             (event, quantity.detach(), value)
@@ -873,5 +990,7 @@ class LoanContracts:
                 ]
             elif item.name in ("renewals", "return_notices", "bonus_return_floors"):
                 value = value.copy()
+            elif item.name == "last_payment":
+                value = deepcopy(value)
             values[item.name] = value
         return LoanContracts(**values)

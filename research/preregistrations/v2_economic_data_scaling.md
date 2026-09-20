@@ -261,6 +261,37 @@ intentions or interest. Later-dated transfer queues are unchanged. The initial
 fixture and executed pre-fix code are retained; prior delayed-payment books are
 outside this corrected branch and are reused without historical reruns.
 
+Loan invoice amendment, frozen 2026-09-20 before new engineering outcomes:
+retain unrounded payments and residual historical R10 minimum at final return as
+primary. Compare cent rounding of rent and total B3 fees separately per original
+contract/pay date, using nearest half-up, downward and upward endpoints. Separately
+compare nearest rounding after aggregation by original security/pay date against
+contract-nearest. Grouping never merges loan registrations, rates, principal,
+renewals or minimum obligations, and never crosses pay dates or rent/fee categories.
+These are invoice hypotheses, not recovered invoices or B3 rounding instructions.
+Recognize only the rounding difference as extra expense at physical payment; the
+previous decision and prior-close funding stay fixed. Exact floor/ceiling arithmetic
+has zero local derivative away from cent boundaries; no straight-through estimator.
+
+As another one-factor bound, allocate the remaining unpaid historical minimum
+pro rata to returned original principal on each actual partial return. Carry early
+allocations as credits against later fees, preserving total max(accrued B3 fees,R10)
+per original contract, never charging a new minimum on a partial return. The credit
+offset remains in loan liabilities and is independently copied/detached. Default
+final-return allocation stays unchanged. Unknown actual invoice grouping remains
+explicit; there is no inferred ordinary-CNPJ fund discount or retail turnover fee.
+
+Freeze36 all933 adaptive synthetic books:64 accepted sessions starting February1
+2019 and February1 2024, R10m/R1m/R5m, six variants (primary, contract-nearest/down/up,
+security-day-nearest, minimum-pro-rata). Preferences sin(axis*.31+day*.07+head*.2)
+rotate across the whole population to exercise actual partial returns and renewals;
+beta1/idio.0004/market.0001, original calibration and OLD PolicyData are fixed.
+Use corrected CDI/qualified lending/strict-prior references and the old bundled4bp
+bridge with no added B3 spot. Record independent actual-account payment details,
+cent/credit Decimal oracles, prior-close funding and full saved NAV identities.
+Do not repeat prior event books or infer model profits. Actual-held-Cielo cents,
+historical spot/custody separation and final Stage A/data admission remain separate.
+
 ## B. Deep source-to-model data audit
 
 Revisit the actual sources and builders, not just finite-value/coverage summaries.

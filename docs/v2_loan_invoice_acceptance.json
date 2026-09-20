@@ -1,0 +1,2838 @@
+{
+  "account_array_cells": 8660736,
+  "adaptive_target_max": 2.006825300226306e-07,
+  "attempts": {
+    "books": "All36 books completed first invocation, no numerical failure or repeated book.",
+    "initial_qualification": "Initial Decimal recomposition of independently printed accrued fees and minimum residual straddled R10 by ulps, causing floor/ceil cent mismatches. Verify component arithmetic then round actual Float64 invoice coordinate in independent Decimal.72 enumerated boundary cases retained; all coordinate-based invoice amounts exact. No production change or book rerun.",
+    "initial_tests": "8passed/3failed: cash roundoff1.82e-12 atR10000 against an absolute1e-12 helper; T+3 credit probe incorrectly day4, correctly day5. Narrow fixtures corrected: comparison atR1000, probe day5 and mutate one credit cell. Production unchanged. Initial test and implementation saved. Qualified11 passed, added threshold-crossing case gives12 plus9loan/6payment existing=27pass; two additional delivery/renewal credit cases produce14distinct new tests. Overlapping batches not additive.",
+    "metadata": "Post-book evaluation report now states chosen invoice/minimum hypothesis instead of always describing final-return allocation. Exactly two metadata text changes verified; all other executed production bytes match current."
+  },
+  "audit": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\loan_invoices\\manifest.json",
+    "sha256": "696b2edd3b8127bb0aaf148131951e6040f2b38b4d59585e4eb26cfb376c0406"
+  },
+  "books": 36,
+  "boundary_counts": {
+    "2019-02-01_contract_down_1000000": 13,
+    "2019-02-01_contract_down_10000000": 5,
+    "2019-02-01_contract_down_5000000": 10,
+    "2019-02-01_contract_up_1000000": 16,
+    "2019-02-01_contract_up_10000000": 14,
+    "2019-02-01_contract_up_5000000": 14
+  },
+  "contrasts": [
+    {
+      "base": "primary",
+      "capital": 10000000,
+      "fee_rounding_brl": 0.07518014610458064,
+      "final_bps": 0.009959622064605355,
+      "first_difference_session": 4,
+      "max_path_bps": 0.010241852212697267,
+      "rent_rounding_brl": 0.018205215688944704,
+      "scenario": "contract_nearest",
+      "start": "2019-02-01"
+    },
+    {
+      "base": "primary",
+      "capital": 1000000,
+      "fee_rounding_brl": 0.026151904540158012,
+      "final_bps": -0.0008237964380532504,
+      "first_difference_session": 4,
+      "max_path_bps": 0.000870670094154775,
+      "rent_rounding_brl": 0.05542898200163123,
+      "scenario": "contract_nearest",
+      "start": "2019-02-01"
+    },
+    {
+      "base": "primary",
+      "capital": 5000000,
+      "fee_rounding_brl": -0.02865621620389454,
+      "final_bps": 9.458058141171933e-05,
+      "first_difference_session": 4,
+      "max_path_bps": 0.00010965514928102493,
+      "rent_rounding_brl": -0.017360459568112878,
+      "scenario": "contract_nearest",
+      "start": "2019-02-01"
+    },
+    {
+      "base": "primary",
+      "capital": 10000000,
+      "fee_rounding_brl": -1.493056989267071,
+      "final_bps": 0.003033415649086237,
+      "first_difference_session": 4,
+      "max_path_bps": 0.003033415649086237,
+      "rent_rounding_brl": -1.5478449521958333,
+      "scenario": "contract_down",
+      "start": "2019-02-01"
+    },
+    {
+      "base": "primary",
+      "capital": 1000000,
+      "fee_rounding_brl": -1.3737796215980582,
+      "final_bps": 0.030105232351925224,
+      "first_difference_session": 4,
+      "max_path_bps": 0.030105232351925224,
+      "rent_rounding_brl": -1.645591819130527,
+      "scenario": "contract_down",
+      "start": "2019-02-01"
+    },
+    {
+      "base": "primary",
+      "capital": 5000000,
+      "fee_rounding_brl": -1.39874948900384,
+      "final_bps": 0.005878199458122253,
+      "first_difference_session": 4,
+      "max_path_bps": 0.005878199458122253,
+      "rent_rounding_brl": -1.5484040671235326,
+      "scenario": "contract_down",
+      "start": "2019-02-01"
+    },
+    {
+      "base": "primary",
+      "capital": 10000000,
+      "fee_rounding_brl": 1.4453069761126451,
+      "final_bps": 0.006939976613968611,
+      "first_difference_session": 4,
+      "max_path_bps": 0.009199514918029308,
+      "rent_rounding_brl": 1.679354730038435,
+      "scenario": "contract_up",
+      "start": "2019-02-01"
+    },
+    {
+      "base": "primary",
+      "capital": 1000000,
+      "fee_rounding_brl": 1.4961087958667978,
+      "final_bps": -0.031435177017701786,
+      "first_difference_session": 4,
+      "max_path_bps": 0.031435177017701786,
+      "rent_rounding_brl": 1.656544184221426,
+      "scenario": "contract_up",
+      "start": "2019-02-01"
+    },
+    {
+      "base": "primary",
+      "capital": 5000000,
+      "fee_rounding_brl": 1.5214077062093911,
+      "final_bps": -0.006302811266854405,
+      "first_difference_session": 4,
+      "max_path_bps": 0.006302811266854405,
+      "rent_rounding_brl": 1.6434625931985154,
+      "scenario": "contract_up",
+      "start": "2019-02-01"
+    },
+    {
+      "base": "primary",
+      "capital": 10000000,
+      "fee_rounding_brl": 0.05518017095999624,
+      "final_bps": 0.009989571105688811,
+      "first_difference_session": 4,
+      "max_path_bps": 0.010241852212697267,
+      "rent_rounding_brl": 0.00820540497433972,
+      "scenario": "security_day_nearest",
+      "start": "2019-02-01"
+    },
+    {
+      "base": "contract_nearest",
+      "capital": 10000000,
+      "fee_rounding_brl": 0.05518017095999624,
+      "final_bps": 2.9949041083455086e-05,
+      "first_difference_session": 44,
+      "max_path_bps": 2.9949041083455086e-05,
+      "rent_rounding_brl": 0.00820540497433972,
+      "scenario": "security_day_nearest",
+      "start": "2019-02-01"
+    },
+    {
+      "base": "primary",
+      "capital": 1000000,
+      "fee_rounding_brl": 0.006151910828265503,
+      "final_bps": -0.0004241563973482698,
+      "first_difference_session": 4,
+      "max_path_bps": 0.0007941249501891434,
+      "rent_rounding_brl": 0.03542903300557464,
+      "scenario": "security_day_nearest",
+      "start": "2019-02-01"
+    },
+    {
+      "base": "contract_nearest",
+      "capital": 1000000,
+      "fee_rounding_brl": 0.006151910828265503,
+      "final_bps": 0.0003996400407049805,
+      "first_difference_session": 44,
+      "max_path_bps": 0.0003996400407049805,
+      "rent_rounding_brl": 0.03542903300557464,
+      "scenario": "security_day_nearest",
+      "start": "2019-02-01"
+    },
+    {
+      "base": "primary",
+      "capital": 5000000,
+      "fee_rounding_brl": -0.01865598176081157,
+      "final_bps": 0.00015420317091047764,
+      "first_difference_session": 4,
+      "max_path_bps": 0.0001619642470031977,
+      "rent_rounding_brl": -0.05735861831502308,
+      "scenario": "security_day_nearest",
+      "start": "2019-02-01"
+    },
+    {
+      "base": "contract_nearest",
+      "capital": 5000000,
+      "fee_rounding_brl": -0.01865598176081157,
+      "final_bps": 5.962258949875832e-05,
+      "first_difference_session": 44,
+      "max_path_bps": 5.994567647576332e-05,
+      "rent_rounding_brl": -0.05735861831502308,
+      "scenario": "security_day_nearest",
+      "start": "2019-02-01"
+    },
+    {
+      "base": "primary",
+      "capital": 10000000,
+      "fee_rounding_brl": 0.0,
+      "final_bps": 0.009829037446528674,
+      "first_difference_session": 4,
+      "max_path_bps": 0.010143452132120728,
+      "rent_rounding_brl": 0.0,
+      "scenario": "minimum_pro_rata",
+      "start": "2019-02-01"
+    },
+    {
+      "base": "primary",
+      "capital": 1000000,
+      "fee_rounding_brl": 0.0,
+      "final_bps": -0.005822562468238175,
+      "first_difference_session": 4,
+      "max_path_bps": 0.005822562468238175,
+      "rent_rounding_brl": 0.0,
+      "scenario": "minimum_pro_rata",
+      "start": "2019-02-01"
+    },
+    {
+      "base": "primary",
+      "capital": 5000000,
+      "fee_rounding_brl": 0.0,
+      "final_bps": -0.0006985725965350866,
+      "first_difference_session": 4,
+      "max_path_bps": 0.0006985725965350866,
+      "rent_rounding_brl": 0.0,
+      "scenario": "minimum_pro_rata",
+      "start": "2019-02-01"
+    },
+    {
+      "base": "primary",
+      "capital": 10000000,
+      "fee_rounding_brl": 0.02030182696469544,
+      "final_bps": -1.2849140912294388e-05,
+      "first_difference_session": 4,
+      "max_path_bps": 4.0418898686766624e-05,
+      "rent_rounding_brl": -0.009319627729023578,
+      "scenario": "contract_nearest",
+      "start": "2024-02-01"
+    },
+    {
+      "base": "primary",
+      "capital": 1000000,
+      "fee_rounding_brl": -0.06497060665418102,
+      "final_bps": 0.0005637588247191162,
+      "first_difference_session": 4,
+      "max_path_bps": 0.0005651514395140112,
+      "rent_rounding_brl": 0.011064364428749075,
+      "scenario": "contract_nearest",
+      "start": "2024-02-01"
+    },
+    {
+      "base": "primary",
+      "capital": 5000000,
+      "fee_rounding_brl": -0.08485331560723337,
+      "final_bps": 0.00022675458528101445,
+      "first_difference_session": 4,
+      "max_path_bps": 0.00022675458528101445,
+      "rent_rounding_brl": -0.02468226312901879,
+      "scenario": "contract_nearest",
+      "start": "2024-02-01"
+    },
+    {
+      "base": "primary",
+      "capital": 10000000,
+      "fee_rounding_brl": -1.0697075100826017,
+      "final_bps": 0.0022076847106218336,
+      "first_difference_session": 4,
+      "max_path_bps": 0.0022076847106218336,
+      "rent_rounding_brl": -1.1093616450089874,
+      "scenario": "contract_down",
+      "start": "2024-02-01"
+    },
+    {
+      "base": "primary",
+      "capital": 1000000,
+      "fee_rounding_brl": -0.9849754179332912,
+      "final_bps": 0.020139084672555325,
+      "first_difference_session": 4,
+      "max_path_bps": 0.020139084672555325,
+      "rent_rounding_brl": -0.9989594390528991,
+      "scenario": "contract_down",
+      "start": "2024-02-01"
+    },
+    {
+      "base": "primary",
+      "capital": 5000000,
+      "fee_rounding_brl": -0.9848547310693948,
+      "final_bps": 0.004188492020592093,
+      "first_difference_session": 4,
+      "max_path_bps": 0.004188492020592093,
+      "rent_rounding_brl": -1.0846829473796846,
+      "scenario": "contract_down",
+      "start": "2024-02-01"
+    },
+    {
+      "base": "primary",
+      "capital": 10000000,
+      "fee_rounding_brl": 1.100306294422234,
+      "final_bps": -0.0021968600545078515,
+      "first_difference_session": 4,
+      "max_path_bps": 0.0021968600545078515,
+      "rent_rounding_brl": 1.0607041742576304,
+      "scenario": "contract_up",
+      "start": "2024-02-01"
+    },
+    {
+      "base": "primary",
+      "capital": 1000000,
+      "fee_rounding_brl": 1.1850376544608243,
+      "final_bps": -0.023882650819141416,
+      "first_difference_session": 4,
+      "max_path_bps": 0.023882650819141416,
+      "rent_rounding_brl": 1.171102362245768,
+      "scenario": "contract_up",
+      "start": "2024-02-01"
+    },
+    {
+      "base": "primary",
+      "capital": 5000000,
+      "fee_rounding_brl": 1.1851566029080145,
+      "final_bps": -0.004608960008248687,
+      "first_difference_session": 4,
+      "max_path_bps": 0.004608960008248687,
+      "rent_rounding_brl": 1.0853681318189146,
+      "scenario": "contract_up",
+      "start": "2024-02-01"
+    },
+    {
+      "base": "primary",
+      "capital": 10000000,
+      "fee_rounding_brl": 0.010302079866485323,
+      "final_bps": -1.58986896276474e-05,
+      "first_difference_session": 4,
+      "max_path_bps": 3.806601092219353e-05,
+      "rent_rounding_brl": 0.0006816113840680225,
+      "scenario": "security_day_nearest",
+      "start": "2024-02-01"
+    },
+    {
+      "base": "contract_nearest",
+      "capital": 10000000,
+      "fee_rounding_brl": 0.010302079866485323,
+      "final_bps": -3.049548715353012e-06,
+      "first_difference_session": 8,
+      "max_path_bps": 1.677604950964451e-05,
+      "rent_rounding_brl": 0.0006816113840680225,
+      "scenario": "security_day_nearest",
+      "start": "2024-02-01"
+    },
+    {
+      "base": "primary",
+      "capital": 1000000,
+      "fee_rounding_brl": -0.02496990114900087,
+      "final_bps": -0.00035026830388233064,
+      "first_difference_session": 4,
+      "max_path_bps": 0.00035026830388233064,
+      "rent_rounding_brl": 0.061067358578855674,
+      "scenario": "security_day_nearest",
+      "start": "2024-02-01"
+    },
+    {
+      "base": "contract_nearest",
+      "capital": 1000000,
+      "fee_rounding_brl": -0.02496990114900087,
+      "final_bps": -0.0009140271286014467,
+      "first_difference_session": 8,
+      "max_path_bps": 0.0009140271286014467,
+      "rent_rounding_brl": 0.061067358578855674,
+      "scenario": "security_day_nearest",
+      "start": "2024-02-01"
+    },
+    {
+      "base": "primary",
+      "capital": 5000000,
+      "fee_rounding_brl": -0.04485283524142071,
+      "final_bps": 0.00012791404500603676,
+      "first_difference_session": 4,
+      "max_path_bps": 0.00012830149196088313,
+      "rent_rounding_brl": -0.014680114335169251,
+      "scenario": "security_day_nearest",
+      "start": "2024-02-01"
+    },
+    {
+      "base": "contract_nearest",
+      "capital": 5000000,
+      "fee_rounding_brl": -0.04485283524142071,
+      "final_bps": -9.884054027497768e-05,
+      "first_difference_session": 8,
+      "max_path_bps": 9.884054027497768e-05,
+      "rent_rounding_brl": -0.014680114335169251,
+      "scenario": "security_day_nearest",
+      "start": "2024-02-01"
+    },
+    {
+      "base": "primary",
+      "capital": 10000000,
+      "fee_rounding_brl": 0.0,
+      "final_bps": 0.0,
+      "first_difference_session": 64,
+      "max_path_bps": 0.0,
+      "rent_rounding_brl": 0.0,
+      "scenario": "minimum_pro_rata",
+      "start": "2024-02-01"
+    },
+    {
+      "base": "primary",
+      "capital": 1000000,
+      "fee_rounding_brl": 0.0,
+      "final_bps": 0.0,
+      "first_difference_session": 64,
+      "max_path_bps": 0.0,
+      "rent_rounding_brl": 0.0,
+      "scenario": "minimum_pro_rata",
+      "start": "2024-02-01"
+    },
+    {
+      "base": "primary",
+      "capital": 5000000,
+      "fee_rounding_brl": 0.0,
+      "final_bps": 0.0,
+      "first_difference_session": 64,
+      "max_path_bps": 0.0,
+      "rent_rounding_brl": 0.0,
+      "scenario": "minimum_pro_rata",
+      "start": "2024-02-01"
+    }
+  ],
+  "errors": {
+    "credit": 7.105427357601002e-14,
+    "decimal_grouping": 1.1e-14,
+    "decimal_invoice": 0.0,
+    "decimal_minimum": 2.32856523044e-15,
+    "decimal_paid": 3e-12,
+    "expense_rollforward": 1.0913936421275139e-11,
+    "funding": 7.916241884231567e-09,
+    "liability": 2.9103830456733704e-11,
+    "nav": 5.587935447692871e-09,
+    "paid_account": 1.0913936421275139e-11,
+    "prefix": 0.0,
+    "rounding_expense": 1.59637635e-11,
+    "target_prefix": 0.0
+  },
+  "identical_intention_max_brl": 1.6763806343078613e-08,
+  "independent_adaptive_max_path_bps": {
+    "1000000": 8.16549058072269e-06,
+    "10000000": 0.010282502409070731,
+    "5000000": 2.2326227277517318e-05
+  },
+  "invoice_groups": 9503,
+  "metadata_patch": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\loan_invoices\\evaluation_metadata.patch",
+    "sha256": "806bfd0ad21fe56be617dbf85f7ab2b99e87ed01e3b0366d3b257511e39eea3e"
+  },
+  "one_factor": "security_day_nearest minus contract_nearest isolates invoice grouping; other variants compare primary. Original-security/day invoice grouping NEVER merges registrations, rates, principal, renewals or minimums. Minimum pro-rata advances only existing residual minimum and offsets future fees; no duplicate toll.",
+  "precision_boundaries": [
+    {
+      "book": "2019-02-01_contract_down_10000000",
+      "coordinate": "10.0",
+      "coordinate_paid": "10.00",
+      "day": 56,
+      "field": "fee",
+      "recomposed": "9.9999999999999998",
+      "recomposed_paid": "9.99",
+      "security": 535
+    },
+    {
+      "book": "2019-02-01_contract_down_10000000",
+      "coordinate": "10.0",
+      "coordinate_paid": "10.00",
+      "day": 56,
+      "field": "fee",
+      "recomposed": "9.99999999999999925",
+      "recomposed_paid": "9.99",
+      "security": 535
+    },
+    {
+      "book": "2019-02-01_contract_down_10000000",
+      "coordinate": "10.0",
+      "coordinate_paid": "10.00",
+      "day": 59,
+      "field": "fee",
+      "recomposed": "9.9999999999999991225",
+      "recomposed_paid": "9.99",
+      "security": 111
+    },
+    {
+      "book": "2019-02-01_contract_down_10000000",
+      "coordinate": "10.0",
+      "coordinate_paid": "10.00",
+      "day": 61,
+      "field": "fee",
+      "recomposed": "9.9999999999999997",
+      "recomposed_paid": "9.99",
+      "security": 537
+    },
+    {
+      "book": "2019-02-01_contract_down_10000000",
+      "coordinate": "10.0",
+      "coordinate_paid": "10.00",
+      "day": 62,
+      "field": "fee",
+      "recomposed": "9.9999999999999996",
+      "recomposed_paid": "9.99",
+      "security": 861
+    },
+    {
+      "book": "2019-02-01_contract_down_1000000",
+      "coordinate": "10.0",
+      "coordinate_paid": "10.00",
+      "day": 16,
+      "field": "fee",
+      "recomposed": "9.99999999999999897",
+      "recomposed_paid": "9.99",
+      "security": 313
+    },
+    {
+      "book": "2019-02-01_contract_down_1000000",
+      "coordinate": "10.0",
+      "coordinate_paid": "10.00",
+      "day": 44,
+      "field": "fee",
+      "recomposed": "9.99999999999999975",
+      "recomposed_paid": "9.99",
+      "security": 232
+    },
+    {
+      "book": "2019-02-01_contract_down_1000000",
+      "coordinate": "10.0",
+      "coordinate_paid": "10.00",
+      "day": 56,
+      "field": "fee",
+      "recomposed": "9.99999999999999997",
+      "recomposed_paid": "9.99",
+      "security": 535
+    },
+    {
+      "book": "2019-02-01_contract_down_1000000",
+      "coordinate": "10.0",
+      "coordinate_paid": "10.00",
+      "day": 56,
+      "field": "fee",
+      "recomposed": "9.99999999999999942",
+      "recomposed_paid": "9.99",
+      "security": 535
+    },
+    {
+      "book": "2019-02-01_contract_down_1000000",
+      "coordinate": "10.0",
+      "coordinate_paid": "10.00",
+      "day": 56,
+      "field": "fee",
+      "recomposed": "9.9999999999999996",
+      "recomposed_paid": "9.99",
+      "security": 653
+    },
+    {
+      "book": "2019-02-01_contract_down_1000000",
+      "coordinate": "10.0",
+      "coordinate_paid": "10.00",
+      "day": 59,
+      "field": "fee",
+      "recomposed": "9.9999999999999998",
+      "recomposed_paid": "9.99",
+      "security": 91
+    },
+    {
+      "book": "2019-02-01_contract_down_1000000",
+      "coordinate": "10.0",
+      "coordinate_paid": "10.00",
+      "day": 59,
+      "field": "fee",
+      "recomposed": "9.9999999999999997",
+      "recomposed_paid": "9.99",
+      "security": 336
+    },
+    {
+      "book": "2019-02-01_contract_down_1000000",
+      "coordinate": "10.0",
+      "coordinate_paid": "10.00",
+      "day": 59,
+      "field": "fee",
+      "recomposed": "9.9999999999999995",
+      "recomposed_paid": "9.99",
+      "security": 537
+    },
+    {
+      "book": "2019-02-01_contract_down_1000000",
+      "coordinate": "10.0",
+      "coordinate_paid": "10.00",
+      "day": 59,
+      "field": "fee",
+      "recomposed": "9.999999999999999",
+      "recomposed_paid": "9.99",
+      "security": 861
+    },
+    {
+      "book": "2019-02-01_contract_down_1000000",
+      "coordinate": "10.0",
+      "coordinate_paid": "10.00",
+      "day": 61,
+      "field": "fee",
+      "recomposed": "9.99999999999999956",
+      "recomposed_paid": "9.99",
+      "security": 91
+    },
+    {
+      "book": "2019-02-01_contract_down_1000000",
+      "coordinate": "10.0",
+      "coordinate_paid": "10.00",
+      "day": 61,
+      "field": "fee",
+      "recomposed": "9.9999999999999994",
+      "recomposed_paid": "9.99",
+      "security": 537
+    },
+    {
+      "book": "2019-02-01_contract_down_1000000",
+      "coordinate": "10.0",
+      "coordinate_paid": "10.00",
+      "day": 62,
+      "field": "fee",
+      "recomposed": "9.9999999999999998",
+      "recomposed_paid": "9.99",
+      "security": 861
+    },
+    {
+      "book": "2019-02-01_contract_down_1000000",
+      "coordinate": "10.0",
+      "coordinate_paid": "10.00",
+      "day": 62,
+      "field": "fee",
+      "recomposed": "9.99999999999999974",
+      "recomposed_paid": "9.99",
+      "security": 902
+    },
+    {
+      "book": "2019-02-01_contract_down_5000000",
+      "coordinate": "10.0",
+      "coordinate_paid": "10.00",
+      "day": 44,
+      "field": "fee",
+      "recomposed": "9.9999999999999995",
+      "recomposed_paid": "9.99",
+      "security": 232
+    },
+    {
+      "book": "2019-02-01_contract_down_5000000",
+      "coordinate": "10.0",
+      "coordinate_paid": "10.00",
+      "day": 44,
+      "field": "fee",
+      "recomposed": "9.99999999999999995",
+      "recomposed_paid": "9.99",
+      "security": 232
+    },
+    {
+      "book": "2019-02-01_contract_down_5000000",
+      "coordinate": "10.0",
+      "coordinate_paid": "10.00",
+      "day": 56,
+      "field": "fee",
+      "recomposed": "9.9999999999999993",
+      "recomposed_paid": "9.99",
+      "security": 535
+    },
+    {
+      "book": "2019-02-01_contract_down_5000000",
+      "coordinate": "10.0",
+      "coordinate_paid": "10.00",
+      "day": 56,
+      "field": "fee",
+      "recomposed": "9.9999999999999998",
+      "recomposed_paid": "9.99",
+      "security": 535
+    },
+    {
+      "book": "2019-02-01_contract_down_5000000",
+      "coordinate": "10.0",
+      "coordinate_paid": "10.00",
+      "day": 56,
+      "field": "fee",
+      "recomposed": "9.99999999999999896",
+      "recomposed_paid": "9.99",
+      "security": 535
+    },
+    {
+      "book": "2019-02-01_contract_down_5000000",
+      "coordinate": "10.0",
+      "coordinate_paid": "10.00",
+      "day": 56,
+      "field": "fee",
+      "recomposed": "9.9999999999999998",
+      "recomposed_paid": "9.99",
+      "security": 653
+    },
+    {
+      "book": "2019-02-01_contract_down_5000000",
+      "coordinate": "10.0",
+      "coordinate_paid": "10.00",
+      "day": 61,
+      "field": "fee",
+      "recomposed": "9.9999999999999998",
+      "recomposed_paid": "9.99",
+      "security": 91
+    },
+    {
+      "book": "2019-02-01_contract_down_5000000",
+      "coordinate": "10.0",
+      "coordinate_paid": "10.00",
+      "day": 61,
+      "field": "fee",
+      "recomposed": "9.9999999999999998",
+      "recomposed_paid": "9.99",
+      "security": 861
+    },
+    {
+      "book": "2019-02-01_contract_down_5000000",
+      "coordinate": "10.0",
+      "coordinate_paid": "10.00",
+      "day": 62,
+      "field": "fee",
+      "recomposed": "9.9999999999999996",
+      "recomposed_paid": "9.99",
+      "security": 537
+    },
+    {
+      "book": "2019-02-01_contract_down_5000000",
+      "coordinate": "10.0",
+      "coordinate_paid": "10.00",
+      "day": 62,
+      "field": "fee",
+      "recomposed": "9.9999999999999999",
+      "recomposed_paid": "9.99",
+      "security": 861
+    },
+    {
+      "book": "2019-02-01_contract_up_10000000",
+      "coordinate": "10.0",
+      "coordinate_paid": "10.00",
+      "day": 16,
+      "field": "fee",
+      "recomposed": "10.0000000000000009",
+      "recomposed_paid": "10.01",
+      "security": 313
+    },
+    {
+      "book": "2019-02-01_contract_up_10000000",
+      "coordinate": "10.0",
+      "coordinate_paid": "10.00",
+      "day": 44,
+      "field": "fee",
+      "recomposed": "10.0000000000000005",
+      "recomposed_paid": "10.01",
+      "security": 232
+    },
+    {
+      "book": "2019-02-01_contract_up_10000000",
+      "coordinate": "10.0",
+      "coordinate_paid": "10.00",
+      "day": 44,
+      "field": "fee",
+      "recomposed": "10.0000000000000003",
+      "recomposed_paid": "10.01",
+      "security": 232
+    },
+    {
+      "book": "2019-02-01_contract_up_10000000",
+      "coordinate": "10.0",
+      "coordinate_paid": "10.00",
+      "day": 44,
+      "field": "fee",
+      "recomposed": "10.0000000000000003",
+      "recomposed_paid": "10.01",
+      "security": 232
+    },
+    {
+      "book": "2019-02-01_contract_up_10000000",
+      "coordinate": "10.0",
+      "coordinate_paid": "10.00",
+      "day": 56,
+      "field": "fee",
+      "recomposed": "10.0000000000000007",
+      "recomposed_paid": "10.01",
+      "security": 535
+    },
+    {
+      "book": "2019-02-01_contract_up_10000000",
+      "coordinate": "10.0",
+      "coordinate_paid": "10.00",
+      "day": 56,
+      "field": "fee",
+      "recomposed": "10.00000000000000043",
+      "recomposed_paid": "10.01",
+      "security": 535
+    },
+    {
+      "book": "2019-02-01_contract_up_10000000",
+      "coordinate": "10.0",
+      "coordinate_paid": "10.00",
+      "day": 56,
+      "field": "fee",
+      "recomposed": "10.0000000000000002",
+      "recomposed_paid": "10.01",
+      "security": 653
+    },
+    {
+      "book": "2019-02-01_contract_up_10000000",
+      "coordinate": "10.0",
+      "coordinate_paid": "10.00",
+      "day": 59,
+      "field": "fee",
+      "recomposed": "10.000000000000001",
+      "recomposed_paid": "10.01",
+      "security": 861
+    },
+    {
+      "book": "2019-02-01_contract_up_10000000",
+      "coordinate": "10.0",
+      "coordinate_paid": "10.00",
+      "day": 61,
+      "field": "fee",
+      "recomposed": "10.00000000000000013",
+      "recomposed_paid": "10.01",
+      "security": 31
+    },
+    {
+      "book": "2019-02-01_contract_up_10000000",
+      "coordinate": "10.0",
+      "coordinate_paid": "10.00",
+      "day": 61,
+      "field": "fee",
+      "recomposed": "10.0000000000000003",
+      "recomposed_paid": "10.01",
+      "security": 861
+    },
+    {
+      "book": "2019-02-01_contract_up_10000000",
+      "coordinate": "10.0",
+      "coordinate_paid": "10.00",
+      "day": 62,
+      "field": "fee",
+      "recomposed": "10.0000000000000007",
+      "recomposed_paid": "10.01",
+      "security": 31
+    },
+    {
+      "book": "2019-02-01_contract_up_10000000",
+      "coordinate": "10.0",
+      "coordinate_paid": "10.00",
+      "day": 62,
+      "field": "fee",
+      "recomposed": "10.0000000000000004",
+      "recomposed_paid": "10.01",
+      "security": 91
+    },
+    {
+      "book": "2019-02-01_contract_up_10000000",
+      "coordinate": "10.0",
+      "coordinate_paid": "10.00",
+      "day": 62,
+      "field": "fee",
+      "recomposed": "10.0000000000000007",
+      "recomposed_paid": "10.01",
+      "security": 537
+    },
+    {
+      "book": "2019-02-01_contract_up_10000000",
+      "coordinate": "10.0",
+      "coordinate_paid": "10.00",
+      "day": 62,
+      "field": "fee",
+      "recomposed": "10.0000000000000011",
+      "recomposed_paid": "10.01",
+      "security": 902
+    },
+    {
+      "book": "2019-02-01_contract_up_1000000",
+      "coordinate": "10.0",
+      "coordinate_paid": "10.00",
+      "day": 8,
+      "field": "fee",
+      "recomposed": "10.00000000000000026",
+      "recomposed_paid": "10.01",
+      "security": 503
+    },
+    {
+      "book": "2019-02-01_contract_up_1000000",
+      "coordinate": "10.0",
+      "coordinate_paid": "10.00",
+      "day": 26,
+      "field": "fee",
+      "recomposed": "10.0000000000000006",
+      "recomposed_paid": "10.01",
+      "security": 803
+    },
+    {
+      "book": "2019-02-01_contract_up_1000000",
+      "coordinate": "10.0",
+      "coordinate_paid": "10.00",
+      "day": 44,
+      "field": "fee",
+      "recomposed": "10.0000000000000004",
+      "recomposed_paid": "10.01",
+      "security": 232
+    },
+    {
+      "book": "2019-02-01_contract_up_1000000",
+      "coordinate": "10.0",
+      "coordinate_paid": "10.00",
+      "day": 44,
+      "field": "fee",
+      "recomposed": "10.00000000000000017",
+      "recomposed_paid": "10.01",
+      "security": 232
+    },
+    {
+      "book": "2019-02-01_contract_up_1000000",
+      "coordinate": "10.0",
+      "coordinate_paid": "10.00",
+      "day": 56,
+      "field": "fee",
+      "recomposed": "10.00000000000000108",
+      "recomposed_paid": "10.01",
+      "security": 535
+    },
+    {
+      "book": "2019-02-01_contract_up_1000000",
+      "coordinate": "10.0",
+      "coordinate_paid": "10.00",
+      "day": 56,
+      "field": "fee",
+      "recomposed": "10.0000000000000003",
+      "recomposed_paid": "10.01",
+      "security": 535
+    },
+    {
+      "book": "2019-02-01_contract_up_1000000",
+      "coordinate": "10.0",
+      "coordinate_paid": "10.00",
+      "day": 56,
+      "field": "fee",
+      "recomposed": "10.000000000000000014",
+      "recomposed_paid": "10.01",
+      "security": 535
+    },
+    {
+      "book": "2019-02-01_contract_up_1000000",
+      "coordinate": "10.0",
+      "coordinate_paid": "10.00",
+      "day": 56,
+      "field": "fee",
+      "recomposed": "10.0000000000000005",
+      "recomposed_paid": "10.01",
+      "security": 535
+    },
+    {
+      "book": "2019-02-01_contract_up_1000000",
+      "coordinate": "10.0",
+      "coordinate_paid": "10.00",
+      "day": 56,
+      "field": "fee",
+      "recomposed": "10.00000000000000006",
+      "recomposed_paid": "10.01",
+      "security": 653
+    },
+    {
+      "book": "2019-02-01_contract_up_1000000",
+      "coordinate": "10.0",
+      "coordinate_paid": "10.00",
+      "day": 59,
+      "field": "fee",
+      "recomposed": "10.00000000000000081227",
+      "recomposed_paid": "10.01",
+      "security": 111
+    },
+    {
+      "book": "2019-02-01_contract_up_1000000",
+      "coordinate": "10.0",
+      "coordinate_paid": "10.00",
+      "day": 59,
+      "field": "fee",
+      "recomposed": "10.0000000000000003",
+      "recomposed_paid": "10.01",
+      "security": 440
+    },
+    {
+      "book": "2019-02-01_contract_up_1000000",
+      "coordinate": "10.0",
+      "coordinate_paid": "10.00",
+      "day": 59,
+      "field": "fee",
+      "recomposed": "10.0000000000000003",
+      "recomposed_paid": "10.01",
+      "security": 639
+    },
+    {
+      "book": "2019-02-01_contract_up_1000000",
+      "coordinate": "10.0",
+      "coordinate_paid": "10.00",
+      "day": 59,
+      "field": "fee",
+      "recomposed": "10.0000000000000004",
+      "recomposed_paid": "10.01",
+      "security": 660
+    },
+    {
+      "book": "2019-02-01_contract_up_1000000",
+      "coordinate": "10.0",
+      "coordinate_paid": "10.00",
+      "day": 61,
+      "field": "fee",
+      "recomposed": "10.00000000000000064",
+      "recomposed_paid": "10.01",
+      "security": 861
+    },
+    {
+      "book": "2019-02-01_contract_up_1000000",
+      "coordinate": "10.0",
+      "coordinate_paid": "10.00",
+      "day": 62,
+      "field": "fee",
+      "recomposed": "10.00000000000000115",
+      "recomposed_paid": "10.01",
+      "security": 91
+    },
+    {
+      "book": "2019-02-01_contract_up_1000000",
+      "coordinate": "10.0",
+      "coordinate_paid": "10.00",
+      "day": 62,
+      "field": "fee",
+      "recomposed": "10.00000000000000024",
+      "recomposed_paid": "10.01",
+      "security": 537
+    },
+    {
+      "book": "2019-02-01_contract_up_5000000",
+      "coordinate": "10.0",
+      "coordinate_paid": "10.00",
+      "day": 8,
+      "field": "fee",
+      "recomposed": "10.0000000000000007",
+      "recomposed_paid": "10.01",
+      "security": 503
+    },
+    {
+      "book": "2019-02-01_contract_up_5000000",
+      "coordinate": "10.0",
+      "coordinate_paid": "10.00",
+      "day": 16,
+      "field": "fee",
+      "recomposed": "10.0000000000000008",
+      "recomposed_paid": "10.01",
+      "security": 313
+    },
+    {
+      "book": "2019-02-01_contract_up_5000000",
+      "coordinate": "10.0",
+      "coordinate_paid": "10.00",
+      "day": 44,
+      "field": "fee",
+      "recomposed": "10.0000000000000011",
+      "recomposed_paid": "10.01",
+      "security": 232
+    },
+    {
+      "book": "2019-02-01_contract_up_5000000",
+      "coordinate": "10.0",
+      "coordinate_paid": "10.00",
+      "day": 44,
+      "field": "fee",
+      "recomposed": "10.0000000000000011",
+      "recomposed_paid": "10.01",
+      "security": 232
+    },
+    {
+      "book": "2019-02-01_contract_up_5000000",
+      "coordinate": "10.0",
+      "coordinate_paid": "10.00",
+      "day": 44,
+      "field": "fee",
+      "recomposed": "10.0000000000000004",
+      "recomposed_paid": "10.01",
+      "security": 232
+    },
+    {
+      "book": "2019-02-01_contract_up_5000000",
+      "coordinate": "10.0",
+      "coordinate_paid": "10.00",
+      "day": 56,
+      "field": "fee",
+      "recomposed": "10.000000000000001",
+      "recomposed_paid": "10.01",
+      "security": 535
+    },
+    {
+      "book": "2019-02-01_contract_up_5000000",
+      "coordinate": "10.0",
+      "coordinate_paid": "10.00",
+      "day": 56,
+      "field": "fee",
+      "recomposed": "10.00000000000000059",
+      "recomposed_paid": "10.01",
+      "security": 535
+    },
+    {
+      "book": "2019-02-01_contract_up_5000000",
+      "coordinate": "10.0",
+      "coordinate_paid": "10.00",
+      "day": 59,
+      "field": "fee",
+      "recomposed": "10.00000000000000106124",
+      "recomposed_paid": "10.01",
+      "security": 111
+    },
+    {
+      "book": "2019-02-01_contract_up_5000000",
+      "coordinate": "10.0",
+      "coordinate_paid": "10.00",
+      "day": 59,
+      "field": "fee",
+      "recomposed": "10.0000000000000004",
+      "recomposed_paid": "10.01",
+      "security": 861
+    },
+    {
+      "book": "2019-02-01_contract_up_5000000",
+      "coordinate": "10.0",
+      "coordinate_paid": "10.00",
+      "day": 61,
+      "field": "fee",
+      "recomposed": "10.000000000000000976",
+      "recomposed_paid": "10.01",
+      "security": 31
+    },
+    {
+      "book": "2019-02-01_contract_up_5000000",
+      "coordinate": "10.0",
+      "coordinate_paid": "10.00",
+      "day": 61,
+      "field": "fee",
+      "recomposed": "10.0000000000000005",
+      "recomposed_paid": "10.01",
+      "security": 537
+    },
+    {
+      "book": "2019-02-01_contract_up_5000000",
+      "coordinate": "10.0",
+      "coordinate_paid": "10.00",
+      "day": 61,
+      "field": "fee",
+      "recomposed": "10.0000000000000002",
+      "recomposed_paid": "10.01",
+      "security": 902
+    },
+    {
+      "book": "2019-02-01_contract_up_5000000",
+      "coordinate": "10.0",
+      "coordinate_paid": "10.00",
+      "day": 62,
+      "field": "fee",
+      "recomposed": "10.00000000000000093",
+      "recomposed_paid": "10.01",
+      "security": 31
+    },
+    {
+      "book": "2019-02-01_contract_up_5000000",
+      "coordinate": "10.0",
+      "coordinate_paid": "10.00",
+      "day": 62,
+      "field": "fee",
+      "recomposed": "10.0000000000000008",
+      "recomposed_paid": "10.01",
+      "security": 91
+    }
+  ],
+  "precision_contract": "Independent components match within1.1e-14BRL; Decimal rounding of saved Float64 invoice coordinates matches all9503 groups exactly.72 recomposition/cent straddles are operand-printing precision boundaries around an actualR10 coordinate, not observed invoice uncertainty or evidence for9.99/10.01 exact fees. All are enumerated; actual lower/upper scenario paths retain their frozen coordinate contract.",
+  "qualification": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\loan_invoices\\qualification_qualified\\manifest.json",
+    "sha256": "bbf83654471fccd06035687789ba534242a9c7908681c2e7fbd642ea9a259caf"
+  },
+  "remaining": "Actual-held-Cielo cent bound; final historical B3 spot/custody/rent-intermediation/brokerage/shortfall/cash/debit separation and negotiated sensitivities; three older clearing ambiguities; held source/succession data admission; then registeredC/D. ALSC credit/exactnet/actualreceipt and ENATfractionauction remainunknown. Both acceptedstores/oldfits and all prior books are sealed; no newfit/modelprofit.",
+  "root_payments": 9738,
+  "runtime": {
+    "execution/__init__.py": {
+      "current": {
+        "path": "C:\\quant\\b3-quant\\research\\src\\brazil_rv\\execution\\__init__.py",
+        "sha256": "a539e7a2e774cde1d67f77066af47da7546dbe59b609d4e0054b6e03e5377e9d"
+      },
+      "executed": {
+        "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\loan_invoices\\executed_execution___init__.py",
+        "sha256": "a539e7a2e774cde1d67f77066af47da7546dbe59b609d4e0054b6e03e5377e9d"
+      }
+    },
+    "execution/action_settlement.py": {
+      "current": {
+        "path": "C:\\quant\\b3-quant\\research\\src\\brazil_rv\\execution\\action_settlement.py",
+        "sha256": "01b106762eded1eddc3a0b38da0bb40760dc0eb71a6e4e1518031f9a5bce58cf"
+      },
+      "executed": {
+        "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\loan_invoices\\executed_execution_action_settlement.py",
+        "sha256": "01b106762eded1eddc3a0b38da0bb40760dc0eb71a6e4e1518031f9a5bce58cf"
+      }
+    },
+    "execution/allocation.py": {
+      "current": {
+        "path": "C:\\quant\\b3-quant\\research\\src\\brazil_rv\\execution\\allocation.py",
+        "sha256": "53dbb9b9b8c7cc46f73b226a93e6ea6cad5057b200fc0ca94c6d2798b05e43a5"
+      },
+      "executed": {
+        "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\loan_invoices\\executed_execution_allocation.py",
+        "sha256": "53dbb9b9b8c7cc46f73b226a93e6ea6cad5057b200fc0ca94c6d2798b05e43a5"
+      }
+    },
+    "execution/config.py": {
+      "current": {
+        "path": "C:\\quant\\b3-quant\\research\\src\\brazil_rv\\execution\\config.py",
+        "sha256": "39860efcb3e81f33e5a0116b732ef142f192f75f2da0565e36b47dde2c08ffff"
+      },
+      "executed": {
+        "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\loan_invoices\\executed_execution_config.py",
+        "sha256": "39860efcb3e81f33e5a0116b732ef142f192f75f2da0565e36b47dde2c08ffff"
+      }
+    },
+    "execution/constraints.py": {
+      "current": {
+        "path": "C:\\quant\\b3-quant\\research\\src\\brazil_rv\\execution\\constraints.py",
+        "sha256": "9d33fc3e92cd2f7d4d415dc15dbd5aa444e9921bf2e4340e725d9fd8bdeff8fb"
+      },
+      "executed": {
+        "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\loan_invoices\\executed_execution_constraints.py",
+        "sha256": "9d33fc3e92cd2f7d4d415dc15dbd5aa444e9921bf2e4340e725d9fd8bdeff8fb"
+      }
+    },
+    "execution/experiment52.py": {
+      "current": {
+        "path": "C:\\quant\\b3-quant\\research\\src\\brazil_rv\\execution\\experiment52.py",
+        "sha256": "2b951ce5625991f4cccdfe1fe77c1cbf5e67e510b1426ae52ce0c1680d84b9ac"
+      },
+      "executed": {
+        "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\loan_invoices\\executed_execution_experiment52.py",
+        "sha256": "2b951ce5625991f4cccdfe1fe77c1cbf5e67e510b1426ae52ce0c1680d84b9ac"
+      }
+    },
+    "execution/experiment53.py": {
+      "current": {
+        "path": "C:\\quant\\b3-quant\\research\\src\\brazil_rv\\execution\\experiment53.py",
+        "sha256": "3943b7cb023a266cb81116fd532b968c1d11169b0260eb983bf09f9091fe3fb2"
+      },
+      "executed": {
+        "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\loan_invoices\\executed_execution_experiment53.py",
+        "sha256": "3943b7cb023a266cb81116fd532b968c1d11169b0260eb983bf09f9091fe3fb2"
+      }
+    },
+    "execution/experiment54.py": {
+      "current": {
+        "path": "C:\\quant\\b3-quant\\research\\src\\brazil_rv\\execution\\experiment54.py",
+        "sha256": "690e3b30491909f2ebc9954d7197c92c3f1568ec5dacbd6079585dc8a2b0e7bb"
+      },
+      "executed": {
+        "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\loan_invoices\\executed_execution_experiment54.py",
+        "sha256": "690e3b30491909f2ebc9954d7197c92c3f1568ec5dacbd6079585dc8a2b0e7bb"
+      }
+    },
+    "execution/experiment56.py": {
+      "current": {
+        "path": "C:\\quant\\b3-quant\\research\\src\\brazil_rv\\execution\\experiment56.py",
+        "sha256": "339b805f2d5226d5bc89c16f3a5e91aa20f22cff59280c0be4d0fa876b30871c"
+      },
+      "executed": {
+        "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\loan_invoices\\executed_execution_experiment56.py",
+        "sha256": "339b805f2d5226d5bc89c16f3a5e91aa20f22cff59280c0be4d0fa876b30871c"
+      }
+    },
+    "execution/experiment57.py": {
+      "current": {
+        "path": "C:\\quant\\b3-quant\\research\\src\\brazil_rv\\execution\\experiment57.py",
+        "sha256": "1b42d4909e842b55f2b167c2e450a6982cd53d75fc75d0c7bee918e0d004eec0"
+      },
+      "executed": {
+        "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\loan_invoices\\executed_execution_experiment57.py",
+        "sha256": "1b42d4909e842b55f2b167c2e450a6982cd53d75fc75d0c7bee918e0d004eec0"
+      }
+    },
+    "execution/experiment58.py": {
+      "current": {
+        "path": "C:\\quant\\b3-quant\\research\\src\\brazil_rv\\execution\\experiment58.py",
+        "sha256": "3b10243058bccad3c3ad70819a84ed3b1c491d3bf21c4f8cb58d17010f957a7e"
+      },
+      "executed": {
+        "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\loan_invoices\\executed_execution_experiment58.py",
+        "sha256": "3b10243058bccad3c3ad70819a84ed3b1c491d3bf21c4f8cb58d17010f957a7e"
+      }
+    },
+    "execution/features.py": {
+      "current": {
+        "path": "C:\\quant\\b3-quant\\research\\src\\brazil_rv\\execution\\features.py",
+        "sha256": "2cbb981051fa4c4c1f67048eb5d0f39b089104044f64c2de2cc754ba2a85eb7a"
+      },
+      "executed": {
+        "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\loan_invoices\\executed_execution_features.py",
+        "sha256": "2cbb981051fa4c4c1f67048eb5d0f39b089104044f64c2de2cc754ba2a85eb7a"
+      }
+    },
+    "execution/inputs.py": {
+      "current": {
+        "path": "C:\\quant\\b3-quant\\research\\src\\brazil_rv\\execution\\inputs.py",
+        "sha256": "fcefdbb279de390f9f41a5bbf8c841a0cb62fc8161d41fe4fca243dcacbc5687"
+      },
+      "executed": {
+        "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\loan_invoices\\executed_execution_inputs.py",
+        "sha256": "fcefdbb279de390f9f41a5bbf8c841a0cb62fc8161d41fe4fca243dcacbc5687"
+      }
+    },
+    "execution/loan_contracts.py": {
+      "current": {
+        "path": "C:\\quant\\b3-quant\\research\\src\\brazil_rv\\execution\\loan_contracts.py",
+        "sha256": "ae444a857a24b203e6e10aeeea9d62adfd8cb73d35583515473ec34c41455be6"
+      },
+      "executed": {
+        "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\loan_invoices\\executed_execution_loan_contracts.py",
+        "sha256": "ae444a857a24b203e6e10aeeea9d62adfd8cb73d35583515473ec34c41455be6"
+      }
+    },
+    "execution/loan_fees.py": {
+      "current": {
+        "path": "C:\\quant\\b3-quant\\research\\src\\brazil_rv\\execution\\loan_fees.py",
+        "sha256": "b2d73ed27085de2e71f43e017e69fb18bc777ab3ed79f280a9434f92e5f7181e"
+      },
+      "executed": {
+        "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\loan_invoices\\executed_execution_loan_fees.py",
+        "sha256": "b2d73ed27085de2e71f43e017e69fb18bc777ab3ed79f280a9434f92e5f7181e"
+      }
+    },
+    "execution/opportunity_policy.py": {
+      "current": {
+        "path": "C:\\quant\\b3-quant\\research\\src\\brazil_rv\\execution\\opportunity_policy.py",
+        "sha256": "10f9b16bbe34ba11e7ca4e2b8e64e4e9e6e0d869bc4fac1a0d49ff5ed26cef1b"
+      },
+      "executed": {
+        "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\loan_invoices\\executed_execution_opportunity_policy.py",
+        "sha256": "10f9b16bbe34ba11e7ca4e2b8e64e4e9e6e0d869bc4fac1a0d49ff5ed26cef1b"
+      }
+    },
+    "execution/policy.py": {
+      "current": {
+        "path": "C:\\quant\\b3-quant\\research\\src\\brazil_rv\\execution\\policy.py",
+        "sha256": "8112ad130d2690cf6dadc7b24fac3a3dbe31351863e49e08a5c003f39e502930"
+      },
+      "executed": {
+        "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\loan_invoices\\executed_execution_policy.py",
+        "sha256": "8112ad130d2690cf6dadc7b24fac3a3dbe31351863e49e08a5c003f39e502930"
+      }
+    },
+    "execution/portfolio_account.py": {
+      "current": {
+        "path": "C:\\quant\\b3-quant\\research\\src\\brazil_rv\\execution\\portfolio_account.py",
+        "sha256": "67f8bc3a8b05fbb55f8f552a5b3ac9e8f227c7a3780b4679c53230eedee9b36c"
+      },
+      "executed": {
+        "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\loan_invoices\\executed_execution_portfolio_account.py",
+        "sha256": "67f8bc3a8b05fbb55f8f552a5b3ac9e8f227c7a3780b4679c53230eedee9b36c"
+      }
+    },
+    "execution/portfolio_policy.py": {
+      "current": {
+        "path": "C:\\quant\\b3-quant\\research\\src\\brazil_rv\\execution\\portfolio_policy.py",
+        "sha256": "eda32b0f2844c8326e20cb58934dc1d000d9ff10d5029aa5950d1038eaefbf97"
+      },
+      "executed": {
+        "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\loan_invoices\\executed_execution_portfolio_policy.py",
+        "sha256": "eda32b0f2844c8326e20cb58934dc1d000d9ff10d5029aa5950d1038eaefbf97"
+      }
+    },
+    "execution/report.py": {
+      "current": {
+        "path": "C:\\quant\\b3-quant\\research\\src\\brazil_rv\\execution\\report.py",
+        "sha256": "9f395da3587cfe3babe5a9d00f1d7cea09690d5332168aa5d97b572cb6456eec"
+      },
+      "executed": {
+        "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\loan_invoices\\executed_execution_report.py",
+        "sha256": "9f395da3587cfe3babe5a9d00f1d7cea09690d5332168aa5d97b572cb6456eec"
+      }
+    },
+    "execution/share_custody.py": {
+      "current": {
+        "path": "C:\\quant\\b3-quant\\research\\src\\brazil_rv\\execution\\share_custody.py",
+        "sha256": "8aa56116a65a3cf0301e8bc2b60baf41595b1910e6e8e35cdfb287aeed136991"
+      },
+      "executed": {
+        "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\loan_invoices\\executed_execution_share_custody.py",
+        "sha256": "8aa56116a65a3cf0301e8bc2b60baf41595b1910e6e8e35cdfb287aeed136991"
+      }
+    },
+    "execution/share_distributions.py": {
+      "current": {
+        "path": "C:\\quant\\b3-quant\\research\\src\\brazil_rv\\execution\\share_distributions.py",
+        "sha256": "cddcefba2dbc9293661fa6d4e4be78620847a0eb97b427cf670fd627fc498da4"
+      },
+      "executed": {
+        "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\loan_invoices\\executed_execution_share_distributions.py",
+        "sha256": "cddcefba2dbc9293661fa6d4e4be78620847a0eb97b427cf670fd627fc498da4"
+      }
+    },
+    "execution/simulator.py": {
+      "current": {
+        "path": "C:\\quant\\b3-quant\\research\\src\\brazil_rv\\execution\\simulator.py",
+        "sha256": "714723c4c0016f4bca8cb988ed36e20e58a956a3a4b3ef6d8399b21a6ad65cab"
+      },
+      "executed": {
+        "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\loan_invoices\\executed_execution_simulator.py",
+        "sha256": "714723c4c0016f4bca8cb988ed36e20e58a956a3a4b3ef6d8399b21a6ad65cab"
+      }
+    },
+    "execution/splits.py": {
+      "current": {
+        "path": "C:\\quant\\b3-quant\\research\\src\\brazil_rv\\execution\\splits.py",
+        "sha256": "ad9376de922072bdc5a5a1ea95ed64609b597b492a71ff6a96758d570e4fdf0b"
+      },
+      "executed": {
+        "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\loan_invoices\\executed_execution_splits.py",
+        "sha256": "ad9376de922072bdc5a5a1ea95ed64609b597b492a71ff6a96758d570e4fdf0b"
+      }
+    },
+    "execution/stateful_ledger.py": {
+      "current": {
+        "path": "C:\\quant\\b3-quant\\research\\src\\brazil_rv\\execution\\stateful_ledger.py",
+        "sha256": "a100d52e1d45b4b3ccc1fae70e346d4e224545904a620cdb30be20da3ce7156e"
+      },
+      "executed": {
+        "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\loan_invoices\\executed_execution_stateful_ledger.py",
+        "sha256": "a100d52e1d45b4b3ccc1fae70e346d4e224545904a620cdb30be20da3ce7156e"
+      }
+    },
+    "execution/trainer.py": {
+      "current": {
+        "path": "C:\\quant\\b3-quant\\research\\src\\brazil_rv\\execution\\trainer.py",
+        "sha256": "ba77650620f34206c7b1c54dcbb632057b7c251c72d65bb7d5f9b53a984d0b05"
+      },
+      "executed": {
+        "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\loan_invoices\\executed_execution_trainer.py",
+        "sha256": "ba77650620f34206c7b1c54dcbb632057b7c251c72d65bb7d5f9b53a984d0b05"
+      }
+    },
+    "v2/__init__.py": {
+      "current": {
+        "path": "C:\\quant\\b3-quant\\research\\src\\brazil_rv\\v2\\__init__.py",
+        "sha256": "a0bb4ba189d415ab6878870fd0101d96cf2e82260727af9275266ea7398674c3"
+      },
+      "executed": {
+        "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\loan_invoices\\executed_v2___init__.py",
+        "sha256": "a0bb4ba189d415ab6878870fd0101d96cf2e82260727af9275266ea7398674c3"
+      }
+    },
+    "v2/action_audit.py": {
+      "current": {
+        "path": "C:\\quant\\b3-quant\\research\\src\\brazil_rv\\v2\\action_audit.py",
+        "sha256": "45ba958f1782e8c0b1b019e512bc0c1b3b56bf5aa1d60df31277774b446b6703"
+      },
+      "executed": {
+        "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\loan_invoices\\executed_v2_action_audit.py",
+        "sha256": "45ba958f1782e8c0b1b019e512bc0c1b3b56bf5aa1d60df31277774b446b6703"
+      }
+    },
+    "v2/artifacts.py": {
+      "current": {
+        "path": "C:\\quant\\b3-quant\\research\\src\\brazil_rv\\v2\\artifacts.py",
+        "sha256": "c709954ea81f6d6b6dafeee9783211ff284f67808e06769be55c283852be7a0b"
+      },
+      "executed": {
+        "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\loan_invoices\\executed_v2_artifacts.py",
+        "sha256": "c709954ea81f6d6b6dafeee9783211ff284f67808e06769be55c283852be7a0b"
+      }
+    },
+    "v2/audit_intraday.py": {
+      "current": {
+        "path": "C:\\quant\\b3-quant\\research\\src\\brazil_rv\\v2\\audit_intraday.py",
+        "sha256": "7ac619a671713e3c234adc74b548a7c407e7c3b49b1d75dfed812f26cc852cd8"
+      },
+      "executed": {
+        "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\loan_invoices\\executed_v2_audit_intraday.py",
+        "sha256": "7ac619a671713e3c234adc74b548a7c407e7c3b49b1d75dfed812f26cc852cd8"
+      }
+    },
+    "v2/auxiliary_history.py": {
+      "current": {
+        "path": "C:\\quant\\b3-quant\\research\\src\\brazil_rv\\v2\\auxiliary_history.py",
+        "sha256": "b1ce0fe670553ae6326ebc21e8bc845f3ddabf13b1a632e706e8c0b8439d035b"
+      },
+      "executed": {
+        "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\loan_invoices\\executed_v2_auxiliary_history.py",
+        "sha256": "b1ce0fe670553ae6326ebc21e8bc845f3ddabf13b1a632e706e8c0b8439d035b"
+      }
+    },
+    "v2/baselines.py": {
+      "current": {
+        "path": "C:\\quant\\b3-quant\\research\\src\\brazil_rv\\v2\\baselines.py",
+        "sha256": "3388a4b00ed36e5d9e21a782848c170b4b069bef96fa1a1d36486767cc29b677"
+      },
+      "executed": {
+        "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\loan_invoices\\executed_v2_baselines.py",
+        "sha256": "3388a4b00ed36e5d9e21a782848c170b4b069bef96fa1a1d36486767cc29b677"
+      }
+    },
+    "v2/bova11.py": {
+      "current": {
+        "path": "C:\\quant\\b3-quant\\research\\src\\brazil_rv\\v2\\bova11.py",
+        "sha256": "972f0ede2e670f84c32f20d31abfd17181df00edb17abbc387efdf4711745e5c"
+      },
+      "executed": {
+        "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\loan_invoices\\executed_v2_bova11.py",
+        "sha256": "972f0ede2e670f84c32f20d31abfd17181df00edb17abbc387efdf4711745e5c"
+      }
+    },
+    "v2/branch_diagnostics.py": {
+      "current": {
+        "path": "C:\\quant\\b3-quant\\research\\src\\brazil_rv\\v2\\branch_diagnostics.py",
+        "sha256": "682e4fa6cdaf77018d48b4c2c94a7a97aa195d9369697c52f58488c6667395eb"
+      },
+      "executed": {
+        "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\loan_invoices\\executed_v2_branch_diagnostics.py",
+        "sha256": "682e4fa6cdaf77018d48b4c2c94a7a97aa195d9369697c52f58488c6667395eb"
+      }
+    },
+    "v2/build_store.py": {
+      "current": {
+        "path": "C:\\quant\\b3-quant\\research\\src\\brazil_rv\\v2\\build_store.py",
+        "sha256": "ef084a2878717e30465a8dfb81338f004cbc098e015df44d6cf05998b11248ad"
+      },
+      "executed": {
+        "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\loan_invoices\\executed_v2_build_store.py",
+        "sha256": "ef084a2878717e30465a8dfb81338f004cbc098e015df44d6cf05998b11248ad"
+      }
+    },
+    "v2/cash_calendar.py": {
+      "current": {
+        "path": "C:\\quant\\b3-quant\\research\\src\\brazil_rv\\v2\\cash_calendar.py",
+        "sha256": "4ff7a71a454fbbb3f74c2575a6418686b1dea8b0aeeef0da3038445973d0704b"
+      },
+      "executed": {
+        "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\loan_invoices\\executed_v2_cash_calendar.py",
+        "sha256": "4ff7a71a454fbbb3f74c2575a6418686b1dea8b0aeeef0da3038445973d0704b"
+      }
+    },
+    "v2/characteristic_model.py": {
+      "current": {
+        "path": "C:\\quant\\b3-quant\\research\\src\\brazil_rv\\v2\\characteristic_model.py",
+        "sha256": "53ff8ebe812b038941f8926e36486608600c55d19372cf76d42ab2f524da67cb"
+      },
+      "executed": {
+        "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\loan_invoices\\executed_v2_characteristic_model.py",
+        "sha256": "53ff8ebe812b038941f8926e36486608600c55d19372cf76d42ab2f524da67cb"
+      }
+    },
+    "v2/checkpoint_readouts.py": {
+      "current": {
+        "path": "C:\\quant\\b3-quant\\research\\src\\brazil_rv\\v2\\checkpoint_readouts.py",
+        "sha256": "6bda32704d9a5b476562f94f5979838cfcb863019c1ec73e396486757cd0303a"
+      },
+      "executed": {
+        "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\loan_invoices\\executed_v2_checkpoint_readouts.py",
+        "sha256": "6bda32704d9a5b476562f94f5979838cfcb863019c1ec73e396486757cd0303a"
+      }
+    },
+    "v2/compute_benchmark.py": {
+      "current": {
+        "path": "C:\\quant\\b3-quant\\research\\src\\brazil_rv\\v2\\compute_benchmark.py",
+        "sha256": "efca8c76a84a10703018bd8bfbcef5ff04980b6281cecbada0a509cdc8412031"
+      },
+      "executed": {
+        "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\loan_invoices\\executed_v2_compute_benchmark.py",
+        "sha256": "efca8c76a84a10703018bd8bfbcef5ff04980b6281cecbada0a509cdc8412031"
+      }
+    },
+    "v2/config.py": {
+      "current": {
+        "path": "C:\\quant\\b3-quant\\research\\src\\brazil_rv\\v2\\config.py",
+        "sha256": "5c715c954ef864de8db9b00944268d40a5e7426ed799c8653ad20ce3b281d22a"
+      },
+      "executed": {
+        "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\loan_invoices\\executed_v2_config.py",
+        "sha256": "5c715c954ef864de8db9b00944268d40a5e7426ed799c8653ad20ce3b281d22a"
+      }
+    },
+    "v2/contract.py": {
+      "current": {
+        "path": "C:\\quant\\b3-quant\\research\\src\\brazil_rv\\v2\\contract.py",
+        "sha256": "552f991a2db8d3f48b027ea4986a46b8806c9e3815e69784cdd01f7fa20ff7f1"
+      },
+      "executed": {
+        "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\loan_invoices\\executed_v2_contract.py",
+        "sha256": "552f991a2db8d3f48b027ea4986a46b8806c9e3815e69784cdd01f7fa20ff7f1"
+      }
+    },
+    "v2/controller_context.py": {
+      "current": {
+        "path": "C:\\quant\\b3-quant\\research\\src\\brazil_rv\\v2\\controller_context.py",
+        "sha256": "30ca82fb1effe60fc291181b47790fc01935c0d987724710420322fa016efb03"
+      },
+      "executed": {
+        "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\loan_invoices\\executed_v2_controller_context.py",
+        "sha256": "30ca82fb1effe60fc291181b47790fc01935c0d987724710420322fa016efb03"
+      }
+    },
+    "v2/controller_program.py": {
+      "current": {
+        "path": "C:\\quant\\b3-quant\\research\\src\\brazil_rv\\v2\\controller_program.py",
+        "sha256": "321e7c2ad3a4052ac5103ac23dcf7e8217c065a2fe27cb0805351a6560087650"
+      },
+      "executed": {
+        "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\loan_invoices\\executed_v2_controller_program.py",
+        "sha256": "321e7c2ad3a4052ac5103ac23dcf7e8217c065a2fe27cb0805351a6560087650"
+      }
+    },
+    "v2/controller_synthetic.py": {
+      "current": {
+        "path": "C:\\quant\\b3-quant\\research\\src\\brazil_rv\\v2\\controller_synthetic.py",
+        "sha256": "b192ef71dbabc86819218aaf696400a3fcc3df9c4ceca0fab78371ae7e54de6b"
+      },
+      "executed": {
+        "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\loan_invoices\\executed_v2_controller_synthetic.py",
+        "sha256": "b192ef71dbabc86819218aaf696400a3fcc3df9c4ceca0fab78371ae7e54de6b"
+      }
+    },
+    "v2/controller_training.py": {
+      "current": {
+        "path": "C:\\quant\\b3-quant\\research\\src\\brazil_rv\\v2\\controller_training.py",
+        "sha256": "415a85c71cffeec5968591af627f44620343d761cdce5dadafd1e9cbd72606aa"
+      },
+      "executed": {
+        "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\loan_invoices\\executed_v2_controller_training.py",
+        "sha256": "415a85c71cffeec5968591af627f44620343d761cdce5dadafd1e9cbd72606aa"
+      }
+    },
+    "v2/corporate_actions.py": {
+      "current": {
+        "path": "C:\\quant\\b3-quant\\research\\src\\brazil_rv\\v2\\corporate_actions.py",
+        "sha256": "90258c99c3a5c1dde08c5680e4b3e1aa370a1861a067f7cf35ab1de3528d7d7c"
+      },
+      "executed": {
+        "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\loan_invoices\\executed_v2_corporate_actions.py",
+        "sha256": "90258c99c3a5c1dde08c5680e4b3e1aa370a1861a067f7cf35ab1de3528d7d7c"
+      }
+    },
+    "v2/corporate_replay.py": {
+      "current": {
+        "path": "C:\\quant\\b3-quant\\research\\src\\brazil_rv\\v2\\corporate_replay.py",
+        "sha256": "a870daa3b22bcdebb2367295542619e042ab876b807cd6da9333df756aec8d7b"
+      },
+      "executed": {
+        "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\loan_invoices\\executed_v2_corporate_replay.py",
+        "sha256": "a870daa3b22bcdebb2367295542619e042ab876b807cd6da9333df756aec8d7b"
+      }
+    },
+    "v2/cross_market_returns.py": {
+      "current": {
+        "path": "C:\\quant\\b3-quant\\research\\src\\brazil_rv\\v2\\cross_market_returns.py",
+        "sha256": "de8e54532f3e6ce46b2a0beffada9abc6e5d90efb2864975f8403852fb7fcc31"
+      },
+      "executed": {
+        "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\loan_invoices\\executed_v2_cross_market_returns.py",
+        "sha256": "de8e54532f3e6ce46b2a0beffada9abc6e5d90efb2864975f8403852fb7fcc31"
+      }
+    },
+    "v2/data.py": {
+      "current": {
+        "path": "C:\\quant\\b3-quant\\research\\src\\brazil_rv\\v2\\data.py",
+        "sha256": "51b060d2437c1c7ba83763322eda1db8765cc8d09e6277e102bc6fb303af1180"
+      },
+      "executed": {
+        "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\loan_invoices\\executed_v2_data.py",
+        "sha256": "51b060d2437c1c7ba83763322eda1db8765cc8d09e6277e102bc6fb303af1180"
+      }
+    },
+    "v2/data_foundation.py": {
+      "current": {
+        "path": "C:\\quant\\b3-quant\\research\\src\\brazil_rv\\v2\\data_foundation.py",
+        "sha256": "f13d6a4a8631366be9bc5944181ca42a9dfb5059eb637a6a78f4d0701b5d96be"
+      },
+      "executed": {
+        "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\loan_invoices\\executed_v2_data_foundation.py",
+        "sha256": "f13d6a4a8631366be9bc5944181ca42a9dfb5059eb637a6a78f4d0701b5d96be"
+      }
+    },
+    "v2/data_repair.py": {
+      "current": {
+        "path": "C:\\quant\\b3-quant\\research\\src\\brazil_rv\\v2\\data_repair.py",
+        "sha256": "4c2c1a29e95de8d5d4e77b2a2b3299c30cdd275c0190d9b9ff618291bace3a40"
+      },
+      "executed": {
+        "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\loan_invoices\\executed_v2_data_repair.py",
+        "sha256": "4c2c1a29e95de8d5d4e77b2a2b3299c30cdd275c0190d9b9ff618291bace3a40"
+      }
+    },
+    "v2/data_roots.py": {
+      "current": {
+        "path": "C:\\quant\\b3-quant\\research\\src\\brazil_rv\\v2\\data_roots.py",
+        "sha256": "3dc88f4bb577d116f0d12159111f414192b5b443a69f2fe437b747b759ef8ddc"
+      },
+      "executed": {
+        "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\loan_invoices\\executed_v2_data_roots.py",
+        "sha256": "3dc88f4bb577d116f0d12159111f414192b5b443a69f2fe437b747b759ef8ddc"
+      }
+    },
+    "v2/decision_clock.py": {
+      "current": {
+        "path": "C:\\quant\\b3-quant\\research\\src\\brazil_rv\\v2\\decision_clock.py",
+        "sha256": "bf777f78efa3c7b22839d77a5b1d0bf4c8b2f92d6b1ac30e075f367897e7adf7"
+      },
+      "executed": {
+        "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\loan_invoices\\executed_v2_decision_clock.py",
+        "sha256": "bf777f78efa3c7b22839d77a5b1d0bf4c8b2f92d6b1ac30e075f367897e7adf7"
+      }
+    },
+    "v2/decision_program.py": {
+      "current": {
+        "path": "C:\\quant\\b3-quant\\research\\src\\brazil_rv\\v2\\decision_program.py",
+        "sha256": "a0621bd9f22c7dac63a5f7c2ec92bf8e76fdcc0363b0bc52419f25f85994f552"
+      },
+      "executed": {
+        "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\loan_invoices\\executed_v2_decision_program.py",
+        "sha256": "a0621bd9f22c7dac63a5f7c2ec92bf8e76fdcc0363b0bc52419f25f85994f552"
+      }
+    },
+    "v2/economic_objective.py": {
+      "current": {
+        "path": "C:\\quant\\b3-quant\\research\\src\\brazil_rv\\v2\\economic_objective.py",
+        "sha256": "2d9c368040bba9651e6aaca99931355e5363b627464ede0b5882546cb9987454"
+      },
+      "executed": {
+        "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\loan_invoices\\executed_v2_economic_objective.py",
+        "sha256": "2d9c368040bba9651e6aaca99931355e5363b627464ede0b5882546cb9987454"
+      }
+    },
+    "v2/evaluate.py": {
+      "current": {
+        "path": "C:\\quant\\b3-quant\\research\\src\\brazil_rv\\v2\\evaluate.py",
+        "sha256": "d9802fb4c38ae10687fbd899274ab9f7aa0b1786dcf90e74cc5c730ea53ad6f8"
+      },
+      "executed": {
+        "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\loan_invoices\\executed_v2_evaluate.py",
+        "sha256": "7e403b3a51008f5a18c5f80d1ccbf666d53759947a62c1f8e0fed61ebb9081fd"
+      }
+    },
+    "v2/execution_policy.py": {
+      "current": {
+        "path": "C:\\quant\\b3-quant\\research\\src\\brazil_rv\\v2\\execution_policy.py",
+        "sha256": "827e8b94091b7b981b0f3881ac7f56ba56a73903df5a15174b83343b0dff670c"
+      },
+      "executed": {
+        "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\loan_invoices\\executed_v2_execution_policy.py",
+        "sha256": "827e8b94091b7b981b0f3881ac7f56ba56a73903df5a15174b83343b0dff670c"
+      }
+    },
+    "v2/execution_sweep.py": {
+      "current": {
+        "path": "C:\\quant\\b3-quant\\research\\src\\brazil_rv\\v2\\execution_sweep.py",
+        "sha256": "ae1c95d618496c3032e7c4038c378be478c844cf1ea853f42e710e0a70d5ad48"
+      },
+      "executed": {
+        "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\loan_invoices\\executed_v2_execution_sweep.py",
+        "sha256": "ae1c95d618496c3032e7c4038c378be478c844cf1ea853f42e710e0a70d5ad48"
+      }
+    },
+    "v2/feature_spec.py": {
+      "current": {
+        "path": "C:\\quant\\b3-quant\\research\\src\\brazil_rv\\v2\\feature_spec.py",
+        "sha256": "afea5617eded05cfd634f52cfeb699a1dd96a0f3a24c5b07cf19c784e7d31ed1"
+      },
+      "executed": {
+        "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\loan_invoices\\executed_v2_feature_spec.py",
+        "sha256": "afea5617eded05cfd634f52cfeb699a1dd96a0f3a24c5b07cf19c784e7d31ed1"
+      }
+    },
+    "v2/features.py": {
+      "current": {
+        "path": "C:\\quant\\b3-quant\\research\\src\\brazil_rv\\v2\\features.py",
+        "sha256": "23ff298f422368ad20cdbbb6bd63690d24e8f2df155e350cc0ba9934f95bdb78"
+      },
+      "executed": {
+        "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\loan_invoices\\executed_v2_features.py",
+        "sha256": "23ff298f422368ad20cdbbb6bd63690d24e8f2df155e350cc0ba9934f95bdb78"
+      }
+    },
+    "v2/foreign_flow.py": {
+      "current": {
+        "path": "C:\\quant\\b3-quant\\research\\src\\brazil_rv\\v2\\foreign_flow.py",
+        "sha256": "5846d8245ec4c627a08a551975c0047057d234914c49f6d81ae6c63e7b169019"
+      },
+      "executed": {
+        "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\loan_invoices\\executed_v2_foreign_flow.py",
+        "sha256": "5846d8245ec4c627a08a551975c0047057d234914c49f6d81ae6c63e7b169019"
+      }
+    },
+    "v2/foundation_averaging.py": {
+      "current": {
+        "path": "C:\\quant\\b3-quant\\research\\src\\brazil_rv\\v2\\foundation_averaging.py",
+        "sha256": "0ca60e49af4453d486f97703b15471d0bdced9c1df617702dda274ba1b5f748d"
+      },
+      "executed": {
+        "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\loan_invoices\\executed_v2_foundation_averaging.py",
+        "sha256": "0ca60e49af4453d486f97703b15471d0bdced9c1df617702dda274ba1b5f748d"
+      }
+    },
+    "v2/foundation_financing.py": {
+      "current": {
+        "path": "C:\\quant\\b3-quant\\research\\src\\brazil_rv\\v2\\foundation_financing.py",
+        "sha256": "e7aaef80f3324c37d249c53cdc773c609b60d1214dec7cadb7a141f17949f21b"
+      },
+      "executed": {
+        "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\loan_invoices\\executed_v2_foundation_financing.py",
+        "sha256": "e7aaef80f3324c37d249c53cdc773c609b60d1214dec7cadb7a141f17949f21b"
+      }
+    },
+    "v2/foundation_program.py": {
+      "current": {
+        "path": "C:\\quant\\b3-quant\\research\\src\\brazil_rv\\v2\\foundation_program.py",
+        "sha256": "af337f54e483f5038d4c95fbbaa24085109874708f42247f92abf1e369f086a1"
+      },
+      "executed": {
+        "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\loan_invoices\\executed_v2_foundation_program.py",
+        "sha256": "af337f54e483f5038d4c95fbbaa24085109874708f42247f92abf1e369f086a1"
+      }
+    },
+    "v2/foundation_readouts.py": {
+      "current": {
+        "path": "C:\\quant\\b3-quant\\research\\src\\brazil_rv\\v2\\foundation_readouts.py",
+        "sha256": "973ffceaed877d28fb5d0162ce3eeec947de6cf74257e7089ccb6a85bee58d27"
+      },
+      "executed": {
+        "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\loan_invoices\\executed_v2_foundation_readouts.py",
+        "sha256": "973ffceaed877d28fb5d0162ce3eeec947de6cf74257e7089ccb6a85bee58d27"
+      }
+    },
+    "v2/foundation_residual.py": {
+      "current": {
+        "path": "C:\\quant\\b3-quant\\research\\src\\brazil_rv\\v2\\foundation_residual.py",
+        "sha256": "62e953ff5bab5736a94cd7ada53afc9a9d821d04e195ba99eece5e630e7e4417"
+      },
+      "executed": {
+        "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\loan_invoices\\executed_v2_foundation_residual.py",
+        "sha256": "62e953ff5bab5736a94cd7ada53afc9a9d821d04e195ba99eece5e630e7e4417"
+      }
+    },
+    "v2/foundation_residual_readouts.py": {
+      "current": {
+        "path": "C:\\quant\\b3-quant\\research\\src\\brazil_rv\\v2\\foundation_residual_readouts.py",
+        "sha256": "ff6dbf20cd5f744749547a2261d05e2141090ea33c87d3198a658c6fd7a2f677"
+      },
+      "executed": {
+        "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\loan_invoices\\executed_v2_foundation_residual_readouts.py",
+        "sha256": "ff6dbf20cd5f744749547a2261d05e2141090ea33c87d3198a658c6fd7a2f677"
+      }
+    },
+    "v2/gbdt.py": {
+      "current": {
+        "path": "C:\\quant\\b3-quant\\research\\src\\brazil_rv\\v2\\gbdt.py",
+        "sha256": "5aec4f95c272ea5a60c1718eac8186e22a56103f3ecb9cc3ca2cad60e0b386f4"
+      },
+      "executed": {
+        "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\loan_invoices\\executed_v2_gbdt.py",
+        "sha256": "5aec4f95c272ea5a60c1718eac8186e22a56103f3ecb9cc3ca2cad60e0b386f4"
+      }
+    },
+    "v2/hedge_beta.py": {
+      "current": {
+        "path": "C:\\quant\\b3-quant\\research\\src\\brazil_rv\\v2\\hedge_beta.py",
+        "sha256": "fac2f645434430291b5b2cf3c83fa197b6d02a6c2a7b03111b31f914543884ce"
+      },
+      "executed": {
+        "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\loan_invoices\\executed_v2_hedge_beta.py",
+        "sha256": "fac2f645434430291b5b2cf3c83fa197b6d02a6c2a7b03111b31f914543884ce"
+      }
+    },
+    "v2/intraday_features.py": {
+      "current": {
+        "path": "C:\\quant\\b3-quant\\research\\src\\brazil_rv\\v2\\intraday_features.py",
+        "sha256": "9a8b2fba0563d0807ecfcffb81c01bf4633e43ee0917c813df26e09bc6d737ef"
+      },
+      "executed": {
+        "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\loan_invoices\\executed_v2_intraday_features.py",
+        "sha256": "9a8b2fba0563d0807ecfcffb81c01bf4633e43ee0917c813df26e09bc6d737ef"
+      }
+    },
+    "v2/lending_archive.py": {
+      "current": {
+        "path": "C:\\quant\\b3-quant\\research\\src\\brazil_rv\\v2\\lending_archive.py",
+        "sha256": "035ecdfbd9dc69ad8b987d10878f5820bfad0695ec635bd194a72437ba69746d"
+      },
+      "executed": {
+        "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\loan_invoices\\executed_v2_lending_archive.py",
+        "sha256": "035ecdfbd9dc69ad8b987d10878f5820bfad0695ec635bd194a72437ba69746d"
+      }
+    },
+    "v2/lending_recovery.py": {
+      "current": {
+        "path": "C:\\quant\\b3-quant\\research\\src\\brazil_rv\\v2\\lending_recovery.py",
+        "sha256": "150552e95ebd6101db28ee128de8e4aa148417e6fe31060d7da90c0a4fa6e6a3"
+      },
+      "executed": {
+        "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\loan_invoices\\executed_v2_lending_recovery.py",
+        "sha256": "150552e95ebd6101db28ee128de8e4aa148417e6fe31060d7da90c0a4fa6e6a3"
+      }
+    },
+    "v2/local_gpu_engineering.py": {
+      "current": {
+        "path": "C:\\quant\\b3-quant\\research\\src\\brazil_rv\\v2\\local_gpu_engineering.py",
+        "sha256": "dbdf666006b6471202a4038e1d0ac77ce7d65b27cd4dc0700a482959a55f6d88"
+      },
+      "executed": {
+        "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\loan_invoices\\executed_v2_local_gpu_engineering.py",
+        "sha256": "dbdf666006b6471202a4038e1d0ac77ce7d65b27cd4dc0700a482959a55f6d88"
+      }
+    },
+    "v2/losses.py": {
+      "current": {
+        "path": "C:\\quant\\b3-quant\\research\\src\\brazil_rv\\v2\\losses.py",
+        "sha256": "551342ac04d5ddc56d6911a4cb03708dcc68515da6c22e6d769cf718c01fe72e"
+      },
+      "executed": {
+        "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\loan_invoices\\executed_v2_losses.py",
+        "sha256": "551342ac04d5ddc56d6911a4cb03708dcc68515da6c22e6d769cf718c01fe72e"
+      }
+    },
+    "v2/model.py": {
+      "current": {
+        "path": "C:\\quant\\b3-quant\\research\\src\\brazil_rv\\v2\\model.py",
+        "sha256": "0adb69f64ee2ec7e08fae51be532c4a2a96c159424c53bf1fd2a0aa1bb4752ed"
+      },
+      "executed": {
+        "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\loan_invoices\\executed_v2_model.py",
+        "sha256": "0adb69f64ee2ec7e08fae51be532c4a2a96c159424c53bf1fd2a0aa1bb4752ed"
+      }
+    },
+    "v2/native_fast_audit.py": {
+      "current": {
+        "path": "C:\\quant\\b3-quant\\research\\src\\brazil_rv\\v2\\native_fast_audit.py",
+        "sha256": "d67fa9c599339e4b8aa020f3dc3afcb0c62b50a8f98a923907ce5fbaf9504833"
+      },
+      "executed": {
+        "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\loan_invoices\\executed_v2_native_fast_audit.py",
+        "sha256": "d67fa9c599339e4b8aa020f3dc3afcb0c62b50a8f98a923907ce5fbaf9504833"
+      }
+    },
+    "v2/normalization.py": {
+      "current": {
+        "path": "C:\\quant\\b3-quant\\research\\src\\brazil_rv\\v2\\normalization.py",
+        "sha256": "1e852dcca71478f393151b69aed66afcdaf248967ea2ce40664288666b2d0314"
+      },
+      "executed": {
+        "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\loan_invoices\\executed_v2_normalization.py",
+        "sha256": "1e852dcca71478f393151b69aed66afcdaf248967ea2ce40664288666b2d0314"
+      }
+    },
+    "v2/objective_program.py": {
+      "current": {
+        "path": "C:\\quant\\b3-quant\\research\\src\\brazil_rv\\v2\\objective_program.py",
+        "sha256": "daafa80e071a674dc739fe4513fd632c69a7fa8be93757e19ffb73997a3b32c6"
+      },
+      "executed": {
+        "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\loan_invoices\\executed_v2_objective_program.py",
+        "sha256": "daafa80e071a674dc739fe4513fd632c69a7fa8be93757e19ffb73997a3b32c6"
+      }
+    },
+    "v2/objective_readouts.py": {
+      "current": {
+        "path": "C:\\quant\\b3-quant\\research\\src\\brazil_rv\\v2\\objective_readouts.py",
+        "sha256": "2809657b88eb2ebc82202f2eb18f6b9a2bfdc36d7a886333a0618241af730699"
+      },
+      "executed": {
+        "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\loan_invoices\\executed_v2_objective_readouts.py",
+        "sha256": "2809657b88eb2ebc82202f2eb18f6b9a2bfdc36d7a886333a0618241af730699"
+      }
+    },
+    "v2/oddlot_archive.py": {
+      "current": {
+        "path": "C:\\quant\\b3-quant\\research\\src\\brazil_rv\\v2\\oddlot_archive.py",
+        "sha256": "942677c21b8ee4b989fd9fa18e68cf96a799253fd65b34c55b42c30d6879e107"
+      },
+      "executed": {
+        "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\loan_invoices\\executed_v2_oddlot_archive.py",
+        "sha256": "942677c21b8ee4b989fd9fa18e68cf96a799253fd65b34c55b42c30d6879e107"
+      }
+    },
+    "v2/opportunity_research.py": {
+      "current": {
+        "path": "C:\\quant\\b3-quant\\research\\src\\brazil_rv\\v2\\opportunity_research.py",
+        "sha256": "1a1d5f5aec2d2432896be625e9954bde21fdac32a934d003022366d8b10d1059"
+      },
+      "executed": {
+        "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\loan_invoices\\executed_v2_opportunity_research.py",
+        "sha256": "1a1d5f5aec2d2432896be625e9954bde21fdac32a934d003022366d8b10d1059"
+      }
+    },
+    "v2/pathway_diagnostics.py": {
+      "current": {
+        "path": "C:\\quant\\b3-quant\\research\\src\\brazil_rv\\v2\\pathway_diagnostics.py",
+        "sha256": "720293beb60bfd7a5bd4b9491c6dfabeca0bb3947d91f405f96842d9f419694c"
+      },
+      "executed": {
+        "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\loan_invoices\\executed_v2_pathway_diagnostics.py",
+        "sha256": "720293beb60bfd7a5bd4b9491c6dfabeca0bb3947d91f405f96842d9f419694c"
+      }
+    },
+    "v2/pathway_learning.py": {
+      "current": {
+        "path": "C:\\quant\\b3-quant\\research\\src\\brazil_rv\\v2\\pathway_learning.py",
+        "sha256": "f47c949373474b5b897d71287663e466c3e7cbaa73a592f8193e33208f79377b"
+      },
+      "executed": {
+        "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\loan_invoices\\executed_v2_pathway_learning.py",
+        "sha256": "f47c949373474b5b897d71287663e466c3e7cbaa73a592f8193e33208f79377b"
+      }
+    },
+    "v2/pathway_statistics.py": {
+      "current": {
+        "path": "C:\\quant\\b3-quant\\research\\src\\brazil_rv\\v2\\pathway_statistics.py",
+        "sha256": "3371db7d290ee93ac32bb14a84705b849c2224a060346c659936e4cd591fb439"
+      },
+      "executed": {
+        "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\loan_invoices\\executed_v2_pathway_statistics.py",
+        "sha256": "3371db7d290ee93ac32bb14a84705b849c2224a060346c659936e4cd591fb439"
+      }
+    },
+    "v2/performance.py": {
+      "current": {
+        "path": "C:\\quant\\b3-quant\\research\\src\\brazil_rv\\v2\\performance.py",
+        "sha256": "897ef2087583510b5ac00de0d8a8e671e2c44c641c8a5320bb9d4ff8c9b7d20d"
+      },
+      "executed": {
+        "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\loan_invoices\\executed_v2_performance.py",
+        "sha256": "897ef2087583510b5ac00de0d8a8e671e2c44c641c8a5320bb9d4ff8c9b7d20d"
+      }
+    },
+    "v2/portfolio_batch.py": {
+      "current": {
+        "path": "C:\\quant\\b3-quant\\research\\src\\brazil_rv\\v2\\portfolio_batch.py",
+        "sha256": "388214f6a8d359c5a4594ce48fe9c31c4f4c5a6265d871a5595a238b89e6e5ee"
+      },
+      "executed": {
+        "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\loan_invoices\\executed_v2_portfolio_batch.py",
+        "sha256": "388214f6a8d359c5a4594ce48fe9c31c4f4c5a6265d871a5595a238b89e6e5ee"
+      }
+    },
+    "v2/portfolio_closeout.py": {
+      "current": {
+        "path": "C:\\quant\\b3-quant\\research\\src\\brazil_rv\\v2\\portfolio_closeout.py",
+        "sha256": "3f8091e220d400307b1ade35867a1db8e6ac03d924d32dcfe53c1b1214c729cd"
+      },
+      "executed": {
+        "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\loan_invoices\\executed_v2_portfolio_closeout.py",
+        "sha256": "3f8091e220d400307b1ade35867a1db8e6ac03d924d32dcfe53c1b1214c729cd"
+      }
+    },
+    "v2/portfolio_inputs.py": {
+      "current": {
+        "path": "C:\\quant\\b3-quant\\research\\src\\brazil_rv\\v2\\portfolio_inputs.py",
+        "sha256": "4c7e92ea408456e547de5f602e751fd4dc258aef1318a4e206262a2ad75db082"
+      },
+      "executed": {
+        "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\loan_invoices\\executed_v2_portfolio_inputs.py",
+        "sha256": "4c7e92ea408456e547de5f602e751fd4dc258aef1318a4e206262a2ad75db082"
+      }
+    },
+    "v2/portfolio_objective.py": {
+      "current": {
+        "path": "C:\\quant\\b3-quant\\research\\src\\brazil_rv\\v2\\portfolio_objective.py",
+        "sha256": "153c13901123508edafdc86e83b129d5fdf5b18cd385b2c0ff7fd91364bd7101"
+      },
+      "executed": {
+        "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\loan_invoices\\executed_v2_portfolio_objective.py",
+        "sha256": "153c13901123508edafdc86e83b129d5fdf5b18cd385b2c0ff7fd91364bd7101"
+      }
+    },
+    "v2/portfolio_objective_readouts.py": {
+      "current": {
+        "path": "C:\\quant\\b3-quant\\research\\src\\brazil_rv\\v2\\portfolio_objective_readouts.py",
+        "sha256": "26e9f595f090e5f70a039ffcb79973f5f57a6dc4dfaffce06852795760ba3e34"
+      },
+      "executed": {
+        "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\loan_invoices\\executed_v2_portfolio_objective_readouts.py",
+        "sha256": "26e9f595f090e5f70a039ffcb79973f5f57a6dc4dfaffce06852795760ba3e34"
+      }
+    },
+    "v2/portfolio_objective_training.py": {
+      "current": {
+        "path": "C:\\quant\\b3-quant\\research\\src\\brazil_rv\\v2\\portfolio_objective_training.py",
+        "sha256": "6dc3ca3b0cfe025a81ad443671e5ebc6d4f63e867e17ee50c6f4b91764f37443"
+      },
+      "executed": {
+        "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\loan_invoices\\executed_v2_portfolio_objective_training.py",
+        "sha256": "6dc3ca3b0cfe025a81ad443671e5ebc6d4f63e867e17ee50c6f4b91764f37443"
+      }
+    },
+    "v2/portfolio_program.py": {
+      "current": {
+        "path": "C:\\quant\\b3-quant\\research\\src\\brazil_rv\\v2\\portfolio_program.py",
+        "sha256": "9bf93b9467532c01b6432f364e60ca71cdc99424a6b57cffd671166c6bf06870"
+      },
+      "executed": {
+        "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\loan_invoices\\executed_v2_portfolio_program.py",
+        "sha256": "9bf93b9467532c01b6432f364e60ca71cdc99424a6b57cffd671166c6bf06870"
+      }
+    },
+    "v2/portfolio_readouts.py": {
+      "current": {
+        "path": "C:\\quant\\b3-quant\\research\\src\\brazil_rv\\v2\\portfolio_readouts.py",
+        "sha256": "7d3596c5a3677eaed96280e477c8384f7da1918cf0d7ff819ffa70a09e437dc1"
+      },
+      "executed": {
+        "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\loan_invoices\\executed_v2_portfolio_readouts.py",
+        "sha256": "7d3596c5a3677eaed96280e477c8384f7da1918cf0d7ff819ffa70a09e437dc1"
+      }
+    },
+    "v2/portfolio_training.py": {
+      "current": {
+        "path": "C:\\quant\\b3-quant\\research\\src\\brazil_rv\\v2\\portfolio_training.py",
+        "sha256": "076d24b7f95c14b6d12082c366c706b1d712863b7eb7f00714f01e6081f66dc5"
+      },
+      "executed": {
+        "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\loan_invoices\\executed_v2_portfolio_training.py",
+        "sha256": "076d24b7f95c14b6d12082c366c706b1d712863b7eb7f00714f01e6081f66dc5"
+      }
+    },
+    "v2/post_data_engineering.py": {
+      "current": {
+        "path": "C:\\quant\\b3-quant\\research\\src\\brazil_rv\\v2\\post_data_engineering.py",
+        "sha256": "d8f5505d4d13186671a0da3f519fecebbccd88a93f9bb871a364bfc8db1e6332"
+      },
+      "executed": {
+        "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\loan_invoices\\executed_v2_post_data_engineering.py",
+        "sha256": "d8f5505d4d13186671a0da3f519fecebbccd88a93f9bb871a364bfc8db1e6332"
+      }
+    },
+    "v2/post_data_precision.py": {
+      "current": {
+        "path": "C:\\quant\\b3-quant\\research\\src\\brazil_rv\\v2\\post_data_precision.py",
+        "sha256": "6b5674a1be43230f9d9f7d3c508a38e36a3f832721d4d029a2c811c2e1994d18"
+      },
+      "executed": {
+        "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\loan_invoices\\executed_v2_post_data_precision.py",
+        "sha256": "6b5674a1be43230f9d9f7d3c508a38e36a3f832721d4d029a2c811c2e1994d18"
+      }
+    },
+    "v2/post_data_program.py": {
+      "current": {
+        "path": "C:\\quant\\b3-quant\\research\\src\\brazil_rv\\v2\\post_data_program.py",
+        "sha256": "7bfedeeea5214a8391bc1844eb7c375b5e8e3e73d91d3436aa68b32053e1ce15"
+      },
+      "executed": {
+        "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\loan_invoices\\executed_v2_post_data_program.py",
+        "sha256": "7bfedeeea5214a8391bc1844eb7c375b5e8e3e73d91d3436aa68b32053e1ce15"
+      }
+    },
+    "v2/post_data_readouts.py": {
+      "current": {
+        "path": "C:\\quant\\b3-quant\\research\\src\\brazil_rv\\v2\\post_data_readouts.py",
+        "sha256": "754ee111a15ef1df25dd2a9fdedf2abf4f8e825e3b5832f3d811f0ff630b3328"
+      },
+      "executed": {
+        "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\loan_invoices\\executed_v2_post_data_readouts.py",
+        "sha256": "754ee111a15ef1df25dd2a9fdedf2abf4f8e825e3b5832f3d811f0ff630b3328"
+      }
+    },
+    "v2/relational_engineering.py": {
+      "current": {
+        "path": "C:\\quant\\b3-quant\\research\\src\\brazil_rv\\v2\\relational_engineering.py",
+        "sha256": "a261c29aacb507d6dbccad283230e80f2bf68ed18173dbeac882e3c9485c1346"
+      },
+      "executed": {
+        "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\loan_invoices\\executed_v2_relational_engineering.py",
+        "sha256": "a261c29aacb507d6dbccad283230e80f2bf68ed18173dbeac882e3c9485c1346"
+      }
+    },
+    "v2/research_checkpoint.py": {
+      "current": {
+        "path": "C:\\quant\\b3-quant\\research\\src\\brazil_rv\\v2\\research_checkpoint.py",
+        "sha256": "6cbaec27e54e4b4f7ba6641d31b3da765da7d421c332e05361f4bb1e551eeced"
+      },
+      "executed": {
+        "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\loan_invoices\\executed_v2_research_checkpoint.py",
+        "sha256": "6cbaec27e54e4b4f7ba6641d31b3da765da7d421c332e05361f4bb1e551eeced"
+      }
+    },
+    "v2/research_diagnostics.py": {
+      "current": {
+        "path": "C:\\quant\\b3-quant\\research\\src\\brazil_rv\\v2\\research_diagnostics.py",
+        "sha256": "db6a11f11636808c2d50728c230d4b0c78fb7e875c4b6de253c2460405acc993"
+      },
+      "executed": {
+        "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\loan_invoices\\executed_v2_research_diagnostics.py",
+        "sha256": "db6a11f11636808c2d50728c230d4b0c78fb7e875c4b6de253c2460405acc993"
+      }
+    },
+    "v2/research_rounds.py": {
+      "current": {
+        "path": "C:\\quant\\b3-quant\\research\\src\\brazil_rv\\v2\\research_rounds.py",
+        "sha256": "b12671d5b699a86c655056cd07e6744898f29c2300537cee6171aa22aac9598f"
+      },
+      "executed": {
+        "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\loan_invoices\\executed_v2_research_rounds.py",
+        "sha256": "b12671d5b699a86c655056cd07e6744898f29c2300537cee6171aa22aac9598f"
+      }
+    },
+    "v2/round3.py": {
+      "current": {
+        "path": "C:\\quant\\b3-quant\\research\\src\\brazil_rv\\v2\\round3.py",
+        "sha256": "2c846fee6a72afc400105a7a60b294beffa26ef6a92b018cf6d19c909c2085f2"
+      },
+      "executed": {
+        "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\loan_invoices\\executed_v2_round3.py",
+        "sha256": "2c846fee6a72afc400105a7a60b294beffa26ef6a92b018cf6d19c909c2085f2"
+      }
+    },
+    "v2/round4.py": {
+      "current": {
+        "path": "C:\\quant\\b3-quant\\research\\src\\brazil_rv\\v2\\round4.py",
+        "sha256": "cc998d9d4aba45176b9cf20559188d7959a5b9163e34f730536a87e8fea4c806"
+      },
+      "executed": {
+        "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\loan_invoices\\executed_v2_round4.py",
+        "sha256": "cc998d9d4aba45176b9cf20559188d7959a5b9163e34f730536a87e8fea4c806"
+      }
+    },
+    "v2/round4_seed_audit.py": {
+      "current": {
+        "path": "C:\\quant\\b3-quant\\research\\src\\brazil_rv\\v2\\round4_seed_audit.py",
+        "sha256": "ec169f7e26e6fdf5229d0c812d4d5b90087bb97d1207eb1f5f73fa20d4ea2dad"
+      },
+      "executed": {
+        "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\loan_invoices\\executed_v2_round4_seed_audit.py",
+        "sha256": "ec169f7e26e6fdf5229d0c812d4d5b90087bb97d1207eb1f5f73fa20d4ea2dad"
+      }
+    },
+    "v2/round5_b3.py": {
+      "current": {
+        "path": "C:\\quant\\b3-quant\\research\\src\\brazil_rv\\v2\\round5_b3.py",
+        "sha256": "e5253fca6ee3b974877a2626acaf35876036e925e92d7afa42566bb9b966c736"
+      },
+      "executed": {
+        "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\loan_invoices\\executed_v2_round5_b3.py",
+        "sha256": "e5253fca6ee3b974877a2626acaf35876036e925e92d7afa42566bb9b966c736"
+      }
+    },
+    "v2/round5_capture.py": {
+      "current": {
+        "path": "C:\\quant\\b3-quant\\research\\src\\brazil_rv\\v2\\round5_capture.py",
+        "sha256": "af3462d3c2845c0a9510d30b6b5def478731e9a21fa0284d1d67d38fc71254e8"
+      },
+      "executed": {
+        "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\loan_invoices\\executed_v2_round5_capture.py",
+        "sha256": "af3462d3c2845c0a9510d30b6b5def478731e9a21fa0284d1d67d38fc71254e8"
+      }
+    },
+    "v2/round5_continuous.py": {
+      "current": {
+        "path": "C:\\quant\\b3-quant\\research\\src\\brazil_rv\\v2\\round5_continuous.py",
+        "sha256": "41d383f27d38a78616ef80718d5d2099ef4dcc07db4bf19b6918ea731af807a1"
+      },
+      "executed": {
+        "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\loan_invoices\\executed_v2_round5_continuous.py",
+        "sha256": "41d383f27d38a78616ef80718d5d2099ef4dcc07db4bf19b6918ea731af807a1"
+      }
+    },
+    "v2/round5_cross_market.py": {
+      "current": {
+        "path": "C:\\quant\\b3-quant\\research\\src\\brazil_rv\\v2\\round5_cross_market.py",
+        "sha256": "0ac4be7c7353e35482bad46cad6a748fd4c20b9b57e150d0fec102212188316d"
+      },
+      "executed": {
+        "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\loan_invoices\\executed_v2_round5_cross_market.py",
+        "sha256": "0ac4be7c7353e35482bad46cad6a748fd4c20b9b57e150d0fec102212188316d"
+      }
+    },
+    "v2/round5_cvm.py": {
+      "current": {
+        "path": "C:\\quant\\b3-quant\\research\\src\\brazil_rv\\v2\\round5_cvm.py",
+        "sha256": "b6035f32ab5ee1b52c061b9be025c6e53ec5ca62ba14308412793298fb3f88f4"
+      },
+      "executed": {
+        "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\loan_invoices\\executed_v2_round5_cvm.py",
+        "sha256": "b6035f32ab5ee1b52c061b9be025c6e53ec5ca62ba14308412793298fb3f88f4"
+      }
+    },
+    "v2/round5_cvm_capital.py": {
+      "current": {
+        "path": "C:\\quant\\b3-quant\\research\\src\\brazil_rv\\v2\\round5_cvm_capital.py",
+        "sha256": "4662077ba93067367c202250495093bc14ae5261b94e32d31ca176e1aeb17eaf"
+      },
+      "executed": {
+        "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\loan_invoices\\executed_v2_round5_cvm_capital.py",
+        "sha256": "4662077ba93067367c202250495093bc14ae5261b94e32d31ca176e1aeb17eaf"
+      }
+    },
+    "v2/round5_cvm_fca.py": {
+      "current": {
+        "path": "C:\\quant\\b3-quant\\research\\src\\brazil_rv\\v2\\round5_cvm_fca.py",
+        "sha256": "6cc6e9f672345fd2d93641352cdedef4286899bc47fc2a9f5c238c4f50a919c0"
+      },
+      "executed": {
+        "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\loan_invoices\\executed_v2_round5_cvm_fca.py",
+        "sha256": "6cc6e9f672345fd2d93641352cdedef4286899bc47fc2a9f5c238c4f50a919c0"
+      }
+    },
+    "v2/round5_cvm_notes.py": {
+      "current": {
+        "path": "C:\\quant\\b3-quant\\research\\src\\brazil_rv\\v2\\round5_cvm_notes.py",
+        "sha256": "05c55ea75a71ab4415cb6c239cad42d2fbde8d804bbbf1c9b851d547ca58bf19"
+      },
+      "executed": {
+        "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\loan_invoices\\executed_v2_round5_cvm_notes.py",
+        "sha256": "05c55ea75a71ab4415cb6c239cad42d2fbde8d804bbbf1c9b851d547ca58bf19"
+      }
+    },
+    "v2/round5_cvm_xml.py": {
+      "current": {
+        "path": "C:\\quant\\b3-quant\\research\\src\\brazil_rv\\v2\\round5_cvm_xml.py",
+        "sha256": "57239fd8123808a82de557e8321080346712bb7846a931159f4547374205fb93"
+      },
+      "executed": {
+        "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\loan_invoices\\executed_v2_round5_cvm_xml.py",
+        "sha256": "57239fd8123808a82de557e8321080346712bb7846a931159f4547374205fb93"
+      }
+    },
+    "v2/round5_derived.py": {
+      "current": {
+        "path": "C:\\quant\\b3-quant\\research\\src\\brazil_rv\\v2\\round5_derived.py",
+        "sha256": "21a5f4e777f19f1b17eaafda1b852a88a8d21718b4088be7df1a6d23ff835632"
+      },
+      "executed": {
+        "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\loan_invoices\\executed_v2_round5_derived.py",
+        "sha256": "21a5f4e777f19f1b17eaafda1b852a88a8d21718b4088be7df1a6d23ff835632"
+      }
+    },
+    "v2/round5_exposures.py": {
+      "current": {
+        "path": "C:\\quant\\b3-quant\\research\\src\\brazil_rv\\v2\\round5_exposures.py",
+        "sha256": "8e8f99752b67ee610603b265e14da23628aae4356d951ca60b4ffec48b827f45"
+      },
+      "executed": {
+        "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\loan_invoices\\executed_v2_round5_exposures.py",
+        "sha256": "8e8f99752b67ee610603b265e14da23628aae4356d951ca60b4ffec48b827f45"
+      }
+    },
+    "v2/round5_index.py": {
+      "current": {
+        "path": "C:\\quant\\b3-quant\\research\\src\\brazil_rv\\v2\\round5_index.py",
+        "sha256": "529f116536c7bec34e6879527ec982d7c0fe35d0122a4d3347c558e3f09d1ed2"
+      },
+      "executed": {
+        "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\loan_invoices\\executed_v2_round5_index.py",
+        "sha256": "529f116536c7bec34e6879527ec982d7c0fe35d0122a4d3347c558e3f09d1ed2"
+      }
+    },
+    "v2/round5_magnitude.py": {
+      "current": {
+        "path": "C:\\quant\\b3-quant\\research\\src\\brazil_rv\\v2\\round5_magnitude.py",
+        "sha256": "a574617af0cc6f5c3542ac0aad9f4b2ed37841e725009e4ca00460eb4ae85cec"
+      },
+      "executed": {
+        "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\loan_invoices\\executed_v2_round5_magnitude.py",
+        "sha256": "a574617af0cc6f5c3542ac0aad9f4b2ed37841e725009e4ca00460eb4ae85cec"
+      }
+    },
+    "v2/round5_market.py": {
+      "current": {
+        "path": "C:\\quant\\b3-quant\\research\\src\\brazil_rv\\v2\\round5_market.py",
+        "sha256": "8407c0390c1b7c45efb6870ed4209c73d9389cd6bfafe596e73021577235ba95"
+      },
+      "executed": {
+        "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\loan_invoices\\executed_v2_round5_market.py",
+        "sha256": "8407c0390c1b7c45efb6870ed4209c73d9389cd6bfafe596e73021577235ba95"
+      }
+    },
+    "v2/round5_replay.py": {
+      "current": {
+        "path": "C:\\quant\\b3-quant\\research\\src\\brazil_rv\\v2\\round5_replay.py",
+        "sha256": "485dd0683ea3c7b4a3f011c9144818d222a47c4f14debfc2f0da6ab239af07bd"
+      },
+      "executed": {
+        "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\loan_invoices\\executed_v2_round5_replay.py",
+        "sha256": "485dd0683ea3c7b4a3f011c9144818d222a47c4f14debfc2f0da6ab239af07bd"
+      }
+    },
+    "v2/round5_screens.py": {
+      "current": {
+        "path": "C:\\quant\\b3-quant\\research\\src\\brazil_rv\\v2\\round5_screens.py",
+        "sha256": "b68e58e4e9dd6385d5047999483da7f903b596172a6eb284b0b015edfcbfac04"
+      },
+      "executed": {
+        "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\loan_invoices\\executed_v2_round5_screens.py",
+        "sha256": "b68e58e4e9dd6385d5047999483da7f903b596172a6eb284b0b015edfcbfac04"
+      }
+    },
+    "v2/round5_store.py": {
+      "current": {
+        "path": "C:\\quant\\b3-quant\\research\\src\\brazil_rv\\v2\\round5_store.py",
+        "sha256": "cd71e9aa2f4991267d7f004cb561b8ed5031eac45e8e486c51181ed431c220c0"
+      },
+      "executed": {
+        "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\loan_invoices\\executed_v2_round5_store.py",
+        "sha256": "cd71e9aa2f4991267d7f004cb561b8ed5031eac45e8e486c51181ed431c220c0"
+      }
+    },
+    "v2/round6.py": {
+      "current": {
+        "path": "C:\\quant\\b3-quant\\research\\src\\brazil_rv\\v2\\round6.py",
+        "sha256": "a325342eb1cb6fe9f64f9c835e4250c1cc2fef0fd1b036ab9dc71d6f4436ec6b"
+      },
+      "executed": {
+        "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\loan_invoices\\executed_v2_round6.py",
+        "sha256": "a325342eb1cb6fe9f64f9c835e4250c1cc2fef0fd1b036ab9dc71d6f4436ec6b"
+      }
+    },
+    "v2/round6_confirmation.py": {
+      "current": {
+        "path": "C:\\quant\\b3-quant\\research\\src\\brazil_rv\\v2\\round6_confirmation.py",
+        "sha256": "d540e6a3b9cf6832c953d0fec5ed3b12df08946dab1cf82ab7caa9f40cea0227"
+      },
+      "executed": {
+        "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\loan_invoices\\executed_v2_round6_confirmation.py",
+        "sha256": "d540e6a3b9cf6832c953d0fec5ed3b12df08946dab1cf82ab7caa9f40cea0227"
+      }
+    },
+    "v2/round6_continuous.py": {
+      "current": {
+        "path": "C:\\quant\\b3-quant\\research\\src\\brazil_rv\\v2\\round6_continuous.py",
+        "sha256": "c8807913634bac6b3bd6e3230064cad4c1dcc2fb1fe44bfb65875fcd247960bf"
+      },
+      "executed": {
+        "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\loan_invoices\\executed_v2_round6_continuous.py",
+        "sha256": "c8807913634bac6b3bd6e3230064cad4c1dcc2fb1fe44bfb65875fcd247960bf"
+      }
+    },
+    "v2/round6_costs.py": {
+      "current": {
+        "path": "C:\\quant\\b3-quant\\research\\src\\brazil_rv\\v2\\round6_costs.py",
+        "sha256": "7491c04f615616e7dd79617e9f655bc39b895bd8e15caf412a866f71f9981a39"
+      },
+      "executed": {
+        "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\loan_invoices\\executed_v2_round6_costs.py",
+        "sha256": "7491c04f615616e7dd79617e9f655bc39b895bd8e15caf412a866f71f9981a39"
+      }
+    },
+    "v2/round6_data.py": {
+      "current": {
+        "path": "C:\\quant\\b3-quant\\research\\src\\brazil_rv\\v2\\round6_data.py",
+        "sha256": "4aba3889aef9087d4aa471191d6aaf8e241cb0ef1041ef9fa753b0254e792386"
+      },
+      "executed": {
+        "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\loan_invoices\\executed_v2_round6_data.py",
+        "sha256": "4aba3889aef9087d4aa471191d6aaf8e241cb0ef1041ef9fa753b0254e792386"
+      }
+    },
+    "v2/round6_decisions.py": {
+      "current": {
+        "path": "C:\\quant\\b3-quant\\research\\src\\brazil_rv\\v2\\round6_decisions.py",
+        "sha256": "d236b3d5895a6d6be6401390ff37a804c9f3ba706b696450b5799a9cfe079d65"
+      },
+      "executed": {
+        "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\loan_invoices\\executed_v2_round6_decisions.py",
+        "sha256": "d236b3d5895a6d6be6401390ff37a804c9f3ba706b696450b5799a9cfe079d65"
+      }
+    },
+    "v2/round6_diagnostics.py": {
+      "current": {
+        "path": "C:\\quant\\b3-quant\\research\\src\\brazil_rv\\v2\\round6_diagnostics.py",
+        "sha256": "9fe0739b4ee4db7dcd7958c3e8120ed87767d986aba3cadcc99eb2e9c9417210"
+      },
+      "executed": {
+        "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\loan_invoices\\executed_v2_round6_diagnostics.py",
+        "sha256": "9fe0739b4ee4db7dcd7958c3e8120ed87767d986aba3cadcc99eb2e9c9417210"
+      }
+    },
+    "v2/round6_economics.py": {
+      "current": {
+        "path": "C:\\quant\\b3-quant\\research\\src\\brazil_rv\\v2\\round6_economics.py",
+        "sha256": "31b7257f11ca35820d5f29ba9cc32cfef195757cbcca43e5c5a44fc368c9f331"
+      },
+      "executed": {
+        "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\loan_invoices\\executed_v2_round6_economics.py",
+        "sha256": "31b7257f11ca35820d5f29ba9cc32cfef195757cbcca43e5c5a44fc368c9f331"
+      }
+    },
+    "v2/round6_readouts.py": {
+      "current": {
+        "path": "C:\\quant\\b3-quant\\research\\src\\brazil_rv\\v2\\round6_readouts.py",
+        "sha256": "3366bd04dd5e52774c2ea2f46a84c9b9e7d6c9754b5ca766f1205158a1d9776b"
+      },
+      "executed": {
+        "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\loan_invoices\\executed_v2_round6_readouts.py",
+        "sha256": "3366bd04dd5e52774c2ea2f46a84c9b9e7d6c9754b5ca766f1205158a1d9776b"
+      }
+    },
+    "v2/round6_seed_audit.py": {
+      "current": {
+        "path": "C:\\quant\\b3-quant\\research\\src\\brazil_rv\\v2\\round6_seed_audit.py",
+        "sha256": "99f7b38078e231c5025f231b90f941c3179db99f2f79224b3fded9e9208007df"
+      },
+      "executed": {
+        "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\loan_invoices\\executed_v2_round6_seed_audit.py",
+        "sha256": "99f7b38078e231c5025f231b90f941c3179db99f2f79224b3fded9e9208007df"
+      }
+    },
+    "v2/round7.py": {
+      "current": {
+        "path": "C:\\quant\\b3-quant\\research\\src\\brazil_rv\\v2\\round7.py",
+        "sha256": "24e38193919fa6c412540a78017623bfe5abdb38d7761d00c54ef5d6e229da37"
+      },
+      "executed": {
+        "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\loan_invoices\\executed_v2_round7.py",
+        "sha256": "24e38193919fa6c412540a78017623bfe5abdb38d7761d00c54ef5d6e229da37"
+      }
+    },
+    "v2/round7_acceptance.py": {
+      "current": {
+        "path": "C:\\quant\\b3-quant\\research\\src\\brazil_rv\\v2\\round7_acceptance.py",
+        "sha256": "b1bee929aeceee5209da4db02730b4eea6e8027e37828d768277c625661fa3f9"
+      },
+      "executed": {
+        "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\loan_invoices\\executed_v2_round7_acceptance.py",
+        "sha256": "b1bee929aeceee5209da4db02730b4eea6e8027e37828d768277c625661fa3f9"
+      }
+    },
+    "v2/round7_archived_diagnostics.py": {
+      "current": {
+        "path": "C:\\quant\\b3-quant\\research\\src\\brazil_rv\\v2\\round7_archived_diagnostics.py",
+        "sha256": "5b22c4d9ace3d0517c7168303466028463fa9ec257dbb841472d3e97eee319cc"
+      },
+      "executed": {
+        "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\loan_invoices\\executed_v2_round7_archived_diagnostics.py",
+        "sha256": "5b22c4d9ace3d0517c7168303466028463fa9ec257dbb841472d3e97eee319cc"
+      }
+    },
+    "v2/round7_clock.py": {
+      "current": {
+        "path": "C:\\quant\\b3-quant\\research\\src\\brazil_rv\\v2\\round7_clock.py",
+        "sha256": "fc3d48311cc24efb5fc8374ab6fa102cfe846bfbfa264de2f6277b2644d6c07c"
+      },
+      "executed": {
+        "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\loan_invoices\\executed_v2_round7_clock.py",
+        "sha256": "fc3d48311cc24efb5fc8374ab6fa102cfe846bfbfa264de2f6277b2644d6c07c"
+      }
+    },
+    "v2/round7_continuous.py": {
+      "current": {
+        "path": "C:\\quant\\b3-quant\\research\\src\\brazil_rv\\v2\\round7_continuous.py",
+        "sha256": "47ffe63c79add5947c10c79461cd5faed17f221fc4412cb1c6b25a03ca542acf"
+      },
+      "executed": {
+        "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\loan_invoices\\executed_v2_round7_continuous.py",
+        "sha256": "47ffe63c79add5947c10c79461cd5faed17f221fc4412cb1c6b25a03ca542acf"
+      }
+    },
+    "v2/round7_corrector.py": {
+      "current": {
+        "path": "C:\\quant\\b3-quant\\research\\src\\brazil_rv\\v2\\round7_corrector.py",
+        "sha256": "8ecc6ba7dcfded51ad769943b9e83a69b231bc760b2e7cce887437ede087df62"
+      },
+      "executed": {
+        "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\loan_invoices\\executed_v2_round7_corrector.py",
+        "sha256": "8ecc6ba7dcfded51ad769943b9e83a69b231bc760b2e7cce887437ede087df62"
+      }
+    },
+    "v2/round7_costs.py": {
+      "current": {
+        "path": "C:\\quant\\b3-quant\\research\\src\\brazil_rv\\v2\\round7_costs.py",
+        "sha256": "993fc70f8ec54505cf706cc2243722f7285abb8a2ae191267f14e560a381d721"
+      },
+      "executed": {
+        "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\loan_invoices\\executed_v2_round7_costs.py",
+        "sha256": "993fc70f8ec54505cf706cc2243722f7285abb8a2ae191267f14e560a381d721"
+      }
+    },
+    "v2/round7_coverage.py": {
+      "current": {
+        "path": "C:\\quant\\b3-quant\\research\\src\\brazil_rv\\v2\\round7_coverage.py",
+        "sha256": "f79c524f1c023191f3c838de2bb141af05efcd8615bfe4d129989c0a23074100"
+      },
+      "executed": {
+        "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\loan_invoices\\executed_v2_round7_coverage.py",
+        "sha256": "f79c524f1c023191f3c838de2bb141af05efcd8615bfe4d129989c0a23074100"
+      }
+    },
+    "v2/round7_data.py": {
+      "current": {
+        "path": "C:\\quant\\b3-quant\\research\\src\\brazil_rv\\v2\\round7_data.py",
+        "sha256": "b17195da575bcef24d265ff2756093ef2b025d4b4922e902eed12101f1436ad9"
+      },
+      "executed": {
+        "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\loan_invoices\\executed_v2_round7_data.py",
+        "sha256": "b17195da575bcef24d265ff2756093ef2b025d4b4922e902eed12101f1436ad9"
+      }
+    },
+    "v2/round7_decisions.py": {
+      "current": {
+        "path": "C:\\quant\\b3-quant\\research\\src\\brazil_rv\\v2\\round7_decisions.py",
+        "sha256": "9e23ecb07b5350289394a56f1c9c310065daa80b0534b20e1f98112f34675961"
+      },
+      "executed": {
+        "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\loan_invoices\\executed_v2_round7_decisions.py",
+        "sha256": "9e23ecb07b5350289394a56f1c9c310065daa80b0534b20e1f98112f34675961"
+      }
+    },
+    "v2/round7_diagnostics_report.py": {
+      "current": {
+        "path": "C:\\quant\\b3-quant\\research\\src\\brazil_rv\\v2\\round7_diagnostics_report.py",
+        "sha256": "ad2131c32fc4a76c3d68d4832801a954ce025cadfe9ee76952c81e4c575f27a6"
+      },
+      "executed": {
+        "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\loan_invoices\\executed_v2_round7_diagnostics_report.py",
+        "sha256": "ad2131c32fc4a76c3d68d4832801a954ce025cadfe9ee76952c81e4c575f27a6"
+      }
+    },
+    "v2/round7_engineering.py": {
+      "current": {
+        "path": "C:\\quant\\b3-quant\\research\\src\\brazil_rv\\v2\\round7_engineering.py",
+        "sha256": "7d23f1543252a15fec03a75cca040e1074f898a3601b2d964f48ce1bdd2da768"
+      },
+      "executed": {
+        "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\loan_invoices\\executed_v2_round7_engineering.py",
+        "sha256": "7d23f1543252a15fec03a75cca040e1074f898a3601b2d964f48ce1bdd2da768"
+      }
+    },
+    "v2/round7_pathway.py": {
+      "current": {
+        "path": "C:\\quant\\b3-quant\\research\\src\\brazil_rv\\v2\\round7_pathway.py",
+        "sha256": "3130c29af57d638600766dab5c3195014c9dda9852385bf58f5004c2bd3f1b02"
+      },
+      "executed": {
+        "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\loan_invoices\\executed_v2_round7_pathway.py",
+        "sha256": "3130c29af57d638600766dab5c3195014c9dda9852385bf58f5004c2bd3f1b02"
+      }
+    },
+    "v2/round7_preprocessing.py": {
+      "current": {
+        "path": "C:\\quant\\b3-quant\\research\\src\\brazil_rv\\v2\\round7_preprocessing.py",
+        "sha256": "d454abaa686ebc7c3553589cabdaadb985f736336e145a630f42070d6d56e706"
+      },
+      "executed": {
+        "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\loan_invoices\\executed_v2_round7_preprocessing.py",
+        "sha256": "d454abaa686ebc7c3553589cabdaadb985f736336e145a630f42070d6d56e706"
+      }
+    },
+    "v2/round7_program.py": {
+      "current": {
+        "path": "C:\\quant\\b3-quant\\research\\src\\brazil_rv\\v2\\round7_program.py",
+        "sha256": "b5f601ceed3b6f5beefd2d4f5fd1b74fbf9d216128c076a85d1b62e693893622"
+      },
+      "executed": {
+        "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\loan_invoices\\executed_v2_round7_program.py",
+        "sha256": "b5f601ceed3b6f5beefd2d4f5fd1b74fbf9d216128c076a85d1b62e693893622"
+      }
+    },
+    "v2/round7_readouts.py": {
+      "current": {
+        "path": "C:\\quant\\b3-quant\\research\\src\\brazil_rv\\v2\\round7_readouts.py",
+        "sha256": "ad46297b30017fa2dab62456c7f42b462a6735b8499031aefdb211ac8d3862bb"
+      },
+      "executed": {
+        "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\loan_invoices\\executed_v2_round7_readouts.py",
+        "sha256": "ad46297b30017fa2dab62456c7f42b462a6735b8499031aefdb211ac8d3862bb"
+      }
+    },
+    "v2/round7_score.py": {
+      "current": {
+        "path": "C:\\quant\\b3-quant\\research\\src\\brazil_rv\\v2\\round7_score.py",
+        "sha256": "b610a6157d7270996e8845c9459cb5a5052d747376b482527d1c57bf9f2e9129"
+      },
+      "executed": {
+        "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\loan_invoices\\executed_v2_round7_score.py",
+        "sha256": "b610a6157d7270996e8845c9459cb5a5052d747376b482527d1c57bf9f2e9129"
+      }
+    },
+    "v2/round7_seed_audit.py": {
+      "current": {
+        "path": "C:\\quant\\b3-quant\\research\\src\\brazil_rv\\v2\\round7_seed_audit.py",
+        "sha256": "e86ad8c96055a2e68fd0c657ba73c909318d46ca1db98ac9b6285dca3a642d64"
+      },
+      "executed": {
+        "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\loan_invoices\\executed_v2_round7_seed_audit.py",
+        "sha256": "e86ad8c96055a2e68fd0c657ba73c909318d46ca1db98ac9b6285dca3a642d64"
+      }
+    },
+    "v2/round7_training.py": {
+      "current": {
+        "path": "C:\\quant\\b3-quant\\research\\src\\brazil_rv\\v2\\round7_training.py",
+        "sha256": "b94c98a4c3ff7d0919aaa255bbaa4f31018bcd71a3be4813a12f87cfcbb9eff1"
+      },
+      "executed": {
+        "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\loan_invoices\\executed_v2_round7_training.py",
+        "sha256": "b94c98a4c3ff7d0919aaa255bbaa4f31018bcd71a3be4813a12f87cfcbb9eff1"
+      }
+    },
+    "v2/round7_transfer.py": {
+      "current": {
+        "path": "C:\\quant\\b3-quant\\research\\src\\brazil_rv\\v2\\round7_transfer.py",
+        "sha256": "2d913f27a12699a900e7ed0f65452f2c392c6d4bdb7f88101e1a8650b0269e04"
+      },
+      "executed": {
+        "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\loan_invoices\\executed_v2_round7_transfer.py",
+        "sha256": "2d913f27a12699a900e7ed0f65452f2c392c6d4bdb7f88101e1a8650b0269e04"
+      }
+    },
+    "v2/run_many.py": {
+      "current": {
+        "path": "C:\\quant\\b3-quant\\research\\src\\brazil_rv\\v2\\run_many.py",
+        "sha256": "e21928b6d14ff124ab3d4645128b6f08ccb731fe833af0ab7aad04fb4e78b74b"
+      },
+      "executed": {
+        "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\loan_invoices\\executed_v2_run_many.py",
+        "sha256": "e21928b6d14ff124ab3d4645128b6f08ccb731fe833af0ab7aad04fb4e78b74b"
+      }
+    },
+    "v2/schedule_reconstruction.py": {
+      "current": {
+        "path": "C:\\quant\\b3-quant\\research\\src\\brazil_rv\\v2\\schedule_reconstruction.py",
+        "sha256": "f69e4f884b7f1f226f5ba946aa7a89c7fd64dee58a8b43544b1177f4b8cbdc56"
+      },
+      "executed": {
+        "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\loan_invoices\\executed_v2_schedule_reconstruction.py",
+        "sha256": "f69e4f884b7f1f226f5ba946aa7a89c7fd64dee58a8b43544b1177f4b8cbdc56"
+      }
+    },
+    "v2/score.py": {
+      "current": {
+        "path": "C:\\quant\\b3-quant\\research\\src\\brazil_rv\\v2\\score.py",
+        "sha256": "3ea32596c07bf56e59ef4f7d1994cd27f521926089c25a033817d3fee8b18b62"
+      },
+      "executed": {
+        "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\loan_invoices\\executed_v2_score.py",
+        "sha256": "3ea32596c07bf56e59ef4f7d1994cd27f521926089c25a033817d3fee8b18b62"
+      }
+    },
+    "v2/sidecars.py": {
+      "current": {
+        "path": "C:\\quant\\b3-quant\\research\\src\\brazil_rv\\v2\\sidecars.py",
+        "sha256": "9e99248d7fc8fa0a6c2f1cd93cd0c422daa84d748a085e82911ce42f823f2d16"
+      },
+      "executed": {
+        "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\loan_invoices\\executed_v2_sidecars.py",
+        "sha256": "9e99248d7fc8fa0a6c2f1cd93cd0c422daa84d748a085e82911ce42f823f2d16"
+      }
+    },
+    "v2/splits.py": {
+      "current": {
+        "path": "C:\\quant\\b3-quant\\research\\src\\brazil_rv\\v2\\splits.py",
+        "sha256": "7b45f30a82b428d5179313d46f9401db0fdfeb043f227abfb7cb8fff83baf4ef"
+      },
+      "executed": {
+        "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\loan_invoices\\executed_v2_splits.py",
+        "sha256": "7b45f30a82b428d5179313d46f9401db0fdfeb043f227abfb7cb8fff83baf4ef"
+      }
+    },
+    "v2/store.py": {
+      "current": {
+        "path": "C:\\quant\\b3-quant\\research\\src\\brazil_rv\\v2\\store.py",
+        "sha256": "f454c9010bb030c77fe344618222ae0dc67e619c26019b0bdcaa8a29e0048e16"
+      },
+      "executed": {
+        "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\loan_invoices\\executed_v2_store.py",
+        "sha256": "f454c9010bb030c77fe344618222ae0dc67e619c26019b0bdcaa8a29e0048e16"
+      }
+    },
+    "v2/store_comparison.py": {
+      "current": {
+        "path": "C:\\quant\\b3-quant\\research\\src\\brazil_rv\\v2\\store_comparison.py",
+        "sha256": "f13e939d0c3614618aa2a1404143ac2e996acf35201f019e4c5fe73eb833a525"
+      },
+      "executed": {
+        "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\loan_invoices\\executed_v2_store_comparison.py",
+        "sha256": "f13e939d0c3614618aa2a1404143ac2e996acf35201f019e4c5fe73eb833a525"
+      }
+    },
+    "v2/targets.py": {
+      "current": {
+        "path": "C:\\quant\\b3-quant\\research\\src\\brazil_rv\\v2\\targets.py",
+        "sha256": "bfdd1213f5675685d6a8d942791e2895902cfdaad83c228882a765562378fd6e"
+      },
+      "executed": {
+        "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\loan_invoices\\executed_v2_targets.py",
+        "sha256": "bfdd1213f5675685d6a8d942791e2895902cfdaad83c228882a765562378fd6e"
+      }
+    },
+    "v2/temporal_pathway.py": {
+      "current": {
+        "path": "C:\\quant\\b3-quant\\research\\src\\brazil_rv\\v2\\temporal_pathway.py",
+        "sha256": "6bd0fbfa592367f3a505efb55352e118982e8ba630e377b7c14d12095ca0af5d"
+      },
+      "executed": {
+        "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\loan_invoices\\executed_v2_temporal_pathway.py",
+        "sha256": "6bd0fbfa592367f3a505efb55352e118982e8ba630e377b7c14d12095ca0af5d"
+      }
+    },
+    "v2/train.py": {
+      "current": {
+        "path": "C:\\quant\\b3-quant\\research\\src\\brazil_rv\\v2\\train.py",
+        "sha256": "ca856ff2e17a8c887bc5ccc3ca09f130f06b4de8c2ff9a681d0cade9844f2d82"
+      },
+      "executed": {
+        "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\loan_invoices\\executed_v2_train.py",
+        "sha256": "ca856ff2e17a8c887bc5ccc3ca09f130f06b4de8c2ff9a681d0cade9844f2d82"
+      }
+    },
+    "v2/training_diagnostics.py": {
+      "current": {
+        "path": "C:\\quant\\b3-quant\\research\\src\\brazil_rv\\v2\\training_diagnostics.py",
+        "sha256": "ea2ccbfff0be87926cfa82ad0147fe27ceff041b62738d28c6b981569df3ddfa"
+      },
+      "executed": {
+        "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\loan_invoices\\executed_v2_training_diagnostics.py",
+        "sha256": "ea2ccbfff0be87926cfa82ad0147fe27ceff041b62738d28c6b981569df3ddfa"
+      }
+    },
+    "v2/universe.py": {
+      "current": {
+        "path": "C:\\quant\\b3-quant\\research\\src\\brazil_rv\\v2\\universe.py",
+        "sha256": "72713739257d547812ee38eed62a01a6aa8562f1a214de9b2233def981f83e42"
+      },
+      "executed": {
+        "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\loan_invoices\\executed_v2_universe.py",
+        "sha256": "72713739257d547812ee38eed62a01a6aa8562f1a214de9b2233def981f83e42"
+      }
+    },
+    "v2/validate_pipeline.py": {
+      "current": {
+        "path": "C:\\quant\\b3-quant\\research\\src\\brazil_rv\\v2\\validate_pipeline.py",
+        "sha256": "a99d08b8d7b4c0dba7fbab155f547cbf78d3c2131186a06da20e066372a8f1a4"
+      },
+      "executed": {
+        "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\loan_invoices\\executed_v2_validate_pipeline.py",
+        "sha256": "a99d08b8d7b4c0dba7fbab155f547cbf78d3c2131186a06da20e066372a8f1a4"
+      }
+    }
+  },
+  "sessions": 2304,
+  "status": "invoice_and_minimum_engineering_accepted_final_A_C_D_pending",
+  "tests": "14distinctnewtests,9existingloancontracttests,6existingfractionpaymenttests pass; overlapping batches not summed. Ruff passes.",
+  "timings": {
+    "engineering_seconds": 74.98602769998251,
+    "saved_qualification_seconds": 1.0876499000005424,
+    "summed_case_seconds": 73.68373520000023
+  },
+  "uncertainty": "Independentadaptive maxpath .010282502409070731/.00000816549058072269/.000022326227277517318bp atR10m/R1m/R5m. Preserve larger V32-V38 fixed-fee uncertainty. Many2019R10m path signs are below this bound. Total synthetic paths, not dailyalpha/modelprofit or an all-interior adaptive extremum proof."
+}

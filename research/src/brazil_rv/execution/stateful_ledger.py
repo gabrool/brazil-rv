@@ -107,6 +107,8 @@ class LedgerConfig:
     approve_loan_renewals: bool = True
     loan_recalls: tuple[LoanRecall, ...] = ()
     electronic_loan_settlement_days: int = 1
+    loan_invoice_convention: str = "none"
+    loan_minimum_allocation: str = "final"
     volatility_balanced_entries: bool = True
     volatility_group_count: int = 5
     small_stratum_scaling_threshold_multiple: int = 2
@@ -127,6 +129,16 @@ class LedgerConfig:
     annual_sessions: int = 252
 
     def __post_init__(self) -> None:
+        if self.loan_invoice_convention not in {
+            "none",
+            "contract_nearest",
+            "contract_down",
+            "contract_up",
+            "security_day_nearest",
+        }:
+            raise ValueError("unknown loan invoice hypothesis")
+        if self.loan_minimum_allocation not in {"final", "pro_rata"}:
+            raise ValueError("unknown loan minimum allocation hypothesis")
         if self.electronic_loan_settlement_days not in (0, 1):
             raise ValueError("electronic loan settlement must be D0 or D1")
         if not 5 <= self.loan_term_sessions <= 126:
@@ -327,6 +339,8 @@ class StatefulLedgerResult:
     loan_payment: NDArray[np.float64]
     loan_outstanding_principal: NDArray[np.float64]
     loan_charges: tuple[LoanCharge, ...]
+    loan_invoice_adjustment: NDArray[np.float64]
+    loan_minimum_credit: NDArray[np.float64]
     loan_renewals: tuple[LoanRenewal, ...]
     loan_return_notices: tuple[LoanReturnNotice, ...]
     loan_overdue_principal: NDArray[np.float64]
@@ -1442,6 +1456,8 @@ def simulate_stateful_ledger(
         config.borrow_fee_multiplier,
         config.annual_sessions,
         config.electronic_loan_settlement_days,
+        invoice_convention=config.loan_invoice_convention,
+        minimum_allocation=config.loan_minimum_allocation,
     )
     loan_references = (
         np.full((day_count, name_count + 1), np.nan)
@@ -1549,6 +1565,8 @@ def simulate_stateful_ledger(
     loan_payment_rows: list[float] = []
     loan_principal_rows: list[float] = []
     loan_charges: list[LoanCharge] = []
+    loan_invoice_rows = []
+    loan_minimum_credit_rows = []
     loan_cash_payments: list[LoanCashPayment] = []
     equity_borrow_raw_rows: list[float] = []
     equity_borrow_fee_rows: list[float] = []
@@ -3909,13 +3927,17 @@ def simulate_stateful_ledger(
         loan_rent, loan_fees = loans.accrue(
             day, inputs.dates[day], charges=loan_charges
         )
+        rent_paid, fees_paid = loans.pay(day)
+        loan_invoice_rows.append(loans.payment_adjustment.sum(0).numpy().copy())
+        loan_minimum_credit_rows.append(float(loans.minimum_credit.sum()))
+        loan_rent = loan_rent + loans.payment_adjustment[:, 0]
+        loan_fees = loan_fees + loans.payment_adjustment[:, 1]
         equity_borrow_raw = float(loan_rent[:-1].sum())
         equity_borrow_fee = float(loan_fees[:-1].sum())
         hedge_borrow_raw = float(loan_rent[-1])
         hedge_borrow_fee = float(loan_fees[-1])
         hedge_borrow = hedge_borrow_raw + hedge_borrow_fee
         borrow = equity_borrow_raw + equity_borrow_fee + hedge_borrow
-        rent_paid, fees_paid = loans.pay(day)
         loan_paid = float(rent_paid.sum() + fees_paid.sum())
         free_cash -= loan_paid
         loan_liability = float(loans.liability)
@@ -4399,6 +4421,8 @@ def simulate_stateful_ledger(
         loan_payment=np.asarray(loan_payment_rows, dtype=np.float64),
         loan_outstanding_principal=np.asarray(loan_principal_rows, dtype=np.float64),
         loan_charges=tuple(loan_charges),
+        loan_invoice_adjustment=np.asarray(loan_invoice_rows, dtype=np.float64),
+        loan_minimum_credit=np.asarray(loan_minimum_credit_rows, dtype=np.float64),
         loan_renewals=tuple(loans.renewals),
         loan_return_notices=tuple(loans.return_notices),
         loan_overdue_principal=np.asarray(loan_overdue_rows, dtype=np.float64),

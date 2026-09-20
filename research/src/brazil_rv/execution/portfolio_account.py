@@ -88,6 +88,8 @@ class PortfolioAccount:
                 config.borrow_fee_multiplier,
                 config.annual_sessions,
                 config.electronic_loan_settlement_days,
+                invoice_convention=config.loan_invoice_convention,
+                minimum_allocation=config.loan_minimum_allocation,
             ),
             custody=ShareCustody(n),
             config=config,
@@ -211,7 +213,9 @@ class PortfolioAccount:
                         r = torch.zeros_like(self.trade_restricted)
                         r[name] = -release
                         if auction.payment_session > day:
-                            self.settlements.append((auction.payment_session, release, r))
+                            self.settlements.append(
+                                (auction.payment_session, release, r)
+                            )
                         self.trade_cash = self.trade_cash + release
                         self.trade_restricted = self.trade_restricted + r
                     for field in ("shares", "marks", "cost_basis", "pending_exit"):
@@ -910,8 +914,8 @@ class PortfolioAccount:
         )
         overdue_principal = self.loans.overdue_principal(day).sum()
         loan_rent, loan_fee = self.loans.accrue(day, session_date)
-        borrow = loan_rent.sum() + loan_fee.sum()
         rent_paid, fees_paid = self.loans.pay(day)
+        borrow = loan_rent.sum() + loan_fee.sum() + self.loans.payment_adjustment.sum()
         self.trade_cash = self.trade_cash - rent_paid.sum() - fees_paid.sum()
         self.marks = torch.where(torch.as_tensor(printed), prices, self.marks)
         valued = printed.copy()
@@ -959,6 +963,8 @@ class PortfolioAccount:
             "withholding_accrual": withholding_accrual,
             "lender_compensation": lender_compensation,
             "borrow_paid": rent_paid.sum() + fees_paid.sum(),
+            "loan_invoice_adjustment": self.loans.payment_adjustment.sum(0),
+            "loan_minimum_credit": self.loans.minimum_credit.sum(),
             "borrow_liability": self.loans.liability,
             "loan_redemption_liability": self.loans.cash_liability,
             "loan_overdue_principal": overdue_principal,

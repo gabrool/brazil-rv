@@ -2030,3 +2030,12 @@ The [payment checkpoint](docs/v2_PAYMENT_BOUNDS.md) qualifies V38 same-day newly
 
 
 Verified recovery: implementatione0a5af96502852e0d4f4169ccbbb04e6f37483bd; payment_bounds_e0a5af9.zip, SHAe7e52af7fe999f6f583aa49f2089453690d3d86123a8d4278e5fd5d7a3d924b5, 26482819bytes. 883unique/1248logical restored/hashchecked members, 365aliases;54completebooks/9645408accountcells. Recovery2.131333s. Current research/patch/frozen plan/nine term variants/initial-failed-qualified-resumed recipes/tests/newbooks recover without immutable sources/stores/old-fit copies. Prior Copel/precredit/ENAT/Natura/lifecycle/lending/economic-store dependencies remain required. AcceptanceSHAaea3d8b96cea1cc0d54d4c9ccc8110dec20bcf14f41bb10be0877fb351547e33; actual-exposure Cielo and final A/C/D remain open.
+
+
+## 2026-09-20 — Loan invoice and minimum allocation checkpoint
+
+The [loan invoice checkpoint](docs/v2_LOAN_INVOICES.md) qualifies V39 cent/payment grouping and partial old-minimum credit hypotheses in BOTH accounts,36full933 adaptive books/2304NAVs. Independent9503invoice groups and minimum-credit arithmetic pass;14newtests, prior books/stores/oldfits preserved.72 Decimal operand-recomposition cent boundaries are enumerated; actual Float64 invoice coordinates round exactly. Larger fixed-fee adaptive uncertainty remains; no model profit. Actual-held-Cielo, final historical corporate costs/source-data admission and C/D remain open.
+
+Independentadaptive maxpath .010282502409070731/.00000816549058072269/.000022326227277517318bp atR10m/R1m/R5m. Preserve larger V32-V38 fixed-fee uncertainty. Many2019R10m path signs are below this bound. Total synthetic paths, not dailyalpha/modelprofit or an all-interior adaptive extremum proof.
+
+14distinctnewtests,9existingloancontracttests,6existingfractionpaymenttests pass; overlapping batches not summed. Ruff passes. Engineering74.986028s/qualification1.087650s; all36 first-pass, no oldbook/source/store rerun.
