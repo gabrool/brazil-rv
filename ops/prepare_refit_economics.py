@@ -301,7 +301,7 @@ def main():
         indices,
         purpose="evaluation",
         verify_hashes=True,
-        history_lookbacks=61,
+        history_lookbacks=60,
         history_end_offsets=0,
     )
     try:
