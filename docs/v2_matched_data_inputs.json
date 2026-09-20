@@ -1,0 +1,159 @@
+{
+  "account_terms": {
+    "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_economic_matched_20260920\\event_admission\\candidate_terms.json",
+    "sha256": "679f468c6547c64740402d104f16698c8ea7791813a57e2d65c677d95862cdc4"
+  },
+  "accounting_source_replay": "Frozen OLD PolicyData and previously qualified corporate candidate terms; no old checkpoint reads altered store coordinates.",
+  "boundaries": "All933/full60/3717dates and original source assignments remain. Unit/peer support losses, missing M1, ALSC locked credit, ENAT null auction, and exposure-conditional Cielo/daytrade remain explicit. No revised profitability or completed fit is implied.",
+  "contract": {
+    "path": "C:\\quant\\b3-quant\\docs\\v2_matched_store_contract.json",
+    "sha256": "09e9ef425aadd9270d16b1f572314003c7fde7ce76ad2870a71508e31db40ba0"
+  },
+  "earlier_baseline_preserved": {
+    "path": "C:\\quant\\b3-quant\\docs\\v2_composed_data_inputs.json",
+    "sha256": "bba9df8c53feeb131b788a3cd83013e12753fa64bad8aeaed9d2b8d5e1e25604"
+  },
+  "evidence": {
+    "neutral_support_attribution": {
+      "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_economic_matched_20260920\\event_data\\composition\\neutral_support_attribution.json",
+      "sha256": "aa0f6f1d521bf80d25e2a9c8a0920c60ed9571b40500d4400afee174b6e39aad"
+    },
+    "stage_c_event_auxiliaries": {
+      "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_economic_matched_20260920\\event_data\\auxiliaries\\manifest.json",
+      "sha256": "53d804084c3e7cb4f68d8789abd7404d00096e39d011e78f4178558c0c49998d"
+    },
+    "stage_c_event_auxiliary_arithmetic": {
+      "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_economic_matched_20260920\\event_data\\auxiliaries\\qualification\\manifest.json",
+      "sha256": "4d9ad1609ab454960a02077304255420387acdd2e15446cbea781e1865ec4714"
+    },
+    "stage_c_event_candidate_terms": {
+      "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_economic_matched_20260920\\event_admission\\candidate_terms.json",
+      "sha256": "679f468c6547c64740402d104f16698c8ea7791813a57e2d65c677d95862cdc4"
+    },
+    "stage_c_event_context": {
+      "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_economic_matched_20260920\\event_data\\context\\manifest.json",
+      "sha256": "780c72984f50ecd2b73e87e4113f899e425917dbadadaaf336e83a78dddff162"
+    },
+    "stage_c_event_daily": {
+      "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_economic_matched_20260920\\event_data\\daily\\corrected\\manifest.json",
+      "sha256": "f440dc1f8c6adad1ed36cab1ed268ba1bcf27432952846d504c997f3658254b7"
+    },
+    "stage_c_event_daily_qualification": {
+      "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_economic_matched_20260920\\event_data\\daily\\admitted\\manifest.json",
+      "sha256": "51d7a392884f2e5e067034036b1dd36e4c97bc5bf3e357b24c03576960a5b000"
+    },
+    "stage_c_event_data_admission": {
+      "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_economic_matched_20260920\\event_data\\manifest.json",
+      "sha256": "2a34a64282eab181db63b4bb12f78473f7a37f476936229ed7ce99908067174e"
+    },
+    "stage_c_event_index_reopening_qualification": {
+      "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_economic_matched_20260920\\event_data\\auxiliaries\\reopening_qualification\\manifest.json",
+      "sha256": "1cb57bc143784732b8a142f5ecd464967fd5adb8c3db2748e4205748dc1f70b2"
+    },
+    "stage_c_event_input_scope": {
+      "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_economic_matched_20260920\\event_input_scope\\manifest.json",
+      "sha256": "b00bd41dc7dd0d497af9b2c120d3fbf1ae674498e56ccf0ba3d0f3bafd95f638"
+    },
+    "stage_c_event_issuers": {
+      "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_economic_matched_20260920\\event_data\\issuers\\manifest.json",
+      "sha256": "27771d26e5b8fbeffb05eb06ab44302dfd9fb4a115729c5244596185f7407d6c"
+    },
+    "stage_c_event_lending": {
+      "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_economic_matched_20260920\\event_data\\lending\\manifest.json",
+      "sha256": "c7f92147b4976901172778e8d2c20b176608a990a097bc4828865d8d92b10959"
+    },
+    "stage_c_event_m1": {
+      "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_economic_matched_20260920\\event_data\\m1\\manifest.json",
+      "sha256": "d0c7dda69ea91747530fefc7403f28b261974947c3c46c90eef7d4f70d538493"
+    },
+    "stage_c_event_market": {
+      "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_economic_matched_20260920\\event_data\\market\\manifest.json",
+      "sha256": "8c6f70845162b7a0766efaeb6a86ff970ef65621fdf215630729342df596a672"
+    },
+    "stage_c_event_minute_qualification": {
+      "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_economic_matched_20260920\\event_data\\minute_qualification\\manifest.json",
+      "sha256": "fe117dbbcf76e31970739cb7756815d200ae10641b73fac662a691314a73af2e"
+    },
+    "stage_c_event_preparation": {
+      "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_economic_matched_20260920\\event_replays\\preparation.json",
+      "sha256": "ccd6c1874e16c9ba49ee7d0578b14b65322713d452953f6a9cd9a85f338b0891"
+    },
+    "stage_c_event_qualification": {
+      "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_economic_matched_20260920\\event_replays\\qualified\\report.json",
+      "sha256": "c1010c02334bbe1745fada3628f48b97b594172f77eda2a7df0d935218c80272"
+    },
+    "stage_c_event_replay_plan": {
+      "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_economic_matched_20260920\\event_replays\\claim_scope_plan.json",
+      "sha256": "059728ec9970536e388f3af1eb46757edef03f602e95a6dc85a4a2bbc4870fd9"
+    },
+    "stage_c_event_replays": {
+      "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_economic_matched_20260920\\event_replays\\combined_primary.json",
+      "sha256": "496225956c50d76c6f9b41839d6f987a9fce6404cb1a6a5d6855fd885d430450"
+    },
+    "stage_c_event_scalars": {
+      "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_economic_matched_20260920\\event_data\\scalars\\manifest.json",
+      "sha256": "2d297a4d5ef77f9d35fa16905f31d9ff61f76b36d242659ab874d0b107d9509e"
+    },
+    "stage_c_event_sidecars": {
+      "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_economic_matched_20260920\\event_data\\sidecars\\manifest.json",
+      "sha256": "a40ab5614a572ed97d1abc115f2d8d208c40d318f87bddf0ce3540fd217074a2"
+    },
+    "stage_c_event_source_admission": {
+      "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_economic_matched_20260920\\event_admission\\source_admission.json",
+      "sha256": "c520f552921ff68d87d57db31fa50ce9a70da891421e211a66c75cf00eaf7900"
+    },
+    "stage_c_event_source_index": {
+      "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_economic_matched_20260920\\event_sources\\issuer_index.json",
+      "sha256": "738eb9665b30386010e9054e143123f258038e353689c9d224e51c120bced640"
+    },
+    "stage_c_event_store_assembly": {
+      "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_economic_matched_20260920\\event_data\\composition\\manifest.json",
+      "sha256": "924e40d73002a2e4f58ca540f0dc7402fe3d3ec6a65beede5e9f3140b0f500fa"
+    },
+    "stage_c_event_store_input_audit": {
+      "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_economic_matched_20260920\\event_data\\composition\\qualification\\manifest.json",
+      "sha256": "9303d51eb769a0775bf01b5d7e44bde02e229d72e1d364183862cd088730177d"
+    },
+    "stage_c_event_targets": {
+      "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_economic_matched_20260920\\event_data\\composition\\targets.json",
+      "sha256": "0511ea78cb1fcb1cefc3af635bfbd8ee1096961e9b5beee67f788ef634043c23"
+    },
+    "stage_c_event_targets_qualification": {
+      "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_economic_matched_20260920\\event_data\\targets_qualification\\manifest.json",
+      "sha256": "895eee760f43d0c7471024d2a8c0991258886a41da521ff64ae89b32b5d7808b"
+    },
+    "stage_c_event_unit_history": {
+      "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_economic_matched_20260920\\event_data\\lending\\unit_qualification\\report.json",
+      "sha256": "2cd6db641566c2f384a20a74380cdd00ab432c38263da2a40b77426387813436"
+    },
+    "stage_c_event_wealth": {
+      "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_economic_matched_20260920\\event_data\\wealth\\manifest.json",
+      "sha256": "8f4acead6333cb2485a392f0cbc78f1547d414d9c8e9ca09c8e51ea386f0bdee"
+    },
+    "stage_c_neutral_attribution": {
+      "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_economic_matched_20260920\\event_data\\composition\\neutral_attribution.json",
+      "sha256": "8fd7ede72df3795201f5fe5639ef11742c6c5a6efb3ae09fd9c07b7b5367d945"
+    }
+  },
+  "neutral_support": {
+    "existing_gross_outcomes_with_restored_risk_support": 145,
+    "losses": 0,
+    "method": "Mask-only classification of saved final virtual attribution; no numerical target or consumer rerun.",
+    "new_gross_outcomes_entering_neutral": 1389
+  },
+  "parent": {
+    "manifest_sha256": "fab704fccbd7ceed0624bcfcc67178327f392e43d124242caf8d77ff1c64dfc0",
+    "root": "D:\\quant-data\\b3\\processed\\v2_economic_composed_store_20260920"
+  },
+  "refit_required": true,
+  "remaining_program": "Fresh original-recipe matched C parents/children and economic comparisons; additional folds and D only under registration.",
+  "report": {
+    "path": "C:\\quant\\b3-quant\\docs\\v2_MATCHED_ECONOMIC_REPLAYS.md",
+    "sha256": "a2ce50de33bda6a91797231a2b6635862e910c7a205f45bec2d71f03cf87b44e"
+  },
+  "status": "accepted_complete_matched_data_contract",
+  "store": {
+    "manifest_sha256": "fd4ad71a0efaad0914520c89d589e0c0dfd9665158204c4721f821f9df8d4161",
+    "root": "C:\\quant-data\\b3\\processed\\v2_economic_matched_store_20260920"
+  }
+}

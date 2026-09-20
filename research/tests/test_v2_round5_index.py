@@ -171,6 +171,43 @@ def test_future_preview_and_ticker_mutations_do_not_change_earlier_pressure():
     assert _identity_at(future_cash, date(2024, 4, 1))["NEW3"] == "ISIN_A"
 
 
+def test_reopened_identifier_distinguishes_each_compositions_historical_episode():
+    sessions = [date(2024, 4, d) for d in range(1, 6)]
+    rule = dict(
+        predecessor_index=0,
+        successor_index=1,
+        effective_index=1,
+        known_index=1,
+        source_reopens_index=2,
+    )
+    args = (
+        _snapshots(),
+        _cash(),
+        sessions,
+        ("ISIN_A", "ISIN_B"),
+        np.ones((5, 2), bool),
+        np.full((5, 2), 20e6),
+    )
+    frame = pressure_panel(*args, history_links=(rule,))[0]
+    # Jan's holding remains B; April3's new-episode A does not become B.
+    assert frame.filter(pl.col("isin") == "ISIN_A")[
+        "index_pressure"
+    ].to_list() == pytest.approx([6, 0, 4.5, 2.25])
+    assert frame.filter(pl.col("isin") == "ISIN_B")[
+        "index_pressure"
+    ].to_list() == pytest.approx([0, 4.5, -3, -1.5])
+    future = args[0].with_columns(
+        pl.when(pl.col("disclosure_date") == sessions[2])
+        .then(0.9)
+        .otherwise(pl.col("weight_fraction"))
+        .alias("weight_fraction")
+    )
+    mutated = pressure_panel(future, *args[1:], history_links=(rule,))[0]
+    assert mutated.filter(pl.col("date") < sessions[2]).equals(
+        frame.filter(pl.col("date") < sessions[2])
+    )
+
+
 def test_date_only_preview_is_not_visible_on_its_publication_date():
     source = _snapshots(False).with_columns(
         pl.when(pl.col("stage") == "preview_1")

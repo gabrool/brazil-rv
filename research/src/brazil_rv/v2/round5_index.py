@@ -290,7 +290,7 @@ def pressure_panel(
             }
         )
         if stage == "effective":
-            effective[effective_day] = (available, weights, unmapped)
+            effective[effective_day] = (available, weights, unmapped, day)
             continue
         previous_days = [
             value
@@ -311,7 +311,7 @@ def pressure_panel(
             (
                 first_available_decision(available, sessions),
                 effective_day,
-                (weights, prior[1] if known else {}),
+                ((weights, day), (prior[1], prior[3]) if known else ({}, day)),
                 known,
                 day,
             )
@@ -334,10 +334,19 @@ def pressure_panel(
             # Re-key BOTH dated compositions only once the sourced share rename
             # is effective and known. Otherwise the new ticker can appear as
             # an index addition while the unchanged old holding is a removal.
-            def route(composition):
+            def route(dated_composition):
+                composition, disclosed = dated_composition
+                source_index = int(np.searchsorted(sessions, disclosed))
                 routed = {}
                 for (index, isin), weight in composition.items():
                     for link in history_links:
+                        # A later snapshot can contain the same identifier in
+                        # a new company episode. An earlier holding still routes
+                        # to its original successor after that identifier reopens.
+                        if source_index >= link.get(
+                            "source_reopens_index", len(sessions)
+                        ):
+                            continue
                         if isin == isins[
                             link["predecessor_index"]
                         ] and day_index >= max(

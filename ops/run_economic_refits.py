@@ -23,6 +23,7 @@ PROJECT = Path(__file__).resolve().parents[1]
 
 
 def freeze(run, root):
+    root.mkdir(exist_ok=False)
     source = bound_json(run["stage_c_plan"])
     accepted = bound_json(run["economic_refit_inputs"])
     store = Path(accepted["store"]["root"])
@@ -199,5 +200,5 @@ if __name__ == "__main__":
     parser.add_argument("--freeze", action="store_true")
     args = parser.parse_args()
     run = json.loads((PROJECT / "docs/v2_economic_data_scaling_run.json").read_text())
-    root = Path(run["stage_c_root"])
+    root = Path(run["stage_c_refit_root"])
     freeze(run, root) if args.freeze else execute(run, root)

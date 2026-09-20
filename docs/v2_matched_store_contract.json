@@ -1,0 +1,78 @@
+{
+  "account_terms": {
+    "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_economic_matched_20260920\\event_admission\\candidate_terms.json",
+    "sha256": "679f468c6547c64740402d104f16698c8ea7791813a57e2d65c677d95862cdc4"
+  },
+  "episodes": "Historical public old-JSL values are preserved. The backward history walk may only traverse decreasing event times; new logistics-JSL history cannot enter old holding/SIMPAR histories. Market continuity never pools distinct legal issuer filings or loan-source aliases.",
+  "evidence": {
+    "stage_c_event_auxiliary_arithmetic": {
+      "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_economic_matched_20260920\\event_data\\auxiliaries\\qualification\\manifest.json",
+      "sha256": "4d9ad1609ab454960a02077304255420387acdd2e15446cbea781e1865ec4714"
+    },
+    "stage_c_event_minute_qualification": {
+      "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_economic_matched_20260920\\event_data\\minute_qualification\\manifest.json",
+      "sha256": "fe117dbbcf76e31970739cb7756815d200ae10641b73fac662a691314a73af2e"
+    },
+    "stage_c_event_sidecars": {
+      "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_economic_matched_20260920\\event_data\\sidecars\\manifest.json",
+      "sha256": "a40ab5614a572ed97d1abc115f2d8d208c40d318f87bddf0ce3540fd217074a2"
+    },
+    "stage_c_event_targets_qualification": {
+      "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_economic_matched_20260920\\event_data\\targets_qualification\\manifest.json",
+      "sha256": "895eee760f43d0c7471024d2a8c0991258886a41da521ff64ae89b32b5d7808b"
+    }
+  },
+  "layers": [
+    {
+      "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_economic_matched_20260920\\event_data\\liquidity_deltas.npz",
+      "sha256": "b8a781e74bda5e3c57297c85c628decb4ce72f714ff45adc188ce117b1a8ef6a"
+    },
+    {
+      "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_economic_matched_20260920\\event_data\\wealth\\deltas.npz",
+      "sha256": "115d1b7a1fa50ac87362d8b7e7309a2985c7824482c11d0eaecd49dc4a83661e"
+    },
+    {
+      "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_economic_matched_20260920\\event_data\\daily\\qualified\\deltas.npz",
+      "sha256": "9ddd416497ebe8e98769c0eba895c93a1f92b5ec3bfab054fc5fca15ba551e9b"
+    },
+    {
+      "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_economic_matched_20260920\\event_data\\context\\deltas.npz",
+      "sha256": "e01827ed42087e26841bd67438b4a0591f6bc0635601c4b183f5c6443c20c475"
+    },
+    {
+      "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_economic_matched_20260920\\event_data\\market\\deltas.npz",
+      "sha256": "09278e28e58d4b75d4c1c522d3f28bbde07cd62ce572ada80ebd9266cfbba65d"
+    },
+    {
+      "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_economic_matched_20260920\\event_data\\m1\\native_deltas.npz",
+      "sha256": "7fd49cb4e84ae98a94697510c83db12cff35226e276dacb11afb8e3e911f9ec5"
+    },
+    {
+      "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_economic_matched_20260920\\event_data\\scalars\\deltas.npz",
+      "sha256": "451feb46953502f9f7aec80fd065c0f45040517044a011b4b1aec219d2726a74"
+    },
+    {
+      "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_economic_matched_20260920\\event_data\\sidecars\\deltas.npz",
+      "sha256": "7d33799ef02a2943066291923611857c3cb9cf4aa7cc1aec215ceed86981d33a"
+    },
+    {
+      "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_economic_matched_20260920\\event_data\\composition\\action_deltas.npz",
+      "sha256": "166fb808efd4abfcca9068fcc920d956687ff8ddafa73d5d8f0224599a09b5e5"
+    },
+    {
+      "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_economic_matched_20260920\\event_data\\composition\\target_deltas.npz",
+      "sha256": "6845ea86a97be540f3d4e89d49c6d5d6b3452323ec34d25f3dd4d1772d23d0ea"
+    }
+  ],
+  "output": "C:\\quant-data\\b3\\processed\\v2_economic_matched_store_20260920",
+  "parent": {
+    "manifest_sha256": "fab704fccbd7ceed0624bcfcc67178327f392e43d124242caf8d77ff1c64dfc0",
+    "root": "D:\\quant-data\\b3\\processed\\v2_economic_composed_store_20260920"
+  },
+  "plan": {
+    "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_economic_matched_20260920\\event_data\\composition\\plan.json",
+    "sha256": "c82bc07dc2490c389202924569b496dcb6bf76523d2093ff82953132d1449ee9"
+  },
+  "refit": "New training-only conditioning and compatible newly fitted P/F weights. Preserve original graphs/folds/seeds/full933/full60/learning budget/optimizer/selector. Optional to-close loss inactive. Old accounting forecasts keep OLDPolicyData.",
+  "storage": "Independent full NPY files, lossless NTFS while writing and LZX read-only compression after each array is finalized. Exact decoded bytes are verified by the manifest and independent composition. No raw/parent/old-fit changes or hardlinks. Prior ordinary-NTFS assembly exhausted space and its unsealed staging was automatically removed; saved numerical layers reused."
+}

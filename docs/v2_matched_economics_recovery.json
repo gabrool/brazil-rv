@@ -1,0 +1,142 @@
+{
+  "aliases": 4024,
+  "archive": {
+    "bytes": 1157808992,
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\matched_economics_7fa42fc.zip",
+    "sha256": "924ba7c1fab72b6044eef741a7438b78439c55c080b169d01a20947b52e53334"
+  },
+  "archived_seconds": 40.3574193000095,
+  "dependencies": {
+    "composed_store_recovery": {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\composed_store_recovery.json",
+      "sha256": "c629bdcb5ba1034e5337d30df7a8a3adb37f95b02c1b3e370572b22ac706cd4f"
+    },
+    "integrated_account_recovery": {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\integrated_account_recovery.json",
+      "sha256": "4fde4a71620aa19ab728e666b82961282423405378a19d26053258b5313ac5cf"
+    },
+    "lending_feature_recovery": {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\lending_feature_recovery.json",
+      "sha256": "95b255ca651f4dce93767d4e06a4088e4610a9ede879ac6491d6c0cd5cc5f8bb"
+    },
+    "surviving_rename_dependency_recovery": {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\surviving_rename_dependency_recovery.json",
+      "sha256": "fa6deab0c9978e6f5888d663b5c88aa9726325fbefe0ceec505ca3a13ecc4a40"
+    },
+    "surviving_rename_market_recovery": {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\surviving_rename_market_recovery.json",
+      "sha256": "1575e45e4b18ac0a4d108e18db94d17defc40dbd1ad3def7c0b051e3b2b23879"
+    },
+    "surviving_rename_recovery": {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\surviving_rename_recovery.json",
+      "sha256": "49dbeba5a2c700d926895811ddddaf547e14a5cc615cfcbf069f8573d398cbd1"
+    }
+  },
+  "evidence": {
+    "stage_c_account_results": {
+      "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_economic_matched_20260920\\account_results\\report.json",
+      "sha256": "50f1656ba0d540fefe44a5cb0d25378d87e7c9446c901fbe891f7fec169d5c08"
+    },
+    "stage_c_control": {
+      "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_economic_matched_20260920\\baseline_control\\manifest.json",
+      "sha256": "28236aff6f4eb9d6b8c978aee2b648a5bb00de0a892f41b7d68691edbd36385e"
+    },
+    "stage_c_event_candidate_terms": {
+      "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_economic_matched_20260920\\event_admission\\candidate_terms.json",
+      "sha256": "679f468c6547c64740402d104f16698c8ea7791813a57e2d65c677d95862cdc4"
+    },
+    "stage_c_event_daily": {
+      "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_economic_matched_20260920\\event_data\\daily\\corrected\\manifest.json",
+      "sha256": "f440dc1f8c6adad1ed36cab1ed268ba1bcf27432952846d504c997f3658254b7"
+    },
+    "stage_c_event_daily_qualification": {
+      "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_economic_matched_20260920\\event_data\\daily\\admitted\\manifest.json",
+      "sha256": "51d7a392884f2e5e067034036b1dd36e4c97bc5bf3e357b24c03576960a5b000"
+    },
+    "stage_c_event_data_admission": {
+      "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_economic_matched_20260920\\event_data\\manifest.json",
+      "sha256": "2a34a64282eab181db63b4bb12f78473f7a37f476936229ed7ce99908067174e"
+    },
+    "stage_c_event_input_scope": {
+      "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_economic_matched_20260920\\event_input_scope\\manifest.json",
+      "sha256": "b00bd41dc7dd0d497af9b2c120d3fbf1ae674498e56ccf0ba3d0f3bafd95f638"
+    },
+    "stage_c_event_issuers": {
+      "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_economic_matched_20260920\\event_data\\issuers\\manifest.json",
+      "sha256": "27771d26e5b8fbeffb05eb06ab44302dfd9fb4a115729c5244596185f7407d6c"
+    },
+    "stage_c_event_lending": {
+      "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_economic_matched_20260920\\event_data\\lending\\manifest.json",
+      "sha256": "c7f92147b4976901172778e8d2c20b176608a990a097bc4828865d8d92b10959"
+    },
+    "stage_c_event_preparation": {
+      "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_economic_matched_20260920\\event_replays\\preparation.json",
+      "sha256": "ccd6c1874e16c9ba49ee7d0578b14b65322713d452953f6a9cd9a85f338b0891"
+    },
+    "stage_c_event_qualification": {
+      "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_economic_matched_20260920\\event_replays\\qualified\\report.json",
+      "sha256": "c1010c02334bbe1745fada3628f48b97b594172f77eda2a7df0d935218c80272"
+    },
+    "stage_c_event_replay_plan": {
+      "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_economic_matched_20260920\\event_replays\\claim_scope_plan.json",
+      "sha256": "059728ec9970536e388f3af1eb46757edef03f602e95a6dc85a4a2bbc4870fd9"
+    },
+    "stage_c_event_replays": {
+      "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_economic_matched_20260920\\event_replays\\combined_primary.json",
+      "sha256": "496225956c50d76c6f9b41839d6f987a9fce6404cb1a6a5d6855fd885d430450"
+    },
+    "stage_c_event_source_admission": {
+      "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_economic_matched_20260920\\event_admission\\source_admission.json",
+      "sha256": "c520f552921ff68d87d57db31fa50ce9a70da891421e211a66c75cf00eaf7900"
+    },
+    "stage_c_event_source_index": {
+      "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_economic_matched_20260920\\event_sources\\issuer_index.json",
+      "sha256": "738eb9665b30386010e9054e143123f258038e353689c9d224e51c120bced640"
+    },
+    "stage_c_event_unit_history": {
+      "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_economic_matched_20260920\\event_data\\lending\\unit_qualification\\report.json",
+      "sha256": "2cd6db641566c2f384a20a74380cdd00ab432c38263da2a40b77426387813436"
+    },
+    "stage_c_event_wealth": {
+      "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_economic_matched_20260920\\event_data\\wealth\\manifest.json",
+      "sha256": "8f4acead6333cb2485a392f0cbc78f1547d414d9c8e9ca09c8e51ea386f0bdee"
+    },
+    "stage_c_exposure_audit": {
+      "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_economic_matched_20260920\\exposure_audit\\manifest.json",
+      "sha256": "fb9e40a908bcf01c8a337914514b8efa675ea49ae71b48ac3b6ef247665891cd"
+    },
+    "stage_c_plan": {
+      "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_economic_matched_20260920\\plan.json",
+      "sha256": "4d2ba8050214426df88166f6a9429640e37cf5a408fbe7b1f97689c73a77e464"
+    },
+    "stage_c_refit_interruption": {
+      "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_economic_matched_20260920\\refit_interruption.json",
+      "sha256": "e42f5fe54c39ae6254449f26ebc6e13bb8475ce11b9f3de153b6608304d071b5"
+    },
+    "stage_c_refit_plan": {
+      "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_economic_matched_20260920\\refit_plan.json",
+      "sha256": "fd4f7c365656107cfb661c1d5dfe2fbbed291d09a70faf243c1f4a49d6d9fa03"
+    },
+    "stage_c_replays": {
+      "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_economic_matched_20260920\\replays.json",
+      "sha256": "962597c8b3e9f209876a561e13790d478be462f1c8fe76ad831e865e00162586"
+    },
+    "stage_c_sensitivities": {
+      "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_economic_matched_20260920\\sensitivities\\qualification\\report.json",
+      "sha256": "6fe3b79af66c287b5b331d503e09e99a0fcee1208df5f781b11280a22660b33d"
+    },
+    "stage_c_sensitivity_plan": {
+      "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_economic_matched_20260920\\sensitivities\\plan.json",
+      "sha256": "ca360ba9d0c652d7ae34f26211fbe8dd5c805bb0a07ff11c8800fb22219ec737"
+    }
+  },
+  "implementation_commit": "7fa42fc5591f0c938308cb3e9612fadc7baa2943",
+  "logical_members": 16014,
+  "no_immutable_input_store_or_old_fit_copies": true,
+  "recovery_method": "Restore/hash-check every logical member one at a time, then remove only its scratch copy; all original evidence remains.",
+  "recovery_seconds": 12.608633299998473,
+  "restored_bytes": 1486592001,
+  "scope": "Completed account/source replays and frozen sensitivities plus current bounded data intermediates; data composition/refits and C/D are not complete.",
+  "status": "verified",
+  "unique_members": 11990
+}
