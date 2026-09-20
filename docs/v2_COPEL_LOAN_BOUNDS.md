@@ -48,3 +48,6 @@ Eleven distinct new tests and seven affected existing precredit tests passed in 
 ## Remaining admission
 
 Apply these explicit variants later to matched actual-model books. Cash/fraction payment sweeps, precision/invoice/security-day grouping/older minimum, dated B3 spot/custody and other corporate cost components, three older equity-clearing ambiguities and remaining held-event source/data admission are still open. ALSC physical credit/exact net fees/payment and ENAT auction remain unknown; their completed source/engineering records stay sealed. No corrected model profitability, new neural forward, GPU fit or final economic acceptance is claimed.
+
+
+Verified recovery: implementatione423e462a185d240a026c38bfdecb07b46f30c63; archive copel_loan_bounds_e423e46.zip, SHA24739f9b1089618a017104cbe41f26a8badc489555cc2cc61977bc9a3416fd2a, 5598321bytes. 724unique/1024logical restored/hashchecked members, 300aliases;30completebooks/3380400accountcells. Recovery1.142679s. Current research/patch/frozen plan/five term variants/executed recipes/failed-qualified tests/newbooks recover without immutable inputs/stores/oldfit duplication. Prior precredit/ENAT/Natura/lifecycle/economic-store dependencies remain required. AcceptanceSHA049f9b06a502b38de1e9a1ebe68d9c16f6db827fc27ce9c090d3964fdc8fb263; final A/C/D remain open.

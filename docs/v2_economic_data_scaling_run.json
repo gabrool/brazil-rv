@@ -81,6 +81,10 @@
     "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\copel_loan_bounds\\qualification\\manifest.json",
     "sha256": "c33a31d55acd81090f2570eb146dde16b9f5993a9437919357295ebc9034d731"
   },
+  "copel_loan_bounds_recovery": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\copel_loan_bounds_recovery.json",
+    "sha256": "6d6675824bb6fcee1ac4cb3d1d9adf077b903dd7c4eaaaba7b13c09e01bfa882"
+  },
   "copel_replay_acceptance": {
     "path": "docs\\v2_copel_replay_acceptance.json",
     "sha256": "f3c79690011a0ca7af3bf252f6ed36f15b4e292c75ef17db3f5cc7b95eec6056"
