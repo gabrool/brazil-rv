@@ -73,13 +73,22 @@ def variance_row(x, y, beta, active):
     return diagonal, factor, count
 
 
-def main():
+def main(scaling=False):
     tick = perf_counter()
     pointer = PROJECT / "docs/v2_economic_data_scaling_run.json"
     run = json.loads(pointer.read_text())
-    accepted = bound_json(run["matched_data_inputs"])
+    input_key = "scaling_data_inputs" if scaling else "matched_data_inputs"
+    output_key = "scaling_refit_economics" if scaling else "stage_c_refit_economics"
+    accepted = bound_json(run[input_key])
+    terms_binding = (
+        accepted["account_terms"] if scaling else run["stage_c_event_candidate_terms"]
+    )
     plan = bound_json(run["stage_c_plan"])
-    out = Path(run["stage_c_root"]) / "refit_economics"
+    out = (
+        Path(bound_json(run["scaling_matched_stopping_plan"])["root"])
+        if scaling
+        else Path(run["stage_c_root"])
+    ) / "refit_economics"
     resume = out.exists()
     out.mkdir(exist_ok=True)
     (out / ("executed_resume.py" if resume else "executed.py")).write_bytes(
@@ -116,15 +125,42 @@ def main():
         root / manifest["tables"]["slow_history_links"]["path"]
     ).to_dicts()
     assert all(r["known_index"] <= r["effective_index"] for r in links)
+    recompute = first
+    previous_risk = None
+    new_links = links
+    if scaling:
+        previous_risk = bound_json(run["stage_c_refit_economics"])
+        assert previous_risk["store"] == accepted["parent"]
+        assert binding(Path(previous_risk["risk"]["path"])) == previous_risk["risk"]
+        contract = bound_json(accepted["contract"])
+        changed_rows = []
+        for rec in contract["layers"]:
+            with np.load(rec["path"]) as patch:
+                for key in (
+                    "shareholder_wealth_close",
+                    "shareholder_wealth_valid",
+                    "active",
+                ):
+                    labels = [k for k in patch.files if k.endswith(key + "__indices")]
+                    for label in labels:
+                        changed_rows.extend(
+                            (patch[label][:, 0] + (key != "active")).tolist()
+                        )
+        recompute = min(changed_rows)
+        source_plan = bound_json(run["scaling_data_plan"])
+        successors = {names.index(e["successor_isin"]) for e in source_plan["history"]}
+        new_links = [r for r in links if r["successor_index"] in successors]
     write_json_atomic(
         out / "plan.json",
         dict(
-            accepted=run["matched_data_inputs"],
+            accepted=run[input_key],
             original_policy_cache=old_binding,
             bova11=bova_spec,
             account=run["economic_account"],
-            terms=run["stage_c_event_candidate_terms"],
+            terms=terms_binding,
             decision_rows=[first, int(indices[-1]) + 1],
+            risk_recompute_start=recompute,
+            reused_parent=run["stage_c_refit_economics"] if scaling else None,
             contrast="New accepted coordinates and all admitted dated market histories, with original allocation beta/variance formulas, support, shrinkage, clipping and20-session beta fallback. Old PolicyData and calibration remain immutable; new PolicyData is solely for fresh matched fits. No model/optimizer/selector changes.",
             history="Each t consumes61wealth closes through t-1 for60adjacent returns. Successor history follows only decreasing event times admitted by t; raw-beta/fallback state can inherit a known predecessor at effect. Public prebirth arrays stay unchanged. Portfolio risk is separate from model slow beta/sigma.",
             verification="Original formula checks on selected decision windows, exact original-cache controls on the same source window, future mutation and source-action versus settlement reconciliation. No old source/feature/book campaign repeats.",
@@ -188,15 +224,33 @@ def main():
         )
         factor = np.full(len(dates), np.nan)
         previous, ages = np.ones(len(names)), np.full(len(names), 21)
-        selected = {int(indices[0]), int(indices[-1])}
+        if scaling:
+            with np.load(previous_risk["risk"]["path"]) as saved:
+                raw, raw_valid, resolved, diagonal, factor, support = [
+                    saved[k].copy()
+                    for k in (
+                        "raw_beta",
+                        "raw_valid",
+                        "resolved_beta",
+                        "diagonal",
+                        "factor",
+                        "support",
+                    )
+                ]
+            for n in range(len(names)):
+                prior = np.flatnonzero(raw_valid[recompute - 20 : recompute, n])
+                if len(prior):
+                    t = recompute - 20 + prior[-1]
+                    previous[n], ages[n] = raw[t, n], recompute - 1 - t
+        selected = {recompute, int(indices[-1])}
         selected.update(
             r["effective_index"] + offset
-            for r in links
+            for r in new_links
             for offset in (-1, 0, 1, 20, 60)
             if first <= r["effective_index"] + offset <= indices[-1]
         )
         formula_checks = []
-        for t in range(first, int(indices[-1]) + 1):
+        for t in range(recompute, int(indices[-1]) + 1):
             prices, mask, hedge = history(t)
             x, y = returns(prices, mask, hedge)
             raw[t], raw_valid[t] = beta_row(x, y)
@@ -254,25 +308,28 @@ def main():
                 "store"
             ]["root"]
         )
-        t = int(indices[0])
-        old_p = np.load(original_store / "shareholder_wealth_close.npy", mmap_mode="r")[
-            t - 61 : t + 1
-        ]
-        old_s = np.load(original_store / "shareholder_wealth_valid.npy", mmap_mode="r")[
-            t - 61 : t + 1
-        ]
-        b, v = rolling_hedge_beta(old_p, old_s, bova.close_by_session[t - 61 : t + 1])
-        np.testing.assert_array_equal(b[-1], old.inputs.hedge_beta[0])
-        np.testing.assert_array_equal(v[-1], old.inputs.hedge_beta_valid[0])
-        d, f, _ = causal_risk(
-            old_p,
-            old_s,
-            bova.close_by_session[t - 61 : t + 1],
-            np.broadcast_to(old.beta[0], old_p.shape),
-            np.broadcast_to(old.inputs.active[0], old_p.shape),
-        )
-        np.testing.assert_array_equal(d[-1], old.diagonal[0])
-        np.testing.assert_array_equal(f[-1], old.factor[0])
+        if not scaling:
+            t = int(indices[0])
+            old_p = np.load(
+                original_store / "shareholder_wealth_close.npy", mmap_mode="r"
+            )[t - 61 : t + 1]
+            old_s = np.load(
+                original_store / "shareholder_wealth_valid.npy", mmap_mode="r"
+            )[t - 61 : t + 1]
+            b, v = rolling_hedge_beta(
+                old_p, old_s, bova.close_by_session[t - 61 : t + 1]
+            )
+            np.testing.assert_array_equal(b[-1], old.inputs.hedge_beta[0])
+            np.testing.assert_array_equal(v[-1], old.inputs.hedge_beta_valid[0])
+            d, f, _ = causal_risk(
+                old_p,
+                old_s,
+                bova.close_by_session[t - 61 : t + 1],
+                np.broadcast_to(old.beta[0], old_p.shape),
+                np.broadcast_to(old.inputs.active[0], old_p.shape),
+            )
+            np.testing.assert_array_equal(d[-1], old.diagonal[0])
+            np.testing.assert_array_equal(f[-1], old.factor[0])
         hedge_root = out / "hedge_beta"
         hedge_root.mkdir()
         arrays = {}
@@ -345,7 +402,7 @@ def main():
                 ],
             },
             lending,
-            {"matched_data": run["matched_data_inputs"]["sha256"]},
+            {"matched_data": run[input_key]["sha256"]},
             transfer_chronology_clean=True,
             execution_policy=old.inputs.execution_policy,
         )
@@ -353,8 +410,8 @@ def main():
     finally:
         store.close()
     terms, calendar = load_corporate_replay(
-        run["stage_c_event_candidate_terms"]["path"],
-        run["stage_c_event_candidate_terms"]["sha256"],
+        terms_binding["path"],
+        terms_binding["sha256"],
     )
     cleared = []
     has = inputs.action_has_action.copy()
@@ -384,9 +441,7 @@ def main():
                 )
             )
     inputs = replace(inputs, action_has_action=has, action_successor_index=successor)
-    inputs = apply_corporate_replay(
-        inputs, terms, calendar, run["stage_c_event_candidate_terms"]["sha256"]
-    )
+    inputs = apply_corporate_replay(inputs, terms, calendar, terms_binding["sha256"])
     source = bound_json(run["loan_source_panels"])["panels"]
     with np.load(source["path"]) as z:
         inputs = replace(
@@ -420,7 +475,8 @@ def main():
         reused_saved_risk_and_controls=resume,
         cash_scope=binding(out / "cash_scope.json"),
         formula_checks=binding(out / "formula_checks.json"),
-        old_control_cells=3 * len(names) + 1,
+        old_control_cells=0 if scaling else 3 * len(names) + 1,
+        unchanged_risk_prefix_reused=recompute - first if scaling else 0,
         source_actions_represented_once=cleared,
         access=access.payload(),
         store=accepted["store"],
@@ -430,7 +486,7 @@ def main():
     )
     write_json_atomic(out / "manifest.json", report)
     run = json.loads(pointer.read_text())
-    run["stage_c_refit_economics"] = binding(out / "manifest.json")
+    run[output_key] = binding(out / "manifest.json")
     write_json_atomic(pointer, run)
     print(json.dumps(report), flush=True)
 

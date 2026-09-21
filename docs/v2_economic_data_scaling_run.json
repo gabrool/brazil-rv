@@ -1140,6 +1140,10 @@
     "path": "C:\\quant\\b3-quant\\docs\\v2_scaling_input_recovery.json",
     "sha256": "7bd52785096c1b51d2e5a9a87f814e931a4442cba2bdd16911a4211477cde7ef"
   },
+  "scaling_invalid_width_epoch_retirement": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\storage\\invalid_width_epochs.json",
+    "sha256": "7bdc59c7b401db7eae7194a92246140a90e90f7e2f2ca750b8653ee302ac3945"
+  },
   "scaling_investigation": {
     "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\plan.json",
     "sha256": "e4c811a848867f39c9b0311544d68e80186e3a45b9f08a5ed7118864af39b98c"
@@ -1179,6 +1183,18 @@
   "scaling_position_attribution": {
     "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\position_attribution.json",
     "sha256": "85d4c5b3bfe1ec225299271c649554048e0166d908a8a12a1d8daa26de9f2dea"
+  },
+  "scaling_recovery_copy_retirement": {
+    "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_attention_stopping_20260921\\storage\\extracted_recovery_copies.json",
+    "sha256": "88c4b119c94ec7bf5c45a05965a6506bafdf7cfabcde71d58f607762d0b263fa"
+  },
+  "scaling_refit_economics": {
+    "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_attention_stopping_20260921\\refit_economics\\manifest.json",
+    "sha256": "da7fcbcbc715935899540a2532b20fb5f797816f5a2ab5e43a3c983f0188de0e"
+  },
+  "scaling_refit_economics_qualification": {
+    "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_attention_stopping_20260921\\refit_economics\\qualification\\report.json",
+    "sha256": "02d831f97b638f77d3d14fba8e9223c47215d5e79d96c681343358bf5e9cf9c1"
   },
   "scaling_storage": {
     "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\storage\\index.json",

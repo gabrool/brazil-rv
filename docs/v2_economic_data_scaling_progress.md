@@ -4,7 +4,7 @@
 
 The bounded accounting/data admission, four-period matched refits, width/depth
 screens and eight-period attention investigation are complete. No new capacity
-candidate is adopted. LSTM and matched broader parent-stopping experiments have
+candidate is adopted. Matched broader parent-stopping is now running; LSTM has
 not started. The heartbeat remains paused.
 
 There is no established overall winner on one common, fully corrected continuous
@@ -26,7 +26,7 @@ histories and four gross distribution targets now qualify in the complete
 `scaling_data_inputs` contract. Linx's 2021 BDR/cash
 valuation and unknown fraction terms remain explicit account limitations.
 
-Next is matched parent-stopping across both attention widths and fixed seeds/periods.
+The current experiment is matched parent-stopping across both attention widths and fixed seeds/periods.
 The single-seed patience result remains diagnostic. Further comparisons should
 put C6/GRU and neutral/flexible policies on common dates and accounting before
 declaring a global best model or resuming conditional architecture expansion.
@@ -36,6 +36,35 @@ See [the current investigation](v2_ATTENTION_REVERSAL_DIAGNOSTICS.md),
 [performance comparability](v2_PERFORMANCE_COMPARABILITY.md).
 
 ## Detailed investigation and historical milestones
+
+### Matched stopping execution
+
+`scaling_matched_stopping_plan` freezes six executed patience20 trajectories and
+twelve labelled patience5/20 selection views. All original seeds11/29/47 and
+attention64/96 are retained. The exact five-stale prefix rule cannot inspect later
+epochs; two targeted selector tests pass. Schedule/max60, child recipes and
+preprocessing/transfer checks remain unchanged. At most96child fits run across
+the same eight periods; exactly identical parent selections permit explicit child
+reuse. The isolated training checkout is df644ec. Two checkout files required
+line-ending-only restoration to the frozen bytes; normalized Git content is exact
+and the checkout was clean before the first fit. No running code is modified.
+
+`scaling_refit_economics` composes the new accepted store and22 previously qualified
+distribution terms for later book evaluation. The first701 allocation-risk rows
+reuse the parent; only the changed tail is recomputed. Independent backward
+fallback checks cover1,322,994cells and all eight actual ledger windows cover
+993sessions. Cash revisions, one-time source actions, strict prior loan references,
+corrected CDI and all source-known clocks qualify. Preparation55.17s and saved
+qualification2.73s; no account book was replayed in this preparation.
+
+Additional cleanup removes301 archived intermediate checkpoints from the excluded
+GRU96 compiler-failed wave, freeing1,813,348,352allocated bytes. Selected/EMA/resume
+files and histories remain, including the interrupted F10 fit. Another3,592 direct
+archived recovery-extract copies free4,575,303bytes. Two initial cleanup inventory
+attempts stopped before any deletion on an unfamiliar receipt status / absent
+completed-fit manifest; their exact code/stdout remain, and the qualified resumes
+retain unrecognized files and preserve interrupted-fit evidence. No model or
+numerical replay failed in these cleanup attempts.
 
 ### Added-period complete data contract
 

@@ -5,11 +5,11 @@ Current contract: 2026-09-21. This is the startup contract, not an experiment lo
 The user's four-step continuation now uses `scaling_data_inputs` for fresh fits.
 The added-period GUAR/QGEP actions, QGEP/GPC/Wiz histories and four distribution
 targets are propagated and the complete store is qualified. Resolve
-`scaling_input_recovery` for recovery once published, and
+`scaling_input_recovery` for verified recovery, and
 [the repair contract](docs/v2_SCALING_DATA_REPAIRS.md). This supersedes the older
 remaining-data wording below; Linx and unknown contractual terms remain explicit.
 Old fits and all earlier accepted stores remain immutable. Fresh attention
-width64/96 parent stopping5/20 is the next comparison, across seeds11/29/47 and
+width64/96 parent stopping5/20 is the current comparison, across seeds11/29/47 and
 the eight fixed periods. One shared patience20 trajectory may supply its exact
 patience5 prefix selection; this is a labelled checkpoint selection view, not a
 second executed fit. Preserve schedule60, child recipes and earlier-tie selector.

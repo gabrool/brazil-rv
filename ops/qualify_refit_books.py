@@ -21,20 +21,26 @@ def main(
     expanded_attention=False,
     source_attention=False,
     later_source_attention=False,
+    plan_key=None,
+    output_key=None,
 ):
     tick = perf_counter()
     pointer = PROJECT / "docs/v2_economic_data_scaling_run.json"
     run = json.loads(pointer.read_text())
     reference = (
-        run["scaling_expanded_later_source_plan"]
-        if later_source_attention
-        else run["scaling_expanded_source_plan"]
-        if source_attention
-        else run["scaling_expanded_evaluation_plan"]
-        if expanded_attention
-        else run["stage_c_refit_sensitivity_plan"]
-        if sensitivities
-        else run["stage_c_data_replay_plan"]
+        run[plan_key]
+        if plan_key
+        else (
+            run["scaling_expanded_later_source_plan"]
+            if later_source_attention
+            else run["scaling_expanded_source_plan"]
+            if source_attention
+            else run["scaling_expanded_evaluation_plan"]
+            if expanded_attention
+            else run["stage_c_refit_sensitivity_plan"]
+            if sensitivities
+            else run["stage_c_data_replay_plan"]
+        )
     )
     outer = bound_json(reference)
     plan = bound_json(outer["primary"]) if sensitivities else outer
@@ -339,15 +345,18 @@ def main(
     write_json_atomic(out / "manifest.json", summary)
     run = json.loads(pointer.read_text())
     run[
-        "scaling_expanded_later_source_qualification"
-        if later_source_attention
-        else "scaling_expanded_source_qualification"
-        if source_attention
-        else "scaling_expanded_qualification"
-        if expanded_attention
-        else "stage_c_refit_sensitivity_qualification"
-        if sensitivities
-        else "stage_c_data_replay_qualification"
+        output_key
+        or (
+            "scaling_expanded_later_source_qualification"
+            if later_source_attention
+            else "scaling_expanded_source_qualification"
+            if source_attention
+            else "scaling_expanded_qualification"
+            if expanded_attention
+            else "stage_c_refit_sensitivity_qualification"
+            if sensitivities
+            else "stage_c_data_replay_qualification"
+        )
     ] = binding(out / "manifest.json")
     write_json_atomic(pointer, run)
     print(json.dumps({k: v for k, v in summary.items() if k != "reports"}), flush=True)
