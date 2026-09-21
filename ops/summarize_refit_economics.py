@@ -77,6 +77,11 @@ def sensitivity_results(run, plan, out, primary_metrics):
                                 "loan_cash_bounds_pending"
                             ],
                             unquoted_holdings=quality["unquoted_holdings"],
+                            terminal_unquoted=[
+                                row
+                                for row in bound_json(quality["unquoted_holdings"])
+                                if row["terminal"]
+                            ],
                             prior_debit_sessions=quality["prior_debit_sessions"],
                             maximum_overdue_principal=quality[
                                 "maximum_overdue_principal"
@@ -107,6 +112,7 @@ def sensitivity_results(run, plan, out, primary_metrics):
                             max_abs_path_bps=0,
                             loan_cash_bounds_pending=base["loan_cash_bounds_pending"],
                             unquoted_holdings=base["unquoted_holdings"],
+                            terminal_unquoted=base["terminal_unquoted"],
                             prior_debit_sessions=base["prior_debit_sessions"],
                             maximum_overdue_principal=base["maximum_overdue_principal"],
                             overdue_dates=base["overdue_dates"],
@@ -161,6 +167,9 @@ def sensitivity_results(run, plan, out, primary_metrics):
                 terminal_overdue_books=sum(
                     r["terminal_overdue_principal"] > 0 for r in group
                 ),
+                terminal_unquoted_by_fold={
+                    r["fold"]: r["terminal_unquoted"] for r in group
+                },
                 maximum_conditional_path_bps=max(r["max_abs_path_bps"] for r in group),
                 mean_fold_brl_cdi_sharpe=float(
                     np.mean([r["performance"]["sharpe_brl_minus_cdi"] for r in group])
@@ -263,6 +272,11 @@ def main():
                 economics_unresolved=rec["economics_unresolved"],
                 loan_cash_bounds_pending=saved_quality["loan_cash_bounds_pending"],
                 unquoted_holdings=saved_quality["unquoted_holdings"],
+                terminal_unquoted=[
+                    row
+                    for row in bound_json(saved_quality["unquoted_holdings"])
+                    if row["terminal"]
+                ],
                 prior_debit_sessions=saved_quality["prior_debit_sessions"],
                 maximum_overdue_principal=saved_quality["maximum_overdue_principal"],
                 overdue_dates=[
@@ -322,6 +336,9 @@ def main():
                     for k in rows[0]["mean"]
                 },
                 unresolved_books=sum(r["economics_unresolved"] for r in rows),
+                terminal_unquoted_by_fold={
+                    r["fold"]: r["terminal_unquoted"] for r in rows
+                },
             )
         )
     comparisons = []
