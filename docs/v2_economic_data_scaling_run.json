@@ -1148,6 +1148,10 @@
     "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\plan.json",
     "sha256": "e4c811a848867f39c9b0311544d68e80186e3a45b9f08a5ed7118864af39b98c"
   },
+  "scaling_matched_refit_epoch_retirement": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\storage\\matched_refit_epochs.json",
+    "sha256": "b26738cdbcde6768d8048fe4aacc9fb0ca6f5103a0b6366194884b5a21a231b7"
+  },
   "scaling_matched_stopping_evaluation_plan": {
     "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_attention_stopping_20260921\\evaluation\\plan.json",
     "sha256": "62ad31226475c2d020ffdb01853aa142158e402f5b8ba19a90b5892b7ad6db9d"

@@ -39,6 +39,23 @@ See [the current investigation](v2_ATTENTION_REVERSAL_DIAGNOSTICS.md),
 
 ### Matched stopping execution
 
+The first wider seed selects the same parent epoch under both stopping rules.
+Exact forecast/mask identity, common dates/capital/member and the same calibration
+now permit explicit book reuse within this one frozen evaluation plan. Reused
+books retain original provenance, bind the second arm's forecast sources and reuse
+the saved arithmetic proof with zero new cell counts. One added identity test
+checks that even a one-ULP forecast change, support change or policy/date/capital
+change prevents reuse; all three stopping/reuse tests pass. No model equation,
+account convention or numerical outcome is changed by this execution optimization.
+
+`scaling_matched_refit_epoch_retirement` removes713 more archived intermediate
+epochs from60 completed old refits, freeing2,817,417,216allocated bytes. The5GB
+recovery ZIP and every selected member were restored/hash-checked before deletion;
+canonical C paths include documented D junction targets. Selected/EMA checkpoints,
+forecasts, histories and the active stopping experiment remain. This attempt passed
+first invocation in33.12s. Together with the preceding cleanup,9,154 redundant
+files free20,818,420,623allocated bytes, plus1,459,560,256bytes of lossless compression.
+
 `scaling_matched_stopping_plan` freezes six executed patience20 trajectories and
 twelve labelled patience5/20 selection views. All original seeds11/29/47 and
 attention64/96 are retained. The exact five-stale prefix rule cannot inspect later

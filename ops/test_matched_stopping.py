@@ -1,5 +1,8 @@
 """Protect the exact-prefix selector against future-history selection."""
 
+import numpy as np
+
+from replay_data_refits import forecast_identity
 from run_matched_stopping import stopped_selection
 
 
@@ -25,3 +28,20 @@ def test_meaningful_improvement_resets_stale_and_earlier_ties_win():
     ]
     chosen = stopped_selection(history, 5, 0.0001)
     assert chosen["selected_epoch"] == 4 and chosen["epochs_completed"] == 9
+
+
+def test_book_reuse_requires_same_forecasts_support_and_policy():
+    panel = np.arange(24, dtype=np.float32).reshape(2, 3, 4)
+    valid = np.ones((2, 3), dtype=bool)
+    args = ("F2", 10000000, "11", "TE_all")
+    original = forecast_identity(panel, valid, *args)
+    assert forecast_identity(panel.copy(), valid.copy(), *args) == original
+    changed = panel.copy()
+    changed[0, 0, 0] = np.nextafter(np.float32(0), np.float32(1))
+    assert forecast_identity(changed, valid, *args) != original
+    missing = valid.copy()
+    missing[0, 0] = False
+    assert forecast_identity(panel, missing, *args) != original
+    assert forecast_identity(panel, valid, *args[:3], "C6") != original
+    assert forecast_identity(panel, valid, "F3", *args[1:]) != original
+    assert forecast_identity(panel, valid, args[0], 1000000, *args[2:]) != original

@@ -87,6 +87,29 @@ def main(
             assert saved["book"] == rec["book"]
             records.append(binding(target))
             continue
+        if "reused_from_key" in rec:
+            original = next(
+                r for r in replays["completed"] if r["key"] == rec["reused_from_key"]
+            )
+            for field in ("book", "exact_input_identity", "mapping"):
+                assert rec[field] == original[field]
+            source = out / (original["key"].replace("/", "_") + ".json")
+            source_ref = binding(source)
+            saved = bound_json(source_ref)
+            assert saved["passed"] and saved["book"] == rec["book"]
+            write_json_atomic(
+                target,
+                dict(
+                    saved,
+                    key=rec["key"],
+                    reused_qualification=source_ref,
+                    counts={},
+                    seconds=0,
+                    limits="Same saved book, exact forecast/mask inputs, mapping and frozen account. Reuses its independent arithmetic proof; copied exposure counts are overlapping observations, not additional evidence.",
+                ),
+            )
+            records.append(binding(target))
+            continue
         started = perf_counter()
         book = bound_json(rec["book"])
         folder = Path(rec["book"]["path"]).parent
@@ -339,7 +362,10 @@ def main(
         reports=records,
         plan=reference,
         executed_recipe=binding(recipe),
-        reused_reports=sum(r["key"] in inherited for r in replays["completed"]),
+        reused_reports=sum(
+            r["key"] in inherited or "reused_from_key" in r
+            for r in replays["completed"]
+        ),
         seconds=perf_counter() - tick,
     )
     write_json_atomic(out / "manifest.json", summary)
