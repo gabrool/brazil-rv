@@ -1,5 +1,42 @@
 # Economic accounting, data audit and scaling progress
 
+## Current decision summary — September 21
+
+The bounded accounting/data admission, four-period matched refits, width/depth
+screens and eight-period attention investigation are complete. No new capacity
+candidate is adopted. LSTM and matched broader parent-stopping experiments have
+not started. The heartbeat remains paused.
+
+There is no established overall winner on one common, fully corrected continuous
+comparison. Full attention 64 is the working return baseline: 3.01618 bps/day above
+CDI versus attention 96's 1.92001 over eight independent periods with separate
+account-source overlays. Only these two architectures have this eight-period
+comparison. C6 flexible-net remains the historical reference at 6.70751 above CDI
+and zero-rate Sharpe 1.88147 over 1,738 continuous sessions; its 45% net cap differs
+from the current 5% screen, and its corrected continuous equivalent is unrun.
+Two-layer GRU has the highest corrected four-period capacity-screen point estimate,
+1.79771 above CDI, but only 1/3 seeds and 2/4 periods improve versus one layer; it is
+an unconfirmed candidate, not an adopted winner. These rows are not one leaderboard.
+
+Source-backed corrections and independent numerical/causality checks support the
+implemented contracts; they do not prove every historical datum or broker term.
+Primary 100%-CDI proceeds, zero brokerage and CDI-plus-zero debit spread are favorable
+negotiated hypotheses, not quotes. Remaining newly evidenced model-data dependencies
+are GUAR/QGEP actions, GPC/Wiz histories and RLOG/Smiles targets. Linx's 2021 BDR/cash
+valuation and unknown fraction terms remain explicit account limitations.
+
+Next priorities are bounded propagation of these known data dependencies, then
+matched parent-stopping across both attention widths and the fixed seeds/periods.
+The single-seed patience result remains diagnostic. Further comparisons should
+put C6/GRU and neutral/flexible policies on common dates and accounting before
+declaring a global best model or resuming conditional architecture expansion.
+Six development reserves and 2025/2026 consumer boundaries remain protected.
+See [the current investigation](v2_ATTENTION_REVERSAL_DIAGNOSTICS.md),
+[capacity results](v2_CAPACITY_RESULTS.md) and
+[performance comparability](v2_PERFORMANCE_COMPARABILITY.md).
+
+## Detailed investigation and historical milestones
+
 September 21 user-directed investigation now takes priority over the unstarted
 LSTM fits. See [the frozen scope](v2_SCALING_INVESTIGATION.md) and
 [diagnostic findings](v2_ATTENTION_REVERSAL_DIAGNOSTICS.md). The exact 30-pair fit
@@ -14,10 +51,12 @@ data, with all nine original epochs/weights exactly reproduced. Its unchanged
 F10 child gains7.04780bps/day; replacing that seed in the ensemble gains2.36412,
 but both remain negative above CDI. This is material stopping sensitivity in one
 outcome-selected fold, not adoption or a complete explanation. The eight-period
-baseline comparison is running:24new F fits, reusing6parents/24children and all
-prior books. It preserves the original recipes and keeps the patience result
-separate. Six development reserves and 2025/2026 remain unopened. Earlier C/D
-screens remain evidence, not a final explanation of scaling.
+baseline comparison is complete: 24 new F fits, reusing 6 parents/24 children and 48
+prior books; 96 baseline books qualify over 993 evaluation sessions. It preserves
+the original recipes and keeps the patience result separate. Six development
+reserves remain unused in new corrected comparisons, and 2025/2026 consumers
+remain unopened. Earlier C/D screens remain evidence, not a final explanation
+of scaling.
 
 2026-09-21 current: [depth](v2_CAPACITY_RESULTS.md) is disposed. All30fits,
 48primary/537ordinary/48funded/3precision books qualify;303/0/21skips are explicit.

@@ -1,6 +1,6 @@
 # Corrected matched economic comparison
 
-Stage C is complete under its explicit account, source and marked-claim hypotheses. Both nominated leads fail the registered positive-mean condition for ten additional development folds. No ten-fold replication runs. Stage D width is disposed and depth is active; this is not model adoption or a held-out result.
+Stage C is complete under its explicit account, source and marked-claim hypotheses. Both nominated leads fail the registered positive-mean condition for ten additional development folds. That ten-fold replication did not run. Stage D width and depth screens are now complete, with no candidate adopted; LSTM is deferred. The later user-authorized eight-period attention investigation is complete and is reported separately in [the current findings](v2_ATTENTION_REVERSAL_DIAGNOSTICS.md). These are development results, not held-out results.
 
 The headline below is **above CDI on four separate neutral screening periods**, not a replacement for the earlier C6 continuous flexible-net result of 6.71 bps/day above CDI and zero-rate Sharpe 1.88. [The matched performance comparison](v2_PERFORMANCE_COMPARABILITY.md) separates policy, period, benchmark, accounting and refit differences.
 
