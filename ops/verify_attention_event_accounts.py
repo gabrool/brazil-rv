@@ -21,13 +21,19 @@ PROJECT = Path(__file__).resolve().parents[1]
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--corrected-hedge", action="store_true")
+    parser.add_argument("--later-source", action="store_true")
     args = parser.parse_args()
     started = perf_counter()
     torch.set_num_threads(1)
     pointer = PROJECT / "docs/v2_economic_data_scaling_run.json"
     run = json.loads(pointer.read_text())
-    plan = bound_json(run["scaling_expanded_source_plan"])
-    root = Path(run["scaling_expanded_source_plan"]["path"]).parent
+    source_key = (
+        "scaling_expanded_later_source_plan"
+        if args.later_source
+        else "scaling_expanded_source_plan"
+    )
+    plan = bound_json(run[source_key])
+    root = Path(run[source_key]["path"]).parent
     books_root = (
         Path(run["scaling_hedge_roundoff_plan"]["path"]).parent
         if args.corrected_hedge
@@ -44,7 +50,10 @@ def main():
     dates = np.asarray(data.inputs.dates).astype(str)
     reports = []
     progress = bound_json(binding(books_root / "replays.json"))
-    assert progress["status"] == "complete" and len(progress["completed"]) == 12
+    assert (
+        progress["status"] == "complete"
+        and len(progress["completed"]) == plan["planned_books"]
+    )
     for record in progress["completed"]:
         book = bound_json(record["book"])
         indices = np.searchsorted(dates, book["state_dates"])
@@ -126,7 +135,7 @@ def main():
         reports.append(report)
     report = dict(
         passed=True,
-        source=run["scaling_expanded_source_plan"],
+        source=run[source_key],
         books=reports,
         seconds=perf_counter() - started,
         limits="Original independent books reused; identical saved intentions replayed only through the differentiable account to test the newly changed pending-cash revision interaction. No allocator/model/independent-account replay, no new numerical contrast. Existing independent Decimal and saved NAV proofs remain separate.",
@@ -134,7 +143,9 @@ def main():
     write_json_atomic(out / "report.json", report)
     run = json.loads(pointer.read_text())
     key = (
-        "scaling_hedge_roundoff_account_parity"
+        "scaling_expanded_later_source_account_parity"
+        if args.later_source
+        else "scaling_hedge_roundoff_account_parity"
         if args.corrected_hedge
         else "scaling_expanded_event_account_parity"
     )

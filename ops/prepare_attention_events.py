@@ -33,7 +33,6 @@ PAGES = {
 
 
 def main():
-    started = perf_counter()
     pointer = PROJECT / "docs/v2_economic_data_scaling_run.json"
     run = json.loads(pointer.read_text())
     base = bound_json(run["scaling_expanded_evaluation_plan"])
@@ -190,6 +189,15 @@ def main():
             limitations="Purpose-limited account admission. The two disproved inferred gross factors and QGEP identity also imply model-data dependencies; these are not silently repaired in the fixed-store comparison. No source-completeness claim.",
         ),
     )
+    save_source_overlay(
+        base, terms, parent_terms, out, run, ["F3"], "scaling_expanded_source_plan"
+    )
+
+
+def save_source_overlay(base, terms, parent_terms, out, run, folds, pointer_key):
+    """Share the unchanged shallow-cache assembly across exposed event groups."""
+    started = perf_counter()
+    pointer = PROJECT / "docs/v2_economic_data_scaling_run.json"
     original = bound_json(base["inputs"])
     with Path(original["cache"]["path"]).open("rb") as f:
         data = pickle.load(f)
@@ -245,11 +253,11 @@ def main():
     )
     plan = dict(
         base,
-        folds=["F3"],
-        planned_books=12,
+        folds=folds,
+        planned_books=12 * len(folds),
         inputs=binding(out / "inputs.json"),
         terms=binding(out / "terms.json"),
-        scope="Twelve new F3 primary books compared to saved matching controls; three exposed transitions plus their own sourced scalars. Existing eight-period fits stay on fixed accepted coordinates.",
+        scope="Separately attributed source-only books compared to saved matching controls; existing eight-period fits stay on fixed accepted coordinates.",
         baseline=run["scaling_expanded_evaluation_plan"],
         source_admission=binding(out / "source_admission.json"),
     )
@@ -265,7 +273,7 @@ def main():
         ),
     )
     run = json.loads(pointer.read_text())
-    run["scaling_expanded_source_plan"] = binding(out / "plan.json")
+    run[pointer_key] = binding(out / "plan.json")
     write_json_atomic(pointer, run)
     print(
         json.dumps(dict(changes=changes, seconds=perf_counter() - started)), flush=True

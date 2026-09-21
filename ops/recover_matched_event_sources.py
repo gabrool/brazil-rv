@@ -42,7 +42,10 @@ def main():
     parser.add_argument("--settlement-index", action="store_true")
     parser.add_argument("--b3-sula", action="store_true")
     parser.add_argument("--expanded-attention", action="store_true")
-    parser.add_argument("--expanded-year", type=int, choices=(2019, 2021), default=2019)
+    parser.add_argument(
+        "--expanded-year", type=int, choices=(2019, 2021, 2023), default=2019
+    )
+    parser.add_argument("--source-index", type=Path)
     args = parser.parse_args()
     started = perf_counter()
     run = json.loads((PROJECT / "docs/v2_economic_data_scaling_run.json").read_text())
@@ -51,8 +54,8 @@ def main():
         if args.expanded_attention
         else Path(run["stage_c_root"])
     ) / (
-        "event_sources_2021"
-        if args.expanded_attention and args.expanded_year == 2021
+        f"event_sources_{args.expanded_year}"
+        if args.expanded_attention and args.expanded_year != 2019
         else "event_sources"
     )
     root.mkdir(exist_ok=True)
@@ -83,7 +86,9 @@ def main():
     scope = {2022: ("UNIDAS",), 2023: ("REDE D",)} if args.supplement else SCOPES
     if args.expanded_attention:
         scope = (
-            {
+            {2023: ("WIZ",)}
+            if args.expanded_year == 2023
+            else {
                 2021: (
                     "SMILES",
                     "GPC PARTIC",
@@ -104,7 +109,9 @@ def main():
     if args.settlement_index:
         scope = {2022: ("22691", "24821")}
         label = "settlement"
-    index_path = root / (label + "_index.json")
+    index_path = args.source_index or root / (label + "_index.json")
+    if args.source_index:
+        assert index_path.exists(), "Explicit bounded source index must already exist"
     if not index_path.exists():
         prior = bound_json(
             binding(Path(run["root"]) / "held_event_sources/issuer_index.json")

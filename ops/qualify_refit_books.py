@@ -16,12 +16,19 @@ from brazil_rv.v2.data_repair import binding, bound_json
 PROJECT = Path(__file__).resolve().parents[1]
 
 
-def main(sensitivities=False, expanded_attention=False, source_attention=False):
+def main(
+    sensitivities=False,
+    expanded_attention=False,
+    source_attention=False,
+    later_source_attention=False,
+):
     tick = perf_counter()
     pointer = PROJECT / "docs/v2_economic_data_scaling_run.json"
     run = json.loads(pointer.read_text())
     reference = (
-        run["scaling_expanded_source_plan"]
+        run["scaling_expanded_later_source_plan"]
+        if later_source_attention
+        else run["scaling_expanded_source_plan"]
         if source_attention
         else run["scaling_expanded_evaluation_plan"]
         if expanded_attention
@@ -332,7 +339,9 @@ def main(sensitivities=False, expanded_attention=False, source_attention=False):
     write_json_atomic(out / "manifest.json", summary)
     run = json.loads(pointer.read_text())
     run[
-        "scaling_expanded_source_qualification"
+        "scaling_expanded_later_source_qualification"
+        if later_source_attention
+        else "scaling_expanded_source_qualification"
         if source_attention
         else "scaling_expanded_qualification"
         if expanded_attention
@@ -350,5 +359,11 @@ if __name__ == "__main__":
     group.add_argument("--sensitivities", action="store_true")
     group.add_argument("--expanded-attention", action="store_true")
     group.add_argument("--source-attention", action="store_true")
+    group.add_argument("--later-source-attention", action="store_true")
     args = parser.parse_args()
-    main(args.sensitivities, args.expanded_attention, args.source_attention)
+    main(
+        args.sensitivities,
+        args.expanded_attention,
+        args.source_attention,
+        args.later_source_attention,
+    )
