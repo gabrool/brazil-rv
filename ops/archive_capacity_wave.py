@@ -65,6 +65,13 @@ def main(wave):
         for name in names:
             add("project/" + name, PROJECT / name)
         evidence = [(root, "capacity_" + wave)]
+        if wave == "lstm" and "stage_d_lstm_storage" in run:
+            evidence.append(
+                (
+                    Path(run["stage_d_lstm_storage"]["path"]).parent,
+                    "capacity_lstm_storage",
+                )
+            )
         if wave == "width" and "stage_d_width_original_plan" in run:
             original_root = Path(run["stage_d_width_original_plan"]["path"]).parent
             assert original_root != root

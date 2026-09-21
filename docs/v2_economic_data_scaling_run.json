@@ -912,6 +912,74 @@
     "sha256": "e064dfaada8ee6bd8d15d1b61dc226f2db97b3636218ad8c5a10706a14b6b62e"
   },
   "root": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919",
+  "scaling_attempt_notes": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\attempt_notes.json",
+    "sha256": "6ae2190b10963faae19c8e52a9c3b43ff659f72a41c18cb267d7677a1a5f3c45"
+  },
+  "scaling_expanded_evaluation_plan": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\evaluation\\plan.json",
+    "sha256": "daedbe333f2534e03589ce70d20d42e5b04ea5a5c7a7f515b4f534bee6ae6474"
+  },
+  "scaling_expanded_fit_plan": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\plan.json",
+    "sha256": "8c8a0cab4f35fe22672945e335ea9374b32fe4e4b46a123cf18accde075fcbbf"
+  },
+  "scaling_fit_audit": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\fit_audit.json",
+    "sha256": "3096864652d5051fea624706806a9c171f1342fd3f71e5234cfccadd08c1b81f"
+  },
+  "scaling_forecast_precision": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\forecast_precision\\report.json",
+    "sha256": "b5a127530467e3513168748ac4acbc0bc0dd88aea9542ec9a99affffb3be4dae"
+  },
+  "scaling_forecast_verification": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\forecast_verification\\report.json",
+    "sha256": "6b5f3b22059578753aa5ea998dd96c3c2a5dd0c0c0092bc5bfe31badb00e03d6"
+  },
+  "scaling_input_contracts": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\input_contracts.json",
+    "sha256": "b7c7b3ab71155499f924227d05e68777b23d3bc02657b9e67b35d9f85294b974"
+  },
+  "scaling_investigation": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\plan.json",
+    "sha256": "e4c811a848867f39c9b0311544d68e80186e3a45b9f08a5ed7118864af39b98c"
+  },
+  "scaling_parent_patience_evaluation_plan": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\parent_patience\\evaluation_plan.json",
+    "sha256": "1b84ea1eaa28fb15eebdda9b66b7598c7535cf5ec9ce38212dfd141584c1c796"
+  },
+  "scaling_parent_patience_fits": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\parent_patience\\fits.json",
+    "sha256": "9dae172a1bd52cd663031597e0c8546a136807fb2f2f6b0dbb733a745bdfe0ac"
+  },
+  "scaling_parent_patience_plan": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\parent_patience\\plan.json",
+    "sha256": "00ebf4f262a1de42d723ce28fcc9a472ad228c78690c775b4ea40009828e52f9"
+  },
+  "scaling_parent_patience_prefix": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\parent_patience\\prefix_qualification.json",
+    "sha256": "2ad5d964951cf23376589fb089ae420ffb32917f92bea2ff0e1b53f0f76d43ba"
+  },
+  "scaling_parent_patience_results": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\parent_patience\\report.json",
+    "sha256": "fdfbe820a7733972663f64771fdcb3a60868d907a072522a870fe4bc6f6cf96f"
+  },
+  "scaling_portfolio_decomposition": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\decomposition\\report.json",
+    "sha256": "4f63ff22b0c6bde42af03cbd97df3cb2bb1cb90f12f3bcdc6ad1477ba8264ced"
+  },
+  "scaling_position_attribution": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\position_attribution.json",
+    "sha256": "85d4c5b3bfe1ec225299271c649554048e0166d908a8a12a1d8daa26de9f2dea"
+  },
+  "scaling_storage": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\storage\\index.json",
+    "sha256": "3248d018412e6f2eb71f4570240bf3f018bb70d2df273170ebe8c1c854bab811"
+  },
+  "scaling_training_probe": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\training_probe\\report.json",
+    "sha256": "2066b5c40e440d8a724d14fc030ce241383c0f8389c53d0450f28553a3b81124"
+  },
   "share_custody_acceptance": {
     "path": "docs\\v2_share_custody_acceptance.json",
     "sha256": "e8ef32f90f97ed6f55d716c7bc706bed922d330106801d03c284c0315de498ff"
@@ -1254,6 +1322,10 @@
   "stage_d_lstm_plan": {
     "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\capacity_lstm\\plan.json",
     "sha256": "fe68f957baa558291b7761af34f97a13cf1c91dcd83c180398e022b411254a53"
+  },
+  "stage_d_lstm_storage": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\capacity_lstm_storage\\index.json",
+    "sha256": "d379cf1da90b77ff09778656e5ab58f02fe0052dd132795d5b9e510b757666a5"
   },
   "stage_d_width_admission": {
     "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\capacity_width_recovery\\admission.json",

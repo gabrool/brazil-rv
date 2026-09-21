@@ -92,12 +92,17 @@ saved comparisons do not isolate one repair as their cause, and the finite
 seed/fold uncertainty remains in the matched-results report.
 
 No corrected continuous-history result yet establishes either preservation or
-loss of the earlier C6 flexible-net 6.71 excess-CDI bps/day. The registered additional
-ten-fold tests are conditional; both nominated Stage C leads failed their
-positive-advantage condition. This explanation does not authorize an unregistered
-full-history refit or change those gates. Capacity experiments retain their own
-predeclared conditions. Reporting must keep period, account continuity, exposure
-policy, forecast version, return benchmark and Sharpe aggregation visible.
+loss of the earlier C6 flexible-net 6.71 excess-CDI bps/day. The September 21 user
+amendment now authorizes a broader diagnostic comparison despite the failed
+original four-fold gates. Eight development evaluation folds are fixed in
+[the investigation contract](v2_SCALING_INVESTIGATION.md), with six reserved from
+new corrected comparisons. Training already uses the expanding historical past;
+the four-fold restriction applied to evaluation. These reserves are not
+retroactively called untouched tests. Reporting must keep period, account
+continuity, exposure policy, forecast version, return benchmark and Sharpe
+aggregation visible. The attention reversal is under investigation; the corrected
+four-period result is not a demonstrated replacement for the older continuous
+flexible-net result.
 
 Evidence: [earlier C6 flexible and neutral accounts](v2_opportunity_results.json),
 [earlier attention continuous account](v2_portfolio_objective_results.json),

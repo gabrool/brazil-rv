@@ -6,6 +6,28 @@ Its older pending queues, permissions and limitations are superseded where resol
 
 ## Objective and execution
 
+September 21 user correction: investigate the wider-attention performance reversal
+before further capacity fits. The LSTM plans are frozen but no LSTM fit has begun.
+Resolve `scaling_investigation` and `scaling_fit_audit`; follow
+[the investigation contract](docs/v2_SCALING_INVESTIGATION.md). Existing C/D screens
+remain evidence, but their failed gates do not bar this newly authorized diagnostic
+and broader chronological evaluation. Eight development evaluation folds are
+fixed, with six reserved from new corrected comparisons; none is retroactively
+called historically untouched. Keep 2025/2026 consumers unopened. The user also
+authorizes deleting stale files; prefer reproducible caches and verified redundant
+artifacts, preserving unique research evidence and immutable sources.
+
+Resolve `scaling_parent_patience_plan` for the outcome-informed TE_wide parent
+seed29 patience5→20 test, followed by the unchanged F10 child recipe. The first
+nine corrected-control epochs and all model weights reproduce exactly. Its F10
+seed/ensemble gains7.04780/2.36412bps/day, remaining negative aboveCDI; the original
+fits remain selected controls. This diagnostic is not model adoption. Resolve
+`scaling_expanded_fit_plan`/`scaling_expanded_evaluation_plan` for the eight-period
+unchanged-baseline comparison, with6P/24F/48books reused and24F/48books new.
+The completed depth and native GRU96 width waves' redundant intermediate epoch
+files now reside only in verified recovery archives; selected checkpoints,
+forecasts and books stay online. Resolve `scaling_storage` before requesting them.
+
 Complete the user-authorized [economic/data/capacity registration](research/preregistrations/v2_economic_data_scaling.md). Foundation is complete and sealed; never repeat it. Resolve [the run pointer](docs/v2_economic_data_scaling_run.json) and [progress](docs/v2_economic_data_scaling_progress.md) for evidence.
 
 The user disabled the one-minute heartbeat on September20 and requested continuous implementation without routine checkpoint pauses. The automation is paused; research remains active. Do not re-enable it or create another recurring monitor. Inspect actual process command lines before launches; never duplicate workers. Report meaningful results or blockers.

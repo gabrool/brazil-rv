@@ -17,7 +17,12 @@ All figures below are R$10m ensemble equal-four-fold mean basis points per sessi
 | GRU early peers | 1.04938 | 1.10752 | 0.68069 | -0.42683 |
 | C6 | 0.66502 | 0.76818 | 0.45646 | -0.31172 |
 
-The prior wider-attention and GRU advantages over full attention reverse. This is why historical identity, corporate entitlements, information timing and account costs matter: they can change which architecture appears preferable. The corrections were source/contract driven, not selected to improve a model's profit.
+The prior wider-attention and GRU advantages over full attention reverse. The
+corrections were source/contract driven, not selected to improve a model's profit,
+but this comparison alone does not establish which changes caused the reversal
+or rule out an implementation defect. The September 21
+[attention investigation](v2_SCALING_INVESTIGATION.md) separates portfolio risk,
+other account inputs and forecasts, and checks the executed training/data path.
 
 | Model | F2 | F6 | F10 | F14 | BRL/CDI Sharpe | BRL/zero Sharpe | USD/US-cash Sharpe | Worst fold BRL drawdown |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|

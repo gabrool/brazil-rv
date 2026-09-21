@@ -1,5 +1,24 @@
 # Economic accounting, data audit and scaling progress
 
+September 21 user-directed investigation now takes priority over the unstarted
+LSTM fits. See [the frozen scope](v2_SCALING_INVESTIGATION.md) and
+[diagnostic findings](v2_ATTENTION_REVERSAL_DIAGNOSTICS.md). The exact 30-pair fit
+audit retains the original graphs, recipes and chronological windows. A 24-book
+decomposition pins wider attention's deterioration primarily to new forecasts,
+not changed portfolio risk or other account inputs. All 24 corrected attention
+checkpoints reproduce eagerly within the frozen tolerance; four small original
+score exceptions remain explicit and have two bounded economic contrasts.
+Two actual compiled ASAM batch probes pass temporary-memory poisoning. The
+TE_wide P seed29 patience20 versus5 diagnostic completes on identical corrected
+data, with all nine original epochs/weights exactly reproduced. Its unchanged
+F10 child gains7.04780bps/day; replacing that seed in the ensemble gains2.36412,
+but both remain negative above CDI. This is material stopping sensitivity in one
+outcome-selected fold, not adoption or a complete explanation. The eight-period
+baseline comparison is running:24new F fits, reusing6parents/24children and all
+prior books. It preserves the original recipes and keeps the patience result
+separate. Six development reserves and 2025/2026 remain unopened. Earlier C/D
+screens remain evidence, not a final explanation of scaling.
+
 2026-09-21 current: [depth](v2_CAPACITY_RESULTS.md) is disposed. All30fits,
 48primary/537ordinary/48funded/3precision books qualify;303/0/21skips are explicit.
 Attention depth loses.18921bps/day; GRU depth gains1.11702 but only1/3seeds and

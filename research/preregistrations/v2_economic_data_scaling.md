@@ -8,6 +8,17 @@ Reread this document after each stage. Progress and evidence belong in
 
 ## Fixed boundaries and priorities
 
+User amendment, September 21: before further capacity fits, investigate why wider
+attention's corrected data/refit result reverses its old-forecast advantage.
+Follow `docs/v2_SCALING_INVESTIGATION.md` and the hash-bound investigation plan.
+The authorized expansion fixes F2/F3/F6/F7/F10/F11/F13/F14 for diagnostic
+development evaluation, reserving F1/F4/F5/F8/F9/F12 from new corrected-model
+comparisons. This supersedes the four-fold positive-screen prerequisite for this
+investigation only; it does not retroactively pass an adoption gate. Past use of
+development years remains explicit. Preserve chronological expanding training,
+selection/purge rules and unopened 2025/2026 consumers. Defer the unstarted LSTM
+wave until the technical investigation establishes the next justified contrast.
+
 Use the local RTX 2060 only. No forward capture, deployment or 2025/2026 consumer
 reads. Keep all eligible securities and the full 60-session history. The user
 authorizes additional historical B3/issuer/CVM retrieval and evidenced derived-data
