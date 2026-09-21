@@ -44,9 +44,12 @@ An actual F3 identical-intention check exposed a hedge roundoff defect: an
 unchanged weight became a sub-nanoreal trade and opened another R10-minimum loan.
 Resolve `scaling_hedge_roundoff_plan`; both accounts now suppress only relative
 Float64-equivalent hedge changes, preserving real tiny positions and liquidation.
-Six new cases and37 affected cases pass; actual corrected-book parity/economic
-attribution remain pending. Do not treat the small first observed fee as the
-explanation for the multi-bps reversal. The unfinished eight-period BASELINE
+Six new cases and37 affected cases pass. All twelve corrected F3 books pass saved
+NAV checks and identical-intention two-account parity (maxR1.863e-8). R10m full/wide
+ensemble final-path changes are+.15514/+.18274bp over122sessions. The16 original
+four-fold source/refit ensembles have zero material tiny-root minimum fees; no
+additional replay is justified from that fee inventory. This defect does not
+explain the multi-bps reversal. The unfinished eight-period BASELINE
 evaluation must import the preserved `hedge_roundoff/baseline_runtime` source
 snapshot, keeping all baseline books on their original account implementation.
 The active GPU training worktree is unchanged; no model-store or fit correction

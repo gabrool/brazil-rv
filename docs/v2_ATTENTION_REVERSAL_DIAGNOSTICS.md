@@ -133,18 +133,37 @@ loan fee in the independent account. The first four NAV comparisons differed
 only by normal floating-point error. A bounded five-day charge capture attributes
 the discrepancy to the hedge root, rather than the corporate event. Initial
 parity failure, first-divergence diagnostic and charge capture remain exact saved
-recipes and outputs. A later opposite-direction spot guard is still to be
-diagnosed; it has not been relaxed.
+recipes and outputs. The later opposite-direction spot guard no longer fires
+when both accounts follow the corrected intentions; the guard was not relaxed.
 
 The correction plan was frozen before corrected outcomes. Both accounts suppress
 only hedge changes within eight Float64 epsilons of their target/current scale;
 there is no absolute currency/quantity floor. Six targeted no-trade, genuine tiny
 opening/partial/reversal/terminal and gradient cases pass, as do37 affected account
-and loan-notice cases. Twelve separate F3 corrected books and their actual
-identical-intention qualification are pending. The unfinished eight-fold baseline
+and loan-notice cases. Twelve separate F3 corrected books pass saved NAV checks;
+their actual identical-intention comparison agrees withinR1.863e-8 across all1464
+account days. AtR10m the full/wide ensemble final-path changes are+.15514/+.18274bp
+over122sessions, not daily returns. All capital/seed contrasts remain saved.
+An initial qualifier failed on a missing plan-wrapper key after all twelve books
+were saved; only the qualification wrapper changed, and no book was repeated.
+
+A read-only inventory of the16 original four-fold R10m source/refit ensembles
+found no tiny hedge fills inF2/F6 and only sub-R1e-11 total tiny-root fees per book
+inF10/F14, after the old minimum-fee regime. This is direct-fee attribution, not
+an all-path adaptive bound; it supplies no reason to repeat their broad economic
+matrix and does not explain the multi-bps reversal. The unfinished eight-fold baseline
 uses a preserved pre-correction source snapshot, and GPU fits keep their isolated
 training runtime. This defect is not yet a demonstrated explanation for the wider
 model's reversal.
+
+The added2019 one-factor funding/delivery bounds completed36 books with six
+unexposed bonus variants skipped. All saved-account checks pass. AtR10m,
+debit+100annualbp changes full/wide daily returns by-.03994/-.03982bps;
+the tested delivery/disposal changes range from-.00845 to+.03266bps/day.
+These source sensitivities retain their original pre-hedge-correction books,
+explicit payment/valuation assumptions and separate numerical uncertainty.
+They are not joint or all-interior bounds. Newly exposed2021 source leads remain
+separate; candidate original notices do not yet make the F7 account accepted.
 
 The expanded 2019 period exposed held Fibria, Guararapes PN and QGEP transitions.
 Ten selected issuer originals and fifteen readable pages supply the dated terms;

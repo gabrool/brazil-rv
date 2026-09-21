@@ -31,7 +31,10 @@ def main():
     out = root / "results"
     out.mkdir(exist_ok=False)
     (out / "executed.py").write_bytes(Path(__file__).read_bytes())
-    proofs = {bound_json(p)["key"]: (p, bound_json(p)) for p in quality["reports"]}
+    proofs = {}
+    for reference in quality["reports"]:
+        proof = bound_json(reference)
+        proofs[proof["key"]] = reference, proof
     books, metrics = {}, []
     for rec in progress["completed"]:
         key = rec["key"]
@@ -189,6 +192,9 @@ def main():
         ],
         source_bounds_proof=run["scaling_expanded_event_bounds_qualification"],
         stopping_diagnostic=run["scaling_parent_patience_results"],
+        hedge_correction=run["scaling_hedge_roundoff_books"],
+        hedge_correction_qualification=run["scaling_hedge_roundoff_qualification"],
+        hedge_correction_parity=run["scaling_hedge_roundoff_account_parity"],
         limits="Eight preselected disjoint development periods, not a continuous portfolio or pristine test. The six other folds are reserved from new corrected comparisons; 2025/2026 consumers remain unopened. Same accepted model data/parents/recipes for both widths. The later GUAR2019 split/QGEP2019 dividend source corrections are account-only; their model-data dependencies remain. New unquoted holdings are listed explicitly and not certified by saved-NAV arithmetic. Source overlays and the outcome-informed parent-patience diagnostic never replace the frozen baseline silently. Equal-fold means differ from the pooled-day paired estimates; mean fold Sharpes and worst individual drawdown are not continuous-account statistics. No model adoption or broad capacity conclusion from this report.",
         seconds=perf_counter() - started,
     )

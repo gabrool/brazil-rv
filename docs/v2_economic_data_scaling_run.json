@@ -968,9 +968,25 @@
     "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\forecast_verification\\report.json",
     "sha256": "6b5f3b22059578753aa5ea998dd96c3c2a5dd0c0c0092bc5bfe31badb00e03d6"
   },
+  "scaling_hedge_prior_exposure": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\hedge_roundoff\\prior_exposure\\report.json",
+    "sha256": "e1407553d607e7a83abf7c3ae7719e42b1efff0f23a1730f67b6e3a2615a0362"
+  },
+  "scaling_hedge_roundoff_account_parity": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\hedge_roundoff\\account_parity\\report.json",
+    "sha256": "320fcfacb4e79e4ecc851506e9dec0d2b0d5b17e1e1577a9535ff8d3d09d58c0"
+  },
+  "scaling_hedge_roundoff_books": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\hedge_roundoff\\replays.json",
+    "sha256": "4da14724c2d1e9ce55453e7ba4c0f51b9f8200fddec75707a323043974bcaef3"
+  },
   "scaling_hedge_roundoff_plan": {
     "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\hedge_roundoff\\plan.json",
     "sha256": "56426254e61fff2b5ef26c5a316e4379674c247994afe3f3b2611d3ec2a3d51a"
+  },
+  "scaling_hedge_roundoff_qualification": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\hedge_roundoff\\qualification\\manifest.json",
+    "sha256": "d979de9ac045801d292b593fcc59196b7c4f5c8b0e214b19cf297a6496552fd3"
   },
   "scaling_input_contracts": {
     "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\input_contracts.json",
