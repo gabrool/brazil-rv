@@ -146,8 +146,15 @@ def main():
     context = root / "qualifier_context"
     (context / "docs").mkdir(parents=True, exist_ok=True)
     write_json_atomic(
+        root / "qualification_plan.json",
+        dict(primary=plan["source_plan"], correction=ref),
+    )
+    write_json_atomic(
         context / "docs/v2_economic_data_scaling_run.json",
-        dict(run, stage_c_refit_sensitivity_plan=ref),
+        dict(
+            run,
+            stage_c_refit_sensitivity_plan=binding(root / "qualification_plan.json"),
+        ),
     )
     qualify_refit_books.PROJECT = context
     qualify_refit_books.main(sensitivities=True)
