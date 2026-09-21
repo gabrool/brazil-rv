@@ -48,6 +48,14 @@ beta5% fixed. Original calibration is reused, not fitted to new outcomes.
 The1738-session historical C6 reference remains separately labelled: its full
 corrected counterpart would consume the six currently protected development
 reserve periods, so it is deferred under the current evaluation boundary.
+`scaling_continuation_plan` now binds one finite offline continuation in the clean
+scaling-evaluation checkout fdd354a. It waits for complete attention three-seed
+forecast groups, evaluates those on CPU, and waits for the active GPU worker to
+exit before verifying every distinct new attention checkpoint eagerly on its full
+evaluation dates. Exact checkpoint aliases reuse that proof. Only after passing
+inference/account checks does it run the frozen C6/GRU jobs and common policy
+books. Any failure stops the sequence for investigation. It has no recurring
+automation or chat wakeup; capacity choices remain a subsequent evidence review.
 
 The first wider seed selects the same parent epoch under both stopping rules.
 Exact forecast/mask identity, common dates/capital/member and the same calibration

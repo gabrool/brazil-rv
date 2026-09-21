@@ -934,6 +934,10 @@
     "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\storage\\completed_artifact_compression.json",
     "sha256": "0925316d6fe6ff363cd5e724c5e1c8b874a9e56fda322bab302f564250df233e"
   },
+  "scaling_continuation_plan": {
+    "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_attention_stopping_20260921\\continuation_plan.json",
+    "sha256": "6d7dbfc77925bb436738c5c13c9c7e4f189c17fc09100c2fa1e65938be5bf1c7"
+  },
   "scaling_data_auxiliaries": {
     "path": "C:\\quant-data\\b3\\processed\\v2_scaling_input_repairs_20260921\\auxiliaries\\manifest.json",
     "sha256": "41ae685dbe1d05307771ce15624b3fe4e4f5ca00df612802595e3ffa66cd0060"
