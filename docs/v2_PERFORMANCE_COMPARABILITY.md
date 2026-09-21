@@ -43,16 +43,21 @@ Corrected CDI averages 3.10594 bps/day on these periods, versus the original
 short proceeds remains 100% CDI; subtracting CDI as a reporting benchmark does
 not remove that income from the account.
 
-| Current corrected model | Absolute BRL bps/day | Above CDI bps/day | Mean fold Sharpe versus zero | Mean fold Sharpe versus CDI |
-|---|---:|---:|---:|---:|
-| Full attention | 4.10514 | 0.99921 | 1.03756 | 0.21312 |
-| Wider attention | 2.96219 | -0.14375 | 1.00386 | 0.13692 |
-| GRU early peers | 3.78663 | 0.68069 | 1.00646 | 0.21667 |
-| C6 | 3.56240 | 0.45646 | 1.20549 | 0.40230 |
+| Model | Current absolute BRL bps/day | Current above CDI bps/day | Original Sharpe versus zero | Current Sharpe versus zero | Current Sharpe versus CDI |
+|---|---:|---:|---:|---:|---:|
+| Full attention | 4.10514 | 0.99921 | 0.69171 | 1.03756 | 0.21312 |
+| Wider attention | 2.96219 | -0.14375 | 1.02689 | 1.00386 | 0.13692 |
+| GRU early peers | 3.78663 | 0.68069 | 1.05728 | 1.00646 | 0.21667 |
+| C6 | 3.56240 | 0.45646 | 1.34691 | 1.20549 | 0.40230 |
 
-The current Sharpes are means of four separate fold Sharpes, not the Sharpe of
+All Sharpes in this table are means of four separate fold Sharpes, not the Sharpe of
 an uninterrupted seven-year account. Full attention earns -7.19915 excess
 bps/day in F6 and +10.90578 in F14, showing why period selection matters.
+The original zero-rate Sharpes are reconstructed directly from each bound
+original book's saved `daily.absolute_bps`: sqrt(252) times its mean divided by
+sample daily standard deviation, then equal-weighted across the four folds.
+All sixteen books have zero burn-in and matching saved return/date lengths.
+This reads saved returns only; it is not a portfolio or model rerun.
 
 ## What can be concluded
 
