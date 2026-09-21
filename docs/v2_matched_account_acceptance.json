@@ -1,0 +1,69 @@
+{
+  "accepted_model_inputs": {
+    "path": "C:\\quant\\b3-quant\\docs\\v2_matched_data_inputs.json",
+    "sha256": "6676a2dc0ea8e2df4bf30ce6ca4f45e94908ae5977c7e0e0fc77d205fa258750"
+  },
+  "account": {
+    "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_economic_matched_20260920\\account_composition\\account.json",
+    "sha256": "097501e3673fc890f59fac743df454f795b98e92ad2c16b9533f2bd6e7a880ac"
+  },
+  "admission_scope": "Canonical account/source metadata only, reusing complete Stage C qualification. No new source retrieval, numerical replay, model inference, fit or repeated verification campaign. Ongoing capacity plans continue their exact frozen account and term bindings.",
+  "corporate_terms": {
+    "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_economic_matched_20260920\\event_admission\\candidate_terms.json",
+    "sha256": "679f468c6547c64740402d104f16698c8ea7791813a57e2d65c677d95862cdc4"
+  },
+  "evidence": {
+    "stage_c_event_qualification": {
+      "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_economic_matched_20260920\\event_replays\\qualified\\report.json",
+      "sha256": "c1010c02334bbe1745fada3628f48b97b594172f77eda2a7df0d935218c80272"
+    },
+    "stage_c_event_source_admission": {
+      "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_economic_matched_20260920\\event_admission\\source_admission.json",
+      "sha256": "c520f552921ff68d87d57db31fa50ce9a70da891421e211a66c75cf00eaf7900"
+    },
+    "stage_c_pending_fraction_qualification": {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\matched_refit_sensitivities\\pending_fraction\\qualification.json",
+      "sha256": "3ec26829b753ded1cd6145f16c93b7070be4c060fb1cf6abbe4f6b631549f301"
+    },
+    "stage_c_refit_action_identity": {
+      "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_economic_matched_20260920\\refit_economics\\action_identity\\plan_resolution.json",
+      "sha256": "431edc505053d47a7f353cf077685a15413ade3a38e48ddcea1f07e6a8e71c5a"
+    },
+    "stage_c_refit_admission": {
+      "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_economic_matched_20260920\\data_refit_replays\\results\\admission.json",
+      "sha256": "18476bdb682a46e33d02999f8b9bae306d8516526f7e92b1ce1de77a1d67cc4f"
+    },
+    "stage_c_refit_economics_qualification": {
+      "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_economic_matched_20260920\\refit_economics\\action_identity\\qualification.json",
+      "sha256": "828aa13c72bc141186ea839db8b0db836f54287bf1d0e52c2c438ea9604b4fdb"
+    },
+    "stage_c_refit_recovery": {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\matched_refit_recovery.json",
+      "sha256": "d33122dc968004a91351692691ae4455d274b8c9c0f7740c3488d87c106f3e86"
+    }
+  },
+  "limits": "100% historical CDI on eligible settled short proceeds and zero brokerage remain negotiated hypotheses, not quotes. Preserve historical tariff bounds, delivery/loan/invoice/valuation assumptions, unknown ENAT auction, source revision limits and all prior adaptive fixed-fee numerical uncertainty. Cielo held-loan cents and opposing daytrade fills remain exposure-conditional. Reused development and post-selection nomination are explicit; IC is diagnostic. No model adoption, held-out result or live capacity claim follows from technical admission.",
+  "pending_source_cases": [
+    "ALSC physical credit/exact net cash unknown: whole signed claim remains locked",
+    "ENAT fraction auction unknown: signed residual retained and lot-dependent unit labels unsupported",
+    "Cielo held-loan cent, opposing same-security/day spot fills and new actual untested corporate interactions require exposure-specific qualification",
+    "Same-class held-loan identity is a bookkeeping hypothesis, not a new published-rate or borrow-balance alias; conditional actual-path interpretation retained",
+    "January25 closed-day primary with separately qualified cash/delivery/accrual hypotheses; historical clearing fact remains unknown"
+  ],
+  "previous_account": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\integrated_admission\\qualified\\account.json",
+    "sha256": "31af19459c9e94fe6d8d8bb4bef6c4e01994b19b694e91ad9af34bed27a051fb"
+  },
+  "previous_terms": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\integrated_admission\\qualified\\primary_terms.json",
+    "sha256": "1c2fbfd0b33a8ee9abdadfd7a7904118c6c66dc79ea279bdb60dfa83315f3cd4"
+  },
+  "primary_exposure_disposition": "No primary overdue loan principal or loan cash redemption. Terminal unquoted ENAT fractions retain their signed, marked, unpaid claims under the already admitted unknown-auction contract. Known corporate delivery intervals and isolated missing own quotes retain qualified marks and obligations. This validates comparison under explicit hypotheses, not liquidation proceeds or an executable broker guarantee.",
+  "recipe": {
+    "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_economic_matched_20260920\\account_composition\\executed.py",
+    "sha256": "e5217e1dbfdb083fa4e1f4381059ff2f55545afbbb05deb0bf982e43bb9fa3d9"
+  },
+  "status": "qualified_matched_account_composition_admitted",
+  "stress_disposition": "Recall/denial overdue intervals and any terminal principal remain unresolved execution stress. No buy-in, penalty, replacement locate or extra charge is invented. Their arithmetic-qualified results are conditional and never adopted as executable gains. Financing variants apply to actual prior debit; skipped unexposed variants are not bounds on held exposures.",
+  "unchanged": "Exact primary configuration, cash/lending/source inputs and already executed corporate terms. Candidate producer status/provenance is preserved byte-for-byte; this wrapper supplies its subsequent acceptance. Existing frozen plans, stores, fits and books retain their original bindings."
+}

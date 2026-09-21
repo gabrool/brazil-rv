@@ -155,8 +155,8 @@
     "status": "source_rules_recovered_historical_axis_admission_pending"
   },
   "corporate_replay": {
-    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\integrated_admission\\qualified\\primary_terms.json",
-    "sha256": "1c2fbfd0b33a8ee9abdadfd7a7904118c6c66dc79ea279bdb60dfa83315f3cd4"
+    "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_economic_matched_20260920\\event_admission\\candidate_terms.json",
+    "sha256": "679f468c6547c64740402d104f16698c8ea7791813a57e2d65c677d95862cdc4"
   },
   "corporate_replay_acceptance": {
     "path": "docs\\v2_corporate_replay_acceptance.json",
@@ -269,12 +269,12 @@
     "sha256": "feb7483d455f9c77093814c1fdfc52725acabfbaa6c8f9d6e6c183777932ae50"
   },
   "economic_account": {
-    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\integrated_admission\\qualified\\account.json",
-    "sha256": "31af19459c9e94fe6d8d8bb4bef6c4e01994b19b694e91ad9af34bed27a051fb"
+    "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_economic_matched_20260920\\account_composition\\account.json",
+    "sha256": "097501e3673fc890f59fac743df454f795b98e92ad2c16b9533f2bd6e7a880ac"
   },
   "economic_account_acceptance": {
-    "path": "C:\\quant\\b3-quant\\docs\\v2_economic_account_acceptance.json",
-    "sha256": "3c1160338ee66a7eb05814856d4b4601034f83144fc76f30fe444509281566cb"
+    "path": "C:\\quant\\b3-quant\\docs\\v2_matched_account_acceptance.json",
+    "sha256": "00865e0e204be8456de6f5c8fb8e72b4026691d88afc7999453ed63eaa917bc4"
   },
   "economic_refit_inputs": {
     "path": "C:\\quant\\b3-quant\\docs\\v2_matched_data_inputs.json",
@@ -953,6 +953,10 @@
     "path": "docs\\v2_STAGE_A_CLOSEOUT.md",
     "sha256": "a0a630c1d3ee70156518950b5f82f44e46da1178a7c35deb5142cecf86398b77"
   },
+  "stage_c_account_composition": {
+    "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_economic_matched_20260920\\account_composition\\manifest.json",
+    "sha256": "00865e0e204be8456de6f5c8fb8e72b4026691d88afc7999453ed63eaa917bc4"
+  },
   "stage_c_account_recovery": {
     "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\matched_economics_recovery.json",
     "sha256": "c92755ff3c80429dbb9262f2c22a8aa329312deb3f84550aad1b3fd006582e96"
@@ -1213,7 +1217,7 @@
   },
   "stage_d_width_evaluation": {
     "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\capacity_width\\evaluation_progress.json",
-    "sha256": "1082ab8ef31ba22cd6faf31ceec4d86f289ab8f24bd7abf93aacb65c29947929"
+    "sha256": "e944fbda21bc58e01da9e707dea21feb218161f08c8d51df9eba00784d9e7ac6"
   },
   "stage_d_width_evaluation_plan": {
     "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\capacity_width\\evaluation_plan.json",

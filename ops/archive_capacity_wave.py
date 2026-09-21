@@ -65,6 +65,13 @@ def main(wave):
         for name in names:
             add("project/" + name, PROJECT / name)
         evidence = [(root, "capacity_" + wave)]
+        if wave == "width" and "stage_c_account_composition" in run:
+            evidence.append(
+                (
+                    Path(run["stage_c_account_composition"]["path"]).parent,
+                    "matched_account_composition",
+                )
+            )
         if wave == "width" and "stage_d_lstm_engineering" in run:
             evidence.append(
                 (
