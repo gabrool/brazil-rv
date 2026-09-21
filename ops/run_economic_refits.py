@@ -5,6 +5,7 @@ from dataclasses import asdict
 import gc
 import json
 from pathlib import Path
+import shutil
 import subprocess
 from time import perf_counter
 
@@ -82,21 +83,25 @@ def execute(run, root):
     assert design["driver"]["sha256"] == sha256_file(Path(__file__))
     store = Path(design["store"]["root"])
     assert sha256_file(store / "manifest.json") == design["store"]["manifest_sha256"]
+    model_arms = [a for a in design["cells"] if a != "C6"]
     jobs = [
         (arm, "P", "pretrain_internal", seed)
         for seed in design["seeds"]
-        for arm in ("TE_full", "TE_wide", "GRU_early")
+        for arm in model_arms
     ]
     jobs += [
         (arm, "F", fold, seed)
         for fold in design["folds"]
         for seed in design["seeds"]
-        for arm in ("TE_full", "TE_wide", "GRU_early")
+        for arm in model_arms
     ]
-    jobs += [("C6", "P", "pretrain_internal", seed) for seed in design["seeds"]]
-    jobs += [
-        ("C6", "F", fold, seed) for fold in design["folds"] for seed in design["seeds"]
-    ]
+    if "C6" in design["cells"]:
+        jobs += [("C6", "P", "pretrain_internal", seed) for seed in design["seeds"]]
+        jobs += [
+            ("C6", "F", fold, seed)
+            for fold in design["folds"]
+            for seed in design["seeds"]
+        ]
     progress = root / "refits.json"
     complete = (
         json.loads(progress.read_text())["completed"] if progress.exists() else []
@@ -119,6 +124,10 @@ def execute(run, root):
             flush=True,
         )
         tick = perf_counter()
+        if shutil.disk_usage(root).free < 2_000_000_000:
+            raise RuntimeError(
+                "Less than2GB free before fit; reclaim redundant archives"
+            )
         torch._dynamo.reset()
         torch.cuda.reset_peak_memory_stats()
         if arm == "C6" and stage == "P":
