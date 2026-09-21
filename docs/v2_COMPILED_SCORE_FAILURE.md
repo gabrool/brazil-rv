@@ -121,3 +121,36 @@ compression:82,428,016/82,475,858 logical bytes occupy17,507,682/17,534,021bytes
 Git reports both clean. No source/store/fit data was removed or changed. The
 capacity archive includes exact per-arm runtime sources and the entire original
 failed width root, while skipping its declared duplicate junction.
+
+## Replacement end-to-end forecast disposition
+
+All15 new GRU96 fits finished in7,256.4915065 summed fit seconds. The preselected
+F2/11 qualification used every original evaluation date. All51,657 valid saved
+values are finite. The first compiled batch has6,459 valid values and passes the
+frozen eager tolerance and NaN temporary-allocation check. The all-date
+saved-versus-eager comparison nevertheless fails two coordinates: MPLU on
+November1 2018, horizons3 and10. Differences .003021240234375 and
+.0031280517578125 exceed original thresholds .0029680177 and .0021707460.
+The initial30.3800905-second attempt, exact code/stdout and arrays are retained
+in capacity_width_recovery/forecast_qualification. It is not relabelled passed.
+
+A separately frozen narrow diagnostic uses the same checkpoint, inputs and
+original batch grouping: every saved forecast reproduces bit-exactly under fresh
+fixed compilation, and every batch remains bit-exact when compiler temporaries
+are initialized to NaN. Thus all51,657 values match, maximum difference0.
+Only the crossing batch also receives eager FP32/FP16 comparisons. Its two
+compiled values are -.05142211914/.00540924072, eager FP16
+-.04840087891/.00853729248, and eager FP32 -.04902833700/.00774550019.
+This is stable backend/mixed-precision variation consistent with rounding,
+not evidence of the earlier allocator-dependent corruption. It is an empirical
+diagnosis, not a formal floating-point error bound or proof for every checkpoint.
+
+The original eager threshold remains unchanged and failed. The admitted contract
+is exact train/select/export reproduction and memory stability with that explicit
+precision limitation, combined with the earlier fixed forward/backward proofs.
+No weights, forecast, economic book, selector or runtime changes follow. The
+diagnostic completed on its first invocation in30.8264281seconds; no fit or
+portfolio was rerun. Resolve stage_d_width_forecast_qualification, which binds
+forecast_roundoff/acceptance.json, both attempts and the executed disposition.
+The new diagnostic ops script passes Ruff. A read-only Windows wildcard search
+failed before any mutation; its tool-session description is reconstructed prose.

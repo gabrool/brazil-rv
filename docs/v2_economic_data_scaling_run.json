@@ -1225,11 +1225,15 @@
   },
   "stage_d_width_evaluation": {
     "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\capacity_width_recovery\\evaluation_progress.json",
-    "sha256": "15b1bcc73c77a17043cc275c13103a14b464749306515b77e3575fd50fae07a8"
+    "sha256": "821e6009d4d0df16fa3fb63562bb019e546686bc76bf5dae0c30cfeb1dc91f9c"
   },
   "stage_d_width_evaluation_plan": {
     "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\capacity_width_recovery\\evaluation_plan.json",
     "sha256": "6abb7ec8554fb264272f3be57c732961fff1d022a8485630055c41a16d087e0d"
+  },
+  "stage_d_width_forecast_qualification": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\capacity_width_recovery\\forecast_roundoff\\acceptance.json",
+    "sha256": "a7b9b1a01ab97d36ac8fe866649ec23ea91f3061787f930b2f28378560504d05"
   },
   "stage_d_width_original_evaluation": {
     "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\capacity_width\\evaluation_progress.json",

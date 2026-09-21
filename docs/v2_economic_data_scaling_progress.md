@@ -7,7 +7,14 @@ ATen-normalization correction. Five TE128 jobs remain on their original runtime.
 C conclusions are retained under the five-architecture reproduction/poisoning
 scope evidence; no claim of exhaustive prior-checkpoint qualification follows.
 Original GRU96 forecasts/books are excluded, preserved and will be replaced.
-One GRU training worker is active, heartbeat paused. Width/depth/LSTM and final
+All15 replacement GRU fits and their portfolio scenarios complete. The remaining
+five TE128 fits are active. The preselected GRU96 F2/11 saved forecasts reproduce
+all51,657 valid values bit-exactly under fresh fixed compilation and every-batch
+NaN allocation poisoning. Its initial eager-allclose comparison still fails two
+MPLU horizon values; frozen tolerance and exact failed outputs remain unchanged.
+Resolve stage_d_width_forecast_qualification for the explicit precision limit and
+same-input FP32 diagnostic; no scores/weights/books were replaced. Heartbeat paused.
+Width/depth/LSTM and final
 program delivery remain unfinished. Earlier status paragraphs are historical.
 
 2026-09-20 current: Stage A is accepted for its bounded contract. Stage C has160combined account/source books and1,062qualified one-factor sensitivities, with618explicit unexposed skips. The complete matched dataset is now accepted by [matched_data_inputs](v2_matched_data_inputs.json), manifest fd4ad71a0efaad0914520c89d589e0c0dfd9665158204c4721f821f9df8d4161. All prior stores and fits remain sealed. Fresh matched C training is next under the frozen original recipes; D remains conditional. The one-minute heartbeat is paused; work continues directly.

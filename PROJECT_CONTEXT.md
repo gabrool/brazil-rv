@@ -29,8 +29,16 @@ stage_d_width_plan now selects capacity_width_recovery: ten TE128 fits are reuse
 five remain under original runtime3b0f921, and fifteen GRU96 fits use isolated
 normalization@308007a. A declared junction references original TE128 directories
 without copies. Twelve primary/132ordinary/12funded TE128 books and84skips are
-reused; no source/store/account proof is repeated. The GRU worker is active.
+reused; no source/store/account proof is repeated. All15 fresh GRU fits and their
+portfolio scenarios are complete; the five remaining TE128 fits are active.
 Original stage_d_width_original_plan/evaluation and all failed attempts remain.
+
+stage_d_width_forecast_qualification admits exact saved/fresh compiled and
+NaN-poisoned reproduction for all51,657 valid values of preselected GRU96 F2/11.
+Its original eager-allclose check still fails two MPLU horizons on2018-11-01;
+differences .00302124/.00312805 remain explicit, with identical-input eager FP32
+references. No threshold/score/weight was changed. This is qualified reproduction
+with a stable mixed-precision limitation, not a passed original tolerance test.
 
 The [three-block closeout](docs/v2_STAGE_A_CLOSEOUT.md) is complete for its bounded contract. [Integrated StageA](docs/v2_ECONOMIC_ACCOUNT_ACCEPTANCE.md) is accepted with explicit conditional exposure limits. Registered C is active: [matched replays](docs/v2_MATCHED_ECONOMIC_REPLAYS.md) expose additional sourced corporate transitions and the JSL identifier reuse. There are160 combined old-coordinate account/source books,100 corrected and60 reused; all1,062frozen sensitivities pass saved accounting checks, with618explicit skips. Some recall/denial stress paths retain unresolved obligations; accounting parity is not proof of executable resolution. Complete matched data and all60 compatible refits are accepted. [Matched results](docs/v2_MATCHED_RESULTS.md) dispose of Stage C: R$10m four-fold net-CDI means full attention .99921, wider attention -.14375, GRU .68069 and C6 .45646 bps/day. Both nominated alternatives trail full attention, so their ten-fold replications stop; no model is adopted. Resolve stage_c_refit_results/admission/completion. Stage D's registered attention96→128 and GRU64→96 wave continues under the compiler recovery disposition above; all original contrasts and controls remain frozen. No held-out or live profitability/capacity claim follows. CPU audit timings are not fit ETAs.
 
