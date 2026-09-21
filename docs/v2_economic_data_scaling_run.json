@@ -1243,6 +1243,10 @@
     "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\capacity_width_recovery\\plan.json",
     "sha256": "46a2ab1fb1f5bca7ce4c1a7621c1199dcac5d141e67abcee80e3473d86109a0e"
   },
+  "stage_d_width_storage": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\capacity_width_recovery\\storage\\audit_view_compression.json",
+    "sha256": "41f1703207744d7fd7942b8f553937a21c47586e8adbcdb94be19ed24f9ced1d"
+  },
   "status": "stage_c_actual_exposure_admission_in_progress_refit_interrupted",
   "succession_identity_dependency_scope": {
     "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\event_composition\\identity_scope\\manifest.json",
