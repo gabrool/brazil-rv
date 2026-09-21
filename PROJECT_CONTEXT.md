@@ -28,6 +28,18 @@ The completed depth and native GRU96 width waves' redundant intermediate epoch
 files now reside only in verified recovery archives; selected checkpoints,
 forecasts and books stay online. Resolve `scaling_storage` before requesting them.
 
+The added F3 evaluation exposed Fibria, Guararapes and QGEP held transitions.
+`scaling_expanded_source_plan` supplies a separate account-only overlay, with
+original dated evidence and twelve qualified books. Pending corporate cash can
+now change only on its announced revision date, preserving original entitlement
+units after share disposal. All earlier terms have no revisions and retain their
+executed branch. The accepted model store and active fits remain unchanged:
+Guararapes' May2019 split (8, not inferred7.457812) and QGEP's April2019 dividend
+(q1/cash1.90684828735, not inferredq1.0879766/cash0) expose remaining model-data
+dependencies. Do not describe the expanded comparison as globally source-corrected.
+Reuse its twelve source replays and independent account/entitlement proofs;
+resolve `scaling_expanded_source_qualification`/`scaling_expanded_event_qualification`.
+
 Complete the user-authorized [economic/data/capacity registration](research/preregistrations/v2_economic_data_scaling.md). Foundation is complete and sealed; never repeat it. Resolve [the run pointer](docs/v2_economic_data_scaling_run.json) and [progress](docs/v2_economic_data_scaling_progress.md) for evidence.
 
 The user disabled the one-minute heartbeat on September20 and requested continuous implementation without routine checkpoint pauses. The automation is paused; research remains active. Do not re-enable it or create another recurring monitor. Inspect actual process command lines before launches; never duplicate workers. Report meaningful results or blockers.

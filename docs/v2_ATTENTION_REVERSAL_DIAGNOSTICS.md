@@ -126,6 +126,35 @@ chosen winner. Further changes require their own explicit controlled contrast.
 
 ## Attempts, recovery and storage
 
+The expanded 2019 period exposed held Fibria, Guararapes PN and QGEP transitions.
+Ten selected issuer originals and fifteen readable pages supply the dated terms;
+this is bounded source recovery, not a repeated source census. Fibria cash was
+announced as50.12 and revised to50.20 before payment. Both accounts now retain
+original entitlement units when repricing pending cash at the later knowledge
+date, even after delivery/disposal of the shares. Three new targeted cases and
+29 affected cases pass; earlier empty-revision terms retain their original branch.
+
+Twelve separate F3 source-only books reuse identical forecasts, static policy
+coordinates and allocation risks. At R10m the ensemble earns4.43000/full and
+3.13913/wide bps/day aboveCDI, changes of approximately+.195/+.171. These small
+changes do not explain the earlier multi-bps attention reversal. Independent
+saved-account arithmetic and Decimal entitlements/pending-cash reconstruction
+pass; the latter checks36 locked quantities,24 arrivals,12 split quantities and
+1464 daily receivables/payables each. The maximum cash discrepancy isR5.83e-11.
+Fibria Jan8 closing custody enters the Jan9 decision, and Guararapes May6 closing
+bonus enters May7. Guararapes PN delivery remains an explicit hypothesis, and
+the Fibria pending-cash mark uses the last announced amount before revision.
+These books are not observed client execution or a complete sensitivity bound.
+
+The originals also disprove two accepted model-data action scalars: Guararapes
+May2 2019 is an8-for-1 split, and QGEP April22 is q1 plus dividend1.90684828735,
+paidMay7. The separate account overlay corrects them without changing the
+accepted model store or current fits. Their remaining feature/target implications
+must be attributed separately; the eight-period comparison cannot be called
+globally corrected data. Current F3 comparisons use the same frozen imperfect
+model-data contract for both widths. No new architecture or training rule follows
+from these source findings.
+
 All numerical controls and original results remain. The decomposition's first
 case saved arrays before a missing scenario label stopped report generation;
 that one case was repeated for its absent detailed readouts, with initial arrays
