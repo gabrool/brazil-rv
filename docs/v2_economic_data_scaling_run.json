@@ -971,7 +971,7 @@
   },
   "stage_c_data_replay_qualification": {
     "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_economic_matched_20260920\\data_refit_replays\\qualification\\manifest.json",
-    "sha256": "10d23e36811814c478540c679184081a33665c853d53049874bae1bf2f7fa902"
+    "sha256": "6467ac3f843a314895b4fc58d1ac5d586e6d21b0152844da9621c2d987e14146"
   },
   "stage_c_event_auxiliaries": {
     "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_economic_matched_20260920\\event_data\\auxiliaries\\manifest.json",
