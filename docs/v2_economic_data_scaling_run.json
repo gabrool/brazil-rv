@@ -1115,7 +1115,7 @@
   },
   "stage_c_refit_debit_qualification": {
     "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\matched_refit_debit_bounds\\qualification\\manifest.json",
-    "sha256": "221d6ce68937093a6b1588055f3d46d8faabde787dced4c5b31f3881c0134ec2"
+    "sha256": "39c5ff578b20cec384dc33675194124ba10c865e139b226eb091521a28eaff71"
   },
   "stage_c_refit_economics": {
     "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_economic_matched_20260920\\refit_economics\\action_identity\\manifest.json",
