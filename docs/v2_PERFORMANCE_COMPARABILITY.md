@@ -1,17 +1,38 @@
 # Reading the old and corrected performance figures
 
-The latest four-period screen is not a corrected replacement for the earlier
-continuous 2018–2024 account. Comparing its excess-CDI return directly with the
-older absolute BRL return materially overstates the apparent deterioration.
+The closest identified match to the user's paired recollection of about seven
+bps/day and zero-rate Sharpe near two is **C6/flexible_net: 6.70751 bps/day ABOVE
+CDI and zero-rate Sharpe 1.88147**. Its absolute BRL return was 9.74623 bps/day.
+The return in that older headline already subtracts CDI. Benchmark subtraction
+therefore cannot explain its difference from the current excess-CDI headline.
 
-An earlier result close to the user's recollection is the attention rank/IC
+That result is in `v2_opportunity_results.json`, `arms.C6.books.flexible_net`.
+It covers 1,738 continuous 2018–2024 evaluation sessions, allowing 45% net
+exposure while retaining a 5% beta cap. The current primary screen instead uses
+a 5% net cap and four separate half-year accounts. The old report already shows
+a substantial policy difference before any current correction:
+
+| C6 comparison | Above CDI bps/day | Absolute BRL bps/day | Zero-rate Sharpe |
+|---|---:|---:|---:|
+| Original continuous history, flexible 45% net cap | 6.70751 | 9.74623 | 1.88147 |
+| Original continuous history, neutral 5% net cap | 4.00048 | 7.03920 | 1.71376 |
+| Original four-period neutral screen | 0.66502 | 3.74677 | 1.34691 |
+| Corrected/refitted four-period neutral screen | 0.45646 | 3.56240 | 1.20549 |
+
+The first two Sharpes use the continuous return series; the last two are equal
+means of fold Sharpes. The last two rows are the matched correction comparison.
+The earlier continuous rows are context, not a pure attribution bridge: policy,
+account boundaries and evaluation periods differ. No corrected continuous
+flexible-net replay yet establishes the survival or disappearance of its 6.71.
+
+A separate earlier result near seven **absolute** bps/day is the attention rank/IC
 three-seed ensemble in `v2_portfolio_objective_results.json`,
 `continuous.TE_all:rank:ic:ensemble`. Across 1,738 continuous evaluation sessions
 it earned 7.63587 bps/day after costs before subtracting CDI, 4.59715 above CDI,
 and Sharpe 1.74387 against zero or 1.05029 against CDI. Its average CDI was
-3.03872 bps/day. This identifies a comparable scale of earlier reporting; it does
-not establish that this is the exact model the user remembered. Its original
-financing and settlement limitations remain recorded.
+3.03872 bps/day. The initial investigation found this attention figure first;
+the C6 flexible-net pair above is a closer match to both numbers in the question.
+The original financing and settlement limitations of both remain recorded.
 
 Stage C instead evaluates July–December of 2018, 2020, 2022 and 2024 (F2, F6,
 F10 and F14), with separate accounts initialized in cash and equal fold weights.
@@ -71,14 +92,15 @@ saved comparisons do not isolate one repair as their cause, and the finite
 seed/fold uncertainty remains in the matched-results report.
 
 No corrected continuous-history result yet establishes either preservation or
-loss of the earlier roughly seven absolute bps/day. The registered additional
+loss of the earlier C6 flexible-net 6.71 excess-CDI bps/day. The registered additional
 ten-fold tests are conditional; both nominated Stage C leads failed their
 positive-advantage condition. This explanation does not authorize an unregistered
 full-history refit or change those gates. Capacity experiments retain their own
 predeclared conditions. Reporting must keep period, account continuity, exposure
 policy, forecast version, return benchmark and Sharpe aggregation visible.
 
-Evidence: [earlier continuous account](v2_portfolio_objective_results.json),
+Evidence: [earlier C6 flexible and neutral accounts](v2_opportunity_results.json),
+[earlier attention continuous account](v2_portfolio_objective_results.json),
 [earlier policy and period distinctions](v2_FOUNDATION.md),
 [matched accounting/source attribution](v2_MATCHED_ECONOMIC_REPLAYS.md),
 [matched corrected refits](v2_MATCHED_RESULTS.md), and the canonical bindings in
