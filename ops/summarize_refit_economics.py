@@ -80,6 +80,18 @@ def sensitivity_results(run, plan, out, primary_metrics):
                             maximum_overdue_principal=quality[
                                 "maximum_overdue_principal"
                             ],
+                            overdue_dates=[
+                                day
+                                for day, value in zip(
+                                    saved["state_dates"],
+                                    saved["daily"]["loan_overdue_principal"],
+                                    strict=True,
+                                )
+                                if value > 0
+                            ],
+                            terminal_overdue_principal=saved["daily"][
+                                "loan_overdue_principal"
+                            ][-1],
                             source=rec,
                         )
                     else:
@@ -92,9 +104,13 @@ def sensitivity_results(run, plan, out, primary_metrics):
                             economics_unresolved=base["economics_unresolved"],
                             exposed=False,
                             max_abs_path_bps=0,
-                            loan_cash_bounds_pending=False,
-                            prior_debit_sessions=None,
-                            maximum_overdue_principal=None,
+                            loan_cash_bounds_pending=base["loan_cash_bounds_pending"],
+                            prior_debit_sessions=base["prior_debit_sessions"],
+                            maximum_overdue_principal=base["maximum_overdue_principal"],
+                            overdue_dates=base["overdue_dates"],
+                            terminal_overdue_principal=base[
+                                "terminal_overdue_principal"
+                            ],
                             source=skipped.get(key),
                             skip_reason="Unexposed hypothesis retains its baseline; not a numerical bound on an exposed book",
                         )
@@ -139,6 +155,10 @@ def sensitivity_results(run, plan, out, primary_metrics):
                 loan_cash_bounds_pending=sum(
                     r["loan_cash_bounds_pending"] for r in group
                 ),
+                overdue_sessions=sum(len(r["overdue_dates"]) for r in group),
+                terminal_overdue_books=sum(
+                    r["terminal_overdue_principal"] > 0 for r in group
+                ),
                 maximum_conditional_path_bps=max(r["max_abs_path_bps"] for r in group),
                 mean_fold_brl_cdi_sharpe=float(
                     np.mean([r["performance"]["sharpe_brl_minus_cdi"] for r in group])
@@ -181,7 +201,7 @@ def sensitivity_results(run, plan, out, primary_metrics):
         books=binding(out / "sensitivity_books.json"),
         summary=binding(out / "sensitivity_summary.json"),
         comparisons=binding(out / "sensitivity_comparisons.json"),
-        limits="Equal four-fold means include explicitly unexposed folds at their unchanged baseline. Conditional debit spreads compare with denied renewal; their total versus approved renewal is separately labelled. These are tested adaptive point contrasts, not joint/interior extrema or an extra multiple-comparison adoption gate. Unresolved recall paths remain unresolved, not executable gains. All prior adaptive numerical uncertainty remains.",
+        limits="Equal four-fold means include explicitly unexposed folds at their unchanged baseline. Conditional debit spreads compare with denied renewal; their total versus approved renewal is separately labelled. These are tested adaptive point contrasts, not joint/interior extrema or an extra multiple-comparison adoption gate. Unresolved status includes any overdue loan during the window, even if later returned; dated exposure and terminal overdue principal are separate. No buy-in/penalty or executable resolution is invented. All prior adaptive numerical uncertainty remains.",
     )
 
 
@@ -211,6 +231,10 @@ def main():
         books[key] = current
         perf = bound_json(rec["performance"])
         forecast = bound_json(rec["forecast"])
+        saved_quality = bound_json(
+            binding(root / "qualification" / (key.replace("/", "_") + ".json"))
+        )
+        assert saved_quality["passed"] and saved_quality["book"] == rec["book"]
         spells = bound_json(rec["holding_spells"])["spells"]
         closed = [
             s["observed_close_sessions"] for s in spells if not s["censored_at_end"]
@@ -235,6 +259,22 @@ def main():
                     np.mean(previous["daily"]["net_excess_bps"])
                 ),
                 economics_unresolved=rec["economics_unresolved"],
+                loan_cash_bounds_pending=saved_quality["loan_cash_bounds_pending"],
+                unquoted_holdings=saved_quality["unquoted_holdings"],
+                prior_debit_sessions=saved_quality["prior_debit_sessions"],
+                maximum_overdue_principal=saved_quality["maximum_overdue_principal"],
+                overdue_dates=[
+                    day
+                    for day, value in zip(
+                        current["state_dates"],
+                        current["daily"]["loan_overdue_principal"],
+                        strict=True,
+                    )
+                    if value > 0
+                ],
+                terminal_overdue_principal=current["daily"]["loan_overdue_principal"][
+                    -1
+                ],
                 holding_spells=dict(
                     completed=len(closed),
                     right_censored=sum(s["censored_at_end"] for s in spells),
