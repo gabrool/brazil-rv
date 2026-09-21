@@ -27,6 +27,7 @@ from .normalization import average_ranks
 from .research_rounds import _git_identity
 from .round7 import configuration, pretrain_key
 from .round7_preprocessing import Round7Preprocessing
+from .selection_rules import smoothed_selection
 from .train import (
     DateBatchSampler,
     _atomic_torch_save,
@@ -62,6 +63,27 @@ class TrainingRecipe:
     schedule_epochs: int = 60
     patience: int = 5
     minimum_improvement: float = 0.0001
+    # Trailing-window mean of the selection IC decides improvement/patience and
+    # selects the window's centre epoch; 1 is the exact historical raw rule.
+    selection_smoothing: int = 1
+
+
+def recipe_contract(recipe):
+    """Recipe payload for the frozen contract; the default smoothing keeps old hashes exact."""
+    payload = asdict(recipe)
+    if payload.get("selection_smoothing", 1) == 1:
+        payload.pop("selection_smoothing", None)
+    return payload
+
+
+def _cpu_copy(value):
+    if isinstance(value, torch.Tensor):
+        return value.detach().cpu().clone()
+    if isinstance(value, dict):
+        return {k: _cpu_copy(v) for k, v in value.items()}
+    if isinstance(value, (list, tuple)):
+        return type(value)(_cpu_copy(v) for v in value)
+    return value
 
 
 def member_loss(scores, targets, mask, *, kind="soft_spearman"):
@@ -617,6 +639,9 @@ def train(
     code = _git_identity()
     cell_name = cell["cell"]
     rho, loss_kind = recipe.rho, "soft_spearman"
+    smoothing = int(recipe.selection_smoothing)
+    if smoothing < 1:
+        raise ValueError("selection_smoothing must be at least one epoch")
     manifest = json.loads((store_root / "manifest.json").read_text(encoding="utf-8"))
     if "data_repair" not in manifest["metadata"]:
         raise ValueError("training requires the accepted post-data store")
@@ -748,9 +773,17 @@ def train(
             "fold": fold,
             "seed": seed,
             "epochs": epochs,
-            "recipe": asdict(recipe),
+            "recipe": recipe_contract(recipe),
             "cell": cell,
-            "selection_policy": "raw_checkpoint; earlier ties; fixed-schedule patience from epoch 1",
+            "selection_policy": (
+                "raw_checkpoint; earlier ties; fixed-schedule patience from epoch 1"
+                if smoothing == 1
+                else (
+                    "raw_checkpoint; earlier ties; fixed-schedule patience from "
+                    f"epoch 1; trailing-{smoothing}-epoch mean selection score "
+                    "selects the window's centre epoch"
+                )
+            ),
             "probe_date_indices": fit[probe_indices].tolist(),
             "module_diagnostics": diagnostics,
             "rho": rho,
@@ -827,6 +860,9 @@ def train(
         module_diagnostics = []
         start_epoch, history = 1, []
         previous_compilation_sessions = []
+        # Raw per-epoch selection means and, for smoothed selection, the states
+        # of the last `smoothing` epochs so the window's centre stays selectable.
+        selection_curve, recent_states = [], []
         resume_path = output / "resume.pt"
         if (output / "run_manifest.json").exists():
             finished = json.loads(
@@ -885,6 +921,8 @@ def train(
                 payload["best_epoch"],
                 payload["stale"],
             )
+            selection_curve = [r["selection"]["mean_ic"] for r in history]
+            recent_states = payload.get("recent_states", [])
             module_diagnostics = payload["module_diagnostics"]
             checkpoint = {
                 k: payload[k]
@@ -1021,9 +1059,13 @@ def train(
             finally:
                 _restore_rng(rng)
             selection_graphs += _unique_compiled_graphs() - before
-            improved = readout["mean_ic"] > best_ic + recipe.minimum_improvement
+            selection_curve.append(readout["mean_ic"])
+            smoothed_scores, centres = smoothed_selection(selection_curve, smoothing)
+            selection_score = float(smoothed_scores[-1])
+            centre_epoch = int(centres[-1]) + 1
+            improved = selection_score > best_ic + recipe.minimum_improvement
             if improved:
-                best_ic, best_epoch, stale = readout["mean_ic"], epoch, 0
+                best_ic, best_epoch, stale = selection_score, centre_epoch, 0
             else:
                 stale += 1
             record = {
@@ -1042,6 +1084,9 @@ def train(
             }
             if ema_readout is not None:
                 record["ema_selection"] = ema_readout
+            if smoothing > 1:
+                record["selection_score"] = selection_score
+                record["selected_epoch"] = best_epoch if improved else None
             history.append(record)
             if epoch in (1, 3):
                 diagnostic(f"epoch_{epoch}")
@@ -1056,13 +1101,34 @@ def train(
                 "model_state_dict": state,
             }
             _atomic_torch_save(output / "epochs" / f"epoch_{epoch:03d}.pt", checkpoint)
-            if improved:
+            if smoothing > 1:
+                recent_states.append(
+                    {
+                        "epoch": epoch,
+                        "model_state_dict": state,
+                        "optimizer_state_dict": _cpu_copy(optimizer.state_dict()),
+                    }
+                )
+                del recent_states[:-smoothing]
+            if improved and smoothing == 1:
                 _atomic_torch_save(
                     output / "selected.pt",
                     {
                         **checkpoint,
                         "selection_ic": best_ic,
                         "optimizer_state_dict": optimizer.state_dict(),
+                    },
+                )
+            elif improved:
+                chosen = next(s for s in recent_states if s["epoch"] == best_epoch)
+                _atomic_torch_save(
+                    output / "selected.pt",
+                    {
+                        **checkpoint,
+                        "epoch": chosen["epoch"],
+                        "model_state_dict": chosen["model_state_dict"],
+                        "selection_ic": best_ic,
+                        "optimizer_state_dict": chosen["optimizer_state_dict"],
                     },
                 )
             if (
@@ -1100,6 +1166,7 @@ def train(
                     ),
                     "module_diagnostics": module_diagnostics,
                     "history": history,
+                    **({"recent_states": recent_states} if smoothing > 1 else {}),
                     "cpu_rng": rng,
                     "cuda_rng": cuda_rng,
                     "compilation_sessions": [
@@ -1172,6 +1239,7 @@ def train(
                 else {}
             ),
             "selection_ic": best_ic,
+            **({"selection_smoothing": smoothing} if smoothing > 1 else {}),
             "stop_reason": "patience" if stale >= recipe.patience else "ceiling",
             "date_tensor_cache_resources": cache_resources,
             "compiled_graphs": {
