@@ -14,7 +14,9 @@ from brazil_rv.v2.foundation_readouts import paired_interval
 PROJECT = Path(__file__).resolve().parents[1]
 
 
-def sensitivity_results(run, plan, out, primary_metrics):
+def sensitivity_results(
+    run, plan, out, primary_metrics, *, comparison_pairs=None, saved_controls=()
+):
     """All tested hypotheses, with unexposed folds explicitly retaining baseline."""
     primary = {
         (r["capital"], r["arm"], r["fold"]): r
@@ -186,13 +188,19 @@ def sensitivity_results(run, plan, out, primary_metrics):
         )
     write_json_atomic(out / "sensitivity_summary.json", summaries)
     indexed = {(r["variant"], r["capital"], r["arm"]): r for r in summaries}
+    for row in saved_controls:
+        key = row["variant"], row["capital"], row["arm"]
+        assert key not in indexed
+        indexed[key] = row
     comparisons = []
-    for variant, capital in sorted({(r["variant"], r["capital"]) for r in summaries}):
-        for candidate, control in (
+    if comparison_pairs is None:
+        comparison_pairs = (
             ("TE_wide", "TE_full"),
             ("GRU_early", "TE_full"),
             ("TE_full", "C6"),
-        ):
+        )
+    for variant, capital in sorted({(r["variant"], r["capital"]) for r in summaries}):
+        for candidate, control in comparison_pairs:
             a, b = (indexed[variant, capital, arm] for arm in (candidate, control))
             comparisons.append(
                 dict(
