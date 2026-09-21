@@ -55,6 +55,12 @@ def freeze(run, width=False):
     (context / "docs/v2_opportunity_run.json").write_bytes(
         (PROJECT / "docs/v2_opportunity_run.json").read_bytes()
     )
+    # The unchanged precision freezer binds these two source paths below PROJECT.
+    # Retain exact recipes in its private context without changing frozen drivers.
+    (context / "ops").mkdir()
+    for module in (run_refit_sensitivities, qualify_refit_books):
+        source = Path(module.__file__)
+        (context / "ops" / source.name).write_bytes(source.read_bytes())
     prior_scenarios = bound_json(run["stage_c_refit_sensitivity_plan"])
     scenarios = root / "matched_refit_sensitivities"
     scenarios.mkdir(exist_ok=False)
