@@ -1148,6 +1148,10 @@
     "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\plan.json",
     "sha256": "e4c811a848867f39c9b0311544d68e80186e3a45b9f08a5ed7118864af39b98c"
   },
+  "scaling_matched_stopping_evaluation_plan": {
+    "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_attention_stopping_20260921\\evaluation\\plan.json",
+    "sha256": "62ad31226475c2d020ffdb01853aa142158e402f5b8ba19a90b5892b7ad6db9d"
+  },
   "scaling_matched_stopping_plan": {
     "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_attention_stopping_20260921\\plan.json",
     "sha256": "52cbf9539dae33aa217f4ad0db4bf2b32390b78feb1003d271e85115779a51d0"
