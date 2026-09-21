@@ -36,9 +36,9 @@ def main(sensitivities=False, expanded_attention=False, source_attention=False):
     out = root / "qualification"
     out.mkdir(exist_ok=True)
     recipe = out / "executed.py"
-    if recipe.exists():
-        assert sha256_file(recipe) == sha256_file(Path(__file__))
-    else:
+    if recipe.exists() and sha256_file(recipe) != sha256_file(Path(__file__)):
+        recipe = out / ("executed_" + sha256_file(Path(__file__))[:12] + ".py")
+    if not recipe.exists():
         recipe.write_bytes(Path(__file__).read_bytes())
     store = Path(plan["store"]["root"])
     names = np.load(store / "isin_index.npy").tolist()
@@ -298,6 +298,7 @@ def main(sensitivities=False, expanded_attention=False, source_attention=False):
             )
         result = dict(
             passed=True,
+            executed_recipe=binding(recipe),
             key=rec["key"],
             book=rec["book"],
             counts=dict(counts),
@@ -324,6 +325,7 @@ def main(sensitivities=False, expanded_attention=False, source_attention=False):
         qualified=len(records),
         reports=records,
         plan=reference,
+        executed_recipe=binding(recipe),
         reused_reports=sum(r["key"] in inherited for r in replays["completed"]),
         seconds=perf_counter() - tick,
     )
