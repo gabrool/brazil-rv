@@ -27,6 +27,7 @@ def main():
     for key in (
         "stage_c_data_replay_qualification",
         "stage_c_refit_sensitivity_qualification",
+        "stage_c_refit_debit_qualification",
     ):
         assert bound_json(run[key])["status"] == "complete"
     bound_json(run["stage_c_refit_results"])
@@ -75,6 +76,10 @@ def main():
             (fit_root, "data_refits"),
             (primary, "data_refit_replays"),
             (sensitivity, "matched_refit_sensitivities"),
+            (
+                Path(run["stage_c_refit_debit_plan"]["path"]).parent,
+                "matched_refit_debit_bounds",
+            ),
         ):
             for directory, children, names in os.walk(root):
                 children[:] = [d for d in children if d not in {"__pycache__", "fits"}]

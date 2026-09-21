@@ -1105,6 +1105,10 @@
     "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_economic_matched_20260920\\plan.json",
     "sha256": "4d2ba8050214426df88166f6a9429640e37cf5a408fbe7b1f97689c73a77e464"
   },
+  "stage_c_refit_debit_plan": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\matched_refit_debit_bounds\\plan.json",
+    "sha256": "4ac3492b1f4e1aad8f38e9a47274b490125791c0dc315f73d912339683b56a29"
+  },
   "stage_c_refit_economics": {
     "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_economic_matched_20260920\\refit_economics\\manifest.json",
     "sha256": "5f69343d132bee3ba5218fc4427d5660cac9a53f07ede97e790305c57592adaa"
@@ -1128,7 +1132,7 @@
   },
   "stage_c_refit_sensitivity_qualification": {
     "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\matched_refit_sensitivities\\qualification\\manifest.json",
-    "sha256": "6d896ed3815bb77edaa191b19ca8d4bd45d43bbaad5bb19f07ad73bd7d7da58a"
+    "sha256": "bf39b36931109707b8fc8e13f7b4d8d5c3a2204f68f02c471949ca21d18ceb56"
   },
   "stage_c_refit_storage": {
     "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_economic_matched_20260920\\data_refits\\storage\\index.json",
