@@ -17,6 +17,8 @@ def main():
     scenarios = bound_json(result["sensitivities"]["books"])
     comparisons = bound_json(result["comparisons"])
     proof = bound_json(result["qualification"])
+    fraction = bound_json(run["stage_c_pending_fraction_qualification"])
+    assert fraction["passed"] and len(fraction["books"]) == 3
     assert proof["status"] == "complete" and proof["qualified"] == len(books) == 96
     for source in result["sensitivities"]["sources"]:
         assert bound_json(source["qualification"])["status"] == "complete"
@@ -50,6 +52,7 @@ def main():
         if replicate
         else "stage_c_complete",
         results=run["stage_c_refit_results"],
+        pending_fraction_qualification=run["stage_c_pending_fraction_qualification"],
         technical_comparisons_valid=True,
         stage_c_complete=not replicate,
         replicate=replicate,

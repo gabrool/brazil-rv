@@ -65,6 +65,7 @@ def main():
         project_files += [
             "PROJECT_CONTEXT.md",
             "docs/v2_MATCHED_REFITS.md",
+            "docs/v2_MATCHED_RESULTS.md",
             "docs/v2_economic_data_scaling_progress.md",
             "docs/v2_economic_data_scaling_run.json",
             "docs/v2_matched_data_inputs.json",
@@ -77,6 +78,10 @@ def main():
             (fit_root, "data_refits"),
             (primary, "data_refit_replays"),
             (sensitivity, "matched_refit_sensitivities"),
+            (
+                Path(run["stage_c_replication_plan"]["path"]).parent,
+                "stage_c_replication",
+            ),
             (
                 Path(run["stage_c_refit_debit_plan"]["path"]).parent,
                 "matched_refit_debit_bounds",

@@ -1,5 +1,7 @@
 # Compatible matched refits
 
+Current status: all60 fits and96 primary books are complete. [Final matched results](v2_MATCHED_RESULTS.md) supersede the partial-status paragraphs below. Both nominated ten-fold replications stop under the registered primary-mean condition; the separate Stage D width wave is active. The following sections retain the exact implementation and attempt history.
+
 The question is whether the existing model leads retain their economic advantage after correcting the historical accounting and model data. Stage C keeps the original graphs, seeds, folds, training budget, optimizer and checkpoint selection. The accepted matched store changes the inputs; new compatible P parents and F children are therefore necessary. Old weights never consume these coordinates.
 
 Resolve `stage_c_refit_plan` and `stage_c_refit_root` in `v2_economic_data_scaling_run.json`. The frozen plan contains60 original-recipe fits:9 attention/GRU parents,36 children,3 C6 parents and12 C6 children. No width/depth contrast has started. Parent selection IC is a training diagnostic, not portfolio profitability or an adoption gate.
