@@ -46,9 +46,14 @@ def source_basis(run, record, root, manifest, start, stop):
         a, b = link["predecessor_index"], link["successor_index"]
         e = max(0, link["effective_index"] - start)
         for key in ("close", "valid"):
-            arrays["shareholder_wealth_" + key][:, b] = np.load(
-                wealth_root[key], mmap_mode="r"
-            )[offset : offset + stop - start, b]
+            values = np.load(wealth_root[key], mmap_mode="r")
+            prefix = max(0, -offset)
+            arrays["shareholder_wealth_" + key][:prefix, b] = arrays[
+                "shareholder_wealth_" + key
+            ][:prefix, a]
+            arrays["shareholder_wealth_" + key][prefix:, b] = values[
+                max(0, offset) : offset + stop - start, b
+            ]
         arrays["slow_valid"][:e, b] = arrays["slow_valid"][:e, a]
         arrays["slow_valid"][e:, b] = slow[e:, b]
         arrays["action_has_action"][:e, b] = arrays["action_has_action"][:e, a]

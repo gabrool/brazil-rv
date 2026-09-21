@@ -24,12 +24,17 @@ from compose_surviving_store import changed, read_layers
 PROJECT = Path(__file__).resolve().parents[1]
 
 
-def main(mode):
+def main(mode, scaling=False):
     tick = perf_counter()
     pointer = PROJECT / "docs/v2_economic_data_scaling_run.json"
     run = json.loads(pointer.read_text())
+    prefix = "scaling_data_" if scaling else "stage_c_event_"
     out = (
-        Path(bound_json(run["stage_c_event_data_admission"])["plan"]["path"]).parent
+        Path(bound_json(run["scaling_data_workspace"])["root"]) / "composition"
+        if scaling
+        else Path(
+            bound_json(run["stage_c_event_data_admission"])["plan"]["path"]
+        ).parent
         / "composition"
     )
     plan = json.loads((out / "plan.json").read_text())
@@ -53,7 +58,7 @@ def main(mode):
         return cached[key]
 
     assert mode in ("store", "attribution")
-    assembly = bound_json(run["stage_c_event_store_assembly"])
+    assembly = bound_json(run[prefix + "store_assembly"])
     contract = bound_json(assembly["contract"])
     root = Path(assembly["store"]["root"])
     m = bound_json(
@@ -182,8 +187,15 @@ def main(mode):
     # samples at each new native tail; monthly peer boundaries retain full60.
     active = expected("active", np.arange(len(dates)))
     samples = set(np.flatnonzero((active & ~old("active")).any(axis=1)).tolist())
-    source = bound_json(run["stage_c_event_source_admission"])
-    for event in source["events"]:
+    source = bound_json(
+        run["scaling_data_plan" if scaling else "stage_c_event_source_admission"]
+    )
+    events = (
+        [*source["history"], *source["scalars"], *source["distributions"]]
+        if scaling
+        else source["events"]
+    )
+    for event in events:
         t = int(np.searchsorted(dates, np.datetime64(event["effective_date"])))
         samples.update(
             t + u for u in (-1, 0, 1, 2, 5, 10, 59, 60) if 59 <= t + u < len(dates)
@@ -197,12 +209,17 @@ def main(mode):
     samples.update(
         t
         for t in month
-        if t >= int(np.searchsorted(dates, np.datetime64("2020-09-18")))
+        if t
+        >= int(
+            np.searchsorted(
+                dates, np.datetime64(min(e["effective_date"] for e in events))
+            )
+        )
     )
-    native = bound_json(run["stage_c_event_m1"])
+    native = bound_json(run[prefix + "m1"])
     for rec in native["cases"]:
         t = np.load(rec["date_indices"]["path"])
-        samples.update([int(t[0]), int(t[-1])])
+        samples.update([int(t[0]), int(t[len(t) // 2]), int(t[-1])])
     samples = sorted(t for t in samples if t >= 59)
     sample_days = [str(dates[t]) for t in samples]
     grants = sorted(
@@ -339,7 +356,12 @@ def main(mode):
             packed += value.size * 2
     dataset.store.close()
     causal = []
-    for day in ("2020-09-18", "2020-11-11", "2020-11-23", "2022-07-04", "2024-09-09"):
+    causal_days = (
+        sorted({e["effective_date"] for e in events} | {"2019-01-10"})
+        if scaling
+        else ("2020-09-18", "2020-11-11", "2020-11-23", "2022-07-04", "2024-09-09")
+    )
+    for day in causal_days:
         t = int(np.searchsorted(dates, np.datetime64(day)))
         ds = V2DailyDataset(
             root,
@@ -380,7 +402,7 @@ def main(mode):
         raise AssertionError("Old weights accepted changed coordinates")
     result = dict(
         status="passed_complete_store_and_combined_consumers",
-        assembly=run["stage_c_event_store_assembly"],
+        assembly=run[prefix + "store_assembly"],
         array_checks=binding(qualification / "arrays.json"),
         samples=len(samples),
         sample_dates=sample_days,
@@ -393,11 +415,12 @@ def main(mode):
         selected_sample_neutral_changes=virtual_changes,
         selected_sample_neutral_gains=virtual_gains,
         selected_sample_neutral_losses=virtual_losses,
-        scope="Complete new-data composition and all240restored-date full60 consumers; original foundation/surviving-family proofs reused. Backward history walks constrain event time to preserve the two JSL episodes. No neural forward/scoring/fit.",
+        scope="Complete new-data composition and every newly restored eligible date with full60 consumers, new event boundaries and native tails; original prior-family proofs reused. Backward history walks constrain event time to preserve the two JSL episodes. No neural forward/scoring/fit.",
         seconds=perf_counter() - tick,
     )
     write_json_atomic(qualification / "manifest.json", result)
-    run["stage_c_event_store_input_audit"] = binding(qualification / "manifest.json")
+    run = json.loads(pointer.read_text())
+    run[prefix + "store_input_audit"] = binding(qualification / "manifest.json")
     write_json_atomic(pointer, run)
     print(json.dumps(result), flush=True)
 

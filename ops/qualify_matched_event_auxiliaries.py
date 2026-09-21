@@ -16,11 +16,17 @@ from brazil_rv.v2.data_repair import binding, bound_json, source_families
 PROJECT = Path(__file__).resolve().parents[1]
 
 
-def main(reopening=False):
+def main(reopening=False, scaling=False):
     tick = perf_counter()
     run = json.loads((PROJECT / "docs/v2_economic_data_scaling_run.json").read_text())
-    admission = bound_json(run["stage_c_event_data_admission"])
-    root = Path(admission["plan"]["path"]).parent / "auxiliaries"
+    admission = bound_json(
+        run["scaling_data_identity" if scaling else "stage_c_event_data_admission"]
+    )
+    root = (
+        Path(bound_json(run["scaling_data_workspace"])["root"])
+        if scaling
+        else Path(admission["plan"]["path"]).parent
+    ) / "auxiliaries"
     produced = bound_json(binding(root / "manifest.json"))
     original = root / "qualification"
     prior_qualification = (
@@ -233,7 +239,10 @@ def main(reopening=False):
         pl.read_parquet(admission["history_mapping"]["path"]).to_dicts(),
         key=lambda x: x["effective_index"],
     )
-    for event in bound_json(admission["plan"])["events"]:
+    event_plan = (
+        bound_json(run["stage_c_event_data_admission"]) if scaling else admission
+    )
+    for event in bound_json(event_plan["plan"])["events"]:
         if event["source_reopens_date"]:
             edge = next(
                 x for x in links if isins[x["predecessor_index"]] == event["isin"]
@@ -425,7 +434,11 @@ def main(reopening=False):
     run[
         "stage_c_event_index_reopening_qualification"
         if reopening
-        else "stage_c_event_auxiliary_arithmetic"
+        else (
+            "scaling_data_auxiliary_arithmetic"
+            if scaling
+            else "stage_c_event_auxiliary_arithmetic"
+        )
     ] = binding(out / "manifest.json")
     write_json_atomic(pointer, run)
     print(json.dumps(report), flush=True)

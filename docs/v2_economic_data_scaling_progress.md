@@ -21,12 +21,12 @@ an unconfirmed candidate, not an adopted winner. These rows are not one leaderbo
 Source-backed corrections and independent numerical/causality checks support the
 implemented contracts; they do not prove every historical datum or broker term.
 Primary 100%-CDI proceeds, zero brokerage and CDI-plus-zero debit spread are favorable
-negotiated hypotheses, not quotes. Remaining newly evidenced model-data dependencies
-are GUAR/QGEP actions, GPC/Wiz histories and RLOG/Smiles targets. Linx's 2021 BDR/cash
+negotiated hypotheses, not quotes. Newly evidenced GUAR/QGEP actions, QGEP/GPC/Wiz
+histories and four gross distribution targets now qualify in the complete
+`scaling_data_inputs` contract. Linx's 2021 BDR/cash
 valuation and unknown fraction terms remain explicit account limitations.
 
-Next priorities are bounded propagation of these known data dependencies, then
-matched parent-stopping across both attention widths and the fixed seeds/periods.
+Next is matched parent-stopping across both attention widths and fixed seeds/periods.
 The single-seed patience result remains diagnostic. Further comparisons should
 put C6/GRU and neutral/flexible policies on common dates and accounting before
 declaring a global best model or resuming conditional architecture expansion.
@@ -36,6 +36,25 @@ See [the current investigation](v2_ATTENTION_REVERSAL_DIAGNOSTICS.md),
 [performance comparability](v2_PERFORMANCE_COMPARABILITY.md).
 
 ## Detailed investigation and historical milestones
+
+### Added-period complete data contract
+
+[The new repair report](v2_SCALING_DATA_REPAIRS.md) binds 180 restored eligible
+name/dates, unchanged raw observations and 1,032 added gross/neutral outcomes.
+The actual neutral target changes260,946 values over1,446dates, with no losses.
+All106arrays/3717sessions/933names/full60 are preserved. Complete composition and
+275 actual dataset/collator samples pass3,245,645,048 comparisons, plus new causal
+boundaries and old-parent rejection. Live losses remain2,980 peer-field cells
+under the unchanged three-other-peer rule and39financial/135lending cells under
+independently enumerated unit-uncertainty barriers. New prebirth observations,
+loan aliases and acquired-issuer histories are not invented. No new fit result.
+These numerical counts are not independent observations; raw, typed and sample
+counts overlap. Assembly146.31s/consumer107.98s are CPU audit runtimes.
+
+Storage cleanup freed16,183,079,752allocated bytes from4,548 archived intermediate
+foundation/decision checkpoints, plus1,459,560,256bytes through lossless compression.
+Selected models, forecasts and unique evidence remain. Receipts resolve through
+`scaling_historical_epoch_retirement` and `scaling_completed_artifact_compression`.
 
 September 21 user-directed investigation now takes priority over the unstarted
 LSTM fits. See [the frozen scope](v2_SCALING_INVESTIGATION.md) and

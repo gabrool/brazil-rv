@@ -79,7 +79,13 @@ def _basket_endpoint(
                     for leg in event.legs
                 ):
                     return None
-                cash += quantity * event.cash_per_prior_share
+                cash_per_share = event.cash_per_prior_share
+                for known, amount in event.cash_values:
+                    if known <= end:
+                        cash_per_share = amount
+                # Revisions value the original entitlement, independent of
+                # later share conversions, custody or cash reinvestment.
+                cash += quantity * cash_per_share
                 for leg in event.legs:
                     target = leg.successor_index
                     after[target] = (

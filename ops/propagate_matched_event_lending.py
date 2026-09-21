@@ -19,13 +19,17 @@ PROJECT = Path(__file__).resolve().parents[1]
 KEYS = ["date", "isin"]
 
 
-def qualify_unit_losses():
+def qualify_unit_losses(
+    source_key="stage_c_event_lending",
+    issuer_key="stage_c_event_issuers",
+    result_key="stage_c_event_unit_history",
+):
     """Walk each selected measurement interval independently of prefix sums."""
     tick = perf_counter()
     pointer = PROJECT / "docs/v2_economic_data_scaling_run.json"
     run = json.loads(pointer.read_text())
-    source = bound_json(run["stage_c_event_lending"])
-    issuer = bound_json(run["stage_c_event_issuers"])
+    source = bound_json(run[source_key])
+    issuer = bound_json(run[issuer_key])
     root = Path(source["parent"]["root"])
     work = Path(source["plan"]["path"]).parent
     out = work / "unit_qualification"
@@ -163,8 +167,8 @@ def qualify_unit_losses():
     write_json_atomic(out / "records.json", records)
     report = dict(
         status="qualified_independent_selected_unit_intervals",
-        producer=run["stage_c_event_lending"],
-        issuer=run["stage_c_event_issuers"],
+        producer=run[source_key],
+        issuer=run[issuer_key],
         records=binding(out / "records.json"),
         losses=len(records),
         distinct_barriers=[
@@ -177,7 +181,8 @@ def qualify_unit_losses():
         limits="Existing printed DISMES and ambiguity/split flags are uncertainty barriers, not proof of a split or an erroneous source denominator. Raw quantities/rates unchanged; no new source extraction. Same-legal links only, never TIM/SIMPAR predecessor capital units.",
     )
     write_json_atomic(out / "report.json", report)
-    run["stage_c_event_unit_history"] = binding(out / "report.json")
+    run = json.loads(pointer.read_text())
+    run[result_key] = binding(out / "report.json")
     write_json_atomic(pointer, run)
     print(json.dumps(report), flush=True)
 
