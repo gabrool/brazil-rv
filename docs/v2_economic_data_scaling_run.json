@@ -1158,7 +1158,7 @@
   },
   "scaling_matched_stopping_evaluation_plan": {
     "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_attention_stopping_20260921\\evaluation\\plan.json",
-    "sha256": "7d99f98927a7c477ecf26f97d3c742c261cf979b23097762157928cecf5329db"
+    "sha256": "d06f37bdfb27e99c3f7019764b0c402889c1156f23b13151e3f11f6349cca2c9"
   },
   "scaling_matched_stopping_plan": {
     "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_attention_stopping_20260921\\plan.json",
