@@ -971,7 +971,7 @@
   },
   "stage_c_data_replay_qualification": {
     "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_economic_matched_20260920\\data_refit_replays\\qualification\\manifest.json",
-    "sha256": "b109630a52820a590b3841696a8100391c778ed894e972c8e675e339c96282a7"
+    "sha256": "e173f150f06182bf4b4843ad14d5163f38f842d13c3eba4789c352b950beaefc"
   },
   "stage_c_event_auxiliaries": {
     "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_economic_matched_20260920\\event_data\\auxiliaries\\manifest.json",
@@ -1123,7 +1123,7 @@
   },
   "stage_c_refit_debit_qualification": {
     "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\matched_refit_debit_bounds\\qualification\\manifest.json",
-    "sha256": "0e8b02dd4b61bdeccc8bfdcc315a7a26eb6f1d9a1856d746710302315114837c"
+    "sha256": "2da002ca6699f21be74724e5f0ebddd9efbad6c3f7d7cf473610a7d6d3e35789"
   },
   "stage_c_refit_economics": {
     "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_economic_matched_20260920\\refit_economics\\action_identity\\manifest.json",
@@ -1143,7 +1143,7 @@
   },
   "stage_c_refit_fraction_precision_qualification": {
     "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\matched_refit_fraction_precision\\qualification\\manifest.json",
-    "sha256": "27cf6dbce44a179996d42ad618a6bd0e4c530cc95b4e4d16e700654eb5f4f701"
+    "sha256": "841bacf90ef1a770bbc716de1befdd9a254b60684612e2e88b282094e470a00a"
   },
   "stage_c_refit_interruption": {
     "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_economic_matched_20260920\\refit_interruption.json",
@@ -1160,7 +1160,7 @@
   },
   "stage_c_refit_sensitivity_qualification": {
     "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\matched_refit_sensitivities\\qualification\\manifest.json",
-    "sha256": "4b24759de1c0093b493e9a25e39d4e92ccf59cf732f750bec93e65edc2ee9aee"
+    "sha256": "9a04226d122a40569b1772b8dc27383202f878910a9a8de90be0c06251a2205d"
   },
   "stage_c_refit_storage": {
     "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_economic_matched_20260920\\data_refits\\storage\\index.json",
@@ -1178,6 +1178,10 @@
   "stage_c_sensitivity_plan": {
     "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_economic_matched_20260920\\sensitivities\\plan.json",
     "sha256": "ca360ba9d0c652d7ae34f26211fbe8dd5c805bb0a07ff11c8800fb22219ec737"
+  },
+  "stage_d_depth_engineering": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\capacity_depth_engineering\\qualification.json",
+    "sha256": "b415dd43ed9618d216bd9beba07001f441013c776c638904181896f06c689cc7"
   },
   "status": "stage_c_actual_exposure_admission_in_progress_refit_interrupted",
   "succession_identity_dependency_scope": {

@@ -147,13 +147,22 @@ class CharacteristicModel(nn.Module):
                 4 * config.slow_feature_count, config.hidden_width
             )
             self.slow_input_norm = nn.LayerNorm(config.hidden_width)
-            self.slow_encoder = (
-                HistoricalAttention(
-                    config.hidden_width, config.lookback, config.dropout
+            if config.temporal_encoder in {"attention", "attention_depth2"}:
+                self.slow_encoder = HistoricalAttention(
+                    config.hidden_width,
+                    config.lookback,
+                    config.dropout,
+                    layers=2 if config.temporal_encoder == "attention_depth2" else 1,
                 )
-                if config.temporal_encoder == "attention"
-                else nn.GRU(config.hidden_width, config.hidden_width, batch_first=True)
-            )
+            elif config.temporal_encoder in {"gru", "gru_depth2"}:
+                self.slow_encoder = nn.GRU(
+                    config.hidden_width,
+                    config.hidden_width,
+                    num_layers=2 if config.temporal_encoder == "gru_depth2" else 1,
+                    batch_first=True,
+                )
+            else:
+                raise ValueError("unsupported temporal encoder")
             if config.peer_timing != "none":
                 self.temporal_peer = TemporalPeerPathway(
                     config.hidden_width, config.dropout, config.peer_timing
@@ -233,7 +242,8 @@ class CharacteristicModel(nn.Module):
                 input_norm=self.slow_input_norm,
                 encoder=self.slow_encoder,
                 return_sequence=self.config.peer_timing != "none",
-                temporal_attention=self.config.temporal_encoder == "attention",
+                temporal_attention=self.config.temporal_encoder
+                in {"attention", "attention_depth2"},
             )
             if self.config.peer_timing != "none":
                 history = self.temporal_peer(history, slow_history_mask.bool(), active)

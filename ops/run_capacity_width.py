@@ -4,6 +4,7 @@ import argparse
 from copy import deepcopy
 from dataclasses import asdict
 import gc
+import inspect
 import json
 from pathlib import Path
 from time import perf_counter
@@ -13,6 +14,7 @@ import torch
 from brazil_rv.v2.artifacts import sha256_file, write_json_atomic
 from brazil_rv.v2.characteristic_model import CharacteristicModel
 from brazil_rv.v2.data_repair import binding, bound_json
+from brazil_rv.v2.research_rounds import _git_identity
 from brazil_rv.v2.round7 import configuration
 from brazil_rv.v2.round7_training import TrainingRecipe, train
 
@@ -108,6 +110,19 @@ def freeze(run):
         ema_half_life_epochs=source["attention_gru_ema_half_life_epochs"],
         planned_fits=len(cells) * len(source["seeds"]) * (1 + len(source["folds"])),
         driver=binding(Path(__file__)),
+        runtime=dict(
+            git=_git_identity(),
+            files={
+                "training": binding(Path(inspect.getfile(train))),
+                "model": binding(Path(inspect.getfile(CharacteristicModel))),
+                "temporal": binding(
+                    Path(inspect.getfile(CharacteristicModel)).with_name(
+                        "temporal_pathway.py"
+                    )
+                ),
+                "configuration": binding(Path(inspect.getfile(configuration))),
+            },
+        ),
         contrast="Existing hidden_width96->128 for attention and64->96 for GRU, one configuration field per cell; new compatible P parents. Other cleaned inputs, FiLM, early-peer timing, history pooling, heads, optimizer, selector and full learning budgets stay fixed. Reuse all matched C controls.",
         dimensional_coupling="The existing hidden_width also sizes the input projection, same-stage peer attention and history query, and the temporal input columns of joint fusion. Report their module parameter deltas; this is the model's coupled temporal-path width contrast, not an isolated recurrent matrix scaling law or an independently expanded final context/trunk. No extra peer layer or final-context width changes.",
         gate="Four-fold primary R10m net-CDI delta >=.25bps/day, at least2/3 positive seed and3/4 positive fold deltas; no unexplained BRL/CDI Sharpe decline or worse drawdown. IC diagnostic. At most one retained candidate per architecture receives ten-fold confirmation under the registered paired20/40/60,40primary, one-sided97.5% lower>0 rule. No automatic grid or added seeds.",
@@ -125,6 +140,8 @@ def execute(run):
     reference = run["stage_d_width_plan"]
     plan = bound_json(reference)
     assert plan["driver"]["sha256"] == sha256_file(Path(__file__))
+    for record in plan["runtime"]["files"].values():
+        assert sha256_file(Path(record["path"])) == record["sha256"]
     root = Path(reference["path"]).parent
     store = Path(plan["store"]["root"])
     assert sha256_file(store / "manifest.json") == plan["store"]["manifest_sha256"]

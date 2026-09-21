@@ -7,17 +7,11 @@ from torch import nn
 from torch.nn import functional as F
 
 
-class HistoricalAttention(nn.Module):
-    """Bidirectional within the available window, never across decision dates."""
+class HistoricalAttentionBlock(nn.Module):
+    """One masked temporal attention and feed-forward residual block."""
 
-    def __init__(self, width, lookback, dropout):
+    def __init__(self, width, dropout):
         super().__init__()
-        positions = torch.arange(lookback)[:, None]
-        frequencies = torch.exp(torch.arange(0, width, 2) * (-math.log(10000) / width))
-        encoding = torch.zeros(lookback, width)
-        encoding[:, 0::2] = torch.sin(positions * frequencies)
-        encoding[:, 1::2] = torch.cos(positions * frequencies)
-        self.register_buffer("positions", encoding)
         self.attention = PeerAttention(width, dropout)
         self.norm = nn.LayerNorm(width)
         self.ffn = nn.Sequential(
@@ -30,12 +24,33 @@ class HistoricalAttention(nn.Module):
 
     def forward(self, values, valid):
         shape = values.shape
-        values = values + self.positions
         values = self.attention(
             values.reshape(-1, shape[-2], shape[-1]), valid.reshape(-1, shape[-2])
         )
         values = values + self.ffn(self.norm(values))
         return torch.where(valid[..., None], values.reshape(shape), 0.0)
+
+
+class HistoricalAttention(HistoricalAttentionBlock):
+    """Bidirectional within the available window, never across decision dates."""
+
+    def __init__(self, width, lookback, dropout, layers=1):
+        super().__init__(width, dropout)
+        positions = torch.arange(lookback)[:, None]
+        frequencies = torch.exp(torch.arange(0, width, 2) * (-math.log(10000) / width))
+        encoding = torch.zeros(lookback, width)
+        encoding[:, 0::2] = torch.sin(positions * frequencies)
+        encoding[:, 1::2] = torch.cos(positions * frequencies)
+        self.register_buffer("positions", encoding)
+        self.additional_layers = nn.ModuleList(
+            HistoricalAttentionBlock(width, dropout) for _ in range(layers - 1)
+        )
+
+    def forward(self, values, valid):
+        values = super().forward(values + self.positions, valid)
+        for layer in self.additional_layers:
+            values = layer(values, valid)
+        return values
 
 
 class PeerAttention(nn.Module):

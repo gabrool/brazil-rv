@@ -44,7 +44,8 @@ def test_restored_gru_last_state_exact_and_invalid_payload_ignored():
 
 @pytest.mark.parametrize(
     "encoder,timing",
-    [(e, t) for e in ("gru", "attention") for t in ("early", "late", "pool")],
+    [(e, t) for e in ("gru", "attention") for t in ("early", "late", "pool")]
+    + [(e, "early") for e in ("gru_depth2", "attention_depth2")],
 )
 def test_peer_masks_permutation_padding_and_no_cross_date_leakage(encoder, timing):
     torch.set_num_threads(2)
@@ -80,6 +81,13 @@ def test_peer_masks_permutation_padding_and_no_cross_date_leakage(encoder, timin
     assert all(
         torch.isfinite(p.grad).all() for p in model.parameters() if p.grad is not None
     )
+    if encoder.endswith("_depth2"):
+        added = [
+            p
+            for name, p in model.slow_encoder.named_parameters()
+            if name.startswith("additional_layers.") or name.endswith("_l1")
+        ]
+        assert added and all(p.grad is not None and p.grad.norm() > 0 for p in added)
 
 
 @pytest.mark.parametrize("encoder", ["gru", "attention"])
@@ -99,7 +107,8 @@ def test_early_late_have_identical_parameter_contract(encoder):
 
 @pytest.mark.parametrize(
     "encoder,timing",
-    [(e, t) for e in ("gru", "attention") for t in ("early", "late", "pool")],
+    [(e, t) for e in ("gru", "attention") for t in ("early", "late", "pool")]
+    + [(e, "early") for e in ("gru_depth2", "attention_depth2")],
 )
 def test_pathway_fullgraph_across_distinct_date_batch_sizes(encoder, timing):
     torch._dynamo.reset()

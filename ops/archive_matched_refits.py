@@ -85,6 +85,10 @@ def main():
                 Path(run["stage_c_refit_fraction_precision_plan"]["path"]).parent,
                 "matched_refit_fraction_precision",
             ),
+            (
+                Path(run["stage_d_depth_engineering"]["path"]).parent,
+                "capacity_depth_engineering",
+            ),
         ):
             for directory, children, names in os.walk(root):
                 children[:] = [d for d in children if d not in {"__pycache__", "fits"}]
