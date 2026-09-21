@@ -1165,6 +1165,10 @@
     "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_economic_matched_20260920\\data_refits\\refit_plan.json",
     "sha256": "3a303991b50f1af4a0012676c676145fe83e354d50f9d3d76d16d7ba80bfb4b2"
   },
+  "stage_c_refit_recovery": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\matched_refit_recovery.json",
+    "sha256": "d33122dc968004a91351692691ae4455d274b8c9c0f7740c3488d87c106f3e86"
+  },
   "stage_c_refit_results": {
     "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_economic_matched_20260920\\data_refit_replays\\results\\report.json",
     "sha256": "7c76fb010b11864fa8a0102469ecdb265e5c005fe4f78554b2fa89441d7e035a"
@@ -1202,6 +1206,10 @@
   "stage_d_depth_engineering": {
     "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\capacity_depth_engineering\\qualification.json",
     "sha256": "b415dd43ed9618d216bd9beba07001f441013c776c638904181896f06c689cc7"
+  },
+  "stage_d_width_evaluation_plan": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\capacity_width\\evaluation_plan.json",
+    "sha256": "d8b7de3f1ba9a523b4b62b9e333d195216abe4bb955cc9feab0b2adcad1e727b"
   },
   "stage_d_width_plan": {
     "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\capacity_width\\plan.json",

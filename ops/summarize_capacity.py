@@ -1,4 +1,6 @@
-"""Matched width comparisons with saved C controls and inherited uncertainty."""
+"""Matched capacity comparisons with reused controls and inherited uncertainty."""
+
+import argparse
 
 import json
 from pathlib import Path
@@ -13,11 +15,12 @@ from summarize_refit_economics import fit_readouts, sensitivity_results
 PROJECT = Path(__file__).resolve().parents[1]
 
 
-def main():
+def main(wave):
     pointer = PROJECT / "docs/v2_economic_data_scaling_run.json"
     run = json.loads(pointer.read_text())
-    design = bound_json(run["stage_d_width_plan"])
-    evaluation = bound_json(run["stage_d_width_evaluation_plan"])
+    prefix = f"stage_d_{wave}"
+    design = bound_json(run[prefix + "_plan"])
+    evaluation = bound_json(run[prefix + "_evaluation_plan"])
     local = json.loads(
         (
             Path(evaluation["context"]) / "docs/v2_economic_data_scaling_run.json"
@@ -28,12 +31,26 @@ def main():
     progress = bound_json(binding(root / "replays.json"))
     proof = bound_json(local["stage_c_data_replay_qualification"])
     fits = bound_json(
-        binding(Path(run["stage_d_width_plan"]["path"]).parent / "refits.json")
+        binding(Path(run[prefix + "_plan"]["path"]).parent / "refits.json")
     )
     assert fits["status"] == progress["status"] == proof["status"] == "complete"
     assert len(progress["completed"]) == proof["qualified"] == plan["planned_books"]
-    screen = bound_json(run["stage_c_refit_results"])
-    control_rows = bound_json(screen["books"])
+    references = {v["reference"] for v in design["parameters"].values()}
+    reports = design.get("reference_results", {"screen": run["stage_c_refit_results"]})
+    report_bindings = {v["path"]: v for v in reports.values()}
+    screens = [bound_json(ref) for ref in report_bindings.values()]
+    control_rows = [
+        row
+        for screen in screens
+        for row in bound_json(screen["books"])
+        if row["arm"] in references
+    ]
+    control_scenarios = [
+        row
+        for screen in screens
+        for row in bound_json(screen["sensitivities"]["summary"])
+        if row["arm"] in references
+    ]
     out = root / "results"
     out.mkdir(exist_ok=False)
     (out / "executed.py").write_bytes(Path(__file__).read_bytes())
@@ -178,24 +195,26 @@ def main():
         out,
         metrics,
         comparison_pairs=pairs,
-        saved_controls=bound_json(screen["sensitivities"]["summary"]),
+        saved_controls=control_scenarios,
     )
     write_json_atomic(out / "fit_diagnostics.json", fit_readouts(fits))
     report = dict(
-        status="width_results_pending_registered_disposition",
-        plan=run["stage_d_width_plan"],
-        reused_controls=run["stage_c_refit_results"],
+        status=f"{wave}_results_pending_registered_disposition",
+        plan=run[prefix + "_plan"],
+        reused_controls=list(report_bindings.values()),
         qualification=local["stage_c_data_replay_qualification"],
         books=binding(out / "books.json"),
         comparisons=binding(out / "comparisons.json"),
         fit_diagnostics=binding(out / "fit_diagnostics.json"),
         sensitivities=sensitivities,
-        limits="Registered coupled temporal-path hidden width, with unchanged final-context/trunk width. Equal-fold means and paired within-fold20/40/60 intervals,40primary; reused development, no untouched test or retrospective IC veto. Sharpes are fold means and drawdown worst individual fold. Preserve all actual unresolved claims, financing scenarios and prior adaptive numerical uncertainty. Screen flags alone do not adopt a model or resolve risk/execution assumptions.",
+        limits="Registered capacity contrast with fixed other configuration and unchanged final-context/trunk width; exact dimensional/layer changes are in the frozen plan. Equal-fold means and paired within-fold20/40/60 intervals,40primary; reused development, no untouched test or retrospective IC veto. Sharpes are fold means and drawdown worst individual fold. Preserve all actual unresolved claims, financing scenarios and prior adaptive numerical uncertainty. Screen flags alone do not adopt a model or resolve risk/execution assumptions.",
     )
     write_json_atomic(out / "report.json", report)
-    run["stage_d_width_results"] = binding(out / "report.json")
+    run[prefix + "_results"] = binding(out / "report.json")
     write_json_atomic(pointer, run)
 
 
 if __name__ == "__main__":
-    main()
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--wave", choices=("width", "depth"), required=True)
+    main(parser.parse_args().wave)

@@ -1,0 +1,27 @@
+{
+  "aliases": 4898,
+  "archive": {
+    "bytes": 4971755703,
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\matched_refits_db1944f.zip",
+    "sha256": "385d4d3d2674cd1ae5aae9f5bd872111f1d1bdc0588603f8c4abee98f4a0a2a8"
+  },
+  "archive_seconds": 238.8993829000101,
+  "dependencies": {
+    "stage_c_account_recovery": {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\matched_economics_recovery.json",
+      "sha256": "c92755ff3c80429dbb9262f2c22a8aa329312deb3f84550aad1b3fd006582e96"
+    },
+    "stage_c_matched_store_recovery": {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\matched_store_recovery.json",
+      "sha256": "b588d487a718682606fb8163ebd279a0ceb7c8d790abd224b368e25d0a6fef23"
+    }
+  },
+  "fits": 60,
+  "implementation_commit": "db1944f560c99eee86c83929710519a3b767c8fb",
+  "inherited_members": 770,
+  "logical_members": 21810,
+  "recovery_seconds": 58.14749179998762,
+  "scope": "Every new logical artifact restored and hash-checked one file at a time, including all epoch checkpoints, fresh derived portfolio cache, failed/executed recipes, storage journals, forecasts, primary and sensitivity books. Unchanged project source inherits the prior verified archive chain. Original sources, accepted store NPY files and old fits are not copied. Canonical fit paths and physical junction targets remain documented. This is byte recovery, not a new model/source/history proof or completion of conditional later experiments.",
+  "status": "verified_matched_refit_and_economic_artifact_recovery",
+  "unique_members": 16912
+}

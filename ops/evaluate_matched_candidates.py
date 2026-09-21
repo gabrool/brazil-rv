@@ -1,4 +1,4 @@
-"""Reuse qualified account drivers for admitted replication or width fits."""
+"""Reuse qualified account drivers for registered candidate fits."""
 
 import argparse
 import json
@@ -15,10 +15,12 @@ import run_refit_sensitivities
 PROJECT = Path(__file__).resolve().parents[1]
 
 
-def freeze(run, width=False):
-    ref = run["stage_d_width_plan" if width else "stage_c_replication_plan"]
+def freeze(run, wave):
+    capacity = wave != "replication"
+    prefix = f"stage_d_{wave}" if capacity else "stage_c_replication"
+    ref = run[prefix + "_plan"]
     fits = bound_json(ref)
-    arms = list(fits["cells"]) if width else fits["arms"]
+    arms = list(fits["cells"]) if capacity else fits["arms"]
     assert arms, "No candidate fits were admitted"
     root = Path(ref["path"]).parent
     context = root / "evaluation_context"
@@ -37,8 +39,8 @@ def freeze(run, width=False):
         folds=fits["folds"],
         planned_books=len(arms) * len(fits["folds"]) * 6,
         attribution=(
-            "Registered width candidates on four screen folds; existing matched C controls are reused separately. "
-            if width
+            f"Registered {wave} candidates on four screen folds; matched saved controls are reused separately. "
+            if capacity
             else "Other ten development folds of the nominated replication. "
         )
         + "Same accepted coordinates/account/source hypotheses and neutral policy. No pure-data attribution or untouched-validation claim.",
@@ -74,7 +76,7 @@ def freeze(run, width=False):
             scope="The existing cost/loan/delivery phase definitions on every admitted replication ensemble and capital, using their unchanged actual-exposure predicates.",
             additional_conditional=(
                 "Four original screen folds; no2019/2023 corporate windows. "
-                if width
+                if capacity
                 else "Other ten folds also intersect2019/2023: apply qualified Natura, BRML/Dommo/Copel and other event hypotheses when exposed; this phase list does not supply those bounds. "
             )
             + "Cielo cents, opposing-fill daytrade and additional actual exposure require disposition before final admission.",
@@ -88,7 +90,7 @@ def freeze(run, width=False):
     bound_refit_fraction_precision.freeze(local)
     specification = dict(
         candidate_fits=ref,
-        width=width,
+        wave=wave,
         primary=local["stage_c_data_replay_plan"],
         sensitivities=local["stage_c_refit_sensitivity_plan"],
         funded_denial=local["stage_c_refit_debit_plan"],
@@ -111,22 +113,16 @@ def freeze(run, width=False):
     (context / "initial_run.json").write_bytes(pointer.read_bytes())
     specification["initial_context"] = binding(context / "initial_run.json")
     write_json_atomic(root / "evaluation_plan.json", specification)
-    run[
-        "stage_d_width_evaluation_plan"
-        if width
-        else "stage_c_replication_evaluation_plan"
-    ] = binding(root / "evaluation_plan.json")
+    run[prefix + "_evaluation_plan"] = binding(root / "evaluation_plan.json")
     write_json_atomic(PROJECT / "docs/v2_economic_data_scaling_run.json", run)
 
 
-def execute(run, width=False):
-    reference = run[
-        "stage_d_width_evaluation_plan"
-        if width
-        else "stage_c_replication_evaluation_plan"
-    ]
+def execute(run, wave):
+    capacity = wave != "replication"
+    prefix = f"stage_d_{wave}" if capacity else "stage_c_replication"
+    reference = run[prefix + "_evaluation_plan"]
     spec = bound_json(reference)
-    assert spec["width"] == width
+    assert spec["wave"] == wave
     context = Path(spec["context"])
     pointer = context / "docs/v2_economic_data_scaling_run.json"
     local = json.loads(pointer.read_text())
@@ -164,12 +160,10 @@ def execute(run, width=False):
         )
     }
     receipt["plan"] = reference
-    receipt["additional_corporate_hypotheses_disposition_required"] = not width
+    receipt["additional_corporate_hypotheses_disposition_required"] = not capacity
     output = Path(spec["candidate_fits"]["path"]).parent / "evaluation_progress.json"
     write_json_atomic(output, receipt)
-    run["stage_d_width_evaluation" if width else "stage_c_replication_evaluation"] = (
-        binding(output)
-    )
+    run[prefix + "_evaluation"] = binding(output)
     write_json_atomic(PROJECT / "docs/v2_economic_data_scaling_run.json", run)
     print(json.dumps(receipt), flush=True)
 
@@ -177,7 +171,9 @@ def execute(run, width=False):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--freeze", action="store_true")
-    parser.add_argument("--width", action="store_true")
+    parser.add_argument(
+        "--wave", choices=("replication", "width", "depth"), default="replication"
+    )
     args = parser.parse_args()
     run = json.loads((PROJECT / "docs/v2_economic_data_scaling_run.json").read_text())
-    freeze(run, args.width) if args.freeze else execute(run, args.width)
+    freeze(run, args.wave) if args.freeze else execute(run, args.wave)
