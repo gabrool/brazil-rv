@@ -1,6 +1,18 @@
 # Economic accounting, data audit and scaling progress
 
-2026-09-21 current: [compiler failure](v2_COMPILED_SCORE_FAILURE.md) is qualified
+2026-09-21 current: the [width wave](v2_CAPACITY_RESULTS.md) is disposed. Both
+larger widths fail: attention128-minus-96 -.70231 and GRU96-minus-64 -.69412
+bps/day at R$10m, only1/4 positive folds each;0/3 GRU and2/3 attention seed
+deltas are positive. Retain96/64 for the registered depth contrasts. All30 accepted
+fits,48primary/537ordinary/48funded/6precision books qualify, with303/0/18skips.
+No primary overdue principal; eight marked ENAT terminal fractions remain.
+Exact fixed-GRU forecast reproduction retains its two eager-precision crossings.
+The result assembler reuses the prior zero-change F2 cache proof; its initial
+provenance-guard failure and code/stdout remain, with no book/source rerun.
+Width recovery, depth, LSTM and final conditional dispositions remain. The
+heartbeat is paused; work continues directly. Earlier statuses are historical.
+
+Earlier compiler-recovery status: [compiler failure](v2_COMPILED_SCORE_FAILURE.md) is qualified
 and scoped. The corrected width plan preserves10 completed TE128 fits and156
 qualified TE128 portfolios, with84skips; fifteen fresh GRU96 fits use the isolated
 ATen-normalization correction. Five TE128 jobs remain on their original runtime.

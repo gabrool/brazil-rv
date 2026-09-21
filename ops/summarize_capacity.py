@@ -106,6 +106,18 @@ def main(wave):
         (r["capital"], r["arm"], r["fold"], r["member"]): r
         for r in [*control_rows, *metrics]
     }
+    input_equivalence = bound_json(run["stage_c_refit_economics_qualification"])
+    correction = bound_json(input_equivalence["correction"])
+    equivalent_inputs = {
+        input_equivalence["inputs"]["sha256"],
+        correction["previous_input"]["sha256"],
+    }
+    unchanged_folds = {
+        row["fold"]
+        for row in correction["account_arguments"]
+        if row["account_schema_passed"] and row["changed_successor_cells"] == 0
+    }
+    reused_equivalence = set()
     comparisons = []
     pairs = [(arm, desc["reference"]) for arm, desc in design["parameters"].items()]
     for candidate, reference in pairs:
@@ -125,8 +137,20 @@ def main(wave):
                         for arm in (candidate, reference)
                     )
                     assert a["dates"] == b["dates"]
-                    for key in ("mapping", "policy_inputs"):
-                        assert a["provenance"][key] == b["provenance"][key]
+                    assert a["provenance"]["mapping"] == b["provenance"]["mapping"]
+                    inputs = [x["provenance"]["policy_inputs"] for x in (a, b)]
+                    if inputs[0] != inputs[1]:
+                        assert input_equivalence["passed"] and fold in unchanged_folds
+                        assert {x["sha256"] for x in inputs} == equivalent_inputs
+                        assert all(
+                            x
+                            in (
+                                input_equivalence["inputs"],
+                                correction["previous_input"],
+                            )
+                            for x in inputs
+                        )
+                        reused_equivalence.add(fold)
                     arrays.append(
                         np.asarray(a["daily"]["net_excess_bps"])
                         - b["daily"]["net_excess_bps"]
@@ -202,6 +226,12 @@ def main(wave):
         status=f"{wave}_results_pending_registered_disposition",
         plan=run[prefix + "_plan"],
         reused_controls=list(report_bindings.values()),
+        reused_input_equivalence=dict(
+            qualification=run["stage_c_refit_economics_qualification"],
+            correction=input_equivalence["correction"],
+            folds=sorted(reused_equivalence),
+            scope="Only the already-qualified original/corrected two-cell action-index caches may differ in provenance, and only on folds whose saved account-coordinate proof reports zero changes. Mapping remains exact; no source, cache or book replay.",
+        ),
         qualification=local["stage_c_data_replay_qualification"],
         books=binding(out / "books.json"),
         comparisons=binding(out / "comparisons.json"),

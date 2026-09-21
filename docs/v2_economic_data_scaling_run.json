@@ -1219,13 +1219,17 @@
     "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\capacity_lstm_engineering\\qualification.json",
     "sha256": "19454b306b5265b61c91868456afe2f323d30dd4982df00e0069c37b8c67ded1"
   },
+  "stage_d_width_admission": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\capacity_width_recovery\\admission.json",
+    "sha256": "ec5ea1f5fb8664a441dd417823a60dee954f134ff7f38034062956b227760f57"
+  },
   "stage_d_width_attention_book_reuse": {
     "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\capacity_width_recovery\\attention_book_reuse.json",
     "sha256": "a996ea302cd87e2aad6a32f00dca801e1ef5d5f43cbe61403791983ae5ec1ed1"
   },
   "stage_d_width_evaluation": {
     "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\capacity_width_recovery\\evaluation_progress.json",
-    "sha256": "511dcee85a7e2b314696865f411894fc9eb35bc17b19e7a1d9b3d6cacd93d565"
+    "sha256": "d0d16d8bc41049c527ad2cf401f7b5f3f0d15ea4462cb08521afb620ee036b06"
   },
   "stage_d_width_evaluation_plan": {
     "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\capacity_width_recovery\\evaluation_plan.json",
@@ -1250,6 +1254,10 @@
   "stage_d_width_plan": {
     "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\capacity_width_recovery\\plan.json",
     "sha256": "46a2ab1fb1f5bca7ce4c1a7621c1199dcac5d141e67abcee80e3473d86109a0e"
+  },
+  "stage_d_width_results": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\capacity_width_recovery\\primary_books\\results\\report.json",
+    "sha256": "d16d9356e7b2deda6440ca7368ca35681b307c5a04c577a97850d19b32ee2b1e"
   },
   "stage_d_width_storage": {
     "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\capacity_width_recovery\\storage\\audit_view_compression.json",
