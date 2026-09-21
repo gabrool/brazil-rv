@@ -8,7 +8,7 @@ import numpy as np
 from brazil_rv.v2.artifacts import write_json_atomic
 from brazil_rv.v2.data_repair import binding, bound_json
 from brazil_rv.v2.foundation_readouts import paired_interval
-from summarize_refit_economics import sensitivity_results
+from summarize_refit_economics import fit_readouts, sensitivity_results
 
 PROJECT = Path(__file__).resolve().parents[1]
 
@@ -180,32 +180,7 @@ def main():
         comparison_pairs=pairs,
         saved_controls=bound_json(screen["sensitivities"]["summary"]),
     )
-    fit_rows = []
-    for rec in fits["completed"]:
-        manifest = bound_json(rec["manifest"])
-        history = bound_json(
-            binding(Path(rec["manifest"]["path"]).parent / "history.json")
-        )
-        fit_rows.append(
-            dict(
-                key=rec["key"],
-                source=rec,
-                epochs=manifest["epochs_completed"],
-                selected_epoch=manifest["selected_epoch"],
-                stop_reason=manifest["stop_reason"],
-                peak_cuda_bytes=manifest["peak_cuda_bytes"],
-                complete_fit_seconds=rec["seconds"],
-                median_epoch_after_first_seconds=float(
-                    np.median([x["seconds"] for x in history[1:]])
-                )
-                if len(history) > 1
-                else None,
-                diagnostics=binding(
-                    Path(rec["manifest"]["path"]).parent / "diagnostics.json"
-                ),
-            )
-        )
-    write_json_atomic(out / "fit_diagnostics.json", fit_rows)
+    write_json_atomic(out / "fit_diagnostics.json", fit_readouts(fits))
     report = dict(
         status="width_results_pending_registered_disposition",
         plan=run["stage_d_width_plan"],

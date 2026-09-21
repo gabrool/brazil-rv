@@ -14,6 +14,38 @@ from brazil_rv.v2.foundation_readouts import paired_interval
 PROJECT = Path(__file__).resolve().parents[1]
 
 
+def fit_readouts(progress):
+    """Read existing fit diagnostics without scoring or rerunning a model."""
+    rows = []
+    for rec in progress["completed"]:
+        manifest = bound_json(rec["manifest"])
+        source = manifest.get("plain_parent", rec["manifest"])
+        manifest = bound_json(source)
+        root = Path(source["path"]).parent
+        history = bound_json(binding(root / "history.json"))
+        diagnostic = root / "diagnostics.json"
+        rows.append(
+            dict(
+                key=rec["key"],
+                source=rec,
+                underlying_fit=source,
+                epochs=manifest["epochs_completed"],
+                selected_epoch=manifest["selected_epoch"],
+                stop_reason=manifest.get("stop_reason"),
+                peak_cuda_bytes=manifest.get("peak_cuda_bytes"),
+                complete_fit_seconds=rec["seconds"],
+                median_epoch_after_first_seconds=float(
+                    np.median([x["seconds"] for x in history[1:]])
+                )
+                if len(history) > 1
+                else None,
+                diagnostics=binding(diagnostic) if diagnostic.exists() else None,
+                history=binding(root / "history.json"),
+            )
+        )
+    return rows
+
+
 def sensitivity_results(
     run, plan, out, primary_metrics, *, comparison_pairs=None, saved_controls=()
 ):
@@ -241,6 +273,8 @@ def main():
     assert (
         len(replays["completed"]) == quality["qualified"] == plan["planned_books"] == 96
     )
+    fits = bound_json(binding(Path(run["stage_c_refit_root"]) / "refits.json"))
+    assert fits["status"] == "complete" and len(fits["completed"]) == fits["planned"]
     old = {r["key"]: r for r in bound_json(run["stage_c_event_replays"])["completed"]}
     out = root / "results"
     out.mkdir(exist_ok=False)
@@ -418,6 +452,7 @@ def main():
                 )
             )
     write_json_atomic(out / "comparisons.json", comparisons)
+    write_json_atomic(out / "fit_diagnostics.json", fit_readouts(fits))
     sensitivities = sensitivity_results(run, plan, out, metrics)
     report = dict(
         status="corrected_data_refit_screen_results_pending_exposure_sensitivity_disposition",
@@ -426,6 +461,7 @@ def main():
         old_account_source_results=run["stage_c_account_results"],
         books=binding(out / "books.json"),
         comparisons=binding(out / "comparisons.json"),
+        fit_diagnostics=binding(out / "fit_diagnostics.json"),
         model_summary=summaries,
         sensitivities=sensitivities,
         seconds=perf_counter() - tick,
