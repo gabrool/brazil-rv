@@ -1,0 +1,31 @@
+{
+  "aliases": 3572,
+  "archive": {
+    "bytes": 4419874534,
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\capacity_width_165a668.zip",
+    "sha256": "a4b6d628dac603c8e8960394cf4f6b980bc0e15fda45991a13e7d1f756b235a2"
+  },
+  "archive_seconds": 186.1470784000121,
+  "dependencies": {
+    "stage_c_refit_recovery": {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\matched_refit_recovery.json",
+      "sha256": "d33122dc968004a91351692691ae4455d274b8c9c0f7740c3488d87c106f3e86"
+    }
+  },
+  "directory_aliases": [
+    {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\capacity_width_recovery\\fits\\TE_128",
+      "target": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\capacity_width\\fits\\TE_128"
+    }
+  ],
+  "directory_restore": "Restore original width files and recreate the listed directory junction before consuming the composed fit root. All target file bytes are independently recovered; the one-file hash test does not itself recreate junctions.",
+  "fits": 30,
+  "implementation_commit": "165a6683b6b12ac0e73de8f5ab87002a2d961cec",
+  "inherited_members": 790,
+  "logical_members": 15653,
+  "recovery_seconds": 43.887361100001726,
+  "scope": "All new wave checkpoints, predictions, primary/scenario books, frozen plans, executed and failed recipes, runtime/source and documentation restore/hash-check. Matched controls and immutable inputs/accepted stores/old fits are inherited, never copied. One-file scratch is removed only after its exact hash check. This verifies bytes, not a repeated source, history, model or economic experiment.",
+  "status": "verified_capacity_wave_artifact_recovery",
+  "unique_members": 12081,
+  "wave": "width"
+}

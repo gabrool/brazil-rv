@@ -98,7 +98,25 @@ registered condition; further peer/context/general capacity is not automatic.
 Lossless report compression saves 839,675,699 allocated bytes across 1,455 completed
 JSON files in 24.04792 seconds; all decoded hashes are exact. Resolve
 `stage_d_width_storage_json`. No source/store/fit or numerical value changes.
-The width recovery pointer will record the archive once verification completes.
+Width recovery is verified: `capacity_width_165a668.zip`, SHA
+`a4b6d628dac603c8e8960394cf4f6b980bc0e15fda45991a13e7d1f756b235a2`,
+4,419,874,534 bytes. It restores/hash-checks 15,653 logical/12,081 unique members,
+3,572 aliases, with 790 inherited members and the prior C archive as dependency.
+Archive/recovery took 186.14708/43.88736 seconds. The declared TE128 directory
+junction must be recreated from its recovered target files; the one-file byte
+check does not itself recreate the junction. Both corrected and original failed
+width evidence are preserved, including 12/132/6 excluded original GRU
+primary/ordinary/funded books and 78/6/6 ordinary/funded/precision skips. Those
+invalid GRU books are not added to accepted counts or interpreted economically.
+
+The depth plan is now frozen and running with fresh compatible parents under
+`normalization-depth@a9a775c`. `TE_depth2` has 1,643,683 parameters at width 96,
+adding 74,976 only in its encoder; `GRU_depth2` has 1,505,411 at width 64,
+adding 24,960 only in its encoder. The plan retains three seeds, four folds,
+maximum 60 epochs with original stopping/selection, and 30 P/F fits. The unchanged
+portfolio/scenario contracts are frozen separately before their outcomes. No
+depth result exists yet. Resolve `stage_d_depth_plan/evaluation_plan`.
+
 The heartbeat remains paused. A documentation patch failed its text match before
 any file changed; read-only shell wildcard errors are reconstructed tooling
 descriptions, not numerical failures or exact standalone shell artifacts.

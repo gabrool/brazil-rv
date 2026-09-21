@@ -1215,6 +1215,14 @@
     "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\capacity_depth_engineering\\qualification.json",
     "sha256": "b415dd43ed9618d216bd9beba07001f441013c776c638904181896f06c689cc7"
   },
+  "stage_d_depth_evaluation_plan": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\capacity_depth\\evaluation_plan.json",
+    "sha256": "358737ef1f4238960bd5fb9242c5baf86d4528f50f7548c2855173888cac3265"
+  },
+  "stage_d_depth_plan": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\capacity_depth\\plan.json",
+    "sha256": "2a4a17e64c704d1b90c574e165ca5f66eec94ec80973659fcde46f848e7cc546"
+  },
   "stage_d_lstm_engineering": {
     "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\capacity_lstm_engineering\\qualification.json",
     "sha256": "19454b306b5265b61c91868456afe2f323d30dd4982df00e0069c37b8c67ded1"
@@ -1254,6 +1262,10 @@
   "stage_d_width_plan": {
     "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\capacity_width_recovery\\plan.json",
     "sha256": "46a2ab1fb1f5bca7ce4c1a7621c1199dcac5d141e67abcee80e3473d86109a0e"
+  },
+  "stage_d_width_recovery": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\capacity_width_recovery.json",
+    "sha256": "df6b86803830c3d2a7a9963b0e618963bbb852452c41d6e5091efe0ef8117b4c"
   },
   "stage_d_width_results": {
     "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\capacity_width_recovery\\primary_books\\results\\report.json",

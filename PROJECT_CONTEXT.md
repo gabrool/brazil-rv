@@ -33,7 +33,12 @@ reused; no source/store/account proof is repeated. All30 accepted fits and their
 portfolio scenarios are complete. [Width results](docs/v2_CAPACITY_RESULTS.md)
 reject both larger widths: TE128-minus-96 -.70231 and GRU96-minus-64 -.69412
 bps/day, each only1/4 positive folds. Resolve stage_d_width_results/admission.
-Retain attention96/GRU64 for the depth wave; neither larger width is adopted.
+Retain attention96/GRU64; neither larger width is adopted. Width recovery is
+verified through stage_d_width_recovery. The depth wave is frozen and active:
+TE_depth2/GRU_depth2 add only a second encoder layer, with1,643,683/1,505,411
+parameters. Resolve stage_d_depth_plan/evaluation_plan;30 fresh P/F fits preserve
+all original seeds/folds/learning budgets. LSTM and final conditional branches
+remain unstarted.
 Original stage_d_width_original_plan/evaluation and all failed attempts remain.
 
 stage_d_width_forecast_qualification admits exact saved/fresh compiled and
@@ -98,7 +103,7 @@ Qualified depth is separately available in economic-accounts@734cf12 and LSTM in
 lstm@c37b432. Clean derived checkouts normalization-depth@a9a775c and
 normalization-lstm@67629a7 add only the qualified compiler correction; their
 model/temporal engineering bindings remain unchanged. The freezer binds and
-checks the qualified compiler bytes. Neither experiment is frozen or run yet. ops/run_capacity_layers.py
+checks the qualified compiler bytes. Depth is frozen/running; LSTM is not yet frozen. ops/run_capacity_layers.py
 --wave depth|lstm reuses the frozen width fit loop; ops/admit_capacity.py applies
 the original economic screen. Never change a runtime while its worker is active.
 

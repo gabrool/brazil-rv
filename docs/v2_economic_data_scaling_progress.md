@@ -9,7 +9,12 @@ No primary overdue principal; eight marked ENAT terminal fractions remain.
 Exact fixed-GRU forecast reproduction retains its two eager-precision crossings.
 The result assembler reuses the prior zero-change F2 cache proof; its initial
 provenance-guard failure and code/stdout remain, with no book/source rerun.
-Width recovery, depth, LSTM and final conditional dispositions remain. The
+Width archive/recovery verifies15,653logical/12,081unique members and3,572aliases,
+with790inherited: capacity_width_165a668.zip,4,419,874,534bytes,
+SHAa4b6d628dac603c8e8960394cf4f6b980bc0e15fda45991a13e7d1f756b235a2.
+The frozen depth wave is active at widths96/64, adding only a second encoder
+layer;1,643,683/1,505,411parameters and30fresh P/F fits. Its account/scenario
+contracts are frozen, with prior controls reused. LSTM/final conditions remain. The
 heartbeat is paused; work continues directly. Earlier statuses are historical.
 
 Earlier compiler-recovery status: [compiler failure](v2_COMPILED_SCORE_FAILURE.md) is qualified
