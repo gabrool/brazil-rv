@@ -65,6 +65,18 @@ def main(wave):
         for name in names:
             add("project/" + name, PROJECT / name)
         evidence = [(root, "capacity_" + wave)]
+        if wave == "width" and "stage_d_width_original_plan" in run:
+            original_root = Path(run["stage_d_width_original_plan"]["path"]).parent
+            assert original_root != root
+            evidence.append((original_root, "capacity_width_original"))
+            design = bound_json(run[prefix + "_plan"])
+            for arm, runtime in design["runtime_by_arm"].items():
+                checkout = Path(runtime["files"]["training"]["path"]).parents[4]
+                runtime_names = subprocess.check_output(
+                    ["git", "ls-files", "research"], cwd=checkout, text=True
+                ).splitlines()
+                for name in runtime_names:
+                    add("runtime/" + arm + "/" + name, checkout / name)
         if wave == "width" and "stage_c_account_composition" in run:
             evidence.append(
                 (
@@ -81,7 +93,12 @@ def main(wave):
             )
         for folder, label in evidence:
             for directory, children, filenames in os.walk(folder):
-                children[:] = [name for name in children if name != "__pycache__"]
+                children[:] = [
+                    name
+                    for name in children
+                    if name != "__pycache__"
+                    and not (Path(directory) / name).is_junction()
+                ]
                 for name in sorted(filenames):
                     path = Path(directory) / name
                     assert path.resolve().is_relative_to(folder.resolve())

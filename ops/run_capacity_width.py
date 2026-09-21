@@ -17,6 +17,7 @@ from brazil_rv.v2.data_repair import binding, bound_json
 from brazil_rv.v2.research_rounds import _git_identity
 from brazil_rv.v2.round7 import configuration
 from brazil_rv.v2.round7_training import TrainingRecipe, train
+from brazil_rv.v2.train import compile_forward
 
 PROJECT = Path(__file__).resolve().parents[1]
 
@@ -135,13 +136,27 @@ def freeze(run):
     write_json_atomic(PROJECT / "docs/v2_economic_data_scaling_run.json", run)
 
 
-def execute(run):
+def execute(run, arms=None):
     torch.set_num_threads(1)
     reference = run["stage_d_width_plan"]
     plan = bound_json(reference)
     assert plan["driver"]["sha256"] == sha256_file(Path(__file__))
-    for record in plan["runtime"]["files"].values():
-        assert sha256_file(Path(record["path"])) == record["sha256"]
+    selected_arms = set(arms or plan["cells"])
+    assert selected_arms <= set(plan["cells"])
+    imported = {
+        "training": Path(inspect.getfile(train)),
+        "model": Path(inspect.getfile(CharacteristicModel)),
+        "temporal": Path(inspect.getfile(CharacteristicModel)).with_name(
+            "temporal_pathway.py"
+        ),
+        "configuration": Path(inspect.getfile(configuration)),
+        "compiler": Path(inspect.getfile(compile_forward)),
+    }
+    for arm in selected_arms:
+        runtime = plan.get("runtime_by_arm", {}).get(arm, plan["runtime"])
+        for name, record in runtime["files"].items():
+            assert sha256_file(Path(record["path"])) == record["sha256"]
+            assert sha256_file(imported[name]) == record["sha256"], (arm, name)
     root = Path(reference["path"]).parent
     store = Path(plan["store"]["root"])
     assert sha256_file(store / "manifest.json") == plan["store"]["manifest_sha256"]
@@ -160,6 +175,8 @@ def execute(run):
         for arm in plan["cells"]
     ]
     for arm, stage, fold, seed in jobs:
+        if arm not in selected_arms:
+            continue
         key = f"{arm}/{stage}/{fold}/{seed}"
         if key in done:
             bound_json(next(r["manifest"] for r in completed if r["key"] == key))
@@ -219,6 +236,7 @@ def execute(run):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--freeze", action="store_true")
+    parser.add_argument("--arm", action="append")
     args = parser.parse_args()
     run = json.loads((PROJECT / "docs/v2_economic_data_scaling_run.json").read_text())
-    freeze(run) if args.freeze else execute(run)
+    freeze(run) if args.freeze else execute(run, args.arm)

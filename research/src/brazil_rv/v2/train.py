@@ -1039,6 +1039,18 @@ def compile_forward(
     torch._dynamo.config.specialize_float = True
     if backend == "inductor":
         _configure_inductor_compiler()
+        # The fused residual LayerNorm reduction can read its temporary before
+        # all warps have written it (reproduced with NaN/zero/one allocations).
+        # Keep normalization on ATen's kernels, including its exact backward;
+        # the model graph, parameters and surrounding compilation stay intact.
+        from torch._inductor import decomposition, lowering
+
+        for operation in (
+            torch.ops.aten.native_layer_norm.default,
+            torch.ops.aten.native_layer_norm_backward.default,
+        ):
+            decomposition.decompositions.pop(operation, None)
+            lowering.make_fallback(operation, warn=False)
         if (
             mode == "max-autotune"
             and torch.cuda.is_available()

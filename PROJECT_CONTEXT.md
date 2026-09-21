@@ -16,7 +16,23 @@ Set `TORCHINDUCTOR_CACHE_DIR=C:/quant-data/b3/interim/ti` for GPU compilation. T
 
 ## Admission and canonical inputs
 
-The [three-block closeout](docs/v2_STAGE_A_CLOSEOUT.md) is complete for its bounded contract. [Integrated StageA](docs/v2_ECONOMIC_ACCOUNT_ACCEPTANCE.md) is accepted with explicit conditional exposure limits. Registered C is active: [matched replays](docs/v2_MATCHED_ECONOMIC_REPLAYS.md) expose additional sourced corporate transitions and the JSL identifier reuse. There are160 combined old-coordinate account/source books,100 corrected and60 reused; all1,062frozen sensitivities pass saved accounting checks, with618explicit skips. Some recall/denial stress paths retain unresolved obligations; accounting parity is not proof of executable resolution. Complete matched data and all60 compatible refits are accepted. [Matched results](docs/v2_MATCHED_RESULTS.md) dispose of Stage C: R$10m four-fold net-CDI means full attention .99921, wider attention -.14375, GRU .68069 and C6 .45646 bps/day. Both nominated alternatives trail full attention, so their ten-fold replications stop; no model is adopted. Resolve stage_c_refit_results/admission/completion. Stage D's registered attention96→128 and GRU64→96 wave is active with30 fresh fits and reused C controls, bound by stage_d_width_plan. Its runtime is the clean detached C:/Brazil-RV/.worktrees/matched-refits checkout at3b0f921; do not change it or duplicate its worker. No held-out or live profitability/capacity claim follows. CPU audit timings are not fit ETAs.
+The [compiled forecast failure](docs/v2_COMPILED_SCORE_FAILURE.md) is resolved to
+an unsafe fused GRU96 residual LayerNorm reduction. Qualified ATen normalization
+and backward preserve model equations within compilation. Resolve
+stage_d_compiler_acceptance. Five other C/D architecture controls reproduce all
+126 F10/11 forecast dates and pass temporary-memory poisoning; C and TE128 results
+are retained. This is bounded scope evidence, not an exhaustive checkpoint proof.
+All original GRU96 width results are excluded and preserved. The tested original
+P batch passed but contains the same unsafe operation; three fresh parents and
+twelve children remove that uncertainty without claiming an observed P mismatch.
+stage_d_width_plan now selects capacity_width_recovery: ten TE128 fits are reused,
+five remain under original runtime3b0f921, and fifteen GRU96 fits use isolated
+normalization@308007a. A declared junction references original TE128 directories
+without copies. Twelve primary/132ordinary/12funded TE128 books and84skips are
+reused; no source/store/account proof is repeated. The GRU worker is active.
+Original stage_d_width_original_plan/evaluation and all failed attempts remain.
+
+The [three-block closeout](docs/v2_STAGE_A_CLOSEOUT.md) is complete for its bounded contract. [Integrated StageA](docs/v2_ECONOMIC_ACCOUNT_ACCEPTANCE.md) is accepted with explicit conditional exposure limits. Registered C is active: [matched replays](docs/v2_MATCHED_ECONOMIC_REPLAYS.md) expose additional sourced corporate transitions and the JSL identifier reuse. There are160 combined old-coordinate account/source books,100 corrected and60 reused; all1,062frozen sensitivities pass saved accounting checks, with618explicit skips. Some recall/denial stress paths retain unresolved obligations; accounting parity is not proof of executable resolution. Complete matched data and all60 compatible refits are accepted. [Matched results](docs/v2_MATCHED_RESULTS.md) dispose of Stage C: R$10m four-fold net-CDI means full attention .99921, wider attention -.14375, GRU .68069 and C6 .45646 bps/day. Both nominated alternatives trail full attention, so their ten-fold replications stop; no model is adopted. Resolve stage_c_refit_results/admission/completion. Stage D's registered attention96→128 and GRU64→96 wave continues under the compiler recovery disposition above; all original contrasts and controls remain frozen. No held-out or live profitability/capacity claim follows. CPU audit timings are not fit ETAs.
 
 Reuse V31-V41, historical-cost, source, feature and consumer proofs. New engineering requires a changed implementation, untested interaction or actual exposure. Freeze contrasts before outcomes; do not repeat passed matrices for a checkpoint. The closeout rows are not new experiment campaigns.
 
@@ -66,7 +82,13 @@ December30 2016 and November20 2017 have source-supported clearing dispositions.
 
 After integrated A, C compares registered matched attention, wider attention, GRU early-peers and C6 economics separately from data refits. Two named leads may replicate on ten other development folds only under corrected four-fold admission. This is explicitly reused development. Net-CDI is primary; IC diagnostic. Preserve paired20/40/60-session uncertainty, seeds, currency-consistent Sharpe/drawdown gates and complete trading statistics.
 
-The running width wave uses the original model implementation in matched-refits@3b0f921. Qualified depth implementation is separately available in economic-accounts@734cf12; run its freezer/training with that imported runtime so its exact engineering bindings remain valid. Explicit lstm/lstm_depth2 encoders are CPU-qualified through stage_d_lstm_engineering and isolated in lstm@c37b432, but no LSTM experiment is yet frozen or run. Its matched comparison follows recurrent width/depth diagnostics. ops/run_capacity_layers.py --wave depth|lstm reuses the frozen width fit loop; ops/admit_capacity.py --wave width|depth|lstm applies the original screen and explicit risk review. Never change a runtime checkout while its worker is active.
+Width recovery selects imported runtime by arm and preserves completed TE128 work.
+Qualified depth is separately available in economic-accounts@734cf12 and LSTM in
+lstm@c37b432. Apply the qualified compiler correction in clean derived checkouts
+before their later freezes; their model/temporal engineering bindings remain
+unchanged. Neither experiment is frozen or run yet. ops/run_capacity_layers.py
+--wave depth|lstm reuses the frozen width fit loop; ops/admit_capacity.py applies
+the original economic screen. Never change a runtime while its worker is active.
 
 D begins attention96→128 and GRU64→96, then distinct temporal/recurrent depth. LSTM/peer/context/general capacity follow registered conditions. Maximum two new candidate cells per GPU wave, frozen contrasts and compatible parents; no grid, automatic extra seeds or reduced populations/history/budgets.
 

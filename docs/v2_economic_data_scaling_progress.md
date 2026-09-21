@@ -1,5 +1,15 @@
 # Economic accounting, data audit and scaling progress
 
+2026-09-21 current: [compiler failure](v2_COMPILED_SCORE_FAILURE.md) is qualified
+and scoped. The corrected width plan preserves10 completed TE128 fits and156
+qualified TE128 portfolios, with84skips; fifteen fresh GRU96 fits use the isolated
+ATen-normalization correction. Five TE128 jobs remain on their original runtime.
+C conclusions are retained under the five-architecture reproduction/poisoning
+scope evidence; no claim of exhaustive prior-checkpoint qualification follows.
+Original GRU96 forecasts/books are excluded, preserved and will be replaced.
+One GRU training worker is active, heartbeat paused. Width/depth/LSTM and final
+program delivery remain unfinished. Earlier status paragraphs are historical.
+
 2026-09-20 current: Stage A is accepted for its bounded contract. Stage C has160combined account/source books and1,062qualified one-factor sensitivities, with618explicit unexposed skips. The complete matched dataset is now accepted by [matched_data_inputs](v2_matched_data_inputs.json), manifest fd4ad71a0efaad0914520c89d589e0c0dfd9665158204c4721f821f9df8d4161. All prior stores and fits remain sealed. Fresh matched C training is next under the frozen original recipes; D remains conditional. The one-minute heartbeat is paused; work continues directly.
 
 The final data composition retains106arrays/3717dates/933names/full60. Seventy changed arrays match2,596,086,612independent composition cells;36unchanged hashes are exact. Actual dataset/collator272dates checks3,220,982,288sample-plus-collation cells, independent neutral targets and causal/old-parent guards, zero mismatches. Gross targets gain1,389; actual neutral targets gain1,534: all1,389new gross outcomes plus145existing outcomes with restored risk support. Five source histories restore240eligible name/dates; missing M1 and original unit/peer support losses remain. All family reducers, endpoint controls and prior views are reused. See [matched evidence](v2_MATCHED_ECONOMIC_REPLAYS.md).
