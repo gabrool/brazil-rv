@@ -1,0 +1,26 @@
+{
+  "aliases": 2417,
+  "archive": {
+    "bytes": 3297218979,
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\capacity_depth_b5a61ba.zip",
+    "sha256": "a6299758ef666fbc6fce7a1475abc775f862d96ae0d5efa892819d38ec6077e5"
+  },
+  "archive_seconds": 179.45807480000076,
+  "dependencies": {
+    "stage_d_width_recovery": {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\capacity_width_recovery.json",
+      "sha256": "df6b86803830c3d2a7a9963b0e618963bbb852452c41d6e5091efe0ef8117b4c"
+    }
+  },
+  "directory_aliases": [],
+  "directory_restore": "Restore original width files and recreate the listed directory junction before consuming the composed fit root. All target file bytes are independently recovered; the one-file hash test does not itself recreate junctions.",
+  "fits": 30,
+  "implementation_commit": "b5a61ba822ae2998ccaf95fa676defc22d694730",
+  "inherited_members": 1305,
+  "logical_members": 11617,
+  "recovery_seconds": 33.25971670000581,
+  "scope": "All new wave checkpoints, predictions, primary/scenario books, frozen plans, executed and failed recipes, runtime/source and documentation restore/hash-check. Matched controls and immutable inputs/accepted stores/old fits are inherited, never copied. One-file scratch is removed only after its exact hash check. This verifies bytes, not a repeated source, history, model or economic experiment.",
+  "status": "verified_capacity_wave_artifact_recovery",
+  "unique_members": 9200,
+  "wave": "depth"
+}

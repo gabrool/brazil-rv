@@ -1231,6 +1231,10 @@
     "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\capacity_depth\\plan.json",
     "sha256": "2a4a17e64c704d1b90c574e165ca5f66eec94ec80973659fcde46f848e7cc546"
   },
+  "stage_d_depth_recovery": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\capacity_depth_recovery.json",
+    "sha256": "c7c74eeab11bc12227a1cd371f739b8740746c358ec24facc48ecfdc54680311"
+  },
   "stage_d_depth_results": {
     "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\capacity_depth\\primary_books\\results\\report.json",
     "sha256": "5de8c061401894e3539af1cfe71148e12fb43d022a88ed261e7578c1c2a430aa"

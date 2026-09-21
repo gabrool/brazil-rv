@@ -185,6 +185,15 @@ seconds. Every decoded hash is unchanged. Resolve `stage_d_depth_storage`; no
 source/store/model arithmetic was rerun. Remaining matched LSTM uses retained
 GRU64/one layer with its extra gate parameters and runtime reported separately.
 
+Depth recovery verifies `capacity_depth_b5a61ba.zip`, SHA
+`a6299758ef666fbc6fce7a1475abc775f862d96ae0d5efa892819d38ec6077e5`,
+3,297,218,979bytes:11,617logical/9,200unique members,2,417aliases and1,305inherited
+members,30fits. Archive/recovery took179.45807/33.25972seconds. Every new depth
+fit, book, executed recipe, frozen plan, diagnostic and storage receipt recovers
+with the prior width/C dependencies. There are no depth directory aliases; the
+generic recovery receipt's instruction to recreate listed aliases applies only
+when that list is nonempty. Resolve `stage_d_depth_recovery`.
+
 The heartbeat remains paused. A documentation patch failed its text match before
 any file changed; read-only shell wildcard errors are reconstructed tooling
 descriptions, not numerical failures or exact standalone shell artifacts.
