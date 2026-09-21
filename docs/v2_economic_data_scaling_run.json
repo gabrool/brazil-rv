@@ -1217,7 +1217,7 @@
   },
   "stage_d_depth_evaluation": {
     "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\capacity_depth\\evaluation_progress.json",
-    "sha256": "137f0141f8e6061d20337152fa12d63ebe2a39c27c222a151477328d2a18e679"
+    "sha256": "1f5acf06990ede906b5ec3497efc1222e757f8b3855972fc5097292292dce993"
   },
   "stage_d_depth_evaluation_plan": {
     "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\capacity_depth\\evaluation_plan.json",
@@ -1229,7 +1229,7 @@
   },
   "stage_d_depth_storage": {
     "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\capacity_depth\\storage\\index.json",
-    "sha256": "c9208a30c1f9cd167e86d4ce906abf7415d1fed2fbd5aae2a69eeac07711267a"
+    "sha256": "063290145c04034ee3fd6cd6f5714141b107e8f346596a17fb4a8724e06f3b45"
   },
   "stage_d_lstm_engineering": {
     "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\capacity_lstm_engineering\\qualification.json",
