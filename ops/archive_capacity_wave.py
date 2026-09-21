@@ -70,8 +70,16 @@ def main(wave):
             assert original_root != root
             evidence.append((original_root, "capacity_width_original"))
         design = bound_json(run[prefix + "_plan"])
+        directory_aliases = []
+        if "directory_alias" in design.get("reuse", {}):
+            alias = design["reuse"]["directory_alias"]
+            assert Path(alias["path"]).is_junction()
+            assert Path(alias["path"]).resolve() == Path(alias["target"]).resolve()
+            directory_aliases.append(alias)
         runtimes = design.get("runtime_by_arm", {"shared": design["runtime"]})
         for arm, runtime in runtimes.items():
+            for record in runtime["files"].values():
+                assert sha256_file(Path(record["path"])) == record["sha256"]
             checkout = Path(runtime["files"]["training"]["path"]).parents[4]
             runtime_names = subprocess.check_output(
                 ["git", "ls-files", "research"], cwd=checkout, text=True
@@ -116,6 +124,7 @@ def main(wave):
         z.writestr(
             "dependencies.json", json.dumps({previous_key: run[previous_key]}, indent=2)
         )
+        z.writestr("directory_aliases.json", json.dumps(directory_aliases, indent=2))
     archive_seconds = perf_counter() - started
     scratch = Path(run["stage_c_root"]) / f"capacity_{wave}_recovery_{commit[:7]}"
     scratch.mkdir(exist_ok=False)
@@ -145,6 +154,8 @@ def main(wave):
         inherited_members=len(inherited),
         fits=len(fits["completed"]),
         dependencies={previous_key: run[previous_key]},
+        directory_aliases=directory_aliases,
+        directory_restore="Restore original width files and recreate the listed directory junction before consuming the composed fit root. All target file bytes are independently recovered; the one-file hash test does not itself recreate junctions.",
         archive_seconds=archive_seconds,
         recovery_seconds=perf_counter() - started - archive_seconds,
         scope="All new wave checkpoints, predictions, primary/scenario books, frozen plans, executed and failed recipes, runtime/source and documentation restore/hash-check. Matched controls and immutable inputs/accepted stores/old fits are inherited, never copied. One-file scratch is removed only after its exact hash check. This verifies bytes, not a repeated source, history, model or economic experiment.",
