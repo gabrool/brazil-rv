@@ -2271,3 +2271,59 @@ The registered LSTM option is implemented as an explicit one/two-layer recurrent
 StageC's exact qualified corporate terms and unchanged primary account configuration now form the canonical matched account, accepted through stage_c_account_composition. This is metadata composition of completed source/book proofs, with no new numerical replay, inference or source campaign. Frozen C/D plans and earlier account/store/fit bindings remain unchanged. Width recovery will include its new account manifest and recipe alongside the existing StageC archive dependencies.
 
 The depth/LSTM freezer and capacity admission now reuse common scripts without legacy aliases. Depth remains on qualified runtime734cf12; LSTM has a clean isolated c37b432 checkout. Neither experiment has begun. A bounded storage check found both completed portfolio caches already compressed, saving no additional bytes. One443899136-byte temporary restored array was then removed only after exact hash equality with the preserved original audit view; its selection/removal receipts are inside the width evidence. No source, accepted store, original view or fit was deleted.
+
+## 2026-09-21 — Attention reversal and eight-period comparison
+
+The user's concern supersedes the older capacity queue. Width/depth outcomes and
+compiler qualifications remain in their dedicated documents; LSTM is unstarted.
+[The consolidated investigation](v2_ATTENTION_REVERSAL_DIAGNOSTICS.md) separates
+the original continuous flexible-net6.70751above-CDI result from the neutral,
+independently initialized period accounts. Training already uses expanding past
+history. Eight fixed evaluation periods now cover993sessions, preserving six
+development reserves and unopened2025/2026 consumers.
+
+All54fits (30reused/24new) and96baseline books (48reused/48new) complete. AtR10m,
+full/wide means are2.97320/1.93671bps/day aboveCDI, versus.99921/-.14375 on the
+original four periods. Separate added-source account overlays yield3.01618/1.92001.
+Wide wins3/8; the source-overlay paired40-session95% difference interval is
+[-2.69949,+.52282], with pooled estimate-1.10723. Allseeds/capitals/threeSharpes,
+drawdowns/holding/funding/exposures are saved. This is not a continuous account,
+pristine test or new model adoption. New fits sum6676.5200seconds;48new baseline
+books92.3117seconds. No fit failed or repeated in this expansion.
+
+The four-period decomposition locates most of the wider-model loss in changed
+forecasts, especially late2022 stock positions. Matched inputs/conditioning,
+compiled forecasts and a two-pass actual training update provide bounded technical
+checks. Parentseed29 stopping changed selectedepoch20→4; a separately frozen,
+outcome-informed patience5→20 experiment reproduces its original nine-epoch prefix
+and improves F10seed/ensemble by7.04780/2.36412bps/day. It remains negative and is
+not adopted. A matched broader stopping contrast is justified but unstarted.
+
+New held2019/2021/2023 sources receive separate account overlays with36primary
+books and72one-factor variants;30unexposed/out-of-period branches skip. Original
+proofs are reused. Decimal entitlements and actual two-account comparisons pass;
+the2021/2023 maximum NAV difference isR2.794e-8. Source effects are small relative
+to the largest forecast reversal. Known GUAR/QGEP/GPC/Wiz/RLOG/Smiles model-data
+dependencies remain open; Linx's BDR/final-cash and unknown Smiles/ENAT fraction
+claims remain explicit. The expanded model contract is not globally source-corrected.
+
+An actual2019 parity check exposed a real sub-nanoreal hedge trade triggering a
+historicalR10minimum. Both accounts now suppress only relativeFloat64-equivalent
+hedge changes; six new/37affected tests pass,12separate corrected books and1464
+identical-intention days qualify. R10m ensemble effects are only+.15514/+.18274bp
+over122sessions. Read-only original-four-period fee inspection finds no material
+minimum-fee exposure from this defect. It cannot explain the multi-bps reversal.
+The baseline imports the preservedb81653c runtime; active training remained isolated.
+
+Exact failed/qualified recipes remain: custody-first harness encoding after two
+saved bounds (reused), summary NumPy-integer serialization after96saved records
+(reused), and earlier hedge/source failures described in the investigation.
+The baseline snapshot/worktree comparison qualifies235files with only newline
+differences. Patience-probe cleanup first assumed a nonexistent parent EMA file
+and stopped before deletion; the qualified artifact-aware check retires62epoch
+copies/396974080logicalbytes only after matching their verified diagnostic ZIP.
+Selected weights/history/forecasts/original fits remain. A waiting uv cache prune
+was cancelled while training was active; after completion it removed181disposable
+files/58.8MiB. Read-only/output-truncation/doc-patch attempts are tooling, not
+numerical failures; prose descriptions are reconstructed where no exact file exists.
+Expansion recovery follows with separate epoch staging to fit available disk.

@@ -29,7 +29,8 @@ def main():
     fits = bound_json(run["scaling_expanded_fits"])
     assert fits["status"] == "complete" and len(fits["completed"]) == 54
     out = root / "results"
-    out.mkdir(exist_ok=False)
+    assert not (out / "report.json").exists()
+    out.mkdir(exist_ok=True)
     (out / "executed.py").write_bytes(Path(__file__).read_bytes())
     proofs = {}
     for reference in quality["reports"]:
@@ -159,14 +160,17 @@ def main():
                             strict=True,
                         )
                     ),
-                    positive_folds=sum(a.mean() > 0 for a in arrays),
+                    positive_folds=int(sum(a.mean() > 0 for a in arrays)),
                     paired={
                         str(block): paired_interval(arrays, block)
                         for block in (20, 40, 60)
                     },
                 )
             )
-    write_json_atomic(out / "books.json", metrics)
+    if (out / "books.json").exists():
+        assert bound_json(binding(out / "books.json")) == metrics
+    else:
+        write_json_atomic(out / "books.json", metrics)
     write_json_atomic(out / "comparisons.json", comparisons)
     write_json_atomic(out / "fit_diagnostics.json", fit_readouts(fits))
     source_results = bound_json(run["scaling_expanded_event_qualification"])
@@ -211,7 +215,7 @@ def main():
                 wide_minus_full_equal_fold_bps_day=float(
                     np.mean([a.mean() for a in arrays])
                 ),
-                positive_folds=sum(a.mean() > 0 for a in arrays),
+                positive_folds=int(sum(a.mean() > 0 for a in arrays)),
                 paired={
                     str(block): paired_interval(arrays, block) for block in (20, 40, 60)
                 },
@@ -245,6 +249,19 @@ def main():
         hedge_correction=run["scaling_hedge_roundoff_books"],
         hedge_correction_qualification=run["scaling_hedge_roundoff_qualification"],
         hedge_correction_parity=run["scaling_hedge_roundoff_account_parity"],
+        timings=dict(
+            new_child_fit_sum_seconds=sum(
+                r["seconds"]
+                for r in fits["completed"]
+                if r["key"].split("/")[-2] in {"F3", "F7", "F11", "F13"}
+            ),
+            new_baseline_book_sum_seconds=sum(
+                r["seconds"]
+                for r in progress["completed"]
+                if r["key"].split("/")[-2] in {"F3", "F7", "F11", "F13"}
+            ),
+            scope="Sum of the24 new child-fit wall times and48 new baseline book wall times. Thirty fits and48 books reused; not a future runtime estimate.",
+        ),
         limits="Eight preselected disjoint development periods, not a continuous portfolio or pristine test. The six other folds are reserved from new corrected comparisons; 2025/2026 consumers remain unopened. Same accepted model data/parents/recipes for both widths. GUAR2019/QGEP2019/GPC2021/WIZ2023/RLOG2021/Smiles2021 source amendments are account-only; their model-data dependencies remain. Linx's three held June2021 dates lack an admitted BDR/final-cash contract, and Smiles fractional auction remains unknown. New unquoted holdings are listed explicitly and not certified by saved-NAV arithmetic. Source overlays, hedge correction and outcome-informed parent-patience diagnostic never replace the frozen baseline silently. The source overlay comparison uses only separate2019/2021/2023 account corrections with unchanged forecasts. Equal-fold means differ from pooled-day paired estimates; mean fold Sharpes and worst individual drawdown are not continuous-account statistics. No model adoption or broad capacity conclusion from this report.",
         seconds=perf_counter() - started,
     )

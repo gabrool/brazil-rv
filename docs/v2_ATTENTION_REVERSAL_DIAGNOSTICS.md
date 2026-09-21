@@ -1,8 +1,12 @@
-# Wider-attention reversal: investigation in progress
+# Wider-attention reversal: evidence and remaining causal questions
 
-The current evidence does not establish that an accounting correction erased the
-model's edge, or that overfitting explains the reversal. The September 21 user
-request makes this investigation the priority; the unstarted LSTM wave is deferred.
+The eight-period comparison is complete. Wider attention remains weaker under
+the current corrected-data recipe, with substantial uncertainty. The strongest
+demonstrated partial mechanism is much earlier parent stopping: changing only
+patience recovers part of the worst-fold loss. A real hedge roundoff defect is
+fixed, but its measured effect is far too small to explain that reversal. There
+is no evidence here establishing a general inability to scale attention, nor a
+complete single-cause explanation. The unstarted LSTM wave remains deferred.
 Resolve the `scaling_*` entries in `v2_economic_data_scaling_run.json` for exact
 plans, executed recipes, saved controls and output hashes.
 
@@ -117,12 +121,81 @@ seed's +8.00419 or ensemble's +1.43619, nor establish a generally better stoppin
 rule. The original model results remain unchanged. Parent/child fit wall times
 are recorded separately from account evaluation and are not future fit estimates.
 
-The eight-period comparison is now running with the original corrected parents
-and recipes for both attention widths. It reuses6parents/24existing children and
-48portfolio books, adds only24children and48primary books for the four new
-periods, and keeps the patience diagnostic separate. More periods measure the
-stability of the existing comparison; they do not certify a retrospectively
-chosen winner. Further changes require their own explicit controlled contrast.
+The eight-period comparison completed with the original corrected parents and
+recipes for both widths. It reuses6parents/24existing children and48portfolio
+books, adds24children and48primary books, and keeps the patience diagnostic
+separate. All96 saved primary books qualify. The24 new fit times sum to6676.52s;
+the48 new account times sum to92.31s. These are measured runtimes, not estimates.
+
+## Expanded chronological comparison
+
+The fixed eight periods contain993 distinct evaluation sessions, up from501.
+F1/F4/F5/F8/F9/F12 remain reserved from new corrected comparisons; historical
+development reuse and the untouched2025/2026 consumer boundary remain explicit.
+Each account starts independently. These are not a continuous seven-year account.
+
+R$10m, three-seed ensembles, equal period weights, bps/day **above CDI**:
+
+| Evaluation contract | Full attention64 | Wider attention96 | Wide minus full |
+|---|---:|---:|---:|
+| Original four-period corrected-data recipe | .99921 | -.14375 | -1.14295 |
+| Same recipe over all eight periods | 2.97320 | 1.93671 | -1.03648 |
+| Eight periods with separate added-source account overlays | 3.01618 | 1.92001 | -1.09617 |
+
+The last row changes only the source/account treatment in F3/F7/F11; forecasts,
+model inputs, risk, training and calibration remain fixed. The hedge roundoff
+diagnostic and the extra-parent-patience result are not silently folded into it.
+The R$1m/R$5m source-overlay means are2.89433/3.00519 for full and1.81806/1.91094
+for wide. Small capital sensitivities do not reverse this comparison.
+
+| Period | Full, with source overlay | Wide, with source overlay |
+|---|---:|---:|
+| 2018 Jul–Dec | -.68461 | -.50311 |
+| 2019 Jan–Jun | 4.43000 | 3.13913 |
+| 2020 Jul–Dec | -7.19915 | -5.93836 |
+| 2021 Jan–Jun | 3.18393 | 5.45372 |
+| 2022 Jul–Dec | .97481 | -4.78314 |
+| 2023 Jan–Jun | 8.26325 | 5.85459 |
+| 2024 Jan–Jun | 4.25544 | 1.48765 |
+| 2024 Jul–Dec | 10.90578 | 10.64963 |
+
+Wide wins3/8 periods. The source-overlay paired40-session block interval for
+the pooled-day difference is[-2.69949,+.52282]bps/day at95%, with estimate-1.10723.
+The20/60-session intervals also cross zero. The baseline's three seed-level
+equal-period differences are-.47445/-.84944/-.68445, while the ensemble differs
+by-1.03648; nonlinear portfolio construction means these need not average.
+Intervals preserve period boundaries and remain nominal development uncertainty.
+There is no adoption or claim that the narrower architecture is inherently superior.
+
+The baseline report includes all three currency-consistent Sharpes, drawdowns,
+turnover, winning/losing days, holding spells, individual seeds and funded exposure.
+Mean period Sharpes are not the Sharpe of a continuous account. F13 has no
+unpriced inventory, overdue principal or loan-cash redemption; both ensembles
+have121 funded sessions. Existing debit-spread mechanics are qualified; a separate
+F13 adaptive spread contrast has not been run, and earlier-period endpoint results
+are not claimed as its numerical bound.
+
+Validation rank correlation is the checkpoint-selection criterion, not the
+economic portfolio objective or an independent final test. In the original
+four-period comparison, mean selected IC rises .04206→.04338 for full and
+.04522→.04629 for wide despite the wider model's return decline. A higher selected
+validation statistic therefore does not imply better portfolio returns, and does
+not by itself rule out selection noise or overfitting. Neither explanation is
+assumed to be the sole cause. The exact stopping-prefix experiment supplies more
+specific evidence than that general possibility.
+
+Remaining source limits matter: the accepted model store has not yet incorporated
+the newly evidenced GUAR/QGEP/GPC/Wiz/RLOG/Smiles data dependencies. The source
+overlay retains the unvalued Linx BDR/final-cash gap in F7 and admitted unknown
+Smiles/ENAT fractional claims in F7/F14. This comparison must not be called fully
+source-corrected. The next justified training contrast is a matched test of parent
+stopping across both widths and the fixed seeds/periods, with no retrospective
+adoption of the single favorable seed29 diagnostic. That contrast is not yet run.
+
+The first summary saved all96 book records, then failed JSON serialization of a
+NumPy integer fold count. The qualified summary casts only that report count,
+reuses the exact saved records and recomputes short summaries/intervals; no fit,
+forecast or account book was repeated. Initial code/stdout/records remain saved.
 
 ## Attempts, recovery and storage
 

@@ -51,5 +51,12 @@ investigation, reusing compatible parents and completed folds. Keep three seeds,
 all names, full 60-session history and original learning budgets.
 
 Evidence is resolved through `scaling_investigation` in the economic run pointer.
-The investigation is open; neither overfitting, a data defect nor an accounting
-artifact has yet been established as the cause.
+The eight-period original-recipe comparison and targeted numerical/forecast/account
+investigation are complete; resolve `scaling_expanded_results` and
+`v2_ATTENTION_REVERSAL_DIAGNOSTICS.md`. Earlier parent stopping is a demonstrated
+partial mechanism from a controlled single-seed experiment. The small hedge
+roundoff defect is corrected but cannot explain the observed reversal. There is
+no complete single-cause explanation or generally adopted new stopping rule.
+Known added-period source/data dependencies remain separately identified. A
+matched parent-stopping contrast across both widths is the next justified
+training investigation, still unstarted; LSTM remains deferred.

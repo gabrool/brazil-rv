@@ -24,6 +24,14 @@ seed/ensemble gains7.04780/2.36412bps/day, remaining negative aboveCDI; the orig
 fits remain selected controls. This diagnostic is not model adoption. Resolve
 `scaling_expanded_fit_plan`/`scaling_expanded_evaluation_plan` for the eight-period
 unchanged-baseline comparison, with6P/24F/48books reused and24F/48books new.
+The eight-period comparison is complete:54 fits (30reused/24new),96 qualified
+baseline books (48reused/48new),993 distinct evaluation sessions. Resolve
+`scaling_expanded_results`. R10m full/wide baseline means2.97320/1.93671bps/day
+aboveCDI; separate source overlays3.01618/1.92001. Wide wins3/8; its paired40-day
+95% difference interval crosses zero[-2.69949,+.52282]. These are independent
+period accounts, not the original continuous flexible-net result. Parent stopping
+is a demonstrated partial cause, not a generally adopted rule or complete cause.
+Matched broader stopping remains the next justified training contrast, unstarted.
 The completed depth and native GRU96 width waves' redundant intermediate epoch
 files now reside only in verified recovery archives; selected checkpoints,
 forecasts and books stay online. Resolve `scaling_storage` before requesting them.
@@ -49,7 +57,7 @@ NAV checks and identical-intention two-account parity (maxR1.863e-8). R10m full/
 ensemble final-path changes are+.15514/+.18274bp over122sessions. The16 original
 four-fold source/refit ensembles have zero material tiny-root minimum fees; no
 additional replay is justified from that fee inventory. This defect does not
-explain the multi-bps reversal. The unfinished eight-period BASELINE
+explain the multi-bps reversal. The completed eight-period BASELINE
 evaluation imports the clean `attention-baseline` worktree at b81653c, qualified
 against the preserved `hedge_roundoff/baseline_runtime` source snapshot (235files;
 only line-ending differences), keeping its original account implementation.
