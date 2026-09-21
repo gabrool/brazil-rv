@@ -1,9 +1,9 @@
 # Registered capacity comparisons
 
-The width wave is complete. Neither larger model passes the registered screen.
-Attention width 96 and GRU width 64 remain the controls for the subsequent depth
-contrasts. No width candidate advances to confirmation or model adoption. Depth,
-matched LSTM and final conditional dispositions remain open.
+Width and depth are complete. None passes the registered screen. Attention width
+96 and GRU width 64, each with one encoder layer, remain the controls. No width
+or depth candidate advances to confirmation or adoption. Matched LSTM and final
+conditional dispositions remain open.
 
 Resolve `stage_d_width_plan`, `stage_d_width_results`, `stage_d_width_admission`
 and `stage_d_width_forecast_qualification` in the run pointer. The 30 accepted fits
@@ -113,13 +113,77 @@ width evidence are preserved, including 12/132/6 excluded original GRU
 primary/ordinary/funded books and 78/6/6 ordinary/funded/precision skips. Those
 invalid GRU books are not added to accepted counts or interpreted economically.
 
-The depth plan is now frozen and running with fresh compatible parents under
+The depth plan ran with fresh compatible parents under
 `normalization-depth@a9a775c`. `TE_depth2` has 1,643,683 parameters at width 96,
 adding 74,976 only in its encoder; `GRU_depth2` has 1,505,411 at width 64,
 adding 24,960 only in its encoder. The plan retains three seeds, four folds,
 maximum 60 epochs with original stopping/selection, and 30 P/F fits. The unchanged
-portfolio/scenario contracts are frozen separately before their outcomes. No
-depth result exists yet. Resolve `stage_d_depth_plan/evaluation_plan`.
+portfolio/scenario contracts were frozen separately before their outcomes.
+Resolve `stage_d_depth_plan/evaluation_plan/results/admission`.
+
+## Depth results
+
+All30 fresh fits and48primary/537ordinary/48funded/3precision books complete.
+There are303/0/21 explicitly unexposed scenario skips. The completed controls,
+source/data/account proofs and earlier portfolio groups were reused; no passed
+fit or book was repeated. Both result assembly and admission passed their first
+invocation. All values below use the same R$10m four-fold neutral comparison.
+
+| Candidate | Absolute BRL bps/day | Above CDI | Change from own one-layer control | Positive seeds | Positive folds | Decision |
+|---|---:|---:|---:|---:|---:|---|
+| Attention, two layers | 2.77298 | -0.33295 | -0.18921 | 2/3 | 3/4 | Retain one layer |
+| GRU, two layers | 4.90365 | 1.79771 | +1.11702 | 1/3 | 2/4 | Retain one layer |
+
+Attention fails the mean-gain condition. GRU's positive ensemble mean fails the
+seed/fold consistency conditions: individual seed deltas are -0.71635, -0.09784
+and +2.06536bps/day. The ensemble is separately reallocated and is not the average
+individual portfolio. This is an inconclusive positive ensemble result, not
+evidence that deeper GRU universally hurts or that more seeds may be added.
+Attention seed deltas are +0.77950,+0.25083,-1.12370.
+
+| Candidate minus control | F2 | F6 | F10 | F14 | Paired40 nominal95% interval |
+|---|---:|---:|---:|---:|---|
+| Attention depth | +0.16276 | +1.24026 | +1.75425 | -3.91409 | [-2.19425,1.80266] |
+| GRU depth | -1.10160 | -0.48421 | +3.99591 | +2.05800 | [-0.67021,2.82592] |
+
+The pooled-day interval points are -0.19945/+1.13661; equal-fold headlines differ
+slightly. Intervals preserve fold boundaries and reuse development outcomes.
+At R$1m/R$5m, attention differences are -0.17058/-0.18707 and GRU
++1.10741/+1.11642. These do not repair the primary consistency failures.
+
+| Candidate | Mean BRL/CDI Sharpe | Mean BRL/zero Sharpe | Mean USD/US-cash Sharpe | Worst fold BRL drawdown | Daily turnover/NAV |
+|---|---:|---:|---:|---:|---:|
+| Attention depth | 0.10511 | 1.03243 | 0.14773 | -13.14958% | 0.14845 |
+| GRU depth | 0.27704 | 1.06750 | 0.40097 | -12.91865% | 0.12816 |
+
+GRU improves mean BRL/CDI Sharpe but its worst-fold drawdown worsens by0.94428
+percentage points; attention's drawdown worsens0.51790 points. Neither passes
+the prior point/seed/fold gate, so a risk explanation cannot promote either.
+Across38 R$10m scenario comparisons, attention ranges -0.28149 to+0.54506;
+its three positives are denied renewal and its two debit-spread variants, each
+with unresolved stress. GRU ranges -0.04221 to+1.14216; its sole negative is
+recall2 with unresolved stress. These are one-factor adaptive scenarios, not
+joint bounds, executable stress resolution or new selection criteria.
+
+No primary overdue loan principal or pending loan-cash sensitivity occurs.
+Five primary books retain marked unpaid ENAT fractions, maximum R$19.04134.
+Thirty-six scenario records have interim overdue principal, none terminal.
+Cielo/daytrade remain conditional on actual exposure; no holding was forced.
+All source, financing and measured adaptive numerical limits carry forward.
+
+Fifteen GRU fits total6,029.85325seconds,6–18epochs, peak CUDA3,443,227,136bytes.
+Fifteen attention fits total6,950.80936seconds,6–49epochs, peak3,927,872,512bytes.
+These include compilation, loading, selection and export while CPU evaluation
+and bounded storage operations overlap; they are not isolated speed benchmarks.
+Original early stopping and60maximum epochs remain unchanged.
+
+Lossless compression of1,164 files from already completed depth fit/book
+directories saves514,858,705allocated bytes in67.22192seconds. The active final
+fit and unfinished books were excluded by saved completion snapshots. After the
+GPU exited,2,016new depth compiler-cache files saved152,758,731bytes in23.50357
+seconds. Every decoded hash is unchanged. Resolve `stage_d_depth_storage`; no
+source/store/model arithmetic was rerun. Remaining matched LSTM uses retained
+GRU64/one layer with its extra gate parameters and runtime reported separately.
 
 The heartbeat remains paused. A documentation patch failed its text match before
 any file changed; read-only shell wildcard errors are reconstructed tooling

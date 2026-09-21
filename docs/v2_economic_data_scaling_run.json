@@ -1211,13 +1211,17 @@
     "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\capacity_width\\scoring_failure\\acceptance.json",
     "sha256": "adef2425a77b8a0502d2cea13e3530f0d9bc60bbcea2aa9f2ff8e6eb64e83b77"
   },
+  "stage_d_depth_admission": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\capacity_depth\\admission.json",
+    "sha256": "df28a52859f81c1966059b3d69c38d6244f35a59ed6c517875cd76773e6f9dfe"
+  },
   "stage_d_depth_engineering": {
     "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\capacity_depth_engineering\\qualification.json",
     "sha256": "b415dd43ed9618d216bd9beba07001f441013c776c638904181896f06c689cc7"
   },
   "stage_d_depth_evaluation": {
     "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\capacity_depth\\evaluation_progress.json",
-    "sha256": "1f5acf06990ede906b5ec3497efc1222e757f8b3855972fc5097292292dce993"
+    "sha256": "cf6189d98aa6ab72887744fae1c30510ee8d35700dfff93225d562ef7f79e7f0"
   },
   "stage_d_depth_evaluation_plan": {
     "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\capacity_depth\\evaluation_plan.json",
@@ -1227,9 +1231,13 @@
     "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\capacity_depth\\plan.json",
     "sha256": "2a4a17e64c704d1b90c574e165ca5f66eec94ec80973659fcde46f848e7cc546"
   },
+  "stage_d_depth_results": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\capacity_depth\\primary_books\\results\\report.json",
+    "sha256": "5de8c061401894e3539af1cfe71148e12fb43d022a88ed261e7578c1c2a430aa"
+  },
   "stage_d_depth_storage": {
     "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\capacity_depth\\storage\\index.json",
-    "sha256": "063290145c04034ee3fd6cd6f5714141b107e8f346596a17fb4a8724e06f3b45"
+    "sha256": "d9d5e32789af6b4befc34c4ecc32ea899b0310529a01ec6f1de72043de3de439"
   },
   "stage_d_lstm_engineering": {
     "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\capacity_lstm_engineering\\qualification.json",

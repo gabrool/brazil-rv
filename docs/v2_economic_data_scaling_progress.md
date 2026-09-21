@@ -1,6 +1,16 @@
 # Economic accounting, data audit and scaling progress
 
-2026-09-21 current: the [width wave](v2_CAPACITY_RESULTS.md) is disposed. Both
+2026-09-21 current: [depth](v2_CAPACITY_RESULTS.md) is disposed. All30fits,
+48primary/537ordinary/48funded/3precision books qualify;303/0/21skips are explicit.
+Attention depth loses.18921bps/day; GRU depth gains1.11702 but only1/3seeds and
+2/4folds improve. Neither advances. Retain one-layer attention96/GRU64 for matched
+LSTM. No primary overdue principal; five unpaid ENAT terminal fractions, max
+R$19.04134.36scenario records have interim overdue principal, none terminal.
+The heartbeat stays paused. [Performance comparability](v2_PERFORMANCE_COMPARABILITY.md)
+identifies the earlier C6/flexible-net6.71aboveCDI/1.88zeroSharpe result and why
+the current four-period neutral screen is not its corrected replacement.
+
+Earlier width completion: the [width wave](v2_CAPACITY_RESULTS.md) is disposed. Both
 larger widths fail: attention128-minus-96 -.70231 and GRU96-minus-64 -.69412
 bps/day at R$10m, only1/4 positive folds each;0/3 GRU and2/3 attention seed
 deltas are positive. Retain96/64 for the registered depth contrasts. All30 accepted

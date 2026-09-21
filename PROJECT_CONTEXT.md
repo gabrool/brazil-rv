@@ -34,11 +34,13 @@ portfolio scenarios are complete. [Width results](docs/v2_CAPACITY_RESULTS.md)
 reject both larger widths: TE128-minus-96 -.70231 and GRU96-minus-64 -.69412
 bps/day, each only1/4 positive folds. Resolve stage_d_width_results/admission.
 Retain attention96/GRU64; neither larger width is adopted. Width recovery is
-verified through stage_d_width_recovery. The depth wave is frozen and active:
+verified through stage_d_width_recovery. The depth wave is complete and rejected:
 TE_depth2/GRU_depth2 add only a second encoder layer, with1,643,683/1,505,411
 parameters. Resolve stage_d_depth_plan/evaluation_plan;30 fresh P/F fits preserve
-all original seeds/folds/learning budgets. LSTM and final conditional branches
-remain unstarted.
+all original seeds/folds/learning budgets. Attention depth changes net by-.18921
+bps/day; GRU depth gains1.11702 but only1/3 seeds and2/4 folds improve. Neither
+passes the registered screen; retain one layer for both. Resolve
+stage_d_depth_results/admission. Matched LSTM and final conditional branches remain.
 Original stage_d_width_original_plan/evaluation and all failed attempts remain.
 
 stage_d_width_forecast_qualification admits exact saved/fresh compiled and
