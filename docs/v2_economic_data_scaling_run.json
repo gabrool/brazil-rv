@@ -1140,7 +1140,7 @@
   },
   "stage_c_refit_sensitivity_qualification": {
     "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\matched_refit_sensitivities\\qualification\\manifest.json",
-    "sha256": "7c66afc74352a7cc91de695fdf07c1453c75195971a20cf8090ca40fcbccc78a"
+    "sha256": "6c7dffe20a968dd2d25eb7fb9efb929949cd21be757661538fbfefc0d9957dec"
   },
   "stage_c_refit_storage": {
     "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_economic_matched_20260920\\data_refits\\storage\\index.json",
