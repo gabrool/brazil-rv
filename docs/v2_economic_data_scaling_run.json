@@ -1109,6 +1109,10 @@
     "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_economic_matched_20260920\\refit_economics\\action_identity\\plan_resolution.json",
     "sha256": "431edc505053d47a7f353cf077685a15413ade3a38e48ddcea1f07e6a8e71c5a"
   },
+  "stage_c_refit_cache_path_resolution": {
+    "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_economic_matched_20260920\\data_refits\\c6_compile\\cache_path_resolution.json",
+    "sha256": "c100344799ba4dbe0a4e1d3500a9a8a465799b57fc759995d4e0614066f0770b"
+  },
   "stage_c_refit_compile_resolution": {
     "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_economic_matched_20260920\\data_refits\\c6_compile\\resolution.json",
     "sha256": "a30d10b0eb65af558ec06b07911510b0b38c3095deb0127249391579e8e0d9e5"
