@@ -1225,7 +1225,7 @@
   },
   "stage_d_width_evaluation": {
     "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\capacity_width_recovery\\evaluation_progress.json",
-    "sha256": "60dac1cac9744594efe45025a89c48178ccd6fa0aa957d7042299efdd3239b67"
+    "sha256": "15b1bcc73c77a17043cc275c13103a14b464749306515b77e3575fd50fae07a8"
   },
   "stage_d_width_evaluation_plan": {
     "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\capacity_width_recovery\\evaluation_plan.json",
