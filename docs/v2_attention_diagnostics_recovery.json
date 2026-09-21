@@ -1,0 +1,26 @@
+{
+  "aliases": 64,
+  "archive": {
+    "bytes": 510016986,
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\attention_diagnostics_d593fd5.zip",
+    "sha256": "5ea74ab869e9e1f5cccce4c5edc524ce8274b8031ef1d1f3191b07f1a816542a"
+  },
+  "archive_seconds": 26.203834899992216,
+  "dependencies": {
+    "stage_c_refit_recovery": {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\matched_refit_recovery.json",
+      "sha256": "d33122dc968004a91351692691ae4455d274b8c9c0f7740c3488d87c106f3e86"
+    },
+    "stage_d_depth_recovery": {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\capacity_depth_recovery.json",
+      "sha256": "c7c74eeab11bc12227a1cd371f739b8740746c358ec24facc48ecfdc54680311"
+    }
+  },
+  "implementation_commit": "d593fd5b64a5aacbfa8455465bd9e15d0ac8622c",
+  "inherited_members": 1306,
+  "logical_members": 1179,
+  "recovery_seconds": 5.304377399996156,
+  "scope": "All completed fit/forecast/portfolio/position/input-contract/training-numerics/parent-patience diagnostics, exact executed/failure recipes, plans and source/docs restore/hash-check. No original source/store/old-fit copies. Broader eight-fold fits are actively growing and excluded, except their three immutable frozen plans. This is byte recovery, not repeated numerical proof. Prior depth/width/C archives also restore removed redundant epoch copies; recorded relocation and directory-junction maps govern physical placement.",
+  "status": "verified_completed_attention_diagnostic_recovery",
+  "unique_members": 1115
+}
