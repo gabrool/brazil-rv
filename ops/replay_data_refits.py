@@ -11,6 +11,7 @@ from time import perf_counter
 import numpy as np
 import torch
 
+from brazil_rv.execution.allocation import AllocationConfig
 from brazil_rv.execution.custody_fees import CustodyAssessment
 from brazil_rv.execution.portfolio_policy import CalibratedPolicy, exact_replay
 from brazil_rv.execution.spot_costs import MonthlySpotTariff
@@ -141,6 +142,10 @@ def execute(run):
     prior = Path(plan["prior_root"])
     account = bound_json(plan["economic_account"])
     values = account["primary_config"].copy()
+    allocation = AllocationConfig(**plan.get("allocation", {}))
+    if "allocation" in plan:
+        values["planned_absolute_net_cap"] = allocation.net_cap
+        values["planned_absolute_beta_cap"] = allocation.beta_cap
     values["monthly_spot_tariffs"] = tuple(
         MonthlySpotTariff(**x) for x in values["monthly_spot_tariffs"]
     )
@@ -179,8 +184,9 @@ def execute(run):
             }
             if keys <= done:
                 continue
+            arm_root = Path(plan.get("fit_roots", {}).get(arm, plan["fit_root"]))
             fits = [
-                Path(plan["fit_root"]) / "fits" / arm / f"{fold}_seed_{seed}"
+                arm_root / "fits" / arm / f"{fold}_seed_{seed}"
                 for seed in plan["seeds"]
             ]
             if not all(
@@ -191,9 +197,7 @@ def execute(run):
             ):
                 pending.append(dict(arm=arm, fold=fold))
                 continue
-            panels, valid, sources = new_panel(
-                Path(plan["fit_root"]), data, arm, fold, rows, "raw"
-            )
+            panels, valid, sources = new_panel(arm_root, data, arm, fold, rows, "raw")
             mapping_key = "C6" if arm == "C6" else "TE_all"
             mapping = calibration(mappings["arms"][mapping_key])
             mapping_ref = binding(mapping_path)
@@ -270,11 +274,17 @@ def execute(run):
                         policy_inputs=plan["inputs"],
                         mapping=binding(mapping_path),
                         forecast_sources=sources,
+                        allocation=asdict(allocation),
                         member=member,
                         heldout_accessed=False,
                     )
                     result, targets, previous = exact_replay(
-                        view, CalibratedPolicy(mapping), start, stop, config=config
+                        view,
+                        CalibratedPolicy(mapping),
+                        start,
+                        stop,
+                        config=config,
+                        allocation=allocation,
                     )
                     book = save_book(
                         target,

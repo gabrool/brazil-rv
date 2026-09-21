@@ -39,6 +39,16 @@ See [the current investigation](v2_ATTENTION_REVERSAL_DIAGNOSTICS.md),
 
 ### Matched stopping execution
 
+Step3's `scaling_common_model_plan` is frozen for54 fresh C6/GRU parent/child
+fits on the same accepted store and eight periods; it has not launched while
+attention occupies the GPU. Original distinct model recipes remain explicit.
+The common policy comparison keeps both attention stopping arms, reuses their
+neutral books and changes only the optimizer/ledger net cap from5% to45%, with
+beta5% fixed. Original calibration is reused, not fitted to new outcomes.
+The1738-session historical C6 reference remains separately labelled: its full
+corrected counterpart would consume the six currently protected development
+reserve periods, so it is deferred under the current evaluation boundary.
+
 The first wider seed selects the same parent epoch under both stopping rules.
 Exact forecast/mask identity, common dates/capital/member and the same calibration
 now permit explicit book reuse within this one frozen evaluation plan. Reused
