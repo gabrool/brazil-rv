@@ -14,15 +14,19 @@ and excluded; see [compiler failure and recovery](v2_COMPILED_SCORE_FAILURE.md).
 
 ## Width results
 
-R$10m ensemble equal-four-fold mean basis points per session above CDI. Attention
+R$10m ensemble equal-four-fold mean basis points per session. Absolute BRL returns
+include account costs and cash income; subtracting the same 3.10594 bps/day CDI
+benchmark gives the excess-return column. These are four separate neutral accounts,
+not the earlier continuous flexible-net policy. See
+[the performance comparison](v2_PERFORMANCE_COMPARABILITY.md). Attention
 128 uses attention 96 (`TE_wide`) as its registered control; GRU 96 uses GRU 64
 (`GRU_early`). Full attention's separate C result remains in
 [matched results](v2_MATCHED_RESULTS.md).
 
-| Candidate | Net above CDI | Change from own control | Positive seeds | Positive folds | Decision |
-|---|---:|---:|---:|---:|---|
-| Attention 128 | -0.84606 | -0.70231 | 2/3 | 1/4 | Retain width 96 |
-| GRU 96 | -0.01343 | -0.69412 | 0/3 | 1/4 | Retain width 64 |
+| Candidate | Absolute BRL | Above CDI | Change from own control | Positive seeds | Positive folds | Decision |
+|---|---:|---:|---:|---:|---:|---|
+| Attention 128 | 2.25988 | -0.84606 | -0.70231 | 2/3 | 1/4 | Retain width 96 |
+| GRU 96 | 3.09250 | -0.01343 | -0.69412 | 0/3 | 1/4 | Retain width 64 |
 
 Both fail the +0.25 bps/day and three-positive-fold requirements. Both BRL/CDI
 Sharpe changes are negative. A risk justification cannot rescue a failed mean/fold
