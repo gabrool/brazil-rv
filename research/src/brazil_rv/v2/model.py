@@ -878,10 +878,10 @@ class DailyMultiHorizonModel(nn.Module):
             )
         hidden = self.trunk(hidden)
         predictions = torch.cat(
-            tuple(
+            [
                 self.heads[name](hidden)
-                for name in (*[f"d{x}" for x in (1, 2, 3, 5, 10)], "to_close")
-            ),
+                for name in ("d1", "d2", "d3", "d5", "d10", "to_close")
+            ],
             dim=-1,
         )
         predictions = torch.where(
