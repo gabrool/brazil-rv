@@ -228,8 +228,9 @@ def main():
                 def write(self, chunk):
                     nonlocal byte_count
                     digest.update(chunk)
-                    byte_count += len(chunk)
-                    return len(chunk)
+                    size = memoryview(chunk).nbytes
+                    byte_count += size
+                    return size
 
             pickle.dump(amended, DigestWriter(), protocol=pickle.HIGHEST_PROTOCOL)
             assert digest.hexdigest() == inputs["cache"]["sha256"]

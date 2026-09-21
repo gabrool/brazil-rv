@@ -980,6 +980,10 @@
     "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\evaluation\\qualification\\manifest.json",
     "sha256": "7c509e17ba18fa1dcf33f1f11f1d5256585b1a283dbca18e82c7acd42abf58cd"
   },
+  "scaling_expanded_recovery": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\attention_expansion_recovery.json",
+    "sha256": "6d176210f74453d1e594046f050b78915605abcef49f2e0cf496090616b33a74"
+  },
   "scaling_expanded_results": {
     "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\evaluation\\results\\report.json",
     "sha256": "9b64cc9cbdb44f9cb0dc9909ed420f48e51f2f4e8469bbb62f07ec65790902bd"

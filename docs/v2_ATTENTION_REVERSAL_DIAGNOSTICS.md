@@ -327,3 +327,21 @@ needed. C free space rose from about33MB before cleanup to about2.53GB, before
 the new probe rebuilt its cache. Earlier physical relocation and lossless runtime
 compression remain recorded separately; one later native-library compression
 attempt failed for lack of space and is not described as completed.
+
+The expansion now has verified recovery through `scaling_expanded_recovery`.
+The main ZIP contains4158logical/3433unique members plus six qualified-resume
+files;1329 inherited members remain prior-archive dependencies. A separate epoch
+ZIP restores/hash-checks all334 new intermediate checkpoints before retiring their
+2093806656bytes of online copies. Selected/EMA weights, histories, forecasts,
+original fits and accepted stores remain online. The62 diagnostic patience epochs
+were likewise verified against the existing diagnostic archive before retirement.
+
+The initial recovery physically verified all ordinary members, then failed only
+while counting a PickleBuffer emitted by protocol5. The qualified writer counts
+its byte view. Only the two omitted cache streams were resumed; they reconstruct
+exactly707327693/707327592bytes to their original hashes. Initial code/stdout,
+qualified code and the six resume files are preserved and independently verified.
+Successful-prefix counts are reconstructed from the retained execution boundary,
+not claimed as a separately saved phase report. Epoch recovery115.20383s; qualified
+resume4.27691s; the initial full wall time was not recorded. No model, book or
+source reducer was repeated for recovery.

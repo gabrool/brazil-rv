@@ -2326,4 +2326,21 @@ Selected weights/history/forecasts/original fits remain. A waiting uv cache prun
 was cancelled while training was active; after completion it removed181disposable
 files/58.8MiB. Read-only/output-truncation/doc-patch attempts are tooling, not
 numerical failures; prose descriptions are reconstructed where no exact file exists.
-Expansion recovery follows with separate epoch staging to fit available disk.
+Expansion recovery uses separate epoch staging to fit available disk.
+
+Recovery is verified for implementationfb27d18. Main archive
+`attention_expansion_fb27d18.zip`, SHA
+acd39b310ed74ed9096d30a1a778f9f227dd290260d0501c6fa2d3a579b1c179,
+736846476bytes, contains4158logical/3433unique members,725aliases,1329inherited
+dependencies and six separately verified resume files. Epoch archive
+`attention_expansion_epochs_fb27d18.zip`, SHA
+41ba503308655f0598ffe7ef4bfbf8cd317129465c731fb0afa7e4b4d2267472,
+1905476785bytes, restores/hash-checks334checkpoints before retiring2093806656
+online bytes. Selected/EMA/history/forecast/oldfit/store/source files remain.
+Both omitted source caches reconstruct as exact707327693/707327592byte streams.
+The initial ordinary-member verification completed before PickleBuffer byte
+counting failed; the qualified resume fixes only byte-view counting and reuses
+the demonstrated successful prefix. Exact code/stdout/qualified recipes remain;
+prefix counts are reconstructed and labelled, not a claimed saved phase receipt.
+Epoch staging/verification115.20383s and cache-stream/resume4.27691s; initial total
+wall time is unknown. No source, fit, forecast, account or data audit was repeated.

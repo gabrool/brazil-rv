@@ -1,0 +1,2279 @@
+{
+  "aliases": 725,
+  "archive": {
+    "bytes": 736846476,
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\attention_expansion_fb27d18.zip",
+    "sha256": "acd39b310ed74ed9096d30a1a778f9f227dd290260d0501c6fa2d3a579b1c179"
+  },
+  "dependencies": {
+    "epoch_archive": {
+      "bytes": 1905476785,
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\attention_expansion_epochs_fb27d18.zip",
+      "sha256": "41ba503308655f0598ffe7ef4bfbf8cd317129465c731fb0afa7e4b4d2267472"
+    },
+    "prior": {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\attention_diagnostics_recovery.json",
+      "sha256": "fbeccf9bf9ebda7659b4fd7729f245feec2536f7bed0d57a9836a80b3be74637"
+    },
+    "source_inputs": [
+      {
+        "access": {
+          "official_validation_accessed": false,
+          "purpose": "evaluation",
+          "registration": null,
+          "test_accessed": false
+        },
+        "account_terms": {
+          "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\evaluation\\source_replays\\incremental_terms.json",
+          "sha256": "6bc93fad3345166f087067b4307da70e1f8e579baa703ecf66608cc70499624d"
+        },
+        "action_identity_correction": {
+          "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_economic_matched_20260920\\refit_economics\\action_identity\\correction.json",
+          "sha256": "5f22f20a4c5d06cfe452a570ad5e8dea6250f5bab659118c140dcd6e06762f4f"
+        },
+        "cache": {
+          "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\evaluation\\source_replays\\policy_data.pkl",
+          "sha256": "1e24db87fa32d8aa4e2ca8d06974a4f6c4e371f3f6f88108e4d57c804feeb5ba"
+        },
+        "cash_scope": {
+          "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_economic_matched_20260920\\refit_economics\\cash_scope.json",
+          "sha256": "2db1f1c5cfcf7d5a4798a60be63089dff33285bfe8646c568c664027209bbe9d"
+        },
+        "changed_cells": {
+          "action_cash_per_prior_share": 1,
+          "action_has_action": 1,
+          "action_payment_session": 1,
+          "action_session_resolved": 4376,
+          "action_shares_per_prior_share": 2,
+          "action_successor_index": 1,
+          "initial_unresolved_action": 0
+        },
+        "dates": 2099,
+        "formula_checks": {
+          "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_economic_matched_20260920\\refit_economics\\formula_checks.json",
+          "sha256": "4ef00211a5d358d426f164f1342d38acf83dfe9f67faa20c91e60b74c535f288"
+        },
+        "names": 933,
+        "old_control_cells": 2800,
+        "parent": {
+          "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_economic_matched_20260920\\refit_economics\\action_identity\\manifest.json",
+          "sha256": "04d52f3e9d1c0636078646e9242c21578703f4af2aeb71e27b41521ec991716f"
+        },
+        "plan": {
+          "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_economic_matched_20260920\\refit_economics\\plan.json",
+          "sha256": "189adfc3ec6dc9501906b3cd487d40490fbd6d45d8ad80a60f56f645768cdb70"
+        },
+        "previous_input": {
+          "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_economic_matched_20260920\\refit_economics\\manifest.json",
+          "sha256": "5f69343d132bee3ba5218fc4427d5660cac9a53f07ede97e790305c57592adaa"
+        },
+        "reused_saved_risk_and_controls": true,
+        "risk": {
+          "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_economic_matched_20260920\\refit_economics\\risk.npz",
+          "sha256": "f38bb02330efb5d84b460c12d4722ef19ceab0dcf11bffa91b1d01de69003c23"
+        },
+        "scope": "Shallow PolicyData copy; model forecasts/static policy/risk/eligibility/history preserved. Only separately attributed sourced account events.",
+        "seconds": 47.13905579998391,
+        "source_actions_represented_once": [
+          {
+            "date": "2020-09-18",
+            "isin": "BRJSLGACNOR2",
+            "reason": "same gross source action represented once by explicit custody/loan distribution"
+          },
+          {
+            "date": "2020-10-13",
+            "isin": "BRTIMPACNOR1",
+            "reason": "same gross source action represented once by explicit custody/loan distribution"
+          }
+        ],
+        "status": "qualified_refit_account_identity_correction",
+        "store": {
+          "manifest_sha256": "fd4ad71a0efaad0914520c89d589e0c0dfd9665158204c4721f821f9df8d4161",
+          "root": "C:\\quant-data\\b3\\processed\\v2_economic_matched_store_20260920"
+        },
+        "unchanged_objects": [
+          "session_indices",
+          "scores",
+          "score_mask",
+          "scaled_midrank_targets",
+          "scaled_target_mask",
+          "neutral_midrank_targets",
+          "neutral_target_mask",
+          "shareholder_midrank_targets",
+          "shareholder_simple_returns",
+          "shareholder_target_mask",
+          "price_midrank_targets",
+          "price_target_mask",
+          "active",
+          "raw_close",
+          "target_scale_sigma",
+          "cdi_returns",
+          "history_age_sessions",
+          "initial_reference_price",
+          "eventual_survives_to_final_year",
+          "annual_borrow_rate_by_name",
+          "borrow_rate_imputed",
+          "borrow_rate_placeholder",
+          "bova11_close",
+          "hedge_annual_borrow_rate",
+          "loan_reference_prices",
+          "hedge_beta",
+          "hedge_beta_valid",
+          "neutral_target_fallback_flags",
+          "entry_fill_allowed"
+        ]
+      },
+      {
+        "access": {
+          "official_validation_accessed": false,
+          "purpose": "evaluation",
+          "registration": null,
+          "test_accessed": false
+        },
+        "account_terms": {
+          "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\evaluation\\later_source_replays\\incremental_terms.json",
+          "sha256": "e43d153b45e3a97ed8dcedd81f4a04c632279b040028ddb3045f8ea60996cdc6"
+        },
+        "action_identity_correction": {
+          "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_economic_matched_20260920\\refit_economics\\action_identity\\correction.json",
+          "sha256": "5f22f20a4c5d06cfe452a570ad5e8dea6250f5bab659118c140dcd6e06762f4f"
+        },
+        "cache": {
+          "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\evaluation\\later_source_replays\\policy_data.pkl",
+          "sha256": "21a0865e46d89881db0136cdeed27255b312549af3e18d5e0bfb803f6348721f"
+        },
+        "cash_scope": {
+          "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_economic_matched_20260920\\refit_economics\\cash_scope.json",
+          "sha256": "2db1f1c5cfcf7d5a4798a60be63089dff33285bfe8646c568c664027209bbe9d"
+        },
+        "changed_cells": {
+          "action_cash_per_prior_share": 0,
+          "action_has_action": 3,
+          "action_payment_session": 0,
+          "action_session_resolved": 4099,
+          "action_shares_per_prior_share": 0,
+          "action_successor_index": 3,
+          "initial_unresolved_action": 0
+        },
+        "dates": 2099,
+        "formula_checks": {
+          "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_economic_matched_20260920\\refit_economics\\formula_checks.json",
+          "sha256": "4ef00211a5d358d426f164f1342d38acf83dfe9f67faa20c91e60b74c535f288"
+        },
+        "names": 933,
+        "old_control_cells": 2800,
+        "parent": {
+          "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_economic_matched_20260920\\refit_economics\\action_identity\\manifest.json",
+          "sha256": "04d52f3e9d1c0636078646e9242c21578703f4af2aeb71e27b41521ec991716f"
+        },
+        "plan": {
+          "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_economic_matched_20260920\\refit_economics\\plan.json",
+          "sha256": "189adfc3ec6dc9501906b3cd487d40490fbd6d45d8ad80a60f56f645768cdb70"
+        },
+        "previous_input": {
+          "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_economic_matched_20260920\\refit_economics\\manifest.json",
+          "sha256": "5f69343d132bee3ba5218fc4427d5660cac9a53f07ede97e790305c57592adaa"
+        },
+        "reused_saved_risk_and_controls": true,
+        "risk": {
+          "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_economic_matched_20260920\\refit_economics\\risk.npz",
+          "sha256": "f38bb02330efb5d84b460c12d4722ef19ceab0dcf11bffa91b1d01de69003c23"
+        },
+        "scope": "Shallow PolicyData copy; model forecasts/static policy/risk/eligibility/history preserved. Only separately attributed sourced account events.",
+        "seconds": 47.13905579998391,
+        "source_actions_represented_once": [
+          {
+            "date": "2020-09-18",
+            "isin": "BRJSLGACNOR2",
+            "reason": "same gross source action represented once by explicit custody/loan distribution"
+          },
+          {
+            "date": "2020-10-13",
+            "isin": "BRTIMPACNOR1",
+            "reason": "same gross source action represented once by explicit custody/loan distribution"
+          }
+        ],
+        "status": "qualified_refit_account_identity_correction",
+        "store": {
+          "manifest_sha256": "fd4ad71a0efaad0914520c89d589e0c0dfd9665158204c4721f821f9df8d4161",
+          "root": "C:\\quant-data\\b3\\processed\\v2_economic_matched_store_20260920"
+        },
+        "unchanged_objects": [
+          "session_indices",
+          "scores",
+          "score_mask",
+          "scaled_midrank_targets",
+          "scaled_target_mask",
+          "neutral_midrank_targets",
+          "neutral_target_mask",
+          "shareholder_midrank_targets",
+          "shareholder_simple_returns",
+          "shareholder_target_mask",
+          "price_midrank_targets",
+          "price_target_mask",
+          "active",
+          "raw_close",
+          "target_scale_sigma",
+          "cdi_returns",
+          "history_age_sessions",
+          "initial_reference_price",
+          "eventual_survives_to_final_year",
+          "annual_borrow_rate_by_name",
+          "borrow_rate_imputed",
+          "borrow_rate_placeholder",
+          "bova11_close",
+          "hedge_annual_borrow_rate",
+          "loan_reference_prices",
+          "hedge_beta",
+          "hedge_beta_valid",
+          "neutral_target_fallback_flags",
+          "entry_fill_allowed"
+        ]
+      }
+    ]
+  },
+  "epoch_archive": {
+    "bytes": 1905476785,
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\attention_expansion_epochs_fb27d18.zip",
+    "sha256": "41ba503308655f0598ffe7ef4bfbf8cd317129465c731fb0afa7e4b4d2267472"
+  },
+  "epoch_members": 334,
+  "epoch_recovery_seconds": 115.20382500000414,
+  "implementation_commit": "fb27d18",
+  "inherited_members": 1329,
+  "initial_full_wall_seconds": null,
+  "logical_members": 4158,
+  "qualification": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\recovery_attempts\\qualification.json",
+    "sha256": "4d93fa61383283b02b4dc4bbddd5a11995daa762f2e3089c3710e46e769342c6"
+  },
+  "qualified_resume_members": 6,
+  "qualified_resume_seconds": 4.276911499997368,
+  "recovered_cache_bytes": 1414655285,
+  "recovered_caches": [
+    {
+      "bytes": 707327693,
+      "cache": {
+        "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\evaluation\\source_replays\\policy_data.pkl",
+        "sha256": "1e24db87fa32d8aa4e2ca8d06974a4f6c4e371f3f6f88108e4d57c804feeb5ba"
+      }
+    },
+    {
+      "bytes": 707327592,
+      "cache": {
+        "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\evaluation\\later_source_replays\\policy_data.pkl",
+        "sha256": "21a0865e46d89881db0136cdeed27255b312549af3e18d5e0bfb803f6348721f"
+      }
+    }
+  ],
+  "retired_epochs": [
+    {
+      "bytes": 6080448,
+      "member": "evidence/expanded/fits/TE_full/F3_seed_11/epochs/epoch_001.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_full\\F3_seed_11\\epochs\\epoch_001.pt",
+      "sha256": "11c7354aafe60d725df122b4b9fc95b09978a5bea4b00a54731d8b12d48174c2"
+    },
+    {
+      "bytes": 6080448,
+      "member": "evidence/expanded/fits/TE_full/F3_seed_11/epochs/epoch_002.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_full\\F3_seed_11\\epochs\\epoch_002.pt",
+      "sha256": "b67af6637fee85ac79a699cc8d86d6953f35cc65213d774716c47013413f968c"
+    },
+    {
+      "bytes": 6080448,
+      "member": "evidence/expanded/fits/TE_full/F3_seed_11/epochs/epoch_003.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_full\\F3_seed_11\\epochs\\epoch_003.pt",
+      "sha256": "a2144efa0d9b7b3b08a713889c29d30931a24ee523df2de791e921e44daeea5b"
+    },
+    {
+      "bytes": 6080448,
+      "member": "evidence/expanded/fits/TE_full/F3_seed_11/epochs/epoch_004.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_full\\F3_seed_11\\epochs\\epoch_004.pt",
+      "sha256": "50509ec4b9108dc485c3fa7216af2c9ad22cc50594ac30de497ac21396b8739f"
+    },
+    {
+      "bytes": 6080448,
+      "member": "evidence/expanded/fits/TE_full/F3_seed_11/epochs/epoch_005.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_full\\F3_seed_11\\epochs\\epoch_005.pt",
+      "sha256": "dfff0c49639b74b7ade70634183448a5ab7a387e4f059f059a2e991b144cd559"
+    },
+    {
+      "bytes": 6080448,
+      "member": "evidence/expanded/fits/TE_full/F3_seed_11/epochs/epoch_006.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_full\\F3_seed_11\\epochs\\epoch_006.pt",
+      "sha256": "0829ec7afdbf4eb430c772c54a298a49ca0295e33ad4c88187baad6064328151"
+    },
+    {
+      "bytes": 6406656,
+      "member": "evidence/expanded/fits/TE_wide/F3_seed_11/epochs/epoch_001.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_wide\\F3_seed_11\\epochs\\epoch_001.pt",
+      "sha256": "4016cccb501a42ac516674f53eda973fae7353beb71a65265b249eb6663a655b"
+    },
+    {
+      "bytes": 6406656,
+      "member": "evidence/expanded/fits/TE_wide/F3_seed_11/epochs/epoch_002.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_wide\\F3_seed_11\\epochs\\epoch_002.pt",
+      "sha256": "1541ab84a823d06c6cd6011502571ab3c42fe78bb63ffcd42afbf02b4fd7a036"
+    },
+    {
+      "bytes": 6406656,
+      "member": "evidence/expanded/fits/TE_wide/F3_seed_11/epochs/epoch_003.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_wide\\F3_seed_11\\epochs\\epoch_003.pt",
+      "sha256": "b7c7317004b27d9d050d92d18d8eb943ab3beed694c3e2e3c9e515879db73ac1"
+    },
+    {
+      "bytes": 6406656,
+      "member": "evidence/expanded/fits/TE_wide/F3_seed_11/epochs/epoch_004.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_wide\\F3_seed_11\\epochs\\epoch_004.pt",
+      "sha256": "bf03ea3c009365c4e67fb6c5390389d9e4aae30fec069b4a9afc817b362722aa"
+    },
+    {
+      "bytes": 6406656,
+      "member": "evidence/expanded/fits/TE_wide/F3_seed_11/epochs/epoch_005.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_wide\\F3_seed_11\\epochs\\epoch_005.pt",
+      "sha256": "f2b51854f59f17308ec77e0b791a259307e66296972bd97f476bef736d275d0b"
+    },
+    {
+      "bytes": 6406656,
+      "member": "evidence/expanded/fits/TE_wide/F3_seed_11/epochs/epoch_006.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_wide\\F3_seed_11\\epochs\\epoch_006.pt",
+      "sha256": "1af242cb631aa00631db0abb10f46dd54807a6e279de7484b07db5956d49c20f"
+    },
+    {
+      "bytes": 6406656,
+      "member": "evidence/expanded/fits/TE_wide/F3_seed_11/epochs/epoch_007.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_wide\\F3_seed_11\\epochs\\epoch_007.pt",
+      "sha256": "ff6962dac0fda83bde7517f4c2e93cc3f703cc4ba06a2320ea2a72a1bf2b4ae8"
+    },
+    {
+      "bytes": 6406656,
+      "member": "evidence/expanded/fits/TE_wide/F3_seed_11/epochs/epoch_008.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_wide\\F3_seed_11\\epochs\\epoch_008.pt",
+      "sha256": "6e87572c46a4fc31ab2d0d5272a899c3c7c5c43a1f2c913244654dfab79e705e"
+    },
+    {
+      "bytes": 6080448,
+      "member": "evidence/expanded/fits/TE_full/F3_seed_29/epochs/epoch_001.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_full\\F3_seed_29\\epochs\\epoch_001.pt",
+      "sha256": "15c26b0806bbd227d126df95bda980d8bd348fe224f3c5b2e7292bcfb2e371b9"
+    },
+    {
+      "bytes": 6080448,
+      "member": "evidence/expanded/fits/TE_full/F3_seed_29/epochs/epoch_002.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_full\\F3_seed_29\\epochs\\epoch_002.pt",
+      "sha256": "a49bc0075a23e8970ccc483eecfbfa80451bd1b14c77b25b56222819048902d2"
+    },
+    {
+      "bytes": 6080448,
+      "member": "evidence/expanded/fits/TE_full/F3_seed_29/epochs/epoch_003.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_full\\F3_seed_29\\epochs\\epoch_003.pt",
+      "sha256": "64a883760e54b89c5cc4816e1a8626b12e4fa0f15de1d070cd2719caaec8ed5d"
+    },
+    {
+      "bytes": 6080448,
+      "member": "evidence/expanded/fits/TE_full/F3_seed_29/epochs/epoch_004.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_full\\F3_seed_29\\epochs\\epoch_004.pt",
+      "sha256": "e74876bed13aa7c2f48007798aad1c9f9ed33d9388a148847e1d6d5394ee9c28"
+    },
+    {
+      "bytes": 6080448,
+      "member": "evidence/expanded/fits/TE_full/F3_seed_29/epochs/epoch_005.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_full\\F3_seed_29\\epochs\\epoch_005.pt",
+      "sha256": "229c5135d26d7ede48ebfa9931ec6b975b8cbbd427c65cc4c409fa588ac51c9e"
+    },
+    {
+      "bytes": 6080448,
+      "member": "evidence/expanded/fits/TE_full/F3_seed_29/epochs/epoch_006.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_full\\F3_seed_29\\epochs\\epoch_006.pt",
+      "sha256": "3b7b64d0128cde8b46e4b4ccdbbe24b5a06ae681329fa688409951104f32e5e5"
+    },
+    {
+      "bytes": 6406656,
+      "member": "evidence/expanded/fits/TE_wide/F3_seed_29/epochs/epoch_001.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_wide\\F3_seed_29\\epochs\\epoch_001.pt",
+      "sha256": "9b00490f72b12986b8137cc1c74434194412f6ba25c5e5c50496b7c8b014634f"
+    },
+    {
+      "bytes": 6406656,
+      "member": "evidence/expanded/fits/TE_wide/F3_seed_29/epochs/epoch_002.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_wide\\F3_seed_29\\epochs\\epoch_002.pt",
+      "sha256": "f86e83ebeb4ce9b11081ec3044dfeaa145f310ca764ccc114ee3ef8e5561101f"
+    },
+    {
+      "bytes": 6406656,
+      "member": "evidence/expanded/fits/TE_wide/F3_seed_29/epochs/epoch_003.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_wide\\F3_seed_29\\epochs\\epoch_003.pt",
+      "sha256": "0590fd397f41e4c94207f9623f4ee0419d1e09b8b1fd7c3f9030667f3e7ef653"
+    },
+    {
+      "bytes": 6406656,
+      "member": "evidence/expanded/fits/TE_wide/F3_seed_29/epochs/epoch_004.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_wide\\F3_seed_29\\epochs\\epoch_004.pt",
+      "sha256": "c7fa525b2dc0b0d5333f4ca97e9af5494eaa76feea85e294e0580b1ba8e80b11"
+    },
+    {
+      "bytes": 6406656,
+      "member": "evidence/expanded/fits/TE_wide/F3_seed_29/epochs/epoch_005.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_wide\\F3_seed_29\\epochs\\epoch_005.pt",
+      "sha256": "ab21ce8175b32951f020b0f4cd42e0a11be96bdce733109b4b40e6202102a482"
+    },
+    {
+      "bytes": 6406656,
+      "member": "evidence/expanded/fits/TE_wide/F3_seed_29/epochs/epoch_006.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_wide\\F3_seed_29\\epochs\\epoch_006.pt",
+      "sha256": "43bba52dff4a1866ac011c4d3c262cec31b432af71ad877ff52ea80076ca0995"
+    },
+    {
+      "bytes": 6080448,
+      "member": "evidence/expanded/fits/TE_full/F3_seed_47/epochs/epoch_001.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_full\\F3_seed_47\\epochs\\epoch_001.pt",
+      "sha256": "ff2b18fc085343d5ef04ba0fe407ff03d852dd35549be726bb3435eeed334fc7"
+    },
+    {
+      "bytes": 6080448,
+      "member": "evidence/expanded/fits/TE_full/F3_seed_47/epochs/epoch_002.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_full\\F3_seed_47\\epochs\\epoch_002.pt",
+      "sha256": "4776ddfcae15d6709981cf978d97b3a3e4501f882ce6caec3022f21b7026390b"
+    },
+    {
+      "bytes": 6080448,
+      "member": "evidence/expanded/fits/TE_full/F3_seed_47/epochs/epoch_003.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_full\\F3_seed_47\\epochs\\epoch_003.pt",
+      "sha256": "711dfbe67e9149d10d1bea5826b195df5eb7dcfa8216b22066b42e670a1a5b8e"
+    },
+    {
+      "bytes": 6080448,
+      "member": "evidence/expanded/fits/TE_full/F3_seed_47/epochs/epoch_004.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_full\\F3_seed_47\\epochs\\epoch_004.pt",
+      "sha256": "479e48bd4bb2f3a0a110db476a20503836c28224eec4cb4c00160df622c83666"
+    },
+    {
+      "bytes": 6080448,
+      "member": "evidence/expanded/fits/TE_full/F3_seed_47/epochs/epoch_005.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_full\\F3_seed_47\\epochs\\epoch_005.pt",
+      "sha256": "c12d1bb5bdcaec159adc05922617faea3dd5cc955e5cc9cf5dcc0b333ab3f2fe"
+    },
+    {
+      "bytes": 6080448,
+      "member": "evidence/expanded/fits/TE_full/F3_seed_47/epochs/epoch_006.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_full\\F3_seed_47\\epochs\\epoch_006.pt",
+      "sha256": "681c206fa87786966775f73cfa76ad39cd5b9d5a698197a1ea5be91d6edadd9c"
+    },
+    {
+      "bytes": 6080448,
+      "member": "evidence/expanded/fits/TE_full/F3_seed_47/epochs/epoch_007.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_full\\F3_seed_47\\epochs\\epoch_007.pt",
+      "sha256": "d758ff6e35cce7446b60ad0e922ccfbae453032a31483d4f2ae34e422681bdf7"
+    },
+    {
+      "bytes": 6406656,
+      "member": "evidence/expanded/fits/TE_wide/F3_seed_47/epochs/epoch_001.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_wide\\F3_seed_47\\epochs\\epoch_001.pt",
+      "sha256": "93b7b822c8f98be5b0ad4331b9625524dfe83de8c722639437c6c6c821730169"
+    },
+    {
+      "bytes": 6406656,
+      "member": "evidence/expanded/fits/TE_wide/F3_seed_47/epochs/epoch_002.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_wide\\F3_seed_47\\epochs\\epoch_002.pt",
+      "sha256": "aa122c4bd4c2c59e2387d92a787966baa30e859a04f6adc4964fcf03fd1bf037"
+    },
+    {
+      "bytes": 6406656,
+      "member": "evidence/expanded/fits/TE_wide/F3_seed_47/epochs/epoch_003.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_wide\\F3_seed_47\\epochs\\epoch_003.pt",
+      "sha256": "2da2c9c5a6619c2eaa09d65fae7b9bc24d4eba479e58e17857db528e04e3ffa0"
+    },
+    {
+      "bytes": 6406656,
+      "member": "evidence/expanded/fits/TE_wide/F3_seed_47/epochs/epoch_004.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_wide\\F3_seed_47\\epochs\\epoch_004.pt",
+      "sha256": "c5da0e2e3a22e346b30b4ee0943a9126e729a46f97fbdab9e68122751e83b042"
+    },
+    {
+      "bytes": 6406656,
+      "member": "evidence/expanded/fits/TE_wide/F3_seed_47/epochs/epoch_005.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_wide\\F3_seed_47\\epochs\\epoch_005.pt",
+      "sha256": "a64cb72359fd9fbd617828f3edd7689806fbf98e61d52bc0f2836af47df8901c"
+    },
+    {
+      "bytes": 6406656,
+      "member": "evidence/expanded/fits/TE_wide/F3_seed_47/epochs/epoch_006.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_wide\\F3_seed_47\\epochs\\epoch_006.pt",
+      "sha256": "ec896144d3af56e6c14341b2692ef417f2b3c611f1cc67e8644f04e60a903cd5"
+    },
+    {
+      "bytes": 6406656,
+      "member": "evidence/expanded/fits/TE_wide/F3_seed_47/epochs/epoch_007.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_wide\\F3_seed_47\\epochs\\epoch_007.pt",
+      "sha256": "4bb01ef4ad4f0514c058281e98e2b5ef49fb6b7a988b9ac2698a3ef6617359d5"
+    },
+    {
+      "bytes": 6406656,
+      "member": "evidence/expanded/fits/TE_wide/F3_seed_47/epochs/epoch_008.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_wide\\F3_seed_47\\epochs\\epoch_008.pt",
+      "sha256": "534611abfc5fe86efe7357179695b7251b32315d85a55f88f63f814e85e73c20"
+    },
+    {
+      "bytes": 6098432,
+      "member": "evidence/expanded/fits/TE_full/F7_seed_11/epochs/epoch_001.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_full\\F7_seed_11\\epochs\\epoch_001.pt",
+      "sha256": "05c3a54c3b0701af2cfe435b2722f6bd8fac99b619a2a78dcf9a13c7333d9e35"
+    },
+    {
+      "bytes": 6098432,
+      "member": "evidence/expanded/fits/TE_full/F7_seed_11/epochs/epoch_002.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_full\\F7_seed_11\\epochs\\epoch_002.pt",
+      "sha256": "e66e8432c0f0df186cd617dd48f81bf48b8ea8cfe3fe6696192b4ed72274889f"
+    },
+    {
+      "bytes": 6098432,
+      "member": "evidence/expanded/fits/TE_full/F7_seed_11/epochs/epoch_003.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_full\\F7_seed_11\\epochs\\epoch_003.pt",
+      "sha256": "f532ca3b525974d8a85a94e1edc8c836d55bda8daeb0a1fe9af808e1405caace"
+    },
+    {
+      "bytes": 6098432,
+      "member": "evidence/expanded/fits/TE_full/F7_seed_11/epochs/epoch_004.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_full\\F7_seed_11\\epochs\\epoch_004.pt",
+      "sha256": "15d6ce56d3ea2ee4f9cb96efa5a19c2c3b55829fff540f16cc9d1118e9f33af0"
+    },
+    {
+      "bytes": 6098432,
+      "member": "evidence/expanded/fits/TE_full/F7_seed_11/epochs/epoch_005.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_full\\F7_seed_11\\epochs\\epoch_005.pt",
+      "sha256": "b87360280c1f6a793e365b8bc2a4cb9dd45ef07541df4c36e72a7d325276fa8d"
+    },
+    {
+      "bytes": 6098432,
+      "member": "evidence/expanded/fits/TE_full/F7_seed_11/epochs/epoch_006.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_full\\F7_seed_11\\epochs\\epoch_006.pt",
+      "sha256": "7c05e89a0138a86d1aac195093a443010026a2d96cbcaf4db5b2a1827efc2fce"
+    },
+    {
+      "bytes": 6098432,
+      "member": "evidence/expanded/fits/TE_full/F7_seed_11/epochs/epoch_007.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_full\\F7_seed_11\\epochs\\epoch_007.pt",
+      "sha256": "c26d99000a189058d188e118973b1a29f178e6c4a6d126e3451df2483582e167"
+    },
+    {
+      "bytes": 6098432,
+      "member": "evidence/expanded/fits/TE_full/F7_seed_11/epochs/epoch_008.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_full\\F7_seed_11\\epochs\\epoch_008.pt",
+      "sha256": "f6720c5164383c6f47c2d675c9af121b782dbf45cab48ba3a878f30f3ed51d1a"
+    },
+    {
+      "bytes": 6098432,
+      "member": "evidence/expanded/fits/TE_full/F7_seed_11/epochs/epoch_009.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_full\\F7_seed_11\\epochs\\epoch_009.pt",
+      "sha256": "33e3b1075a51445a30c5029b741166be4d676f69ba9187d41414d731b024c689"
+    },
+    {
+      "bytes": 6098432,
+      "member": "evidence/expanded/fits/TE_full/F7_seed_11/epochs/epoch_010.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_full\\F7_seed_11\\epochs\\epoch_010.pt",
+      "sha256": "72a990903ee266bfea50775bbad05782040f0f33bf3a2c453715c35013a046bb"
+    },
+    {
+      "bytes": 6098432,
+      "member": "evidence/expanded/fits/TE_full/F7_seed_11/epochs/epoch_011.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_full\\F7_seed_11\\epochs\\epoch_011.pt",
+      "sha256": "c1744b33f760ab032d40e3f97c002c2968a50fd5f3cd003d2346bed34c516896"
+    },
+    {
+      "bytes": 6098432,
+      "member": "evidence/expanded/fits/TE_full/F7_seed_11/epochs/epoch_012.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_full\\F7_seed_11\\epochs\\epoch_012.pt",
+      "sha256": "d9d83dc6cc748be52ce3f6c12c8d1fb97018b55fa2494df12bcbf756c4ef59ea"
+    },
+    {
+      "bytes": 6098432,
+      "member": "evidence/expanded/fits/TE_full/F7_seed_11/epochs/epoch_013.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_full\\F7_seed_11\\epochs\\epoch_013.pt",
+      "sha256": "af8472cdfa3362b0ff96ce5bb3c29cd61c7c06491a5e75f8cec1b878006e26d2"
+    },
+    {
+      "bytes": 6098432,
+      "member": "evidence/expanded/fits/TE_full/F7_seed_11/epochs/epoch_014.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_full\\F7_seed_11\\epochs\\epoch_014.pt",
+      "sha256": "9a97d637a247f983fc297e9d08921a6e9a4ffa6895e175c4475a3b7a24ad6ef3"
+    },
+    {
+      "bytes": 6424640,
+      "member": "evidence/expanded/fits/TE_wide/F7_seed_11/epochs/epoch_001.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_wide\\F7_seed_11\\epochs\\epoch_001.pt",
+      "sha256": "3ace1779c30b3db750b5b8cdc9fcc6fc5527792a455d1330af3dc79fb0d7b6b1"
+    },
+    {
+      "bytes": 6424640,
+      "member": "evidence/expanded/fits/TE_wide/F7_seed_11/epochs/epoch_002.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_wide\\F7_seed_11\\epochs\\epoch_002.pt",
+      "sha256": "f8276da91ce33518fed155ec11f8ecf6c6cf2dda5f7b7b2a1f608297a9fef4b2"
+    },
+    {
+      "bytes": 6424640,
+      "member": "evidence/expanded/fits/TE_wide/F7_seed_11/epochs/epoch_003.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_wide\\F7_seed_11\\epochs\\epoch_003.pt",
+      "sha256": "8554f1f543c45e3dd5a1bc1f23e11910f76867efa310e4e10dfcec9b5e41b70c"
+    },
+    {
+      "bytes": 6424640,
+      "member": "evidence/expanded/fits/TE_wide/F7_seed_11/epochs/epoch_004.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_wide\\F7_seed_11\\epochs\\epoch_004.pt",
+      "sha256": "eafc5847167a5aa439740452ddee852c4a4dacd114bc7b6935c15bd73ee92e05"
+    },
+    {
+      "bytes": 6424640,
+      "member": "evidence/expanded/fits/TE_wide/F7_seed_11/epochs/epoch_005.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_wide\\F7_seed_11\\epochs\\epoch_005.pt",
+      "sha256": "0e0518662327b978a8de71201159db428b950679dc8edb9625ff080e15fbdede"
+    },
+    {
+      "bytes": 6424640,
+      "member": "evidence/expanded/fits/TE_wide/F7_seed_11/epochs/epoch_006.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_wide\\F7_seed_11\\epochs\\epoch_006.pt",
+      "sha256": "7e67a27fb6dbf0d06e2c1a886a3410fdf163f8e2c4d9f86a0323b99ec5eec948"
+    },
+    {
+      "bytes": 6424640,
+      "member": "evidence/expanded/fits/TE_wide/F7_seed_11/epochs/epoch_007.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_wide\\F7_seed_11\\epochs\\epoch_007.pt",
+      "sha256": "73c92271e0e36b3369e9429651d1cfc1e22198bd32c2ec33753c84d72400aeb1"
+    },
+    {
+      "bytes": 6424640,
+      "member": "evidence/expanded/fits/TE_wide/F7_seed_11/epochs/epoch_008.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_wide\\F7_seed_11\\epochs\\epoch_008.pt",
+      "sha256": "1b599f260c702a98be142212a39c134658fb44269cb296a6ae0dc23cd71f7b24"
+    },
+    {
+      "bytes": 6424640,
+      "member": "evidence/expanded/fits/TE_wide/F7_seed_11/epochs/epoch_009.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_wide\\F7_seed_11\\epochs\\epoch_009.pt",
+      "sha256": "c5a57630e53d6ef9ac768d9ca9e9fcaf9b7c581f0b88dec71110b3c057e2c476"
+    },
+    {
+      "bytes": 6424640,
+      "member": "evidence/expanded/fits/TE_wide/F7_seed_11/epochs/epoch_010.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_wide\\F7_seed_11\\epochs\\epoch_010.pt",
+      "sha256": "491ad723e4ed16b81dd3b04cde90b6c576c928d9de148dd424538fdd4531e7c7"
+    },
+    {
+      "bytes": 6424640,
+      "member": "evidence/expanded/fits/TE_wide/F7_seed_11/epochs/epoch_011.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_wide\\F7_seed_11\\epochs\\epoch_011.pt",
+      "sha256": "ff7c2808da2839acc5991386ebf58e096e9576e8444182415c06398a06bb8d07"
+    },
+    {
+      "bytes": 6098432,
+      "member": "evidence/expanded/fits/TE_full/F7_seed_29/epochs/epoch_001.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_full\\F7_seed_29\\epochs\\epoch_001.pt",
+      "sha256": "11a86321cc5716a8d15a7f334a8b74330c327eb72b2dc0ea92f77375be1b35a3"
+    },
+    {
+      "bytes": 6098432,
+      "member": "evidence/expanded/fits/TE_full/F7_seed_29/epochs/epoch_002.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_full\\F7_seed_29\\epochs\\epoch_002.pt",
+      "sha256": "5309a2cb71cbe13ce84af9c2638358620cabe8cd7747a90291b7f91affd15752"
+    },
+    {
+      "bytes": 6098432,
+      "member": "evidence/expanded/fits/TE_full/F7_seed_29/epochs/epoch_003.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_full\\F7_seed_29\\epochs\\epoch_003.pt",
+      "sha256": "75fbda9bab22cb7ed5de89ca1442fe50c0a55ef31bf097a0dc56ccd857532f7d"
+    },
+    {
+      "bytes": 6098432,
+      "member": "evidence/expanded/fits/TE_full/F7_seed_29/epochs/epoch_004.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_full\\F7_seed_29\\epochs\\epoch_004.pt",
+      "sha256": "ab88f219fbe2c41840dfb5e903a48e07e604ae8a62ed7540ee71b1e32360b15e"
+    },
+    {
+      "bytes": 6098432,
+      "member": "evidence/expanded/fits/TE_full/F7_seed_29/epochs/epoch_005.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_full\\F7_seed_29\\epochs\\epoch_005.pt",
+      "sha256": "e7189dd2922cb0df77dbab867a2efd2236505cba21508e9ad4f1330a9e84671a"
+    },
+    {
+      "bytes": 6098432,
+      "member": "evidence/expanded/fits/TE_full/F7_seed_29/epochs/epoch_006.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_full\\F7_seed_29\\epochs\\epoch_006.pt",
+      "sha256": "bda347b4e1aaba6e96eee75ffcbc1ddcd3055af1dfc3a81515381273912c84e8"
+    },
+    {
+      "bytes": 6098432,
+      "member": "evidence/expanded/fits/TE_full/F7_seed_29/epochs/epoch_007.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_full\\F7_seed_29\\epochs\\epoch_007.pt",
+      "sha256": "5d9179d1441497b0e53fa34e100e6896541cc97c5c6d156a803c0534288d24b2"
+    },
+    {
+      "bytes": 6098432,
+      "member": "evidence/expanded/fits/TE_full/F7_seed_29/epochs/epoch_008.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_full\\F7_seed_29\\epochs\\epoch_008.pt",
+      "sha256": "1e5dcd17fb829e27bbd0fc213946997a2f345eed619c5a9dcd1fc7bda0af6230"
+    },
+    {
+      "bytes": 6098432,
+      "member": "evidence/expanded/fits/TE_full/F7_seed_29/epochs/epoch_009.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_full\\F7_seed_29\\epochs\\epoch_009.pt",
+      "sha256": "b9de5cba9ba1e733b475e9c656435a52270d6b66bfe4e8797c3bddd7c5562f1c"
+    },
+    {
+      "bytes": 6098432,
+      "member": "evidence/expanded/fits/TE_full/F7_seed_29/epochs/epoch_010.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_full\\F7_seed_29\\epochs\\epoch_010.pt",
+      "sha256": "b75209d6bf55880b699287539d3acc739ffca4e2c299b4c222539c4e3ed0168d"
+    },
+    {
+      "bytes": 6098432,
+      "member": "evidence/expanded/fits/TE_full/F7_seed_29/epochs/epoch_011.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_full\\F7_seed_29\\epochs\\epoch_011.pt",
+      "sha256": "1c0d52922a11e99285281f272c287f22668ce673566bdf67c75ab3e6b6ba9fb1"
+    },
+    {
+      "bytes": 6098432,
+      "member": "evidence/expanded/fits/TE_full/F7_seed_29/epochs/epoch_012.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_full\\F7_seed_29\\epochs\\epoch_012.pt",
+      "sha256": "b4b396b1e0441051bcfa9f263251791f28bb3f2dabf4a46d7744e65ccb138dbb"
+    },
+    {
+      "bytes": 6098432,
+      "member": "evidence/expanded/fits/TE_full/F7_seed_29/epochs/epoch_013.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_full\\F7_seed_29\\epochs\\epoch_013.pt",
+      "sha256": "b1f76524e39d51df0d658c221768bc52c95e1a91cde2dffabed9b04aa7e87fee"
+    },
+    {
+      "bytes": 6098432,
+      "member": "evidence/expanded/fits/TE_full/F7_seed_29/epochs/epoch_014.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_full\\F7_seed_29\\epochs\\epoch_014.pt",
+      "sha256": "5ca267cb3d053b747a253cc3b5afa2647d07a288c3fe7fa20f686b8252ad3ef4"
+    },
+    {
+      "bytes": 6098432,
+      "member": "evidence/expanded/fits/TE_full/F7_seed_29/epochs/epoch_015.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_full\\F7_seed_29\\epochs\\epoch_015.pt",
+      "sha256": "b2dc4e62f86f8e15424b83ae42dab0d23f6e90a6a468b13cfbf22f22eba7b360"
+    },
+    {
+      "bytes": 6098432,
+      "member": "evidence/expanded/fits/TE_full/F7_seed_29/epochs/epoch_016.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_full\\F7_seed_29\\epochs\\epoch_016.pt",
+      "sha256": "cd9b466a1f603c9f3c06fda8cd68f39d8cd0f196826d91c9ed2ca2aec74921e3"
+    },
+    {
+      "bytes": 6098432,
+      "member": "evidence/expanded/fits/TE_full/F7_seed_29/epochs/epoch_017.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_full\\F7_seed_29\\epochs\\epoch_017.pt",
+      "sha256": "4479372431a88464495ea513ba393e4b376d1425e8e2f36c0740d9f360bebb74"
+    },
+    {
+      "bytes": 6424640,
+      "member": "evidence/expanded/fits/TE_wide/F7_seed_29/epochs/epoch_001.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_wide\\F7_seed_29\\epochs\\epoch_001.pt",
+      "sha256": "32cdc1d9620a1b3986f3244a19900dc16dadbf2d566fb6ed07cbe2d1ae4719ea"
+    },
+    {
+      "bytes": 6424640,
+      "member": "evidence/expanded/fits/TE_wide/F7_seed_29/epochs/epoch_002.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_wide\\F7_seed_29\\epochs\\epoch_002.pt",
+      "sha256": "17f7dd6a71d0de4e002651eaec81f82edff957149dc1fd202bbc5e15c2a20008"
+    },
+    {
+      "bytes": 6424640,
+      "member": "evidence/expanded/fits/TE_wide/F7_seed_29/epochs/epoch_003.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_wide\\F7_seed_29\\epochs\\epoch_003.pt",
+      "sha256": "031e6ac4883cf60c8a62dd9f7f7641b63fcb58a36770b61944fae9cff27570d3"
+    },
+    {
+      "bytes": 6424640,
+      "member": "evidence/expanded/fits/TE_wide/F7_seed_29/epochs/epoch_004.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_wide\\F7_seed_29\\epochs\\epoch_004.pt",
+      "sha256": "7454e418701b910e795017ddd4115e9fe703558cea0fe28e7d7f66c9182bf7a1"
+    },
+    {
+      "bytes": 6424640,
+      "member": "evidence/expanded/fits/TE_wide/F7_seed_29/epochs/epoch_005.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_wide\\F7_seed_29\\epochs\\epoch_005.pt",
+      "sha256": "79967a5d33b5848e4b02ff4f07cc297b233f355a51a8f7a363698dae05eb92f7"
+    },
+    {
+      "bytes": 6424640,
+      "member": "evidence/expanded/fits/TE_wide/F7_seed_29/epochs/epoch_006.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_wide\\F7_seed_29\\epochs\\epoch_006.pt",
+      "sha256": "55ebd986baf8f46106d28e92a5ee182447cccf8f5ec8622344c635ed49e0eb9b"
+    },
+    {
+      "bytes": 6424640,
+      "member": "evidence/expanded/fits/TE_wide/F7_seed_29/epochs/epoch_007.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_wide\\F7_seed_29\\epochs\\epoch_007.pt",
+      "sha256": "bfc1fe1e848b15874773c792e53da414e6f9cd77e3811eec128d9cab4131863c"
+    },
+    {
+      "bytes": 6424640,
+      "member": "evidence/expanded/fits/TE_wide/F7_seed_29/epochs/epoch_008.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_wide\\F7_seed_29\\epochs\\epoch_008.pt",
+      "sha256": "3d8cde6c15ad44c27832c4102afefc2b2fa4cf84ee2910abf118eb699cce3064"
+    },
+    {
+      "bytes": 6424640,
+      "member": "evidence/expanded/fits/TE_wide/F7_seed_29/epochs/epoch_009.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_wide\\F7_seed_29\\epochs\\epoch_009.pt",
+      "sha256": "3d2b4b08c48dcb50355819e4c9ae54b078321a8a52f3c270a99cf9698acdc6d1"
+    },
+    {
+      "bytes": 6424640,
+      "member": "evidence/expanded/fits/TE_wide/F7_seed_29/epochs/epoch_010.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_wide\\F7_seed_29\\epochs\\epoch_010.pt",
+      "sha256": "6794b747ee13b9ae55121a17f01d62a6d8fb46e6da3023740233a62ed4c58c4b"
+    },
+    {
+      "bytes": 6424640,
+      "member": "evidence/expanded/fits/TE_wide/F7_seed_29/epochs/epoch_011.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_wide\\F7_seed_29\\epochs\\epoch_011.pt",
+      "sha256": "a78c08bce8f30f892f2606283ec5b3505395b9783fd220b207bad67920dd55f0"
+    },
+    {
+      "bytes": 6424640,
+      "member": "evidence/expanded/fits/TE_wide/F7_seed_29/epochs/epoch_012.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_wide\\F7_seed_29\\epochs\\epoch_012.pt",
+      "sha256": "3a9c6d2aa17abcb383582749b3afcde99c77cd2aba6750b8e09cea57ec64e53a"
+    },
+    {
+      "bytes": 6424640,
+      "member": "evidence/expanded/fits/TE_wide/F7_seed_29/epochs/epoch_013.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_wide\\F7_seed_29\\epochs\\epoch_013.pt",
+      "sha256": "277882c93ca85b2f66765357da2201ffb5ff7fe99ca867d865c00c2ca4922044"
+    },
+    {
+      "bytes": 6424640,
+      "member": "evidence/expanded/fits/TE_wide/F7_seed_29/epochs/epoch_014.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_wide\\F7_seed_29\\epochs\\epoch_014.pt",
+      "sha256": "d0f5a61cb0cb3b42c0cef0a8819922e72ce3528a7118b1eb119e837094bbc3b5"
+    },
+    {
+      "bytes": 6424640,
+      "member": "evidence/expanded/fits/TE_wide/F7_seed_29/epochs/epoch_015.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_wide\\F7_seed_29\\epochs\\epoch_015.pt",
+      "sha256": "63a22c47dbcd0f6f8c0ca80541fab605fed927b282747f122d310cf3ea713f44"
+    },
+    {
+      "bytes": 6424640,
+      "member": "evidence/expanded/fits/TE_wide/F7_seed_29/epochs/epoch_016.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_wide\\F7_seed_29\\epochs\\epoch_016.pt",
+      "sha256": "26374ef5390dfb031758e49b18bf04e5290b3fb6d29a6747886e5f387312b391"
+    },
+    {
+      "bytes": 6424640,
+      "member": "evidence/expanded/fits/TE_wide/F7_seed_29/epochs/epoch_017.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_wide\\F7_seed_29\\epochs\\epoch_017.pt",
+      "sha256": "1f8e46bdce16dd2cafe335e526f14bd144927622d4ff361eb90e29f75bc856f9"
+    },
+    {
+      "bytes": 6098432,
+      "member": "evidence/expanded/fits/TE_full/F7_seed_47/epochs/epoch_001.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_full\\F7_seed_47\\epochs\\epoch_001.pt",
+      "sha256": "f5469e64efed3a92a8fcfe894c18bdf0a1779105c12e9e0a0d9751fb12065dfe"
+    },
+    {
+      "bytes": 6098432,
+      "member": "evidence/expanded/fits/TE_full/F7_seed_47/epochs/epoch_002.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_full\\F7_seed_47\\epochs\\epoch_002.pt",
+      "sha256": "a6357c31f459045725d730fd0c1373f6a944b65533ec5e07a1ba56e5c5e70fda"
+    },
+    {
+      "bytes": 6098432,
+      "member": "evidence/expanded/fits/TE_full/F7_seed_47/epochs/epoch_003.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_full\\F7_seed_47\\epochs\\epoch_003.pt",
+      "sha256": "5210b9f53e89a7d0b859e0a003e24c5ff264d6df688543fa88cc14c2a6eb6f8a"
+    },
+    {
+      "bytes": 6098432,
+      "member": "evidence/expanded/fits/TE_full/F7_seed_47/epochs/epoch_004.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_full\\F7_seed_47\\epochs\\epoch_004.pt",
+      "sha256": "3253d09928c15938e2c827c456fba80dad582f56598c5dd3daf4fafc6fc709be"
+    },
+    {
+      "bytes": 6098432,
+      "member": "evidence/expanded/fits/TE_full/F7_seed_47/epochs/epoch_005.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_full\\F7_seed_47\\epochs\\epoch_005.pt",
+      "sha256": "bc787391f73d75dedf6c0976d000c49123df906566ab10eefe3c58f0f88c74ed"
+    },
+    {
+      "bytes": 6098432,
+      "member": "evidence/expanded/fits/TE_full/F7_seed_47/epochs/epoch_006.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_full\\F7_seed_47\\epochs\\epoch_006.pt",
+      "sha256": "22a822db44329ab62bc85adaed66f3580973a478709313f9b72f2bd944cee890"
+    },
+    {
+      "bytes": 6098432,
+      "member": "evidence/expanded/fits/TE_full/F7_seed_47/epochs/epoch_007.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_full\\F7_seed_47\\epochs\\epoch_007.pt",
+      "sha256": "9abbdef38ca02987bd4de42b4a670f5eaf1bb7303e02581d07ed50f909fee777"
+    },
+    {
+      "bytes": 6098432,
+      "member": "evidence/expanded/fits/TE_full/F7_seed_47/epochs/epoch_008.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_full\\F7_seed_47\\epochs\\epoch_008.pt",
+      "sha256": "2d94fd2e89cd5cb476a198eba070c7357990c2c6551848cf6fa3f8b679c74ecf"
+    },
+    {
+      "bytes": 6098432,
+      "member": "evidence/expanded/fits/TE_full/F7_seed_47/epochs/epoch_009.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_full\\F7_seed_47\\epochs\\epoch_009.pt",
+      "sha256": "5fe4aa8077cdc9639c4668600cd98b98731895441689345379967e602dbf6a24"
+    },
+    {
+      "bytes": 6098432,
+      "member": "evidence/expanded/fits/TE_full/F7_seed_47/epochs/epoch_010.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_full\\F7_seed_47\\epochs\\epoch_010.pt",
+      "sha256": "3a76c440b7ae4deea02c70e1abc40a376ac1feea32e0548d43cfb5af5195ac59"
+    },
+    {
+      "bytes": 6098432,
+      "member": "evidence/expanded/fits/TE_full/F7_seed_47/epochs/epoch_011.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_full\\F7_seed_47\\epochs\\epoch_011.pt",
+      "sha256": "de582016ccc49e9426e99f8a5469cd297714a8663b4f0742ddc4f75d557ed716"
+    },
+    {
+      "bytes": 6098432,
+      "member": "evidence/expanded/fits/TE_full/F7_seed_47/epochs/epoch_012.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_full\\F7_seed_47\\epochs\\epoch_012.pt",
+      "sha256": "d1b590bdca9f7b95b7a1dd9b134a0ed85dadb97593ef58a9ebbc0fe1eaf76788"
+    },
+    {
+      "bytes": 6098432,
+      "member": "evidence/expanded/fits/TE_full/F7_seed_47/epochs/epoch_013.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_full\\F7_seed_47\\epochs\\epoch_013.pt",
+      "sha256": "b4dcc20c28e3ea8d3459722494fa96b24b09600e8bdd7ddd7d2f0e4ba3cd69e9"
+    },
+    {
+      "bytes": 6098432,
+      "member": "evidence/expanded/fits/TE_full/F7_seed_47/epochs/epoch_014.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_full\\F7_seed_47\\epochs\\epoch_014.pt",
+      "sha256": "199e94b3bda117365c09896a4a8f30a53c827b0ee6fc750c102910a2daa3147c"
+    },
+    {
+      "bytes": 6424640,
+      "member": "evidence/expanded/fits/TE_wide/F7_seed_47/epochs/epoch_001.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_wide\\F7_seed_47\\epochs\\epoch_001.pt",
+      "sha256": "14eac9ddd08663a6b19e7be965ae70dc9004e6d831c2228c7599658a808cb8aa"
+    },
+    {
+      "bytes": 6424640,
+      "member": "evidence/expanded/fits/TE_wide/F7_seed_47/epochs/epoch_002.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_wide\\F7_seed_47\\epochs\\epoch_002.pt",
+      "sha256": "ed3a9263c65b3ec109b428e9afa47f3bb4328b8671e407cf353becc32ebcfc5c"
+    },
+    {
+      "bytes": 6424640,
+      "member": "evidence/expanded/fits/TE_wide/F7_seed_47/epochs/epoch_003.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_wide\\F7_seed_47\\epochs\\epoch_003.pt",
+      "sha256": "3bb2f6d85158718249dc4d2def18c92c847b67701c5ee5fda53e05222a02a872"
+    },
+    {
+      "bytes": 6424640,
+      "member": "evidence/expanded/fits/TE_wide/F7_seed_47/epochs/epoch_004.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_wide\\F7_seed_47\\epochs\\epoch_004.pt",
+      "sha256": "631318cc1af2f571e568d58b8ed5e53a7f60e4ca852fca261221ed32c9f3130c"
+    },
+    {
+      "bytes": 6424640,
+      "member": "evidence/expanded/fits/TE_wide/F7_seed_47/epochs/epoch_005.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_wide\\F7_seed_47\\epochs\\epoch_005.pt",
+      "sha256": "c38cd9e857801acca41bdf767b1a1ced9447eb0fef1820d767a6afcec60a7cfb"
+    },
+    {
+      "bytes": 6424640,
+      "member": "evidence/expanded/fits/TE_wide/F7_seed_47/epochs/epoch_006.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_wide\\F7_seed_47\\epochs\\epoch_006.pt",
+      "sha256": "ff2929abff867bd9887aacc48c5e34fe327d11fad152f9a82dd50b1e03cc6b6b"
+    },
+    {
+      "bytes": 6424640,
+      "member": "evidence/expanded/fits/TE_wide/F7_seed_47/epochs/epoch_007.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_wide\\F7_seed_47\\epochs\\epoch_007.pt",
+      "sha256": "4ffda6e977a90dff68d36d5bff65ae0362222a2826a664184d759d0eeb0bcde3"
+    },
+    {
+      "bytes": 6424640,
+      "member": "evidence/expanded/fits/TE_wide/F7_seed_47/epochs/epoch_008.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_wide\\F7_seed_47\\epochs\\epoch_008.pt",
+      "sha256": "d1b371962da9d7e4919c569ddf674370f038fe533eb73caf83002e05e3568b70"
+    },
+    {
+      "bytes": 6424640,
+      "member": "evidence/expanded/fits/TE_wide/F7_seed_47/epochs/epoch_009.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_wide\\F7_seed_47\\epochs\\epoch_009.pt",
+      "sha256": "ec42a199a9b16f5dcd0012360dd48363540d1339956375dd1bef07b20135e54c"
+    },
+    {
+      "bytes": 6424640,
+      "member": "evidence/expanded/fits/TE_wide/F7_seed_47/epochs/epoch_010.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_wide\\F7_seed_47\\epochs\\epoch_010.pt",
+      "sha256": "9a09bd5b8c9ec69711541538d832daadf02d4313cabd1f6425d00e1e6027b449"
+    },
+    {
+      "bytes": 6424640,
+      "member": "evidence/expanded/fits/TE_wide/F7_seed_47/epochs/epoch_011.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_wide\\F7_seed_47\\epochs\\epoch_011.pt",
+      "sha256": "ef3317ab03ad4747198552224fc6272b3aa6305d28103b4c9a3777e8330ca0b4"
+    },
+    {
+      "bytes": 6424640,
+      "member": "evidence/expanded/fits/TE_wide/F7_seed_47/epochs/epoch_012.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_wide\\F7_seed_47\\epochs\\epoch_012.pt",
+      "sha256": "30d125af2b28f8ea42727fd2df797ee360646da35c300515ebe107329cca28f9"
+    },
+    {
+      "bytes": 6424640,
+      "member": "evidence/expanded/fits/TE_wide/F7_seed_47/epochs/epoch_013.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_wide\\F7_seed_47\\epochs\\epoch_013.pt",
+      "sha256": "03c2fe190c3265505f3a42422f1969455f722981f7aa87005a28af3759d06bc1"
+    },
+    {
+      "bytes": 6424640,
+      "member": "evidence/expanded/fits/TE_wide/F7_seed_47/epochs/epoch_014.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_wide\\F7_seed_47\\epochs\\epoch_014.pt",
+      "sha256": "bdca5bd0def2f81757678b0fb8b452b3a73032393089352ca52356678fd6e231"
+    },
+    {
+      "bytes": 6116416,
+      "member": "evidence/expanded/fits/TE_full/F11_seed_11/epochs/epoch_001.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_full\\F11_seed_11\\epochs\\epoch_001.pt",
+      "sha256": "062dd7cacf0909154990818790ec6c5fffae0a5e3f0d95d4c21e4a3d50470823"
+    },
+    {
+      "bytes": 6116416,
+      "member": "evidence/expanded/fits/TE_full/F11_seed_11/epochs/epoch_002.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_full\\F11_seed_11\\epochs\\epoch_002.pt",
+      "sha256": "316bb7be6212f00d942428901135ba563d784d2094c0393adc4558e617ed79ca"
+    },
+    {
+      "bytes": 6116416,
+      "member": "evidence/expanded/fits/TE_full/F11_seed_11/epochs/epoch_003.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_full\\F11_seed_11\\epochs\\epoch_003.pt",
+      "sha256": "8fb09861eba42e181a0783c6f68bbbb7cf93c55e0e619899bcf3ad417a2ecc77"
+    },
+    {
+      "bytes": 6116416,
+      "member": "evidence/expanded/fits/TE_full/F11_seed_11/epochs/epoch_004.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_full\\F11_seed_11\\epochs\\epoch_004.pt",
+      "sha256": "5bd753f239133bc0cfcc2418d0e73c1e54d49175d3cf5e1b8518fb9401013c8b"
+    },
+    {
+      "bytes": 6116416,
+      "member": "evidence/expanded/fits/TE_full/F11_seed_11/epochs/epoch_005.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_full\\F11_seed_11\\epochs\\epoch_005.pt",
+      "sha256": "0360c96a67b5dfdb1f9af1d546066c8ccdc6eb8e92a248fe803aa5dd24fb7734"
+    },
+    {
+      "bytes": 6116416,
+      "member": "evidence/expanded/fits/TE_full/F11_seed_11/epochs/epoch_006.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_full\\F11_seed_11\\epochs\\epoch_006.pt",
+      "sha256": "87130d3093fd8a5b3c8da58e18919961deb667ca37faea643c1596319d16948e"
+    },
+    {
+      "bytes": 6116416,
+      "member": "evidence/expanded/fits/TE_full/F11_seed_11/epochs/epoch_007.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_full\\F11_seed_11\\epochs\\epoch_007.pt",
+      "sha256": "1a32044c03ed73271d0b9ce5b55b755d1304486df1ee825f82f0d85fa299c205"
+    },
+    {
+      "bytes": 6116416,
+      "member": "evidence/expanded/fits/TE_full/F11_seed_11/epochs/epoch_008.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_full\\F11_seed_11\\epochs\\epoch_008.pt",
+      "sha256": "c7f46f304370ad52e332e821faaac0791b500e644d3377d04a2449b8e2464ae9"
+    },
+    {
+      "bytes": 6116416,
+      "member": "evidence/expanded/fits/TE_full/F11_seed_11/epochs/epoch_009.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_full\\F11_seed_11\\epochs\\epoch_009.pt",
+      "sha256": "f406a189f0d10555683d780b7e96d188d224af23376e84716ca005ac40dac4a8"
+    },
+    {
+      "bytes": 6116416,
+      "member": "evidence/expanded/fits/TE_full/F11_seed_11/epochs/epoch_010.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_full\\F11_seed_11\\epochs\\epoch_010.pt",
+      "sha256": "f8d66afedbd7ef357e20a18de127b3e8275ea62676ec828c49a1b83c70a97995"
+    },
+    {
+      "bytes": 6116416,
+      "member": "evidence/expanded/fits/TE_full/F11_seed_11/epochs/epoch_011.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_full\\F11_seed_11\\epochs\\epoch_011.pt",
+      "sha256": "f5fe87e12a4e14d80bc1792703593344f1c8c2e486198b09d14993a5e0e1f4b1"
+    },
+    {
+      "bytes": 6116416,
+      "member": "evidence/expanded/fits/TE_full/F11_seed_11/epochs/epoch_012.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_full\\F11_seed_11\\epochs\\epoch_012.pt",
+      "sha256": "4f2e84a6a8d134dff2736fc520183def67317ce051c8433fb17e2a6e8201fc8d"
+    },
+    {
+      "bytes": 6116416,
+      "member": "evidence/expanded/fits/TE_full/F11_seed_11/epochs/epoch_013.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_full\\F11_seed_11\\epochs\\epoch_013.pt",
+      "sha256": "fc5f52892c505450c43d29edfc47421bf2bb2a857f13d1ab6ba7f9a759103324"
+    },
+    {
+      "bytes": 6116416,
+      "member": "evidence/expanded/fits/TE_full/F11_seed_11/epochs/epoch_014.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_full\\F11_seed_11\\epochs\\epoch_014.pt",
+      "sha256": "b24a2f569057312be70802dee3353c9df8e0bb3d48c7acb7524cbf826d619c46"
+    },
+    {
+      "bytes": 6116416,
+      "member": "evidence/expanded/fits/TE_full/F11_seed_11/epochs/epoch_015.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_full\\F11_seed_11\\epochs\\epoch_015.pt",
+      "sha256": "5c2ceb67902c3b83ea4d644aaa72dee8adbabf0bad7cbcf8f6d3ebd89d078618"
+    },
+    {
+      "bytes": 6116416,
+      "member": "evidence/expanded/fits/TE_full/F11_seed_11/epochs/epoch_016.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_full\\F11_seed_11\\epochs\\epoch_016.pt",
+      "sha256": "65588ddfbeab6097e4958ca39652047d5d7e4707c20482e5e177917c2c4996b6"
+    },
+    {
+      "bytes": 6116416,
+      "member": "evidence/expanded/fits/TE_full/F11_seed_11/epochs/epoch_017.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_full\\F11_seed_11\\epochs\\epoch_017.pt",
+      "sha256": "cc963baf59fcfac81d080bbd0e0507572c9976ce4df958eaf250a6c096b60710"
+    },
+    {
+      "bytes": 6116416,
+      "member": "evidence/expanded/fits/TE_full/F11_seed_11/epochs/epoch_018.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_full\\F11_seed_11\\epochs\\epoch_018.pt",
+      "sha256": "31754ce1023cd2aa9fa1c28e53024d3fdef26dc23a585032fa014f40defbe13d"
+    },
+    {
+      "bytes": 6116416,
+      "member": "evidence/expanded/fits/TE_full/F11_seed_11/epochs/epoch_019.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_full\\F11_seed_11\\epochs\\epoch_019.pt",
+      "sha256": "da917078c74a6efa72afe1ad00babcf328acfe361ddae8fd28172d85104769ab"
+    },
+    {
+      "bytes": 6116416,
+      "member": "evidence/expanded/fits/TE_full/F11_seed_11/epochs/epoch_020.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_full\\F11_seed_11\\epochs\\epoch_020.pt",
+      "sha256": "fe06fbb3f157f2519f9b4ae76dfbedd1cd514e2c00b8f99b473341e955b43f86"
+    },
+    {
+      "bytes": 6116416,
+      "member": "evidence/expanded/fits/TE_full/F11_seed_11/epochs/epoch_021.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_full\\F11_seed_11\\epochs\\epoch_021.pt",
+      "sha256": "b46809560a9e5936f42753873a0acc5965123ccfd1a61be4ef6199b8f278a8ee"
+    },
+    {
+      "bytes": 6116416,
+      "member": "evidence/expanded/fits/TE_full/F11_seed_11/epochs/epoch_022.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_full\\F11_seed_11\\epochs\\epoch_022.pt",
+      "sha256": "d3603505cf13569b60272e527d8720e53e1110eaea67dede8b292df39d904de6"
+    },
+    {
+      "bytes": 6116416,
+      "member": "evidence/expanded/fits/TE_full/F11_seed_11/epochs/epoch_023.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_full\\F11_seed_11\\epochs\\epoch_023.pt",
+      "sha256": "b0013ae40df8b1c5e087f8ce84cc7ce3dc9527821539e1726a0ee153e9d3f503"
+    },
+    {
+      "bytes": 6442560,
+      "member": "evidence/expanded/fits/TE_wide/F11_seed_11/epochs/epoch_001.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_wide\\F11_seed_11\\epochs\\epoch_001.pt",
+      "sha256": "59fc35813d96c501cfc0948a5809eb0cf57fef300ee23547871ed2040640f336"
+    },
+    {
+      "bytes": 6442560,
+      "member": "evidence/expanded/fits/TE_wide/F11_seed_11/epochs/epoch_002.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_wide\\F11_seed_11\\epochs\\epoch_002.pt",
+      "sha256": "cf3ae2a1d036668910780fed459d3c78a9f83afd5890cd592e0e202edd79187d"
+    },
+    {
+      "bytes": 6442560,
+      "member": "evidence/expanded/fits/TE_wide/F11_seed_11/epochs/epoch_003.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_wide\\F11_seed_11\\epochs\\epoch_003.pt",
+      "sha256": "def4b6fa90cf6ee86ec0cf536e3f7a7456dddad26275571295e02fdfe1be72f7"
+    },
+    {
+      "bytes": 6442560,
+      "member": "evidence/expanded/fits/TE_wide/F11_seed_11/epochs/epoch_004.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_wide\\F11_seed_11\\epochs\\epoch_004.pt",
+      "sha256": "27da9a8fd8377c62a319dc87f26858642255edc403be7c87ad12af387e0d4880"
+    },
+    {
+      "bytes": 6442560,
+      "member": "evidence/expanded/fits/TE_wide/F11_seed_11/epochs/epoch_005.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_wide\\F11_seed_11\\epochs\\epoch_005.pt",
+      "sha256": "05eafc485d6e2b2cb99ea4242d8f1dda9f368b63989454806572c909cae4c289"
+    },
+    {
+      "bytes": 6442560,
+      "member": "evidence/expanded/fits/TE_wide/F11_seed_11/epochs/epoch_006.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_wide\\F11_seed_11\\epochs\\epoch_006.pt",
+      "sha256": "f3e5f616b277df035981daab2002faf96ac12d0b0f90761c37245a6a60fe75a3"
+    },
+    {
+      "bytes": 6442560,
+      "member": "evidence/expanded/fits/TE_wide/F11_seed_11/epochs/epoch_007.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_wide\\F11_seed_11\\epochs\\epoch_007.pt",
+      "sha256": "d2f4c8b16a061be185c0b2f1239c0f9511654e5a16c893f5c4010dc6798f1d5d"
+    },
+    {
+      "bytes": 6442560,
+      "member": "evidence/expanded/fits/TE_wide/F11_seed_11/epochs/epoch_008.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_wide\\F11_seed_11\\epochs\\epoch_008.pt",
+      "sha256": "d892756e315c42b75891feab3575cd5c190c376e703016a9c4fa147679dbe4eb"
+    },
+    {
+      "bytes": 6442560,
+      "member": "evidence/expanded/fits/TE_wide/F11_seed_11/epochs/epoch_009.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_wide\\F11_seed_11\\epochs\\epoch_009.pt",
+      "sha256": "75b21e6b1423453d1bf77b7392e39ad84e7f6923e93ab1731b57e9c802a3bad1"
+    },
+    {
+      "bytes": 6442560,
+      "member": "evidence/expanded/fits/TE_wide/F11_seed_11/epochs/epoch_010.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_wide\\F11_seed_11\\epochs\\epoch_010.pt",
+      "sha256": "3983333488b218e94d564f1aed370c311da3a3041af596139240037c5790a6c3"
+    },
+    {
+      "bytes": 6442560,
+      "member": "evidence/expanded/fits/TE_wide/F11_seed_11/epochs/epoch_011.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_wide\\F11_seed_11\\epochs\\epoch_011.pt",
+      "sha256": "fee8e7e3a1b5c508445c7d85c7ee5cf3ea899a440c03808fdd970369b7966247"
+    },
+    {
+      "bytes": 6442560,
+      "member": "evidence/expanded/fits/TE_wide/F11_seed_11/epochs/epoch_012.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_wide\\F11_seed_11\\epochs\\epoch_012.pt",
+      "sha256": "b7429d4ca09a84362a48f64dc68c841584c537c02b0785b1ffa14d9ceedfd7d4"
+    },
+    {
+      "bytes": 6442560,
+      "member": "evidence/expanded/fits/TE_wide/F11_seed_11/epochs/epoch_013.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_wide\\F11_seed_11\\epochs\\epoch_013.pt",
+      "sha256": "660cf91dae5287490da4e0b92c44e785d29bef95efdb359ad7d5f5042996b038"
+    },
+    {
+      "bytes": 6442560,
+      "member": "evidence/expanded/fits/TE_wide/F11_seed_11/epochs/epoch_014.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_wide\\F11_seed_11\\epochs\\epoch_014.pt",
+      "sha256": "f3ef2a08b6565eee81a844bfc8157630b49bf7b38e10e059f4632e9a61d479b6"
+    },
+    {
+      "bytes": 6442560,
+      "member": "evidence/expanded/fits/TE_wide/F11_seed_11/epochs/epoch_015.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_wide\\F11_seed_11\\epochs\\epoch_015.pt",
+      "sha256": "a6f61017c99954c9da08f79c88a8cbb8792579f14e6840dd2d1960317c09b48c"
+    },
+    {
+      "bytes": 6442560,
+      "member": "evidence/expanded/fits/TE_wide/F11_seed_11/epochs/epoch_016.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_wide\\F11_seed_11\\epochs\\epoch_016.pt",
+      "sha256": "b5eb9e857644568b561b7e52088bd8e7d2c8988b4e956081d314d552c8d98243"
+    },
+    {
+      "bytes": 6442560,
+      "member": "evidence/expanded/fits/TE_wide/F11_seed_11/epochs/epoch_017.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_wide\\F11_seed_11\\epochs\\epoch_017.pt",
+      "sha256": "d476c8b68661c5a45046882dc2e9aeef10d5cb9612466bef46c635e20a55ca8e"
+    },
+    {
+      "bytes": 6442560,
+      "member": "evidence/expanded/fits/TE_wide/F11_seed_11/epochs/epoch_018.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_wide\\F11_seed_11\\epochs\\epoch_018.pt",
+      "sha256": "f035a922a9753d1d9f1dbdf8f73bf1076034c3177ef4ef1288c6c66e00ae6952"
+    },
+    {
+      "bytes": 6442560,
+      "member": "evidence/expanded/fits/TE_wide/F11_seed_11/epochs/epoch_019.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_wide\\F11_seed_11\\epochs\\epoch_019.pt",
+      "sha256": "c07bb96559c722d3d47b0bf5372eeb586f960cc0537c7ccda41a966d1b246bce"
+    },
+    {
+      "bytes": 6442560,
+      "member": "evidence/expanded/fits/TE_wide/F11_seed_11/epochs/epoch_020.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_wide\\F11_seed_11\\epochs\\epoch_020.pt",
+      "sha256": "a949f9fca005e7d4d0c665a0deb8f9cde144b0863ef61dbbe46696250591ba7d"
+    },
+    {
+      "bytes": 6116416,
+      "member": "evidence/expanded/fits/TE_full/F11_seed_29/epochs/epoch_001.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_full\\F11_seed_29\\epochs\\epoch_001.pt",
+      "sha256": "f4145072cdead3c10d266786c6a9282e24fcacc52b56d2d267c78da5e196b348"
+    },
+    {
+      "bytes": 6116416,
+      "member": "evidence/expanded/fits/TE_full/F11_seed_29/epochs/epoch_002.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_full\\F11_seed_29\\epochs\\epoch_002.pt",
+      "sha256": "c77c259d76ffad4df676e037b93daf6d3e3075855b18078fceca27dec8ac72b1"
+    },
+    {
+      "bytes": 6116416,
+      "member": "evidence/expanded/fits/TE_full/F11_seed_29/epochs/epoch_003.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_full\\F11_seed_29\\epochs\\epoch_003.pt",
+      "sha256": "247382d5ab28fa845970a14f1d148f36cb28622c4828752b763ed5cb554980e2"
+    },
+    {
+      "bytes": 6116416,
+      "member": "evidence/expanded/fits/TE_full/F11_seed_29/epochs/epoch_004.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_full\\F11_seed_29\\epochs\\epoch_004.pt",
+      "sha256": "a85d90eec6d9588cefa937e169f85a85d461bd906500cfb5cab96d40f1d34391"
+    },
+    {
+      "bytes": 6116416,
+      "member": "evidence/expanded/fits/TE_full/F11_seed_29/epochs/epoch_005.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_full\\F11_seed_29\\epochs\\epoch_005.pt",
+      "sha256": "184d4421781892999f750c0dab29c892b182994b030ffcb9ba26897326fa4d26"
+    },
+    {
+      "bytes": 6116416,
+      "member": "evidence/expanded/fits/TE_full/F11_seed_29/epochs/epoch_006.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_full\\F11_seed_29\\epochs\\epoch_006.pt",
+      "sha256": "51f0cbcfbdf8a3b0958ebf4aa85ad06616103ad363aa68c4cc3bf06be3436801"
+    },
+    {
+      "bytes": 6116416,
+      "member": "evidence/expanded/fits/TE_full/F11_seed_29/epochs/epoch_007.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_full\\F11_seed_29\\epochs\\epoch_007.pt",
+      "sha256": "fa9d4fbc159aa3a69117b18b883db6972077d560711e4e9e6d8a57c124abcbae"
+    },
+    {
+      "bytes": 6116416,
+      "member": "evidence/expanded/fits/TE_full/F11_seed_29/epochs/epoch_008.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_full\\F11_seed_29\\epochs\\epoch_008.pt",
+      "sha256": "01081294bf308283e70265b1d65f9de199dce2eb151a24cca79aecc07bd180a6"
+    },
+    {
+      "bytes": 6116416,
+      "member": "evidence/expanded/fits/TE_full/F11_seed_29/epochs/epoch_009.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_full\\F11_seed_29\\epochs\\epoch_009.pt",
+      "sha256": "2fb769caa5f0b7cd9cc3eb78fd89478f57da2b5f4d4777b9a4ed5ad31fad1bb0"
+    },
+    {
+      "bytes": 6116416,
+      "member": "evidence/expanded/fits/TE_full/F11_seed_29/epochs/epoch_010.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_full\\F11_seed_29\\epochs\\epoch_010.pt",
+      "sha256": "93217b45727a72caff7bcb3c4336ac68d17e4f33537a7d07644b0c4f78775a76"
+    },
+    {
+      "bytes": 6116416,
+      "member": "evidence/expanded/fits/TE_full/F11_seed_29/epochs/epoch_011.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_full\\F11_seed_29\\epochs\\epoch_011.pt",
+      "sha256": "93684be6ae8e93c1c7d031df5ca221cd291c9d39dd6b0ff262334dd17e00fa0a"
+    },
+    {
+      "bytes": 6116416,
+      "member": "evidence/expanded/fits/TE_full/F11_seed_29/epochs/epoch_012.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_full\\F11_seed_29\\epochs\\epoch_012.pt",
+      "sha256": "148c55259867ca9c96493b432a1057aced5feff59e33ac373cb5fbcb60d14699"
+    },
+    {
+      "bytes": 6116416,
+      "member": "evidence/expanded/fits/TE_full/F11_seed_29/epochs/epoch_013.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_full\\F11_seed_29\\epochs\\epoch_013.pt",
+      "sha256": "bc5b7025f032c681975955897d22f98c2f6c46a675d8595ce9fdbf5cac03e371"
+    },
+    {
+      "bytes": 6116416,
+      "member": "evidence/expanded/fits/TE_full/F11_seed_29/epochs/epoch_014.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_full\\F11_seed_29\\epochs\\epoch_014.pt",
+      "sha256": "2247ae40dc52125d11cee65ed0b4733719ef7098e5e9e2336000837b4bd19a95"
+    },
+    {
+      "bytes": 6116416,
+      "member": "evidence/expanded/fits/TE_full/F11_seed_29/epochs/epoch_015.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_full\\F11_seed_29\\epochs\\epoch_015.pt",
+      "sha256": "de053ab8250385e5bb247c12bb22fc0ef74b5e8a9d331c0d48fb04b87f43b468"
+    },
+    {
+      "bytes": 6116416,
+      "member": "evidence/expanded/fits/TE_full/F11_seed_29/epochs/epoch_016.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_full\\F11_seed_29\\epochs\\epoch_016.pt",
+      "sha256": "ea1017e31835fe642747aba0a8f3fb3cb9d773add088b07b322012f87ccb0c63"
+    },
+    {
+      "bytes": 6116416,
+      "member": "evidence/expanded/fits/TE_full/F11_seed_29/epochs/epoch_017.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_full\\F11_seed_29\\epochs\\epoch_017.pt",
+      "sha256": "1334d8e39b087e470147b2960095f66580d88f6ad76c205d5a1caa5e3f453c88"
+    },
+    {
+      "bytes": 6116416,
+      "member": "evidence/expanded/fits/TE_full/F11_seed_29/epochs/epoch_018.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_full\\F11_seed_29\\epochs\\epoch_018.pt",
+      "sha256": "da4f448ac49af52f1bc15f0ed90f68bef2680d697365cda31ef44a40caa7ed8d"
+    },
+    {
+      "bytes": 6116416,
+      "member": "evidence/expanded/fits/TE_full/F11_seed_29/epochs/epoch_019.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_full\\F11_seed_29\\epochs\\epoch_019.pt",
+      "sha256": "7347042a2c57a7e86d16b65c58c1840ed91604fb5419b941802b59c802472931"
+    },
+    {
+      "bytes": 6116416,
+      "member": "evidence/expanded/fits/TE_full/F11_seed_29/epochs/epoch_020.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_full\\F11_seed_29\\epochs\\epoch_020.pt",
+      "sha256": "69437c09948b3b26ee9d680ca0827807a95eb497a14f078877d7c9b1203e2e14"
+    },
+    {
+      "bytes": 6116416,
+      "member": "evidence/expanded/fits/TE_full/F11_seed_29/epochs/epoch_021.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_full\\F11_seed_29\\epochs\\epoch_021.pt",
+      "sha256": "1bdf7849e325a0319ae8cf98e6875ecb858b56098af5c4129f3c1e5558fe8eca"
+    },
+    {
+      "bytes": 6116416,
+      "member": "evidence/expanded/fits/TE_full/F11_seed_29/epochs/epoch_022.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_full\\F11_seed_29\\epochs\\epoch_022.pt",
+      "sha256": "848cb4c306b26e1c5a105184da2503ba83e1c6d46a173b247f4f32857b7d759e"
+    },
+    {
+      "bytes": 6116416,
+      "member": "evidence/expanded/fits/TE_full/F11_seed_29/epochs/epoch_023.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_full\\F11_seed_29\\epochs\\epoch_023.pt",
+      "sha256": "01615ca17d632a7ee40565f56b33b114f9b39f003142922d1b0910d4ccdca3dc"
+    },
+    {
+      "bytes": 6116416,
+      "member": "evidence/expanded/fits/TE_full/F11_seed_29/epochs/epoch_024.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_full\\F11_seed_29\\epochs\\epoch_024.pt",
+      "sha256": "33894bfbee5bc3f1a654396df94b624a836985857bfb6e40ed3d8e223887360c"
+    },
+    {
+      "bytes": 6442560,
+      "member": "evidence/expanded/fits/TE_wide/F11_seed_29/epochs/epoch_001.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_wide\\F11_seed_29\\epochs\\epoch_001.pt",
+      "sha256": "c58d12c814bc9649fafe15039965545355ecca7ee281ea263dfabfee607975f7"
+    },
+    {
+      "bytes": 6442560,
+      "member": "evidence/expanded/fits/TE_wide/F11_seed_29/epochs/epoch_002.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_wide\\F11_seed_29\\epochs\\epoch_002.pt",
+      "sha256": "0d98a4d86330fd769e4a2064a9bde5475d3a008e1758ef1d69b8978453ce2213"
+    },
+    {
+      "bytes": 6442560,
+      "member": "evidence/expanded/fits/TE_wide/F11_seed_29/epochs/epoch_003.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_wide\\F11_seed_29\\epochs\\epoch_003.pt",
+      "sha256": "9ae09d74f5653ffa93d7e32da33a8c2b1ffe269384ad39988073b3c895afabc4"
+    },
+    {
+      "bytes": 6442560,
+      "member": "evidence/expanded/fits/TE_wide/F11_seed_29/epochs/epoch_004.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_wide\\F11_seed_29\\epochs\\epoch_004.pt",
+      "sha256": "88169d7e2379f64664834923335cdb12a9c26e92040d50680f9f3e711e076f87"
+    },
+    {
+      "bytes": 6442560,
+      "member": "evidence/expanded/fits/TE_wide/F11_seed_29/epochs/epoch_005.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_wide\\F11_seed_29\\epochs\\epoch_005.pt",
+      "sha256": "60327cab3d0c8b3147522a63e3b161b5262303a56dc101418be20b82e6765ad3"
+    },
+    {
+      "bytes": 6442560,
+      "member": "evidence/expanded/fits/TE_wide/F11_seed_29/epochs/epoch_006.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_wide\\F11_seed_29\\epochs\\epoch_006.pt",
+      "sha256": "ce760dd4bd16a5eea6bd95e71ca66926a7c8926fa202f800c8292f4a3d706a2c"
+    },
+    {
+      "bytes": 6442560,
+      "member": "evidence/expanded/fits/TE_wide/F11_seed_29/epochs/epoch_007.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_wide\\F11_seed_29\\epochs\\epoch_007.pt",
+      "sha256": "b259cb7e6b110fd58e92998c87fe309bfb9378eeaa5640a96bcd2c76c30ca7f0"
+    },
+    {
+      "bytes": 6442560,
+      "member": "evidence/expanded/fits/TE_wide/F11_seed_29/epochs/epoch_008.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_wide\\F11_seed_29\\epochs\\epoch_008.pt",
+      "sha256": "cecad49ffc4e04073edd874c9d2af9cba7c2c095271066eba322d10b09ddab06"
+    },
+    {
+      "bytes": 6442560,
+      "member": "evidence/expanded/fits/TE_wide/F11_seed_29/epochs/epoch_009.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_wide\\F11_seed_29\\epochs\\epoch_009.pt",
+      "sha256": "c42e80bdf64a03f563b04ee0290dfa9a1ca17d7f8d117814eef1d427e68c4eed"
+    },
+    {
+      "bytes": 6442560,
+      "member": "evidence/expanded/fits/TE_wide/F11_seed_29/epochs/epoch_010.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_wide\\F11_seed_29\\epochs\\epoch_010.pt",
+      "sha256": "591af1735dc9f932d876fe2dbca0399eb0c7577dfcd23ac700a931ce0d4b659c"
+    },
+    {
+      "bytes": 6442560,
+      "member": "evidence/expanded/fits/TE_wide/F11_seed_29/epochs/epoch_011.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_wide\\F11_seed_29\\epochs\\epoch_011.pt",
+      "sha256": "77622574122e69a3121b5b02684253799bd7789f1be6dbaf40bba55f5b75f44e"
+    },
+    {
+      "bytes": 6442560,
+      "member": "evidence/expanded/fits/TE_wide/F11_seed_29/epochs/epoch_012.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_wide\\F11_seed_29\\epochs\\epoch_012.pt",
+      "sha256": "9401f894ad955d784bd46867277dc12c15079e5add38d20e87276305069d3daf"
+    },
+    {
+      "bytes": 6442560,
+      "member": "evidence/expanded/fits/TE_wide/F11_seed_29/epochs/epoch_013.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_wide\\F11_seed_29\\epochs\\epoch_013.pt",
+      "sha256": "77d9843b75f9dfaaddbd493ef142652110f440059edd55c08dca1e5e42611510"
+    },
+    {
+      "bytes": 6442560,
+      "member": "evidence/expanded/fits/TE_wide/F11_seed_29/epochs/epoch_014.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_wide\\F11_seed_29\\epochs\\epoch_014.pt",
+      "sha256": "52edab3188e6cfcd54852c3eab53a5b35be353479ad1d6e7bf1b05af74aee108"
+    },
+    {
+      "bytes": 6442560,
+      "member": "evidence/expanded/fits/TE_wide/F11_seed_29/epochs/epoch_015.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_wide\\F11_seed_29\\epochs\\epoch_015.pt",
+      "sha256": "a27be4ec81735ffbed787af8b5a5d58a971ea2eec20e16177ba7e190e956f40c"
+    },
+    {
+      "bytes": 6442560,
+      "member": "evidence/expanded/fits/TE_wide/F11_seed_29/epochs/epoch_016.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_wide\\F11_seed_29\\epochs\\epoch_016.pt",
+      "sha256": "c3224bbd7e5b4dd793e966a6fbb96dcdc0544eda284b2c16762207aeabae334a"
+    },
+    {
+      "bytes": 6442560,
+      "member": "evidence/expanded/fits/TE_wide/F11_seed_29/epochs/epoch_017.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_wide\\F11_seed_29\\epochs\\epoch_017.pt",
+      "sha256": "32702ae256e372fb319865e8c498774589022762c907f887effd77b759d13ddb"
+    },
+    {
+      "bytes": 6116416,
+      "member": "evidence/expanded/fits/TE_full/F11_seed_47/epochs/epoch_001.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_full\\F11_seed_47\\epochs\\epoch_001.pt",
+      "sha256": "4f8416fbf1b45346e648e2e9ed64e91703ffa9345cb77761bdfcacd2dd631567"
+    },
+    {
+      "bytes": 6116416,
+      "member": "evidence/expanded/fits/TE_full/F11_seed_47/epochs/epoch_002.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_full\\F11_seed_47\\epochs\\epoch_002.pt",
+      "sha256": "0a9d77b7ff373eca9f013e76fa14e2bb299da6005c3b65269792ce9bca43d8af"
+    },
+    {
+      "bytes": 6116416,
+      "member": "evidence/expanded/fits/TE_full/F11_seed_47/epochs/epoch_003.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_full\\F11_seed_47\\epochs\\epoch_003.pt",
+      "sha256": "98fa367b3f3d22795175e61623fc3065f60c47cc7cd3f4191e20a1a394927d63"
+    },
+    {
+      "bytes": 6116416,
+      "member": "evidence/expanded/fits/TE_full/F11_seed_47/epochs/epoch_004.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_full\\F11_seed_47\\epochs\\epoch_004.pt",
+      "sha256": "38cfb5c68777d306a122cb711a3b27443670dd5becd4cab1e020b1fccc786bbf"
+    },
+    {
+      "bytes": 6116416,
+      "member": "evidence/expanded/fits/TE_full/F11_seed_47/epochs/epoch_005.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_full\\F11_seed_47\\epochs\\epoch_005.pt",
+      "sha256": "881d3aace1adb62eed2751df42ffcc156aa25337507bac736c51e087d39f5eaf"
+    },
+    {
+      "bytes": 6116416,
+      "member": "evidence/expanded/fits/TE_full/F11_seed_47/epochs/epoch_006.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_full\\F11_seed_47\\epochs\\epoch_006.pt",
+      "sha256": "f23c90f190fe5fcd72c02814b55a848162ff510cf455d88cec9c9321ed01c944"
+    },
+    {
+      "bytes": 6116416,
+      "member": "evidence/expanded/fits/TE_full/F11_seed_47/epochs/epoch_007.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_full\\F11_seed_47\\epochs\\epoch_007.pt",
+      "sha256": "37e260212abcc7005e19db4c70faf6b34681567d8c8115f94f2bb13dbc53d757"
+    },
+    {
+      "bytes": 6116416,
+      "member": "evidence/expanded/fits/TE_full/F11_seed_47/epochs/epoch_008.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_full\\F11_seed_47\\epochs\\epoch_008.pt",
+      "sha256": "530e563c1cb20c4d5a83e446b3eb8c8fbc2edefb7a1f9fcc2d2b92d0b1d50f07"
+    },
+    {
+      "bytes": 6116416,
+      "member": "evidence/expanded/fits/TE_full/F11_seed_47/epochs/epoch_009.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_full\\F11_seed_47\\epochs\\epoch_009.pt",
+      "sha256": "ef1fa85141982c3cebd0f13f71e1929174868a596a9420b6b4cc62a7332eb71e"
+    },
+    {
+      "bytes": 6116416,
+      "member": "evidence/expanded/fits/TE_full/F11_seed_47/epochs/epoch_010.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_full\\F11_seed_47\\epochs\\epoch_010.pt",
+      "sha256": "dba88ef22655a4dc022a0feac06530ac308ed33d194cff3edffc9e2ae0d48085"
+    },
+    {
+      "bytes": 6116416,
+      "member": "evidence/expanded/fits/TE_full/F11_seed_47/epochs/epoch_011.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_full\\F11_seed_47\\epochs\\epoch_011.pt",
+      "sha256": "ce17f7e561826091008c3e0fee93905d2d9565172176b04ab2986f0426d5e0e4"
+    },
+    {
+      "bytes": 6116416,
+      "member": "evidence/expanded/fits/TE_full/F11_seed_47/epochs/epoch_012.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_full\\F11_seed_47\\epochs\\epoch_012.pt",
+      "sha256": "f5c58c6f49777590a233e49d558385dbe147f947bbc98fb2f764c4a0b3d829e9"
+    },
+    {
+      "bytes": 6116416,
+      "member": "evidence/expanded/fits/TE_full/F11_seed_47/epochs/epoch_013.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_full\\F11_seed_47\\epochs\\epoch_013.pt",
+      "sha256": "e108156b8500797c2810a685a92efee6a3b4c3de5f9e9a724fc3f19dc1a81798"
+    },
+    {
+      "bytes": 6116416,
+      "member": "evidence/expanded/fits/TE_full/F11_seed_47/epochs/epoch_014.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_full\\F11_seed_47\\epochs\\epoch_014.pt",
+      "sha256": "958ac2b962383c55a7a7d0243e1014a566c28376c356b91fae76b2ea59c047cf"
+    },
+    {
+      "bytes": 6116416,
+      "member": "evidence/expanded/fits/TE_full/F11_seed_47/epochs/epoch_015.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_full\\F11_seed_47\\epochs\\epoch_015.pt",
+      "sha256": "4023f66d6b66a69302dfa505186666dde6818adeef93d4b01d35ef1f74e8a3f2"
+    },
+    {
+      "bytes": 6116416,
+      "member": "evidence/expanded/fits/TE_full/F11_seed_47/epochs/epoch_016.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_full\\F11_seed_47\\epochs\\epoch_016.pt",
+      "sha256": "f7b29e93300ae53663bee7cbb3c3648d82a0a5c1afb010eaf4180ff5443b0f4a"
+    },
+    {
+      "bytes": 6442560,
+      "member": "evidence/expanded/fits/TE_wide/F11_seed_47/epochs/epoch_001.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_wide\\F11_seed_47\\epochs\\epoch_001.pt",
+      "sha256": "8eab5de0dfb1f18e28dcfc24ce9bf0396e0ed99a63ae7e0058211c521181eac0"
+    },
+    {
+      "bytes": 6442560,
+      "member": "evidence/expanded/fits/TE_wide/F11_seed_47/epochs/epoch_002.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_wide\\F11_seed_47\\epochs\\epoch_002.pt",
+      "sha256": "5392b1c37c297f92d4fcead51425f6a89abc2ff7be48843a6e20726c6813f89e"
+    },
+    {
+      "bytes": 6442560,
+      "member": "evidence/expanded/fits/TE_wide/F11_seed_47/epochs/epoch_003.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_wide\\F11_seed_47\\epochs\\epoch_003.pt",
+      "sha256": "c5a5f38bde3cc3662cf4a45e1eee8f06e50434d5c815116c9ec45934fdfb6e8f"
+    },
+    {
+      "bytes": 6442560,
+      "member": "evidence/expanded/fits/TE_wide/F11_seed_47/epochs/epoch_004.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_wide\\F11_seed_47\\epochs\\epoch_004.pt",
+      "sha256": "7ce36604c090d0f98b0262419dcff46905e62e75b9a89f5b370b53a7c6253351"
+    },
+    {
+      "bytes": 6442560,
+      "member": "evidence/expanded/fits/TE_wide/F11_seed_47/epochs/epoch_005.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_wide\\F11_seed_47\\epochs\\epoch_005.pt",
+      "sha256": "6f50023fb0806083cd2a3400661086f2ed15a93ffd984347f4d376174c936ee3"
+    },
+    {
+      "bytes": 6442560,
+      "member": "evidence/expanded/fits/TE_wide/F11_seed_47/epochs/epoch_006.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_wide\\F11_seed_47\\epochs\\epoch_006.pt",
+      "sha256": "bbaef606d95b3061844fcd0b77b442c531ddf430d3115f59c77f277ca04340f1"
+    },
+    {
+      "bytes": 6442560,
+      "member": "evidence/expanded/fits/TE_wide/F11_seed_47/epochs/epoch_007.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_wide\\F11_seed_47\\epochs\\epoch_007.pt",
+      "sha256": "469c77682f148783959d7889d0f22d136f82522455aa1940bada0f07ad769a03"
+    },
+    {
+      "bytes": 6442560,
+      "member": "evidence/expanded/fits/TE_wide/F11_seed_47/epochs/epoch_008.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_wide\\F11_seed_47\\epochs\\epoch_008.pt",
+      "sha256": "b3375ddc42d7e4ebabe21143b370ceb6be178c3a4a27d99934bf7e74be4e088d"
+    },
+    {
+      "bytes": 6442560,
+      "member": "evidence/expanded/fits/TE_wide/F11_seed_47/epochs/epoch_009.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_wide\\F11_seed_47\\epochs\\epoch_009.pt",
+      "sha256": "adf9ee8e19dbdbc7c06c9466fc49fc01adfb2a628da37913b088f24fc7150e74"
+    },
+    {
+      "bytes": 6442560,
+      "member": "evidence/expanded/fits/TE_wide/F11_seed_47/epochs/epoch_010.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_wide\\F11_seed_47\\epochs\\epoch_010.pt",
+      "sha256": "4fdf2ddb695d7e62e71e08c8a0816dbd6b6470dafdff7b065a6183d0f1336657"
+    },
+    {
+      "bytes": 6442560,
+      "member": "evidence/expanded/fits/TE_wide/F11_seed_47/epochs/epoch_011.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_wide\\F11_seed_47\\epochs\\epoch_011.pt",
+      "sha256": "7b365327c5e070e214ed9322d48ddce0038cb202e644e528ad2bb104e83033ce"
+    },
+    {
+      "bytes": 6442560,
+      "member": "evidence/expanded/fits/TE_wide/F11_seed_47/epochs/epoch_012.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_wide\\F11_seed_47\\epochs\\epoch_012.pt",
+      "sha256": "3d00f7b152777a81a96090d007c6a4500de5062fcb38188e07e2db55d062c212"
+    },
+    {
+      "bytes": 6442560,
+      "member": "evidence/expanded/fits/TE_wide/F11_seed_47/epochs/epoch_013.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_wide\\F11_seed_47\\epochs\\epoch_013.pt",
+      "sha256": "fbc5e275be68796e0c2014097379c660f036bc496cfa1f7ce9c4e9cdacad7d29"
+    },
+    {
+      "bytes": 6442560,
+      "member": "evidence/expanded/fits/TE_wide/F11_seed_47/epochs/epoch_014.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_wide\\F11_seed_47\\epochs\\epoch_014.pt",
+      "sha256": "0517cd5913fa53aa210324d89d97667e69e639e09cad8fad2e90b054598d3a1b"
+    },
+    {
+      "bytes": 6442560,
+      "member": "evidence/expanded/fits/TE_wide/F11_seed_47/epochs/epoch_015.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_wide\\F11_seed_47\\epochs\\epoch_015.pt",
+      "sha256": "b21826b3a5f4e7cf2847aed7d070416b211205c28fb3f04a62d45200712d9398"
+    },
+    {
+      "bytes": 6442560,
+      "member": "evidence/expanded/fits/TE_wide/F11_seed_47/epochs/epoch_016.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_wide\\F11_seed_47\\epochs\\epoch_016.pt",
+      "sha256": "f2de88f0b3a5fd6e5fc55274ca3ad2c12cc35d4908ce4ef07d8a5d1d142e8ceb"
+    },
+    {
+      "bytes": 6442560,
+      "member": "evidence/expanded/fits/TE_wide/F11_seed_47/epochs/epoch_017.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_wide\\F11_seed_47\\epochs\\epoch_017.pt",
+      "sha256": "ace817c51a4d18f1be4c411ab21ac2158a34592ae346d1a26282ace3251e3095"
+    },
+    {
+      "bytes": 6125376,
+      "member": "evidence/expanded/fits/TE_full/F13_seed_11/epochs/epoch_001.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_full\\F13_seed_11\\epochs\\epoch_001.pt",
+      "sha256": "fe3e2f2a30354f197d207f4b2ccd03a9afb5c350bbcf6023bb47aab6580a2c9e"
+    },
+    {
+      "bytes": 6125376,
+      "member": "evidence/expanded/fits/TE_full/F13_seed_11/epochs/epoch_002.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_full\\F13_seed_11\\epochs\\epoch_002.pt",
+      "sha256": "26d7bb41ba9a045e4827138b6cef1943ce4f926feb6d1000d308d709a98ab7fa"
+    },
+    {
+      "bytes": 6125376,
+      "member": "evidence/expanded/fits/TE_full/F13_seed_11/epochs/epoch_003.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_full\\F13_seed_11\\epochs\\epoch_003.pt",
+      "sha256": "0961f4b7f6094ef69b521eddb4efbdfbf436bc51759e3939cdf98a1532277507"
+    },
+    {
+      "bytes": 6125376,
+      "member": "evidence/expanded/fits/TE_full/F13_seed_11/epochs/epoch_004.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_full\\F13_seed_11\\epochs\\epoch_004.pt",
+      "sha256": "849297b57a05ca9641ca68f357a5a6495b9daa2616948b4238d21d9c1805be0e"
+    },
+    {
+      "bytes": 6125376,
+      "member": "evidence/expanded/fits/TE_full/F13_seed_11/epochs/epoch_005.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_full\\F13_seed_11\\epochs\\epoch_005.pt",
+      "sha256": "b86994276d9fcaa042f8a33db78b001a4a0a70146b8e3650b4bb1c4b93c62c8a"
+    },
+    {
+      "bytes": 6125376,
+      "member": "evidence/expanded/fits/TE_full/F13_seed_11/epochs/epoch_006.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_full\\F13_seed_11\\epochs\\epoch_006.pt",
+      "sha256": "e2039dbf6a72f17b42210073f4c6f2f7fd6278999ced487b22e8faae40f21eb5"
+    },
+    {
+      "bytes": 6125376,
+      "member": "evidence/expanded/fits/TE_full/F13_seed_11/epochs/epoch_007.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_full\\F13_seed_11\\epochs\\epoch_007.pt",
+      "sha256": "654b27b7456eb61915055a1df6c64c86844be7ed59b78d5ce6be889c1a7130d1"
+    },
+    {
+      "bytes": 6125376,
+      "member": "evidence/expanded/fits/TE_full/F13_seed_11/epochs/epoch_008.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_full\\F13_seed_11\\epochs\\epoch_008.pt",
+      "sha256": "f4ca8e9b1458c9bfabb8594d4959d4b3ba05646313abb4c55b64323690a0657f"
+    },
+    {
+      "bytes": 6125376,
+      "member": "evidence/expanded/fits/TE_full/F13_seed_11/epochs/epoch_009.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_full\\F13_seed_11\\epochs\\epoch_009.pt",
+      "sha256": "12d2ab2e138f7c0bdbcc15ff7a7559a2785fd95461208525c97bcf9f7b186b3d"
+    },
+    {
+      "bytes": 6125376,
+      "member": "evidence/expanded/fits/TE_full/F13_seed_11/epochs/epoch_010.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_full\\F13_seed_11\\epochs\\epoch_010.pt",
+      "sha256": "1316f2b6d457c85aa4d11d77d58c82599f043c00f39b5f1fcc7fd20fb20c2b4a"
+    },
+    {
+      "bytes": 6125376,
+      "member": "evidence/expanded/fits/TE_full/F13_seed_11/epochs/epoch_011.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_full\\F13_seed_11\\epochs\\epoch_011.pt",
+      "sha256": "a8811df2b77e6d6c5470e62c7057c6f2933ea2a5e73f1a9b069d40c5d7a5508d"
+    },
+    {
+      "bytes": 6451520,
+      "member": "evidence/expanded/fits/TE_wide/F13_seed_11/epochs/epoch_001.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_wide\\F13_seed_11\\epochs\\epoch_001.pt",
+      "sha256": "a352a3758698b0335a18a25851f8dbdce4f895cb2f211cd5f6c8fa4d7f6b94ac"
+    },
+    {
+      "bytes": 6451520,
+      "member": "evidence/expanded/fits/TE_wide/F13_seed_11/epochs/epoch_002.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_wide\\F13_seed_11\\epochs\\epoch_002.pt",
+      "sha256": "ceacd3740aa1cca2f7d931127316db51942b94974790313d1a4aaa0e46f64e6e"
+    },
+    {
+      "bytes": 6451520,
+      "member": "evidence/expanded/fits/TE_wide/F13_seed_11/epochs/epoch_003.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_wide\\F13_seed_11\\epochs\\epoch_003.pt",
+      "sha256": "c41ad65c0f90ee71db9cd73ebcace8ed8c80a184d0bdfa14eea15c5696d8a4c6"
+    },
+    {
+      "bytes": 6451520,
+      "member": "evidence/expanded/fits/TE_wide/F13_seed_11/epochs/epoch_004.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_wide\\F13_seed_11\\epochs\\epoch_004.pt",
+      "sha256": "bbb309ced91cc21967be099fe3dc9fbe0d6d435e8388090b62ff74cb22db8a7d"
+    },
+    {
+      "bytes": 6451520,
+      "member": "evidence/expanded/fits/TE_wide/F13_seed_11/epochs/epoch_005.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_wide\\F13_seed_11\\epochs\\epoch_005.pt",
+      "sha256": "d703b8b9b34eb17e228d924ddfeae5a316c7492e4260de49264ef2d7303c1ed7"
+    },
+    {
+      "bytes": 6451520,
+      "member": "evidence/expanded/fits/TE_wide/F13_seed_11/epochs/epoch_006.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_wide\\F13_seed_11\\epochs\\epoch_006.pt",
+      "sha256": "9a9d33d694595778e24241263c5070605a434c66fe5d7101c88b992a11313b34"
+    },
+    {
+      "bytes": 6451520,
+      "member": "evidence/expanded/fits/TE_wide/F13_seed_11/epochs/epoch_007.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_wide\\F13_seed_11\\epochs\\epoch_007.pt",
+      "sha256": "a7c482ea3603d19a98f77c50ce8ddefab8ceda37479cc776386c54e677d4b53f"
+    },
+    {
+      "bytes": 6451520,
+      "member": "evidence/expanded/fits/TE_wide/F13_seed_11/epochs/epoch_008.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_wide\\F13_seed_11\\epochs\\epoch_008.pt",
+      "sha256": "9fe69e23798a57dc552047de33c513b3928564091412e6cce3956af34f8ecc37"
+    },
+    {
+      "bytes": 6451520,
+      "member": "evidence/expanded/fits/TE_wide/F13_seed_11/epochs/epoch_009.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_wide\\F13_seed_11\\epochs\\epoch_009.pt",
+      "sha256": "1267ea10e3fd2562edb9b0b3aec021b493abd1bf49386fd3b6e281095b4560cf"
+    },
+    {
+      "bytes": 6451520,
+      "member": "evidence/expanded/fits/TE_wide/F13_seed_11/epochs/epoch_010.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_wide\\F13_seed_11\\epochs\\epoch_010.pt",
+      "sha256": "a91919e96a5ac28b2474444b188424305ad7ec433619877396e7294030c9aaf7"
+    },
+    {
+      "bytes": 6451520,
+      "member": "evidence/expanded/fits/TE_wide/F13_seed_11/epochs/epoch_011.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_wide\\F13_seed_11\\epochs\\epoch_011.pt",
+      "sha256": "afc70b2712c0c2c7f6edfe3eec76ffeb7a39279c3985aa31d5a076e47cbebff9"
+    },
+    {
+      "bytes": 6451520,
+      "member": "evidence/expanded/fits/TE_wide/F13_seed_11/epochs/epoch_012.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_wide\\F13_seed_11\\epochs\\epoch_012.pt",
+      "sha256": "2557e3961afa852af407f8e239eec778b3b2e3244dd67df4f897afe367fb39ad"
+    },
+    {
+      "bytes": 6451520,
+      "member": "evidence/expanded/fits/TE_wide/F13_seed_11/epochs/epoch_013.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_wide\\F13_seed_11\\epochs\\epoch_013.pt",
+      "sha256": "47b46c3ea92d381891d51fea026e4811beeed4b3091f3c1275b8a1d0cecd5c81"
+    },
+    {
+      "bytes": 6451520,
+      "member": "evidence/expanded/fits/TE_wide/F13_seed_11/epochs/epoch_014.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_wide\\F13_seed_11\\epochs\\epoch_014.pt",
+      "sha256": "145b2d78d1ab7150e2092c694acdc0ed25e29bf82bc5b673c2f1a4c5ea21ba59"
+    },
+    {
+      "bytes": 6451520,
+      "member": "evidence/expanded/fits/TE_wide/F13_seed_11/epochs/epoch_015.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_wide\\F13_seed_11\\epochs\\epoch_015.pt",
+      "sha256": "c062599b1f54df0221bc2cc2c4d1dbbd7e4c1344050d44bc11a91a8fc4d24d34"
+    },
+    {
+      "bytes": 6451520,
+      "member": "evidence/expanded/fits/TE_wide/F13_seed_11/epochs/epoch_016.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_wide\\F13_seed_11\\epochs\\epoch_016.pt",
+      "sha256": "d50d3f0229d0e866e6ebad0d6188daa45ebf2eed59b07031d3fec200cc3626a9"
+    },
+    {
+      "bytes": 6451520,
+      "member": "evidence/expanded/fits/TE_wide/F13_seed_11/epochs/epoch_017.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_wide\\F13_seed_11\\epochs\\epoch_017.pt",
+      "sha256": "ccba151d1bf5f3c50d2db0de86abcbe14d6bff2ae62d04f683e9635d6d4815a2"
+    },
+    {
+      "bytes": 6125376,
+      "member": "evidence/expanded/fits/TE_full/F13_seed_29/epochs/epoch_001.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_full\\F13_seed_29\\epochs\\epoch_001.pt",
+      "sha256": "19745d29aa9a808a501f82605aaed621cb955896f9b0b7bcb2d8a57de5e03d8a"
+    },
+    {
+      "bytes": 6125376,
+      "member": "evidence/expanded/fits/TE_full/F13_seed_29/epochs/epoch_002.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_full\\F13_seed_29\\epochs\\epoch_002.pt",
+      "sha256": "9e8f53529edbc3b2cead14bba61dc94ae0c5c05903697634e7614870d53dc699"
+    },
+    {
+      "bytes": 6125376,
+      "member": "evidence/expanded/fits/TE_full/F13_seed_29/epochs/epoch_003.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_full\\F13_seed_29\\epochs\\epoch_003.pt",
+      "sha256": "bc9c3f5644824f7797ddf155dfbe2d06840c81c7d1a895c8a39e316582373555"
+    },
+    {
+      "bytes": 6125376,
+      "member": "evidence/expanded/fits/TE_full/F13_seed_29/epochs/epoch_004.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_full\\F13_seed_29\\epochs\\epoch_004.pt",
+      "sha256": "b6065c4e83317b431c442c228153d834a71f2d29b1df8fde02cf6a44c9b63c19"
+    },
+    {
+      "bytes": 6125376,
+      "member": "evidence/expanded/fits/TE_full/F13_seed_29/epochs/epoch_005.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_full\\F13_seed_29\\epochs\\epoch_005.pt",
+      "sha256": "ad0c4ba5f092f2aa57e0f856d5fbc77648ef5ca9b05507c0ea41e2c35e1232ee"
+    },
+    {
+      "bytes": 6125376,
+      "member": "evidence/expanded/fits/TE_full/F13_seed_29/epochs/epoch_006.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_full\\F13_seed_29\\epochs\\epoch_006.pt",
+      "sha256": "103c12a96fc60d993765451cac26a6a3ec269f636d980fe4520d27f5208cbe48"
+    },
+    {
+      "bytes": 6125376,
+      "member": "evidence/expanded/fits/TE_full/F13_seed_29/epochs/epoch_007.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_full\\F13_seed_29\\epochs\\epoch_007.pt",
+      "sha256": "35333ed258c412fc1096c8dcb1196435a2ce7a2c3450c27cc3aa9fa1ab769938"
+    },
+    {
+      "bytes": 6125376,
+      "member": "evidence/expanded/fits/TE_full/F13_seed_29/epochs/epoch_008.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_full\\F13_seed_29\\epochs\\epoch_008.pt",
+      "sha256": "ed9b2a7ef49282a1ab591c841049e8ed7ff92b2fc987d7aac173e0517d6e3338"
+    },
+    {
+      "bytes": 6125376,
+      "member": "evidence/expanded/fits/TE_full/F13_seed_29/epochs/epoch_009.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_full\\F13_seed_29\\epochs\\epoch_009.pt",
+      "sha256": "74dfd18b52a519756717dae3f7f82d1d67e5721b8aa7a1c1bc10c86fc285c6e1"
+    },
+    {
+      "bytes": 6125376,
+      "member": "evidence/expanded/fits/TE_full/F13_seed_29/epochs/epoch_010.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_full\\F13_seed_29\\epochs\\epoch_010.pt",
+      "sha256": "6f3e30db48843f5367639ae22c48a77474c4846dca2df4315e04c24969857f7a"
+    },
+    {
+      "bytes": 6125376,
+      "member": "evidence/expanded/fits/TE_full/F13_seed_29/epochs/epoch_011.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_full\\F13_seed_29\\epochs\\epoch_011.pt",
+      "sha256": "27fb4c4f07c8eee7c818fa068c183cd14bf9a351035820f76ccc658b1345a9f3"
+    },
+    {
+      "bytes": 6125376,
+      "member": "evidence/expanded/fits/TE_full/F13_seed_29/epochs/epoch_012.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_full\\F13_seed_29\\epochs\\epoch_012.pt",
+      "sha256": "c37a700ee4e5173f985922da11370b40be928880aa1f8981fb2ba34fd75259bc"
+    },
+    {
+      "bytes": 6125376,
+      "member": "evidence/expanded/fits/TE_full/F13_seed_29/epochs/epoch_013.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_full\\F13_seed_29\\epochs\\epoch_013.pt",
+      "sha256": "46935482cab4bc90d256c784f44c7beb950939134017efde7749b461cb5f7e53"
+    },
+    {
+      "bytes": 6125376,
+      "member": "evidence/expanded/fits/TE_full/F13_seed_29/epochs/epoch_014.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_full\\F13_seed_29\\epochs\\epoch_014.pt",
+      "sha256": "9852f110ef01e90032d15c9c3f8c696ad79a95d20ce8b4dfa6c229d7b4763dc3"
+    },
+    {
+      "bytes": 6125376,
+      "member": "evidence/expanded/fits/TE_full/F13_seed_29/epochs/epoch_015.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_full\\F13_seed_29\\epochs\\epoch_015.pt",
+      "sha256": "5e45d4621ccaa6b01ccba61a347704023efcea079e7d02a82f21ba4686add34e"
+    },
+    {
+      "bytes": 6451520,
+      "member": "evidence/expanded/fits/TE_wide/F13_seed_29/epochs/epoch_001.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_wide\\F13_seed_29\\epochs\\epoch_001.pt",
+      "sha256": "2a3628c1a6e78eef821f737095fc282b9f090a9215cc6e6d145d9ebe54b13b55"
+    },
+    {
+      "bytes": 6451520,
+      "member": "evidence/expanded/fits/TE_wide/F13_seed_29/epochs/epoch_002.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_wide\\F13_seed_29\\epochs\\epoch_002.pt",
+      "sha256": "8dcb78bcf22783185c311c3bda447d62ca21e5cf60d315577dd150d1825ab51b"
+    },
+    {
+      "bytes": 6451520,
+      "member": "evidence/expanded/fits/TE_wide/F13_seed_29/epochs/epoch_003.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_wide\\F13_seed_29\\epochs\\epoch_003.pt",
+      "sha256": "5c16b06b2a9c1b0ebe95f310724e096df590b5ea47f3a31bd49ae24ff50e8054"
+    },
+    {
+      "bytes": 6451520,
+      "member": "evidence/expanded/fits/TE_wide/F13_seed_29/epochs/epoch_004.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_wide\\F13_seed_29\\epochs\\epoch_004.pt",
+      "sha256": "fcc28e383e7678a423c9876e2f8877a96dd519dd8ba2b9199f089a3e5dc5a438"
+    },
+    {
+      "bytes": 6451520,
+      "member": "evidence/expanded/fits/TE_wide/F13_seed_29/epochs/epoch_005.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_wide\\F13_seed_29\\epochs\\epoch_005.pt",
+      "sha256": "3e81f75d8512c8e97ed28fbb7dd339a0e93273f088b59aea5e5d5fabc400b807"
+    },
+    {
+      "bytes": 6451520,
+      "member": "evidence/expanded/fits/TE_wide/F13_seed_29/epochs/epoch_006.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_wide\\F13_seed_29\\epochs\\epoch_006.pt",
+      "sha256": "b484af838b31959c7341fe129f3176ffd5e8f2cecfb13f55fded2bd55c9ff69b"
+    },
+    {
+      "bytes": 6451520,
+      "member": "evidence/expanded/fits/TE_wide/F13_seed_29/epochs/epoch_007.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_wide\\F13_seed_29\\epochs\\epoch_007.pt",
+      "sha256": "d1cee04f4cc5aa87b7f5c91ee3bf819472f1d8f44202ee3bc8aad44b3e56ab2e"
+    },
+    {
+      "bytes": 6451520,
+      "member": "evidence/expanded/fits/TE_wide/F13_seed_29/epochs/epoch_008.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_wide\\F13_seed_29\\epochs\\epoch_008.pt",
+      "sha256": "8cca858d74e1cf700e3e138d1446626f1925c3b60f3704725405b5661ee77a3e"
+    },
+    {
+      "bytes": 6451520,
+      "member": "evidence/expanded/fits/TE_wide/F13_seed_29/epochs/epoch_009.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_wide\\F13_seed_29\\epochs\\epoch_009.pt",
+      "sha256": "4b707b20d0c73ce35bda612657e23a9f66eae63f5fc81ca5d5bddb3de4f4f986"
+    },
+    {
+      "bytes": 6451520,
+      "member": "evidence/expanded/fits/TE_wide/F13_seed_29/epochs/epoch_010.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_wide\\F13_seed_29\\epochs\\epoch_010.pt",
+      "sha256": "5d658feae301d514b0b9ff843bccffd509cc3969c0b9d303e9ca7472c29c30fe"
+    },
+    {
+      "bytes": 6451520,
+      "member": "evidence/expanded/fits/TE_wide/F13_seed_29/epochs/epoch_011.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_wide\\F13_seed_29\\epochs\\epoch_011.pt",
+      "sha256": "e8218834eec2ac10282190cf69fbf60466d9edd0fa904c5f6a9ebf409fa7b83d"
+    },
+    {
+      "bytes": 6451520,
+      "member": "evidence/expanded/fits/TE_wide/F13_seed_29/epochs/epoch_012.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_wide\\F13_seed_29\\epochs\\epoch_012.pt",
+      "sha256": "e743a006ee4a6c6549496a66e02dc8670ea572d1e0fad183aad302bff377ac45"
+    },
+    {
+      "bytes": 6451520,
+      "member": "evidence/expanded/fits/TE_wide/F13_seed_29/epochs/epoch_013.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_wide\\F13_seed_29\\epochs\\epoch_013.pt",
+      "sha256": "c3a2b8f982f23250871999aec436d4b8a2c9f8ca00b087cf5f3350b394698ac8"
+    },
+    {
+      "bytes": 6451520,
+      "member": "evidence/expanded/fits/TE_wide/F13_seed_29/epochs/epoch_014.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_wide\\F13_seed_29\\epochs\\epoch_014.pt",
+      "sha256": "564dbabc1758e249b6ebc4356e5e80e1da0d580647e3e36c9903e1eb3cf670f4"
+    },
+    {
+      "bytes": 6451520,
+      "member": "evidence/expanded/fits/TE_wide/F13_seed_29/epochs/epoch_015.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_wide\\F13_seed_29\\epochs\\epoch_015.pt",
+      "sha256": "f396a8de2f2bb849626dcf871286aa74ea39160365edc61460871628000898a6"
+    },
+    {
+      "bytes": 6125376,
+      "member": "evidence/expanded/fits/TE_full/F13_seed_47/epochs/epoch_001.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_full\\F13_seed_47\\epochs\\epoch_001.pt",
+      "sha256": "6b40cd8fb2c4426bf30bf07b5e4957ecf499200211af1c8f5aa4c045bedb9930"
+    },
+    {
+      "bytes": 6125376,
+      "member": "evidence/expanded/fits/TE_full/F13_seed_47/epochs/epoch_002.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_full\\F13_seed_47\\epochs\\epoch_002.pt",
+      "sha256": "f57ceb84168011d06a0a2b7d7100292da97733cada804f2df8591be1148d9b1b"
+    },
+    {
+      "bytes": 6125376,
+      "member": "evidence/expanded/fits/TE_full/F13_seed_47/epochs/epoch_003.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_full\\F13_seed_47\\epochs\\epoch_003.pt",
+      "sha256": "06f73feb6b68c6e40885f373c903f486f034531bf63b6964b87e5b612c19b417"
+    },
+    {
+      "bytes": 6125376,
+      "member": "evidence/expanded/fits/TE_full/F13_seed_47/epochs/epoch_004.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_full\\F13_seed_47\\epochs\\epoch_004.pt",
+      "sha256": "51c79149e1a4d9ea16517f020f0c349e5ef85d8f4a1e712cf212290c7cdceaca"
+    },
+    {
+      "bytes": 6125376,
+      "member": "evidence/expanded/fits/TE_full/F13_seed_47/epochs/epoch_005.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_full\\F13_seed_47\\epochs\\epoch_005.pt",
+      "sha256": "b9ed89dc1970e9f6449a753f4dc6b4885c493a1c0d8c1ea93a6ba07b103f9e29"
+    },
+    {
+      "bytes": 6125376,
+      "member": "evidence/expanded/fits/TE_full/F13_seed_47/epochs/epoch_006.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_full\\F13_seed_47\\epochs\\epoch_006.pt",
+      "sha256": "210883198d8284c72a8af27cb34a2f02798f3528287843403fbd21acc750980a"
+    },
+    {
+      "bytes": 6125376,
+      "member": "evidence/expanded/fits/TE_full/F13_seed_47/epochs/epoch_007.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_full\\F13_seed_47\\epochs\\epoch_007.pt",
+      "sha256": "1edb1303abf676ff4ee7d346bedc4f806aac997fba9146d85c90e8f3e7cf4ba3"
+    },
+    {
+      "bytes": 6125376,
+      "member": "evidence/expanded/fits/TE_full/F13_seed_47/epochs/epoch_008.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_full\\F13_seed_47\\epochs\\epoch_008.pt",
+      "sha256": "8459970d83f3706064a91235988b7fbf6f0207ac1cd955d4da0d72a17d6c9dee"
+    },
+    {
+      "bytes": 6125376,
+      "member": "evidence/expanded/fits/TE_full/F13_seed_47/epochs/epoch_009.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_full\\F13_seed_47\\epochs\\epoch_009.pt",
+      "sha256": "4808d70f2419675d7a52699d0c23498769d7025f8d4c6c653ff08dc7b430a894"
+    },
+    {
+      "bytes": 6125376,
+      "member": "evidence/expanded/fits/TE_full/F13_seed_47/epochs/epoch_010.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_full\\F13_seed_47\\epochs\\epoch_010.pt",
+      "sha256": "f12b787cf2ceeb86df6b6c201d5b59f9def30bfe481e6cf2e31f663fc1e564a7"
+    },
+    {
+      "bytes": 6125376,
+      "member": "evidence/expanded/fits/TE_full/F13_seed_47/epochs/epoch_011.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_full\\F13_seed_47\\epochs\\epoch_011.pt",
+      "sha256": "d94ebb36b60f502da6eb0e1657f7c73fcf67ff69911b6898edc742f1e21b054e"
+    },
+    {
+      "bytes": 6125376,
+      "member": "evidence/expanded/fits/TE_full/F13_seed_47/epochs/epoch_012.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_full\\F13_seed_47\\epochs\\epoch_012.pt",
+      "sha256": "4d27c6aafac68f1bf40c82a42b278c57e6308553071875710d669ba2081b5635"
+    },
+    {
+      "bytes": 6125376,
+      "member": "evidence/expanded/fits/TE_full/F13_seed_47/epochs/epoch_013.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_full\\F13_seed_47\\epochs\\epoch_013.pt",
+      "sha256": "16f7f5ca6400e8c0444f3f90b54117694ccdd7abb3eb06f7d07a736fc6733b58"
+    },
+    {
+      "bytes": 6125376,
+      "member": "evidence/expanded/fits/TE_full/F13_seed_47/epochs/epoch_014.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_full\\F13_seed_47\\epochs\\epoch_014.pt",
+      "sha256": "dab4db6e832e2ede9f605df7d8292d52dc951807b1eeb3c09837e1d19a886149"
+    },
+    {
+      "bytes": 6125376,
+      "member": "evidence/expanded/fits/TE_full/F13_seed_47/epochs/epoch_015.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_full\\F13_seed_47\\epochs\\epoch_015.pt",
+      "sha256": "ce62a521ca4f11a9c819bf466222ad267b440e1717387d447e5c8169af6521bb"
+    },
+    {
+      "bytes": 6125376,
+      "member": "evidence/expanded/fits/TE_full/F13_seed_47/epochs/epoch_016.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_full\\F13_seed_47\\epochs\\epoch_016.pt",
+      "sha256": "e85654e52602abf482e0f61030bb93c75d8968d1bdee1166dad4d1a941cdc2a6"
+    },
+    {
+      "bytes": 6125376,
+      "member": "evidence/expanded/fits/TE_full/F13_seed_47/epochs/epoch_017.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_full\\F13_seed_47\\epochs\\epoch_017.pt",
+      "sha256": "4f4ea411c8f5fe79e253a48b19d541a3dab09ec6d98fa67e8579a41605a1d8a4"
+    },
+    {
+      "bytes": 6125376,
+      "member": "evidence/expanded/fits/TE_full/F13_seed_47/epochs/epoch_018.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_full\\F13_seed_47\\epochs\\epoch_018.pt",
+      "sha256": "0f08c4e0bf82759624c2e31b58dd2e8fad49950477ca314c6aa400ce9652f8d2"
+    },
+    {
+      "bytes": 6451520,
+      "member": "evidence/expanded/fits/TE_wide/F13_seed_47/epochs/epoch_001.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_wide\\F13_seed_47\\epochs\\epoch_001.pt",
+      "sha256": "b3dd22238b28dbda1a819eb69366fd87217c378f5faeb8a9b1906ac25e8059ce"
+    },
+    {
+      "bytes": 6451520,
+      "member": "evidence/expanded/fits/TE_wide/F13_seed_47/epochs/epoch_002.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_wide\\F13_seed_47\\epochs\\epoch_002.pt",
+      "sha256": "1987a0999f2e86985232855706e69ac5aef1cab694e747799466cbd4acb284fc"
+    },
+    {
+      "bytes": 6451520,
+      "member": "evidence/expanded/fits/TE_wide/F13_seed_47/epochs/epoch_003.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_wide\\F13_seed_47\\epochs\\epoch_003.pt",
+      "sha256": "34298bd80046c638825348e79ec1539919ea62daa7b57a6725e173379d452663"
+    },
+    {
+      "bytes": 6451520,
+      "member": "evidence/expanded/fits/TE_wide/F13_seed_47/epochs/epoch_004.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_wide\\F13_seed_47\\epochs\\epoch_004.pt",
+      "sha256": "c5199e786f72f0c082390f198841659f41a3a16e173c6d2ddbac6eb716ea3761"
+    },
+    {
+      "bytes": 6451520,
+      "member": "evidence/expanded/fits/TE_wide/F13_seed_47/epochs/epoch_005.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_wide\\F13_seed_47\\epochs\\epoch_005.pt",
+      "sha256": "bc54673644b69c47f1ea0be9d894203c3551272e9b7951ac7d66e17b64c47654"
+    },
+    {
+      "bytes": 6451520,
+      "member": "evidence/expanded/fits/TE_wide/F13_seed_47/epochs/epoch_006.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_wide\\F13_seed_47\\epochs\\epoch_006.pt",
+      "sha256": "d49a46b1bcc7114410a8e64c6cdf83e14d91a0b8ecf82c8c015b75333b643aea"
+    },
+    {
+      "bytes": 6451520,
+      "member": "evidence/expanded/fits/TE_wide/F13_seed_47/epochs/epoch_007.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_wide\\F13_seed_47\\epochs\\epoch_007.pt",
+      "sha256": "8bf9a01aa29d940da24e8a61442b3548228ee309124b04589406b122955166e8"
+    },
+    {
+      "bytes": 6451520,
+      "member": "evidence/expanded/fits/TE_wide/F13_seed_47/epochs/epoch_008.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_wide\\F13_seed_47\\epochs\\epoch_008.pt",
+      "sha256": "a5de99debdaec4000fb96e8cb138d82dcaaa8da23321fd7d1e6c97dfa158e539"
+    },
+    {
+      "bytes": 6451520,
+      "member": "evidence/expanded/fits/TE_wide/F13_seed_47/epochs/epoch_009.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_wide\\F13_seed_47\\epochs\\epoch_009.pt",
+      "sha256": "fcb59c424d0e1900ca753bff826e0be5693c29ee18cb3cd49ac1dacd4c13b2fc"
+    },
+    {
+      "bytes": 6451520,
+      "member": "evidence/expanded/fits/TE_wide/F13_seed_47/epochs/epoch_010.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_wide\\F13_seed_47\\epochs\\epoch_010.pt",
+      "sha256": "8ac6fd5595f81063e95293110673967f94b976c5bc2d76af0d896d07f35813e5"
+    },
+    {
+      "bytes": 6451520,
+      "member": "evidence/expanded/fits/TE_wide/F13_seed_47/epochs/epoch_011.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_wide\\F13_seed_47\\epochs\\epoch_011.pt",
+      "sha256": "e0310fe137c0458a326779b48b5f5f3b1c3a9c92ed03ca9cfa014e018a3564a4"
+    },
+    {
+      "bytes": 6451520,
+      "member": "evidence/expanded/fits/TE_wide/F13_seed_47/epochs/epoch_012.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_wide\\F13_seed_47\\epochs\\epoch_012.pt",
+      "sha256": "ef92a74cea3c6ec1f80356135c39d47731a786288e9d35604a33a4ac4479d15e"
+    },
+    {
+      "bytes": 6451520,
+      "member": "evidence/expanded/fits/TE_wide/F13_seed_47/epochs/epoch_013.pt",
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\fits\\TE_wide\\F13_seed_47\\epochs\\epoch_013.pt",
+      "sha256": "f0eeaadcbf0c9bc64fa8f1acfa9c1b91980be8138601b9bd8ada551a1580183e"
+    }
+  ],
+  "retired_logical_bytes": 2093806656,
+  "scope": "All24 new child fits and96 baseline book records, source overlays/bounds, hedge correction, originals/leads and attempts recover through the two ZIPs and prior diagnostic dependencies. Initial main ZIP ordinary-member verification completed before PickleBuffer byte counting failed; exact recipe/stdout retain that boundary. Only two cache streams resumed, both hash-exact; all new recovery-resume files physically restored/hash-checked. Frozen original project source remains in project/; qualified archiver and resumer are in recovery_resume/. Initial ordinary members were not rebuilt or reverified. Selected/EMA checkpoints, histories, forecasts, caches, accepted stores, old fits and immutable raw sources remain online. Deleted intermediate epochs were verified before retirement.",
+  "status": "verified_expanded_attention_recovery",
+  "unique_members": 3433
+}

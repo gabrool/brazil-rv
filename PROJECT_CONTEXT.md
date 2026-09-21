@@ -32,6 +32,12 @@ aboveCDI; separate source overlays3.01618/1.92001. Wide wins3/8; its paired40-da
 period accounts, not the original continuous flexible-net result. Parent stopping
 is a demonstrated partial cause, not a generally adopted rule or complete cause.
 Matched broader stopping remains the next justified training contrast, unstarted.
+`scaling_expanded_recovery` binds the verified main/epoch ZIPs and exact attempts.
+All334 new intermediate epoch copies and62 patience-probe copies now restore
+from their verified archives; selected/EMA weights, histories, forecasts and old
+fits remain online. Both source-only caches reconstruct byte-exactly from their
+immutable parent and restored terms. The recovery's PickleBuffer counting failure
+was confined to scratch verification and resumed without repeating numerical work.
 The completed depth and native GRU96 width waves' redundant intermediate epoch
 files now reside only in verified recovery archives; selected checkpoints,
 forecasts and books stay online. Resolve `scaling_storage` before requesting them.
