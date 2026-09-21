@@ -1110,8 +1110,8 @@
     "sha256": "431edc505053d47a7f353cf077685a15413ade3a38e48ddcea1f07e6a8e71c5a"
   },
   "stage_c_refit_cache_path_resolution": {
-    "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_economic_matched_20260920\\data_refits\\c6_compile\\cache_path_resolution.json",
-    "sha256": "c100344799ba4dbe0a4e1d3500a9a8a465799b57fc759995d4e0614066f0770b"
+    "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_economic_matched_20260920\\data_refits\\c6_compile\\cache_path_resume.json",
+    "sha256": "4383d6eaafbcd44eac0790c94c3b964d3bb0f46cd31a032c87f73239264fb734"
   },
   "stage_c_refit_compile_resolution": {
     "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_economic_matched_20260920\\data_refits\\c6_compile\\resolution.json",
