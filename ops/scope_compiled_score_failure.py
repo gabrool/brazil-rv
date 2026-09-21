@@ -1,5 +1,6 @@
 """Bound the observed compiler failure across the six actual C/D architectures."""
 
+import argparse
 import gc
 import inspect
 import json
@@ -46,14 +47,19 @@ def contrast(actual, expected, valid):
     )
 
 
-def main():
+def main(replacement=False):
     from torch._inductor.codecache import PyCodeCache
 
     torch.set_num_threads(1)
     run = json.loads((PROJECT / "docs/v2_economic_data_scaling_run.json").read_text())
-    plan = bound_json(run["stage_d_width_plan"])
-    root = Path(run["stage_d_width_plan"]["path"]).parent
-    out = root / "scoring_failure/architecture_scope"
+    key = "stage_d_width_plan" if replacement else "stage_d_width_original_plan"
+    plan = bound_json(run[key])
+    root = Path(run[key]["path"]).parent
+    out = root / (
+        "forecast_qualification"
+        if replacement
+        else "scoring_failure/architecture_scope"
+    )
     out.mkdir(exist_ok=False)
     (out / "executed.py").write_bytes(Path(__file__).read_bytes())
     cases = {
@@ -63,6 +69,9 @@ def main():
     cases.update(
         {name: root / "fits" / name / "F10_seed_11" for name in ("TE_128", "GRU_96")}
     )
+    if replacement:
+        cases = {"GRU_96": root / "fits/GRU_96/F2_seed_11"}
+    fold = "F2" if replacement else "F10"
     write_json_atomic(
         out / "plan.json",
         dict(
@@ -70,7 +79,9 @@ def main():
             compiler=binding(Path(inspect.getfile(compile_forward))),
             rtol=0.02,
             atol=0.002,
-            scope="Six saved F10 seed11 checkpoints: every126 original evaluation date in eager mode and the first original chronological compiled export batch under NaN-initialized temporary buffers. Compare original saved forecasts. No refit, optimizer step, held-out data, accounting replay or source/store change. A representative shape test does not qualify every other checkpoint or training/selection graph.",
+            scope="First replacement F2/11 checkpoint chosen before its outcomes: qualify the complete train/select/diagnostic/export interaction using every original evaluation date for eager/saved comparison and its first compiled batch with NaN allocations. Own conditioning/full population/full60, frozen tolerance. No optimizer, accounting or source change; six original controls are reused, not repeated. This qualifies this actual fit/export interaction, not every other fitted checkpoint."
+            if replacement
+            else "Six saved F10 seed11 checkpoints: every126 original evaluation date in eager mode and the first original chronological compiled export batch under NaN-initialized temporary buffers. Compare original saved forecasts. No refit, optimizer step, held-out data, accounting replay or source/store change. A representative shape test does not qualify every other checkpoint or training/selection graph.",
         ),
     )
     results = {}
@@ -94,7 +105,7 @@ def main():
             )
         )
         store = Path(plan["store"]["root"])
-        _, _, rows, _ = _cli_stage_indices(store, "F", "F10")
+        _, _, rows, _ = _cli_stage_indices(store, "F", fold)
         dataset = V2DailyDataset(
             store,
             rows,
@@ -250,7 +261,19 @@ def main():
         gc.collect()
         torch.cuda.empty_cache()
     write_json_atomic(out / "report.json", results)
+    if replacement:
+        for result in results.values():
+            for name in ("saved_vs_eager", "compiled_vs_eager", "poisoned_vs_eager"):
+                check = result[name]
+                assert (
+                    check["finite"] == check["cells"]
+                    and check["outside_tolerance"] == 0
+                ), name
+        run["stage_d_width_forecast_qualification"] = binding(out / "report.json")
+        write_json_atomic(PROJECT / "docs/v2_economic_data_scaling_run.json", run)
 
 
 if __name__ == "__main__":
-    main()
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--replacement", action="store_true")
+    main(parser.parse_args().replacement)
