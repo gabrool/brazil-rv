@@ -1,6 +1,8 @@
 # Corrected matched economic comparison
 
-Stage C is complete under its explicit account, source and marked-claim hypotheses. Both nominated leads fail the registered positive-mean condition for ten additional development folds. No ten-fold replication runs. The separately registered Stage D width wave is now active; this is not model adoption or a held-out result.
+Stage C is complete under its explicit account, source and marked-claim hypotheses. Both nominated leads fail the registered positive-mean condition for ten additional development folds. No ten-fold replication runs. Stage D width is disposed and depth is active; this is not model adoption or a held-out result.
+
+The headline below is **above CDI on four separate screening periods**, not a replacement for the earlier continuous-history absolute return near seven bps/day. [The before/after comparison in absolute BRL units](v2_PERFORMANCE_COMPARABILITY.md) separates benchmark, period, accounting and refit differences.
 
 Resolve `stage_c_refit_results`, `stage_c_refit_admission`, `stage_c_refit_completion` and `stage_c_replication_plan` in the run pointer. The result manifest binds every seed, fold, capital, daily book, forecast diagnostic, holding spell, cost component, uncertainty estimate and sensitivity. Earlier attempts and source/data qualification are retained in [matched refits](v2_MATCHED_REFITS.md) and [account/source comparisons](v2_MATCHED_ECONOMIC_REPLAYS.md).
 
