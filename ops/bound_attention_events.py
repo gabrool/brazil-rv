@@ -29,8 +29,18 @@ import qualify_refit_books
 PROJECT = Path(__file__).resolve().parents[1]
 
 
-def freeze(run):
-    root = Path(run["scaling_expanded_source_plan"]["path"]).parent / "bounds"
+def freeze(run, later=False):
+    source_key = (
+        "scaling_expanded_later_source_plan"
+        if later
+        else "scaling_expanded_source_plan"
+    )
+    plan_key = (
+        "scaling_expanded_later_bounds_plan"
+        if later
+        else "scaling_expanded_event_bounds_plan"
+    )
+    root = Path(run[source_key]["path"]).parent / "bounds"
     root.mkdir(exist_ok=False)
     variants = [
         dict(name="debit50", annual_debit_spread=0.005),
@@ -41,24 +51,54 @@ def freeze(run):
         dict(name="guar_delivery2", isin="BRGUARACNPR1", delivery_shift=2),
         dict(name="guar_bonus_arrival", isin="BRGUARACNOR4", bonus_shift=-1),
     ]
+    if later:
+        variants = [
+            dict(name="debit50", annual_debit_spread=0.005),
+            dict(name="debit100", annual_debit_spread=0.01),
+            dict(
+                name="rlog_custody",
+                fold="F7",
+                isin="BRRLOGACNOR4",
+                disposal_at_custody=True,
+            ),
+            dict(
+                name="rlog_precision",
+                fold="F7",
+                isin="BRRLOGACNOR4",
+                auction_price=2572750.87 / 27449,
+            ),
+            dict(
+                name="smiles_delivery", fold="F7", isin="BRSMLSACNOR1", delivery_shift=1
+            ),
+        ]
     plan = dict(
-        primary=run["scaling_expanded_source_plan"],
+        primary=run[source_key],
         variants=variants,
         driver=binding(Path(__file__)),
         scope="Six F3 ensembles, both widths and all three capitals; seven one-factor hypotheses, at most42 books. Reuse all twelve primary books. Execute only actual funded or held exposure. No seed/model/data refit or repeated old sensitivity grid.",
         timing="Jan8 closing Fibria delivery versus next-decision primary; Jan4 prearranged owned disposal with unchanged Jan8 closing receipt. GUAR PN effect-day primary versus one/two later sessions is an unobserved delivery assumption; May6 closing split credit versus May7 primary. Existing custody and disposal implementations are reused.",
         limits="No obtained debit quote, client delivery permission, causal-DI cash-mark result, joint worst-case or all-interior adaptive bound. Fibria last-announced cash mark remains primary; its optional causal-DI contrast is unexecuted. Actual Fibria source holdings are positive, so no forced loan-fraction case. Preserve earlier adaptive numerical uncertainty.",
     )
+    if later:
+        plan.update(
+            scope="Twelve F7/F11 ensembles at all three capitals; funding50/100annualbp and only the three F7 event contrasts. At most42 books; source/capital cases without relevant held/funded exposure are skipped. Reuse24 source and24 frozen baseline books, all existing model/data/source proofs.",
+            timing="RLOG custody-first versus expressly permitted March8 owned disposal; fraction printed93.72 versus aggregate2572750.87/27449, unchanged knowledge/payment. Smiles June9 versus following-session custody, fixed June23 cash/default exchange election. F7 event hypotheses do not apply to F11.",
+            limits="Same frozen pre-hedge runtime as primary and baseline. Explicit unobserved lender/debit/payment precision hypotheses, no tax exemption or optional-election hindsight. Linx BDR/final-cash gap remains. No combined/interior bound or new model result.",
+        )
     write_json_atomic(root / "plan.json", plan)
-    run["scaling_expanded_event_bounds_plan"] = binding(root / "plan.json")
+    run[plan_key] = binding(root / "plan.json")
     write_json_atomic(PROJECT / "docs/v2_economic_data_scaling_run.json", run)
-    print(json.dumps(dict(frozen=run["scaling_expanded_event_bounds_plan"])))
+    print(json.dumps(dict(frozen=run[plan_key])))
 
 
-def execute(run):
+def execute(run, later=False):
     torch.set_num_threads(1)
     code = _git_identity()
-    ref = run["scaling_expanded_event_bounds_plan"]
+    ref = run[
+        "scaling_expanded_later_bounds_plan"
+        if later
+        else "scaling_expanded_event_bounds_plan"
+    ]
     plan = bound_json(ref)
     assert plan["driver"]["sha256"] == sha256_file(Path(__file__))
     root = Path(ref["path"]).parent
@@ -101,11 +141,11 @@ def execute(run):
         _, capital, arm, fold, _ = base["key"].split("/")
         rows = windows(Path(primary["prior_root"]), data, fold)["evaluation"]
         start, stop = int(rows[0]), int(rows[-1]) + 1
-        if arm not in panels:
-            panels[arm] = new_panel(
+        if (arm, fold) not in panels:
+            panels[arm, fold] = new_panel(
                 Path(primary["fit_root"]), data, arm, fold, rows, "raw"
             )
-        forecasts, valid, sources = panels[arm]
+        forecasts, valid, sources = panels[arm, fold]
         assert sources == book["provenance"]["forecast_sources"]
         mapping = calibration(
             bound_json(book["provenance"]["mapping"])["arms"]["TE_all"]
@@ -115,6 +155,17 @@ def execute(run):
         for variant in plan["variants"]:
             key = variant["name"] + "/" + base["key"].split("/", 1)[1]
             if key in done:
+                continue
+            if variant.get("fold", fold) != fold:
+                skipped.append(
+                    dict(
+                        key=key,
+                        baseline=base,
+                        reason="Event is outside this fold; no book run",
+                    )
+                )
+                done.add(key)
+                save()
                 continue
             tick = perf_counter()
             amended = copy(data)
@@ -152,7 +203,15 @@ def execute(run):
                 event = events[position]
                 before = event.effective_session - start - 1
                 held = original["signed_shares"][before, axis]
-                exposed = held > 0 if variant.get("disposal_at_effect") else held != 0
+                owned = any(
+                    variant.get(k)
+                    for k in (
+                        "disposal_at_effect",
+                        "disposal_at_custody",
+                        "auction_price",
+                    )
+                )
+                exposed = held > 0 if owned else held != 0
                 if field == "action_settlements":
                     events[position] = replace(
                         event,
@@ -163,6 +222,16 @@ def execute(run):
                     legs = tuple(
                         replace(leg, disposal_session=event.effective_session)
                         if variant.get("disposal_at_effect")
+                        else replace(leg, disposal_session=leg.delivery_session)
+                        if variant.get("disposal_at_custody")
+                        else replace(
+                            leg,
+                            fractional_auction=replace(
+                                leg.fractional_auction,
+                                cash_per_share=variant["auction_price"],
+                            ),
+                        )
+                        if "auction_price" in variant
                         else replace(
                             leg,
                             delivery_session=leg.delivery_session
@@ -243,16 +312,21 @@ def execute(run):
     qualify_refit_books.PROJECT = context
     qualify_refit_books.main(sensitivities=True)
     run = json.loads((PROJECT / "docs/v2_economic_data_scaling_run.json").read_text())
-    run["scaling_expanded_event_bounds"] = binding(root / "replays.json")
-    run["scaling_expanded_event_bounds_qualification"] = binding(
-        root / "qualification/manifest.json"
-    )
+    run[
+        "scaling_expanded_later_bounds" if later else "scaling_expanded_event_bounds"
+    ] = binding(root / "replays.json")
+    run[
+        "scaling_expanded_later_bounds_qualification"
+        if later
+        else "scaling_expanded_event_bounds_qualification"
+    ] = binding(root / "qualification/manifest.json")
     write_json_atomic(PROJECT / "docs/v2_economic_data_scaling_run.json", run)
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--freeze", action="store_true")
+    parser.add_argument("--later-source", action="store_true")
     args = parser.parse_args()
     run = json.loads((PROJECT / "docs/v2_economic_data_scaling_run.json").read_text())
-    freeze(run) if args.freeze else execute(run)
+    freeze(run, args.later_source) if args.freeze else execute(run, args.later_source)
