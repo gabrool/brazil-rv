@@ -1223,6 +1223,10 @@
     "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\capacity_width_recovery\\attention_book_reuse.json",
     "sha256": "a996ea302cd87e2aad6a32f00dca801e1ef5d5f43cbe61403791983ae5ec1ed1"
   },
+  "stage_d_width_evaluation": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\capacity_width_recovery\\evaluation_progress.json",
+    "sha256": "9f3cf2eb608c297e7dd70f996df787b737c4843a78e33139b1acb8bb6933f6f1"
+  },
   "stage_d_width_evaluation_plan": {
     "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\capacity_width_recovery\\evaluation_plan.json",
     "sha256": "6abb7ec8554fb264272f3be57c732961fff1d022a8485630055c41a16d087e0d"
