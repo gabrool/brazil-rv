@@ -1223,6 +1223,10 @@
     "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\capacity_depth\\plan.json",
     "sha256": "2a4a17e64c704d1b90c574e165ca5f66eec94ec80973659fcde46f848e7cc546"
   },
+  "stage_d_depth_storage": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\capacity_depth\\storage\\index.json",
+    "sha256": "9ef6a24bab0ca7b7dbfb436680dfa23e3731b994b59f5dad082286175bdd05e4"
+  },
   "stage_d_lstm_engineering": {
     "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\capacity_lstm_engineering\\qualification.json",
     "sha256": "19454b306b5265b61c91868456afe2f323d30dd4982df00e0069c37b8c67ded1"
