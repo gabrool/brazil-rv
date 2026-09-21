@@ -131,7 +131,7 @@ frozen eager tolerance and NaN temporary-allocation check. The all-date
 saved-versus-eager comparison nevertheless fails two coordinates: MPLU on
 November1 2018, horizons3 and10. Differences .003021240234375 and
 .0031280517578125 exceed original thresholds .0029680177 and .0021707460.
-The initial30.3800905-second attempt, exact code/stdout and arrays are retained
+The initial case reports30.3800905seconds; exact code/stdout and arrays are retained
 in capacity_width_recovery/forecast_qualification. It is not relabelled passed.
 
 A separately frozen narrow diagnostic uses the same checkpoint, inputs and

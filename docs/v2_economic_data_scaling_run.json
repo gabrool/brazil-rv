@@ -1225,7 +1225,7 @@
   },
   "stage_d_width_evaluation": {
     "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\capacity_width_recovery\\evaluation_progress.json",
-    "sha256": "821e6009d4d0df16fa3fb63562bb019e546686bc76bf5dae0c30cfeb1dc91f9c"
+    "sha256": "511dcee85a7e2b314696865f411894fc9eb35bc17b19e7a1d9b3d6cacd93d565"
   },
   "stage_d_width_evaluation_plan": {
     "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\capacity_width_recovery\\evaluation_plan.json",
@@ -1254,6 +1254,10 @@
   "stage_d_width_storage": {
     "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\capacity_width_recovery\\storage\\audit_view_compression.json",
     "sha256": "41f1703207744d7fd7942b8f553937a21c47586e8adbcdb94be19ed24f9ced1d"
+  },
+  "stage_d_width_storage_json": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\capacity_width_recovery\\storage_json\\report.json",
+    "sha256": "a9a33e6b013d7983b30b8b8ea3cce7faf4a8050794cd7c888113b610e57af6c7"
   },
   "status": "stage_c_actual_exposure_admission_in_progress_refit_interrupted",
   "succession_identity_dependency_scope": {
