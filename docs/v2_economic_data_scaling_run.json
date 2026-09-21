@@ -1247,6 +1247,10 @@
     "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\capacity_lstm_engineering\\qualification.json",
     "sha256": "19454b306b5265b61c91868456afe2f323d30dd4982df00e0069c37b8c67ded1"
   },
+  "stage_d_lstm_evaluation_plan": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\capacity_lstm\\evaluation_plan.json",
+    "sha256": "9398280ff2116be586f88566f282ac2c9c4b8664e0a5325dc777c3c3dd0b97f5"
+  },
   "stage_d_lstm_plan": {
     "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\capacity_lstm\\plan.json",
     "sha256": "fe68f957baa558291b7761af34f97a13cf1c91dcd83c180398e022b411254a53"
