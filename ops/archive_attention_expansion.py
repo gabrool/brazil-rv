@@ -2,6 +2,7 @@
 
 from copy import copy
 from dataclasses import replace
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -43,9 +44,14 @@ def main():
     archive = staging / f"attention_expansion_{commit[:7]}.zip"
     final = Path(run["root"]).resolve() / archive.name
     assert not final.exists() and final.parent == Path(run["root"]).resolve()
-    source_plan = bound_json(run["scaling_expanded_source_plan"])
-    inputs = bound_json(source_plan["inputs"])
-    cache = Path(inputs["cache"]["path"]).resolve()
+    source_inputs = [
+        bound_json(bound_json(run[key])["inputs"])
+        for key in (
+            "scaling_expanded_source_plan",
+            "scaling_expanded_later_source_plan",
+        )
+    ]
+    caches = {Path(inputs["cache"]["path"]).resolve() for inputs in source_inputs}
     members, inherited, aliases, unique, retired = {}, {}, {}, {}, []
     with zipfile.ZipFile(archive, "x", zipfile.ZIP_DEFLATED, compresslevel=6) as output:
 
@@ -79,7 +85,7 @@ def main():
                 for name in sorted(files):
                     path = Path(directory) / name
                     assert path.resolve().is_relative_to(folder)
-                    if path.resolve() == cache:
+                    if path.resolve() in caches:
                         continue
                     member = (
                         "evidence/" + label + "/" + path.relative_to(folder).as_posix()
@@ -112,7 +118,10 @@ def main():
         output.writestr(
             "dependencies.json",
             json.dumps(
-                dict(prior=run["scaling_diagnostic_recovery"], source_inputs=inputs),
+                dict(
+                    prior=run["scaling_diagnostic_recovery"],
+                    source_inputs=source_inputs,
+                ),
                 indent=2,
             ),
         )
@@ -130,38 +139,49 @@ def main():
                 and sha256_file(target) == receipt["sha256"]
             ), name
             target.unlink()
-        term_name = (
-            "evidence/expanded/"
-            + Path(inputs["account_terms"]["path"])
-            .resolve()
-            .relative_to(root)
-            .as_posix()
-        )
-        terms = staging / "incremental_terms.json"
-        terms.write_bytes(source.read(aliases.get(term_name, term_name)))
-    # Rebuild the omitted shallow account cache, using its accepted immutable
-    # parent and the restored incremental terms. No source reducers/model data.
-    parent = bound_json(inputs["parent"])["cache"]
-    with Path(parent["path"]).open("rb") as f:
-        data = pickle.load(f)
-    provenance = dict(data.inputs.source_artifact_hashes)
-    provenance["corporate_replay_parent"] = provenance.pop("corporate_replay")
-    loaded, calendar = load_corporate_replay(
-        str(terms), inputs["account_terms"]["sha256"]
-    )
-    amended = copy(data)
-    amended.inputs = apply_corporate_replay(
-        replace(data.inputs, source_artifact_hashes=provenance),
-        loaded,
-        calendar,
-        inputs["account_terms"]["sha256"],
-    )
-    with target.open("wb") as f:
-        pickle.dump(amended, f, protocol=pickle.HIGHEST_PROTOCOL)
-    assert sha256_file(target) == inputs["cache"]["sha256"]
-    cache_bytes = target.stat().st_size
-    target.unlink()
-    terms.unlink()
+        recovered_caches = []
+        for inputs in source_inputs:
+            term_name = (
+                "evidence/expanded/"
+                + Path(inputs["account_terms"]["path"])
+                .resolve()
+                .relative_to(root)
+                .as_posix()
+            )
+            terms = staging / "incremental_terms.json"
+            terms.write_bytes(source.read(aliases.get(term_name, term_name)))
+            # Stream reconstructed pickle bytes into a digest, avoiding another
+            # 707MB temporary cache on the nearly full staging volume.
+            parent = bound_json(inputs["parent"])["cache"]
+            with Path(parent["path"]).open("rb") as f:
+                data = pickle.load(f)
+            provenance = dict(data.inputs.source_artifact_hashes)
+            provenance["corporate_replay_parent"] = provenance.pop("corporate_replay")
+            loaded, calendar = load_corporate_replay(
+                str(terms), inputs["account_terms"]["sha256"]
+            )
+            amended = copy(data)
+            amended.inputs = apply_corporate_replay(
+                replace(data.inputs, source_artifact_hashes=provenance),
+                loaded,
+                calendar,
+                inputs["account_terms"]["sha256"],
+            )
+            digest = hashlib.sha256()
+            byte_count = 0
+
+            class DigestWriter:
+                def write(self, chunk):
+                    nonlocal byte_count
+                    digest.update(chunk)
+                    byte_count += len(chunk)
+                    return len(chunk)
+
+            pickle.dump(amended, DigestWriter(), protocol=pickle.HIGHEST_PROTOCOL)
+            assert digest.hexdigest() == inputs["cache"]["sha256"]
+            recovered_caches.append(dict(cache=inputs["cache"], bytes=byte_count))
+            terms.unlink()
+            del data, amended
     verified_hash = sha256_file(archive)
     # Only exact new-fit intermediate files verified above are retired. This is
     # not recursive deletion and cannot traverse old-fit junctions.
@@ -183,15 +203,17 @@ def main():
         unique_members=len(unique),
         aliases=len(aliases),
         inherited_members=len(inherited),
-        recovered_cache_bytes=cache_bytes,
+        recovered_caches=recovered_caches,
+        recovered_cache_bytes=sum(r["bytes"] for r in recovered_caches),
         retired_epochs=retired,
         retired_logical_bytes=sum(r["bytes"] for r in retired),
         archive_seconds=archive_seconds,
         recovery_seconds=perf_counter() - started - archive_seconds,
         dependencies=dict(
-            prior=run["scaling_diagnostic_recovery"], source_parent=inputs["parent"]
+            prior=run["scaling_diagnostic_recovery"],
+            source_parents=[inputs["parent"] for inputs in source_inputs],
         ),
-        scope="All24 new completed child fits and96 baseline book records, source overlays/bounds, hedge correction, selected originals/leads, exact attempts and current research restore/hash-check. Thirty old-fit junctions remain dependencies. The shallow account cache reconstructs byte-exactly from its prior immutable cache and restored terms. Every removed new intermediate epoch is verified in this archive; selected/EMA weights, histories, forecasts and all original fits remain online. No raw or accepted-store copies, source census or repeated numerical proof.",
+        scope="All24 new completed child fits and96 baseline book records, source overlays/bounds, hedge correction, selected originals/leads, exact attempts and current research restore/hash-check. Thirty old-fit junctions remain dependencies. Both omitted shallow account caches reconstruct as byte-exact pickle streams from their prior immutable cache and restored terms; streams are hashed without writing redundant cache files. Every removed new intermediate epoch is physically restored and verified in this archive; selected/EMA weights, histories, forecasts and all original fits remain online. No raw or accepted-store copies, source census or repeated numerical proof.",
     )
     destination = Path(run["root"]) / "attention_expansion_recovery.json"
     write_json_atomic(destination, report)

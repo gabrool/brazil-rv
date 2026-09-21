@@ -50,10 +50,22 @@ ensemble final-path changes are+.15514/+.18274bp over122sessions. The16 original
 four-fold source/refit ensembles have zero material tiny-root minimum fees; no
 additional replay is justified from that fee inventory. This defect does not
 explain the multi-bps reversal. The unfinished eight-period BASELINE
-evaluation must import the preserved `hedge_roundoff/baseline_runtime` source
-snapshot, keeping all baseline books on their original account implementation.
+evaluation imports the clean `attention-baseline` worktree at b81653c, qualified
+against the preserved `hedge_roundoff/baseline_runtime` source snapshot (235files;
+only line-ending differences), keeping its original account implementation.
 The active GPU training worktree is unchanged; no model-store or fit correction
 follows from this account-only defect.
+
+The added F7/F11 held transitions now have a separate qualified account overlay:
+RLOG/Smiles distributions and approved GPC/Wiz same-company renames. Resolve
+`scaling_expanded_later_source_plan`, `scaling_expanded_later_event_qualification`
+and `scaling_expanded_later_source_account_parity`;24 saved books qualify, and36
+exposed one-factor bounds reuse those books. Original meeting approvals and
+default Smiles election prevent conditional-notice or optional-election hindsight.
+Linx's held June2021 BDR/cash transition remains unresolved, as do unknown Smiles
+fraction auction terms. This changes no model coordinates: GUAR/QGEP/GPC/Wiz
+history and RLOG/Smiles target dependencies remain separately open. Do not call
+the expanded comparison globally source-corrected or silently replace its baseline.
 
 Complete the user-authorized [economic/data/capacity registration](research/preregistrations/v2_economic_data_scaling.md). Foundation is complete and sealed; never repeat it. Resolve [the run pointer](docs/v2_economic_data_scaling_run.json) and [progress](docs/v2_economic_data_scaling_progress.md) for evidence.
 

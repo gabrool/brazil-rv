@@ -944,13 +944,25 @@
     "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\plan.json",
     "sha256": "8c8a0cab4f35fe22672945e335ea9374b32fe4e4b46a123cf18accde075fcbbf"
   },
+  "scaling_expanded_later_bounds": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\evaluation\\later_source_replays\\bounds\\replays.json",
+    "sha256": "418857d24c51694eefe8253e2c6f9095aaff5a3f4d1218f45dc773230f97da4c"
+  },
   "scaling_expanded_later_bounds_plan": {
     "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\evaluation\\later_source_replays\\bounds\\qualified_plan.json",
     "sha256": "9d7e59c48ffd730f6e27905d236d5be5a7a6f915b3efcb51b921af312ea21dd3"
   },
+  "scaling_expanded_later_bounds_qualification": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\evaluation\\later_source_replays\\bounds\\qualification\\manifest.json",
+    "sha256": "96f973b2e6e7801a2fdb576c65295ca72d2d5f469092950acf63f7c7168f5412"
+  },
+  "scaling_expanded_later_event_qualification": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\evaluation\\later_source_replays\\event_qualification\\report.json",
+    "sha256": "c8f1b4ce130beb3d4cbbb41c601d8fb31abd9c02fe0a0de6ac6f07557acb03a8"
+  },
   "scaling_expanded_later_source_account_parity": {
     "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\evaluation\\later_source_replays\\account_parity\\report.json",
-    "sha256": "2e326d7a88d7cdf2aa44188ca2402f95bfcbdcb117d0f86f730aad0082e1a62a"
+    "sha256": "44a24d6bc225b9b6816cc8de5ad01af2b5be9254966e875f15a6eaf416d2f0ac"
   },
   "scaling_expanded_later_source_plan": {
     "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\evaluation\\later_source_replays\\plan.json",

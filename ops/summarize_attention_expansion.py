@@ -170,8 +170,54 @@ def main():
     write_json_atomic(out / "comparisons.json", comparisons)
     write_json_atomic(out / "fit_diagnostics.json", fit_readouts(fits))
     source_results = bound_json(run["scaling_expanded_event_qualification"])
+    later_results = bound_json(run["scaling_expanded_later_event_qualification"])
+    assert source_results["passed"] and later_results["passed"]
     source_bounds = bound_json(run["scaling_expanded_event_bounds_qualification"])
     bounds = [bound_json(r) for r in source_bounds["reports"]]
+    later_bounds = bound_json(run["scaling_expanded_later_bounds_qualification"])
+    bounds.extend(bound_json(r) for r in later_bounds["reports"])
+    source_books = dict(books)
+    source_records = [*source_results["books"], *later_results["books"]]
+    for rec in source_records:
+        _, capital, arm, fold, member = rec["key"].split("/")
+        source_books[int(capital), arm, fold, member] = bound_json(rec["book"])
+    source_comparison = []
+    for capital in plan["capitals"]:
+        arrays = []
+        means = {arm: {} for arm in plan["arms"]}
+        unresolved = {arm: [] for arm in plan["arms"]}
+        for fold in plan["folds"]:
+            for arm in plan["arms"]:
+                book = source_books[capital, arm, fold, "ensemble"]
+                means[arm][fold] = float(np.mean(book["daily"]["net_excess_bps"]))
+                if book["summary"]["economics_unresolved"]:
+                    unresolved[arm].append(fold)
+            wide, full = (
+                source_books[capital, arm, fold, "ensemble"]
+                for arm in ("TE_wide", "TE_full")
+            )
+            arrays.append(
+                np.asarray(wide["daily"]["net_excess_bps"])
+                - full["daily"]["net_excess_bps"]
+            )
+        source_comparison.append(
+            dict(
+                capital=capital,
+                arm_equal_fold_means={
+                    arm: float(np.mean(list(values.values())))
+                    for arm, values in means.items()
+                },
+                fold_means=means,
+                wide_minus_full_equal_fold_bps_day=float(
+                    np.mean([a.mean() for a in arrays])
+                ),
+                positive_folds=sum(a.mean() > 0 for a in arrays),
+                paired={
+                    str(block): paired_interval(arrays, block) for block in (20, 40, 60)
+                },
+                unresolved_folds=unresolved,
+            )
+        )
     report = dict(
         status="eight_period_development_comparison_with_explicit_source_limits",
         plan=ref,
@@ -182,6 +228,8 @@ def main():
         fit_diagnostics=binding(out / "fit_diagnostics.json"),
         model_summary=summaries,
         source_only_f3=source_results,
+        source_only_f7_f11=later_results,
+        source_overlay_comparison=source_comparison,
         source_bounds=[
             dict(
                 key=r["key"],
@@ -191,11 +239,13 @@ def main():
             for r in bounds
         ],
         source_bounds_proof=run["scaling_expanded_event_bounds_qualification"],
+        later_source_bounds_proof=run["scaling_expanded_later_bounds_qualification"],
+        later_source_parity=run["scaling_expanded_later_source_account_parity"],
         stopping_diagnostic=run["scaling_parent_patience_results"],
         hedge_correction=run["scaling_hedge_roundoff_books"],
         hedge_correction_qualification=run["scaling_hedge_roundoff_qualification"],
         hedge_correction_parity=run["scaling_hedge_roundoff_account_parity"],
-        limits="Eight preselected disjoint development periods, not a continuous portfolio or pristine test. The six other folds are reserved from new corrected comparisons; 2025/2026 consumers remain unopened. Same accepted model data/parents/recipes for both widths. The later GUAR2019 split/QGEP2019 dividend source corrections are account-only; their model-data dependencies remain. New unquoted holdings are listed explicitly and not certified by saved-NAV arithmetic. Source overlays and the outcome-informed parent-patience diagnostic never replace the frozen baseline silently. Equal-fold means differ from the pooled-day paired estimates; mean fold Sharpes and worst individual drawdown are not continuous-account statistics. No model adoption or broad capacity conclusion from this report.",
+        limits="Eight preselected disjoint development periods, not a continuous portfolio or pristine test. The six other folds are reserved from new corrected comparisons; 2025/2026 consumers remain unopened. Same accepted model data/parents/recipes for both widths. GUAR2019/QGEP2019/GPC2021/WIZ2023/RLOG2021/Smiles2021 source amendments are account-only; their model-data dependencies remain. Linx's three held June2021 dates lack an admitted BDR/final-cash contract, and Smiles fractional auction remains unknown. New unquoted holdings are listed explicitly and not certified by saved-NAV arithmetic. Source overlays, hedge correction and outcome-informed parent-patience diagnostic never replace the frozen baseline silently. The source overlay comparison uses only separate2019/2021/2023 account corrections with unchanged forecasts. Equal-fold means differ from pooled-day paired estimates; mean fold Sharpes and worst individual drawdown are not continuous-account statistics. No model adoption or broad capacity conclusion from this report.",
         seconds=perf_counter() - started,
     )
     write_json_atomic(out / "report.json", report)

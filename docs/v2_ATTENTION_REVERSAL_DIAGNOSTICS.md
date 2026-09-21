@@ -162,8 +162,8 @@ debit+100annualbp changes full/wide daily returns by-.03994/-.03982bps;
 the tested delivery/disposal changes range from-.00845 to+.03266bps/day.
 These source sensitivities retain their original pre-hedge-correction books,
 explicit payment/valuation assumptions and separate numerical uncertainty.
-They are not joint or all-interior bounds. Newly exposed2021 source leads remain
-separate; candidate original notices do not yet make the F7 account accepted.
+They are not joint or all-interior bounds. The separately qualified2021/2023
+overlay below resolves specific held transitions; F7 retains explicit gaps.
 
 The expanded 2019 period exposed held Fibria, Guararapes PN and QGEP transitions.
 Ten selected issuer originals and fifteen readable pages supply the dated terms;
@@ -193,6 +193,44 @@ must be attributed separately; the eight-period comparison cannot be called
 globally corrected data. Current F3 comparisons use the same frozen imperfect
 model-data contract for both widths. No new architecture or training rule follows
 from these source findings.
+
+The added2021/2023 source overlay uses eight originals and thirteen visually
+qualified pages, including GPC/Wiz meeting approvals after their conditional
+notices. RLOG is one CSAN per3.943112 RLOG, with expressly permitted March8 owned
+disposal and March10 physical credit. Printed93.72 fraction cash is knownMarch26
+and paidMarch29. Smiles' non-election default is .6601GOLL plus5.11719919cash;
+its elective alternative cannot be selected with hindsight. June9 custody and
+June23 cash remain distinct; unknown fraction auction stays null. GPC→DEXP and
+WIZS→WIZC use existing same-company held-position transfers without a loan-source
+alias or model-history change. Two additional Linx leads remain unadmitted:
+the StoneCo BDR leg is outside933axes and final adjusted cash is unknown at the
+June30 end. Its three held dates are not assigned zero value or future prices.
+
+All24 new source books pass saved NAV checks, independent dated Decimal
+entitlements and identical-intention two-account comparisons (maxR2.794e-8).
+AtR10m, full/wide F7 returns are3.18393/5.45372bps/day aboveCDI; F11 returns
+are8.26325/5.85459. Their source-only changes are respectively+.19423/-.12626
+and-.04601/-.17868bps/day. These are same-forecast account effects, not data
+refits. F7 remains unresolved; F11 has no remaining unpriced holdings. RLOG/Smiles
+labels and GPC/Wiz model histories remain separately open along with GUAR/QGEP.
+
+Thirty-six exposed one-factor bounds qualify;24 out-of-period/unexposed branches
+are skipped. AtR10m, debit+100annualbp changes daily returns by-.0470 to-.0531bp.
+RLOG custody-first changes wideF7 by-.02335bp/day; printed-versus-aggregate
+fraction precision is about4.31e-8bp/day and the Smiles custody shift is below
+1e-9bp/day on these paths. These are actual path endpoints, not joint or universal
+bounds. Initial execution saved two funding books before a harness used
+disposal_session equal to custody, rejected by the existing contract. Custody-first
+correctly means no early-disposal override; only that harness encoding changed,
+and the two completed books were reused. The production account was unchanged.
+The later parity receipt originally retained2019-specific descriptive prose;
+its qualified receipt changes only that description and binds the original.
+
+The preserved baseline worktree matches all235 snapshot source files after newline
+normalization:120 exact bytes and115 CRLF/LF-only differences. An initial stricter
+byte assertion failed before the shell continued into the twelve F11 evaluations;
+the subsequent source comparison verifies no semantic differences and those
+completed books are reused. No GPU fit or numerical result was rerun for this.
 
 All numerical controls and original results remain. The decomposition's first
 case saved arrays before a missing scenario label stopped report generation;
