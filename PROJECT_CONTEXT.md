@@ -84,9 +84,10 @@ After integrated A, C compares registered matched attention, wider attention, GR
 
 Width recovery selects imported runtime by arm and preserves completed TE128 work.
 Qualified depth is separately available in economic-accounts@734cf12 and LSTM in
-lstm@c37b432. Apply the qualified compiler correction in clean derived checkouts
-before their later freezes; their model/temporal engineering bindings remain
-unchanged. Neither experiment is frozen or run yet. ops/run_capacity_layers.py
+lstm@c37b432. Clean derived checkouts normalization-depth@a9a775c and
+normalization-lstm@67629a7 add only the qualified compiler correction; their
+model/temporal engineering bindings remain unchanged. The freezer binds and
+checks the qualified compiler bytes. Neither experiment is frozen or run yet. ops/run_capacity_layers.py
 --wave depth|lstm reuses the frozen width fit loop; ops/admit_capacity.py applies
 the original economic screen. Never change a runtime while its worker is active.
 

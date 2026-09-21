@@ -15,6 +15,7 @@ from brazil_rv.v2.data_repair import binding, bound_json
 from brazil_rv.v2.research_rounds import _git_identity
 from brazil_rv.v2.round7 import configuration
 from brazil_rv.v2.round7_training import train
+from brazil_rv.v2.train import compile_forward
 import run_capacity_width
 
 PROJECT = Path(__file__).resolve().parents[1]
@@ -27,6 +28,11 @@ def freeze(run, wave):
     assert admission["technical_comparisons_valid"]
     engineering = bound_json(run[prefix + "_engineering"])
     assert engineering["status"] == f"implementation_qualified_not_{wave}_experiment"
+    compiler = binding(Path(inspect.getfile(compile_forward)))
+    correction = bound_json(run["stage_d_compiler_acceptance"])
+    assert (
+        compiler["sha256"] == correction["fixed_runtime"]["files"]["compiler"]["sha256"]
+    )
     model_source = Path(inspect.getfile(CharacteristicModel))
     for name, record in engineering["runtime"].items():
         assert sha256_file(model_source.with_name(name)) == record["sha256"]
@@ -113,6 +119,7 @@ def freeze(run, wave):
         stage="D",
         admission=run[f"stage_d_{previous}_admission"],
         engineering=run[prefix + "_engineering"],
+        compiler_acceptance=run["stage_d_compiler_acceptance"],
         store=original["store"],
         cells=cells,
         parameters=counts,
@@ -138,6 +145,7 @@ def freeze(run, wave):
                     )
                 ),
                 "configuration": binding(Path(inspect.getfile(configuration))),
+                "compiler": compiler,
             },
         ),
         contrast=(

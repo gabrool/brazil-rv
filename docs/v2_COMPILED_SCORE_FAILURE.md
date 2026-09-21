@@ -113,3 +113,11 @@ junction prevents duplicate fit storage. Resolve stage_d_width_attention_book_re
 Read-only inspection once used a nonnumeric PowerShell First argument and later
 large output was truncated. These changed no research artifacts; they are
 reconstructed tooling descriptions, not saved exact failed execution files.
+
+Future depth/LSTM runtime checkouts a9a775c/67629a7 apply the same12-line compiler
+fix to their previously qualified graphs. Their freezer now explicitly binds and
+checks the compiler bytes. Both idle code checkouts received lossless NTFS LZX
+compression:82,428,016/82,475,858 logical bytes occupy17,507,682/17,534,021bytes;
+Git reports both clean. No source/store/fit data was removed or changed. The
+capacity archive includes exact per-arm runtime sources and the entire original
+failed width root, while skipping its declared duplicate junction.

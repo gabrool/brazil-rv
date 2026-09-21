@@ -69,14 +69,15 @@ def main(wave):
             original_root = Path(run["stage_d_width_original_plan"]["path"]).parent
             assert original_root != root
             evidence.append((original_root, "capacity_width_original"))
-            design = bound_json(run[prefix + "_plan"])
-            for arm, runtime in design["runtime_by_arm"].items():
-                checkout = Path(runtime["files"]["training"]["path"]).parents[4]
-                runtime_names = subprocess.check_output(
-                    ["git", "ls-files", "research"], cwd=checkout, text=True
-                ).splitlines()
-                for name in runtime_names:
-                    add("runtime/" + arm + "/" + name, checkout / name)
+        design = bound_json(run[prefix + "_plan"])
+        runtimes = design.get("runtime_by_arm", {"shared": design["runtime"]})
+        for arm, runtime in runtimes.items():
+            checkout = Path(runtime["files"]["training"]["path"]).parents[4]
+            runtime_names = subprocess.check_output(
+                ["git", "ls-files", "research"], cwd=checkout, text=True
+            ).splitlines()
+            for name in runtime_names:
+                add("runtime/" + arm + "/" + name, checkout / name)
         if wave == "width" and "stage_c_account_composition" in run:
             evidence.append(
                 (
