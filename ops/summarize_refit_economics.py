@@ -76,6 +76,7 @@ def sensitivity_results(run, plan, out, primary_metrics):
                             loan_cash_bounds_pending=quality[
                                 "loan_cash_bounds_pending"
                             ],
+                            unquoted_holdings=quality["unquoted_holdings"],
                             prior_debit_sessions=quality["prior_debit_sessions"],
                             maximum_overdue_principal=quality[
                                 "maximum_overdue_principal"
@@ -105,6 +106,7 @@ def sensitivity_results(run, plan, out, primary_metrics):
                             exposed=False,
                             max_abs_path_bps=0,
                             loan_cash_bounds_pending=base["loan_cash_bounds_pending"],
+                            unquoted_holdings=base["unquoted_holdings"],
                             prior_debit_sessions=base["prior_debit_sessions"],
                             maximum_overdue_principal=base["maximum_overdue_principal"],
                             overdue_dates=base["overdue_dates"],
