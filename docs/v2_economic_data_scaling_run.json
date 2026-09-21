@@ -1109,6 +1109,10 @@
     "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\matched_refit_debit_bounds\\plan.json",
     "sha256": "4ac3492b1f4e1aad8f38e9a47274b490125791c0dc315f73d912339683b56a29"
   },
+  "stage_c_refit_debit_qualification": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\matched_refit_debit_bounds\\qualification\\manifest.json",
+    "sha256": "e70b0c0cf9b925d83c806581a309d2e9dd30b97e2ca8b6e6a591283fdcc72560"
+  },
   "stage_c_refit_economics": {
     "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_economic_matched_20260920\\refit_economics\\manifest.json",
     "sha256": "5f69343d132bee3ba5218fc4427d5660cac9a53f07ede97e790305c57592adaa"

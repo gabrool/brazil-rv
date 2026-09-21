@@ -14,6 +14,177 @@ from brazil_rv.v2.foundation_readouts import paired_interval
 PROJECT = Path(__file__).resolve().parents[1]
 
 
+def sensitivity_results(run, plan, out, primary_metrics):
+    """All tested hypotheses, with unexposed folds explicitly retaining baseline."""
+    primary = {
+        (r["capital"], r["arm"], r["fold"]): r
+        for r in primary_metrics
+        if r["member"] == "ensemble"
+    }
+    rows = {}
+    sources = []
+    for plan_key, proof_key, conditional in (
+        (
+            "stage_c_refit_sensitivity_plan",
+            "stage_c_refit_sensitivity_qualification",
+            False,
+        ),
+        ("stage_c_refit_debit_plan", "stage_c_refit_debit_qualification", True),
+    ):
+        specification = bound_json(run[plan_key])
+        root = Path(run[plan_key]["path"]).parent
+        replay = bound_json(binding(root / "replays.json"))
+        proof = bound_json(run[proof_key])
+        assert replay["status"] == proof["status"] == "complete"
+        assert proof["qualified"] == len(replay["completed"])
+        records = {r["key"]: r for r in replay["completed"]}
+        skipped = {r["key"]: r for r in replay["skipped"]}
+        sources.append(
+            dict(
+                plan=run[plan_key],
+                qualification=run[proof_key],
+                completed=len(records),
+                skipped=len(skipped),
+            )
+        )
+        for phase in specification["phases"]:
+            variant = ("denied_" if conditional else "") + phase["name"]
+            capital = phase["capital"]
+            for arm in plan["arms"]:
+                for fold in plan["folds"]:
+                    base = primary[capital, arm, fold]
+                    if conditional:
+                        base = rows["denied_renewal", capital, arm, fold]
+                    key = f"{variant}/{capital}/{arm}/{fold}/ensemble"
+                    if key in records:
+                        rec = records[key]
+                        saved = bound_json(rec["book"])
+                        quality = bound_json(
+                            binding(
+                                root
+                                / "qualification"
+                                / (key.replace("/", "_") + ".json")
+                            )
+                        )
+                        assert quality["passed"] and quality["book"] == rec["book"]
+                        row = dict(
+                            mean=saved["summary"]["mean"],
+                            performance=bound_json(rec["performance"]),
+                            economics_unresolved=rec["economics_unresolved"],
+                            exposed=True,
+                            max_abs_path_bps=quality["contrast"]["max_abs_path_bps"],
+                            loan_cash_bounds_pending=quality[
+                                "loan_cash_bounds_pending"
+                            ],
+                            prior_debit_sessions=quality["prior_debit_sessions"],
+                            maximum_overdue_principal=quality[
+                                "maximum_overdue_principal"
+                            ],
+                            source=rec,
+                        )
+                    else:
+                        assert key in skipped or (
+                            conditional and not base["exposed"]
+                        ), key
+                        row = dict(
+                            mean=base["mean"],
+                            performance=base["performance"],
+                            economics_unresolved=base["economics_unresolved"],
+                            exposed=False,
+                            max_abs_path_bps=0,
+                            loan_cash_bounds_pending=False,
+                            prior_debit_sessions=None,
+                            maximum_overdue_principal=None,
+                            source=skipped.get(key),
+                            skip_reason="Unexposed hypothesis retains its baseline; not a numerical bound on an exposed book",
+                        )
+                    row.update(
+                        variant=variant,
+                        capital=capital,
+                        arm=arm,
+                        fold=fold,
+                        baseline="denied_renewal"
+                        if conditional
+                        else "approved_renewal_primary",
+                        conditional_delta_bps_day=row["mean"]["net_excess_bps"]
+                        - base["mean"]["net_excess_bps"],
+                        total_vs_primary_bps_day=row["mean"]["net_excess_bps"]
+                        - primary[capital, arm, fold]["mean"]["net_excess_bps"],
+                    )
+                    rows[variant, capital, arm, fold] = row
+    write_json_atomic(out / "sensitivity_books.json", list(rows.values()))
+    groups = defaultdict(list)
+    for row in rows.values():
+        groups[row["variant"], row["capital"], row["arm"]].append(row)
+    summaries = []
+    for (variant, capital, arm), group in sorted(groups.items()):
+        assert len(group) == len(plan["folds"])
+        summaries.append(
+            dict(
+                variant=variant,
+                capital=capital,
+                arm=arm,
+                baseline=group[0]["baseline"],
+                mean_net_cdi_bps_day=float(
+                    np.mean([r["mean"]["net_excess_bps"] for r in group])
+                ),
+                mean_conditional_delta_bps_day=float(
+                    np.mean([r["conditional_delta_bps_day"] for r in group])
+                ),
+                mean_total_vs_primary_bps_day=float(
+                    np.mean([r["total_vs_primary_bps_day"] for r in group])
+                ),
+                exposed_folds=sum(r["exposed"] for r in group),
+                unresolved_books=sum(r["economics_unresolved"] for r in group),
+                loan_cash_bounds_pending=sum(
+                    r["loan_cash_bounds_pending"] for r in group
+                ),
+                maximum_conditional_path_bps=max(r["max_abs_path_bps"] for r in group),
+                mean_fold_brl_cdi_sharpe=float(
+                    np.mean([r["performance"]["sharpe_brl_minus_cdi"] for r in group])
+                ),
+                worst_fold_drawdown_brl=min(
+                    r["performance"]["maximum_drawdown_brl"] for r in group
+                ),
+            )
+        )
+    write_json_atomic(out / "sensitivity_summary.json", summaries)
+    indexed = {(r["variant"], r["capital"], r["arm"]): r for r in summaries}
+    comparisons = []
+    for variant, capital in sorted({(r["variant"], r["capital"]) for r in summaries}):
+        for candidate, control in (
+            ("TE_wide", "TE_full"),
+            ("GRU_early", "TE_full"),
+            ("TE_full", "C6"),
+        ):
+            a, b = (indexed[variant, capital, arm] for arm in (candidate, control))
+            comparisons.append(
+                dict(
+                    variant=variant,
+                    capital=capital,
+                    candidate=candidate,
+                    reference=control,
+                    net_advantage_bps_day=a["mean_net_cdi_bps_day"]
+                    - b["mean_net_cdi_bps_day"],
+                    mean_fold_sharpe_delta=a["mean_fold_brl_cdi_sharpe"]
+                    - b["mean_fold_brl_cdi_sharpe"],
+                    worst_fold_drawdown_delta=a["worst_fold_drawdown_brl"]
+                    - b["worst_fold_drawdown_brl"],
+                    unresolved_books=a["unresolved_books"] + b["unresolved_books"],
+                    conditional_loan_cash_pending=a["loan_cash_bounds_pending"]
+                    + b["loan_cash_bounds_pending"],
+                )
+            )
+    write_json_atomic(out / "sensitivity_comparisons.json", comparisons)
+    return dict(
+        sources=sources,
+        books=binding(out / "sensitivity_books.json"),
+        summary=binding(out / "sensitivity_summary.json"),
+        comparisons=binding(out / "sensitivity_comparisons.json"),
+        limits="Equal four-fold means include explicitly unexposed folds at their unchanged baseline. Conditional debit spreads compare with denied renewal; their total versus approved renewal is separately labelled. These are tested adaptive point contrasts, not joint/interior extrema or an extra multiple-comparison adoption gate. Unresolved recall paths remain unresolved, not executable gains. All prior adaptive numerical uncertainty remains.",
+    )
+
+
 def main():
     tick = perf_counter()
     pointer = PROJECT / "docs/v2_economic_data_scaling_run.json"
@@ -175,6 +346,7 @@ def main():
                 )
             )
     write_json_atomic(out / "comparisons.json", comparisons)
+    sensitivities = sensitivity_results(run, plan, out, metrics)
     report = dict(
         status="corrected_data_refit_screen_results_pending_exposure_sensitivity_disposition",
         primary=run["stage_c_data_replay_plan"],
@@ -183,6 +355,7 @@ def main():
         books=binding(out / "books.json"),
         comparisons=binding(out / "comparisons.json"),
         model_summary=summaries,
+        sensitivities=sensitivities,
         seconds=perf_counter() - tick,
         limits="Corrected data plus necessary matched refits; no incompatible old-weight pure-data counterfactual. Fold means equally weighted; circular paired intervals pool days within separately preserved fold boundaries. Reported Sharpes are means of fold Sharpes, drawdown worst individual fold, not a continuous account. Both named leads were nominated from observed foundation development results. Positive four-fold point means authorize technical review for the other ten development folds, not adoption or retrospective IC-gate passage. Preserve all adaptive numerical uncertainty, cost/loan sensitivities and unresolved actual exposures.",
     )
