@@ -41,10 +41,15 @@ def main():
     parser.add_argument("--supplement", action="store_true")
     parser.add_argument("--settlement-index", action="store_true")
     parser.add_argument("--b3-sula", action="store_true")
+    parser.add_argument("--expanded-attention", action="store_true")
     args = parser.parse_args()
     started = perf_counter()
     run = json.loads((PROJECT / "docs/v2_economic_data_scaling_run.json").read_text())
-    root = Path(run["stage_c_root"]) / "event_sources"
+    root = (
+        Path(run["scaling_expanded_evaluation_plan"]["path"]).parent
+        if args.expanded_attention
+        else Path(run["stage_c_root"])
+    ) / "event_sources"
     root.mkdir(exist_ok=True)
     if args.b3_sula:
         path = root / "b3_189_2022.pdf"
@@ -71,6 +76,11 @@ def main():
         print(json.dumps(binding(path)))
         return
     scope = {2022: ("UNIDAS",), 2023: ("REDE D",)} if args.supplement else SCOPES
+    if args.expanded_attention:
+        scope = {
+            year: ("FIBRIA", "SUZANO", "GUARARAPES", "QGEP", "ENAUTA")
+            for year in (2018, 2019)
+        }
     label = "supplement" if args.supplement else "issuer"
     if args.settlement_index:
         scope = {2022: ("22691", "24821")}
@@ -85,11 +95,17 @@ def main():
             root / (label + "_plan.json"),
             dict(
                 exposure=binding(
-                    Path(run["stage_c_root"]) / "exposure_audit/manifest.json"
+                    Path(run["scaling_expanded_qualification"]["path"])
+                    if args.expanded_attention
+                    else Path(run["stage_c_root"]) / "exposure_audit/manifest.json"
                 ),
                 scopes=scope,
                 rad_manifest=prior["rad_manifest"],
-                purpose="Resolve nine actually exposed transition leads together; reuse all previously admitted events and sources. INEP one-day gap is a separate quote disposition, not an assumed action.",
+                purpose=(
+                    "Resolve only FIBR/GUAR PN/QGEP transitions actually held in expanded F3 books. Freeze sources/account effects separately; keep current fits/store immutable. Existing issuer/year RAD groups only, no source census or model-data propagation."
+                    if args.expanded_attention
+                    else "Resolve nine actually exposed transition leads together; reuse all previously admitted events and sources. INEP one-day gap is a separate quote disposition, not an assumed action."
+                ),
                 admissions="No corporate terms, account transfer, issuer history or loan alias admitted by the index. Original dated notices and separate clock/quantity qualification required.",
             ),
         )

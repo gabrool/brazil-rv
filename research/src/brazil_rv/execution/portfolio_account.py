@@ -900,6 +900,28 @@ class PortfolioAccount:
                     for leg, price in zip(legs, prices)
                 )
                 self.marks = marks
+        # Revalue an already recognized cash leg only at its dated publication.
+        # Its original quantity survives share delivery/sale in the pending cash.
+        for event in share_distributions:
+            previous = event.cash_per_prior_share
+            for known, value in event.cash_values:
+                if known == day:
+                    name = event.source_index
+                    matches = [
+                        i
+                        for i, (due, amount) in enumerate(self.payments)
+                        if due == event.payment_session
+                        and amount[name].detach().item() != 0
+                    ]
+                    if len(matches) > 1:
+                        raise ValueError("ambiguous pending distribution cash revision")
+                    for i in matches:
+                        due, amount = self.payments[i]
+                        revised = amount.clone()
+                        revised[name] = amount[name] * (value / previous)
+                        self.claims = self.claims + revised - amount
+                        self.payments[i] = (due, revised)
+                previous = value
         # Same-session delivery of a newly recognized claim is a realization;
         # later deliveries were handled before this day's decision above.
         self.pending_exit = exit_fraction

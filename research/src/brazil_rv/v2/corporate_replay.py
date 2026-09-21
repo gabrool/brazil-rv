@@ -203,6 +203,13 @@ def apply_corporate_replay(inputs, terms, calendar, manifest_sha256):
                     source=source,
                     carry_source_value=event.get("carry_source_value", False),
                     source_reopens_session=reopening,
+                    cash_values=tuple(
+                        (
+                            session(value["available_date"]),
+                            value["cash_per_prior_share"],
+                        )
+                        for value in event.get("cash_values", ())
+                    ),
                 )
             )
 

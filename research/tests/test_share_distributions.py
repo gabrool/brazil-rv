@@ -16,6 +16,94 @@ from test_v2_stateful_ledger import _config
 
 
 @pytest.mark.parametrize("sign", [-1, 1])
+def test_dated_cash_revisions_retain_original_units_after_share_delivery(sign):
+    event = ShareDistribution(
+        0,
+        1,
+        0,
+        (ShareDelivery(1, 0.5, 2),),
+        "dated cash fixture",
+        cash_per_prior_share=50,
+        payment_session=6,
+        cash_values=((3, 52), (5, 51)),
+    )
+    close = np.array([[100, 100]] + [[np.nan, 100]] * 7, float)
+    targets = [[sign * 0.4, 0]] + [[0, 0]] * 7
+    config = _config(initial_capital_brl=1000)
+    result = replay(
+        close,
+        lambda state: PortfolioTarget(np.asarray(targets[state.day])),
+        share_distributions=(event,),
+        config=config,
+    )
+    units = result.signed_shares[0, 0]
+    # Successor shares have been sold/covered before the second cash revision.
+    assert result.signed_shares[4, 1] == 0
+    cash = result.receivables - result.payables
+    np.testing.assert_allclose(
+        cash[1:6], units * np.array([50, 50, 52, 52, 51]), atol=1e-12
+    )
+    np.testing.assert_allclose(cash[6:], 0, atol=1e-12)
+    compare(close, targets, config=config, share_distributions=(event,))
+    changed = replace(event, cash_values=((3, 60), (5, 63)))
+    future = replay(
+        close,
+        lambda state: PortfolioTarget(np.asarray(targets[state.day])),
+        share_distributions=(changed,),
+        config=config,
+    )
+    np.testing.assert_array_equal(result.nav[:3], future.nav[:3])
+    assert [o for o in result.intended_orders if o.decision_session <= 3] == [
+        o for o in future.intended_orders if o.decision_session <= 3
+    ]
+    # Unit-value gains, not a second principal payment; signed short cash follows.
+    assert future.nav[-1] - result.nav[-1] == pytest.approx(units * 12, abs=1e-9)
+    sliced = slice_distributions((event,), 2, 8)[0]
+    assert sliced.cash_values == ((1, 52), (3, 51))
+    with pytest.raises(ValueError, match="ordered known values"):
+        replace(event, cash_values=((6, 51),))
+
+
+def test_cash_revision_gradient_and_copied_pending_payment_are_independent():
+    import torch
+    from brazil_rv.v2.portfolio_objective import clone_account
+
+    event = ShareDistribution(
+        0,
+        1,
+        0,
+        (ShareDelivery(1, 0.5, 2),),
+        "dated cash fixture",
+        cash_per_prior_share=50,
+        payment_session=5,
+        cash_values=((3, 52),),
+    )
+    weight = tensor(0.4).requires_grad_()
+    account = PortfolioAccount.empty([100, 100, 100], config=_config())
+    for day in range(6):
+        account.step(
+            torch.stack((weight, weight * 0, weight * 0))
+            if day == 0
+            else tensor([0, 0, 0]),
+            day=day,
+            close=[100 if day == 0 else np.nan, 100, 100],
+            cdi=0,
+            session_date="2024-01-02",
+            annual_borrow=[0, 0, 0],
+            loan_reference=[100, 100, 100],
+            share_distributions=(event,),
+        )
+        if day == 2:
+            copied = clone_account(account)
+            copied.payments[0][1][0] += 1
+            copied.detach()
+            assert account.payments[0][1][0].item() == pytest.approx(0.2)
+    account.nav.backward()
+    assert account.nav.item() == pytest.approx(1.008)
+    assert weight.grad.item() == pytest.approx(0.02)
+
+
+@pytest.mark.parametrize("sign", [-1, 1])
 def test_reused_source_reopens_after_conversion_without_old_inventory(sign):
     event = ShareDistribution(
         0,

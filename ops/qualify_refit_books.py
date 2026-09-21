@@ -16,12 +16,16 @@ from brazil_rv.v2.data_repair import binding, bound_json
 PROJECT = Path(__file__).resolve().parents[1]
 
 
-def main(sensitivities=False):
+def main(sensitivities=False, expanded_attention=False, source_attention=False):
     tick = perf_counter()
     pointer = PROJECT / "docs/v2_economic_data_scaling_run.json"
     run = json.loads(pointer.read_text())
     reference = (
-        run["stage_c_refit_sensitivity_plan"]
+        run["scaling_expanded_source_plan"]
+        if source_attention
+        else run["scaling_expanded_evaluation_plan"]
+        if expanded_attention
+        else run["stage_c_refit_sensitivity_plan"]
         if sensitivities
         else run["stage_c_data_replay_plan"]
     )
@@ -48,8 +52,22 @@ def main(sensitivities=False):
         c["date"]: c for c in bound_json(run["historical_cost_sources"])["calendar"]
     }
     terms = bound_json(plan["terms"])
+    inherited = {}
+    if expanded_attention:
+        original = bound_json(run["stage_c_data_replay_plan"])
+        for field in ("store", "inputs", "terms", "configuration"):
+            if field in original:
+                assert plan[field] == original[field]
+        for proof in bound_json(run["stage_c_data_replay_qualification"])["reports"]:
+            saved = bound_json(proof)
+            inherited[saved["key"]] = (proof, saved)
     records = []
     for rec in replays["completed"]:
+        if rec["key"] in inherited:
+            proof, saved = inherited[rec["key"]]
+            assert saved["passed"] and saved["book"] == rec["book"]
+            records.append(proof)
+            continue
         target = out / (rec["key"].replace("/", "_") + ".json")
         if target.exists():
             saved = bound_json(binding(target))
@@ -306,11 +324,17 @@ def main(sensitivities=False):
         qualified=len(records),
         reports=records,
         plan=reference,
+        reused_reports=sum(r["key"] in inherited for r in replays["completed"]),
         seconds=perf_counter() - tick,
     )
     write_json_atomic(out / "manifest.json", summary)
+    run = json.loads(pointer.read_text())
     run[
-        "stage_c_refit_sensitivity_qualification"
+        "scaling_expanded_source_qualification"
+        if source_attention
+        else "scaling_expanded_qualification"
+        if expanded_attention
+        else "stage_c_refit_sensitivity_qualification"
         if sensitivities
         else "stage_c_data_replay_qualification"
     ] = binding(out / "manifest.json")
@@ -320,5 +344,9 @@ def main(sensitivities=False):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--sensitivities", action="store_true")
-    main(parser.parse_args().sensitivities)
+    group = parser.add_mutually_exclusive_group()
+    group.add_argument("--sensitivities", action="store_true")
+    group.add_argument("--expanded-attention", action="store_true")
+    group.add_argument("--source-attention", action="store_true")
+    args = parser.parse_args()
+    main(args.sensitivities, args.expanded_attention, args.source_attention)

@@ -928,6 +928,14 @@
     "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\plan.json",
     "sha256": "8c8a0cab4f35fe22672945e335ea9374b32fe4e4b46a123cf18accde075fcbbf"
   },
+  "scaling_expanded_qualification": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\evaluation\\qualification\\manifest.json",
+    "sha256": "511877c46dcf2c6d315ee6f99bd5dc3f2cd67ed3d295a2f7f041b567370a60ad"
+  },
+  "scaling_expanded_source_plan": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\evaluation\\source_replays\\plan.json",
+    "sha256": "1ce39762c27d20813a5bf7eff08a3d4245f9f383a428aa0824d4b68f9fe001ca"
+  },
   "scaling_fit_audit": {
     "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\fit_audit.json",
     "sha256": "3096864652d5051fea624706806a9c171f1342fd3f71e5234cfccadd08c1b81f"

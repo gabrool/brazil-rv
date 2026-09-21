@@ -3672,6 +3672,31 @@ def simulate_stateful_ledger(
                 explicit_unresolved_action[name] = False
             last_observed[name] = np.nan
 
+        # Dated cash revisions realize after the frozen current intentions.
+        for event in share_distributions:
+            previous = event.cash_per_prior_share
+            for known, value in event.cash_values:
+                if known == day:
+                    name = event.source_index
+                    matches = [
+                        i
+                        for i, claim in enumerate(pending_claims)
+                        if claim.security_index == name
+                        and claim.payment_session == event.payment_session
+                        and claim.signed_amount != 0
+                    ]
+                    if len(matches) > 1:
+                        raise ValueError("ambiguous pending distribution cash revision")
+                    for i in matches:
+                        claim = pending_claims[i]
+                        revised = claim.signed_amount * (value / previous)
+                        difference = revised - claim.signed_amount
+                        if claim.signed_amount > 0:
+                            receivable_by_name[name] += difference
+                        else:
+                            payable_by_name[name] -= difference
+                        pending_claims[i] = replace(claim, signed_amount=revised)
+                previous = value
         deliver_due(day, realize_auctions=True)
 
         pay_claims(day)

@@ -70,6 +70,7 @@ class ShareDistribution:
     payment_session: int | None = None
     carry_source_value: bool = False
     source_reopens_session: int | None = None
+    cash_values: tuple[tuple[int, float], ...] = ()
 
     def __post_init__(self):
         if not self.legs or not self.source:
@@ -108,6 +109,19 @@ class ShareDistribution:
             and self.payment_session < self.effective_session
         ):
             raise ValueError("cash payment cannot precede economic succession")
+        previous = self.effective_session
+        for known, amount in self.cash_values:
+            if (
+                self.cash_per_prior_share <= 0
+                or self.payment_session is None
+                or not previous < known < self.payment_session
+                or not math.isfinite(amount)
+                or amount <= 0
+            ):
+                raise ValueError(
+                    "cash revisions require ordered known values before payment"
+                )
+            previous = known
         for leg in self.legs:
             if leg.loan_conversion_session is not None and (
                 leg.delivery_session is None
@@ -169,6 +183,9 @@ def slice_distributions(distributions, start, stop):
             payment_session=None
             if event.payment_session is None
             else event.payment_session - start,
+            cash_values=tuple(
+                (known - start, amount) for known, amount in event.cash_values
+            ),
             legs=tuple(
                 replace(
                     leg,
