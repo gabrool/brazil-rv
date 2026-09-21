@@ -216,5 +216,5 @@ def main(wave):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--wave", choices=("width", "depth"), required=True)
+    parser.add_argument("--wave", choices=("width", "depth", "lstm"), required=True)
     main(parser.parse_args().wave)

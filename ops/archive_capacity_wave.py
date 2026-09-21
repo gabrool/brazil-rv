@@ -27,9 +27,11 @@ def main(wave):
     assert bound_json(result["qualification"])["status"] == "complete"
     for source in result["sensitivities"]["sources"]:
         assert bound_json(source["qualification"])["status"] == "complete"
-    previous_key = (
-        "stage_d_width_recovery" if wave == "depth" else "stage_c_refit_recovery"
-    )
+    previous_key = {
+        "width": "stage_c_refit_recovery",
+        "depth": "stage_d_width_recovery",
+        "lstm": "stage_d_depth_recovery",
+    }[wave]
     previous = bound_json(run[previous_key])
     with zipfile.ZipFile(previous["archive"]["path"]) as z:
         known = json.loads(z.read("inherited_members.json"))
@@ -62,18 +64,24 @@ def main(wave):
         ).splitlines()
         for name in names:
             add("project/" + name, PROJECT / name)
-        for directory, children, filenames in os.walk(root):
-            children[:] = [name for name in children if name != "__pycache__"]
-            for name in sorted(filenames):
-                path = Path(directory) / name
-                assert path.resolve().is_relative_to(root.resolve())
-                add(
-                    "evidence/capacity_"
-                    + wave
-                    + "/"
-                    + path.relative_to(root).as_posix(),
-                    path,
+        evidence = [(root, "capacity_" + wave)]
+        if wave == "width" and "stage_d_lstm_engineering" in run:
+            evidence.append(
+                (
+                    Path(run["stage_d_lstm_engineering"]["path"]).parent,
+                    "capacity_lstm_engineering",
                 )
+            )
+        for folder, label in evidence:
+            for directory, children, filenames in os.walk(folder):
+                children[:] = [name for name in children if name != "__pycache__"]
+                for name in sorted(filenames):
+                    path = Path(directory) / name
+                    assert path.resolve().is_relative_to(folder.resolve())
+                    add(
+                        "evidence/" + label + "/" + path.relative_to(folder).as_posix(),
+                        path,
+                    )
         for name, value in (
             ("members", members),
             ("inherited_members", inherited),
@@ -126,5 +134,5 @@ def main(wave):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--wave", choices=("width", "depth"), required=True)
+    parser.add_argument("--wave", choices=("width", "depth", "lstm"), required=True)
     main(parser.parse_args().wave)

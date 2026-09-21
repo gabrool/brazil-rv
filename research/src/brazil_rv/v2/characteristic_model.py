@@ -161,6 +161,13 @@ class CharacteristicModel(nn.Module):
                     num_layers=2 if config.temporal_encoder == "gru_depth2" else 1,
                     batch_first=True,
                 )
+            elif config.temporal_encoder in {"lstm", "lstm_depth2"}:
+                self.slow_encoder = nn.LSTM(
+                    config.hidden_width,
+                    config.hidden_width,
+                    num_layers=2 if config.temporal_encoder == "lstm_depth2" else 1,
+                    batch_first=True,
+                )
             else:
                 raise ValueError("unsupported temporal encoder")
             if config.peer_timing != "none":

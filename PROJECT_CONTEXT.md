@@ -1,6 +1,6 @@
 # Brazil-RV project context
 
-Current contract: 2026-09-20. This is the startup contract, not an experiment log.
+Current contract: 2026-09-21. This is the startup contract, not an experiment log.
 The previous context is preserved byte-for-byte in [historical context](docs/PROJECT_CONTEXT_HISTORY.md), SHA b80c3539acaed9bfdde84a871b630d9d43fb7e9badcf8b54f0e315da14f76044.
 Its older pending queues, permissions and limitations are superseded where resolved below. Read historical sections only when relevant.
 
@@ -65,6 +65,8 @@ December30 2016 and November20 2017 have source-supported clearing dispositions.
 ## Subsequent work and delivery
 
 After integrated A, C compares registered matched attention, wider attention, GRU early-peers and C6 economics separately from data refits. Two named leads may replicate on ten other development folds only under corrected four-fold admission. This is explicitly reused development. Net-CDI is primary; IC diagnostic. Preserve paired20/40/60-session uncertainty, seeds, currency-consistent Sharpe/drawdown gates and complete trading statistics.
+
+The running width wave uses the original model implementation in matched-refits@3b0f921. Qualified depth implementation is separately available in economic-accounts@734cf12; run its freezer/training with that imported runtime so its exact engineering bindings remain valid. Main additionally supports explicit lstm/lstm_depth2 encoders, CPU-qualified through stage_d_lstm_engineering, but no LSTM experiment is yet frozen or run. Its matched comparison follows recurrent width/depth diagnostics. Never change a runtime checkout while its worker is active.
 
 D begins attention96→128 and GRU64→96, then distinct temporal/recurrent depth. LSTM/peer/context/general capacity follow registered conditions. Maximum two new candidate cells per GPU wave, frozen contrasts and compatible parents; no grid, automatic extra seeds or reduced populations/history/budgets.
 

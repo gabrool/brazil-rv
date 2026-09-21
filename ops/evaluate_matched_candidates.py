@@ -4,7 +4,7 @@ import argparse
 import json
 from pathlib import Path
 
-from brazil_rv.v2.artifacts import write_json_atomic
+from brazil_rv.v2.artifacts import sha256_file, write_json_atomic
 from brazil_rv.v2.data_repair import binding, bound_json
 import bound_refit_debit
 import bound_refit_fraction_precision
@@ -123,6 +123,11 @@ def execute(run, wave):
     reference = run[prefix + "_evaluation_plan"]
     spec = bound_json(reference)
     assert spec["wave"] == wave
+    executed = Path(reference["path"]).parent / "evaluation_executed.py"
+    if executed.exists():
+        assert sha256_file(executed) == sha256_file(Path(__file__))
+    else:
+        executed.write_bytes(Path(__file__).read_bytes())
     context = Path(spec["context"])
     pointer = context / "docs/v2_economic_data_scaling_run.json"
     local = json.loads(pointer.read_text())
@@ -160,6 +165,7 @@ def execute(run, wave):
         )
     }
     receipt["plan"] = reference
+    receipt["executed_recipe"] = binding(executed)
     receipt["additional_corporate_hypotheses_disposition_required"] = not capacity
     output = Path(spec["candidate_fits"]["path"]).parent / "evaluation_progress.json"
     write_json_atomic(output, receipt)
@@ -172,7 +178,9 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--freeze", action="store_true")
     parser.add_argument(
-        "--wave", choices=("replication", "width", "depth"), default="replication"
+        "--wave",
+        choices=("replication", "width", "depth", "lstm"),
+        default="replication",
     )
     args = parser.parse_args()
     run = json.loads((PROJECT / "docs/v2_economic_data_scaling_run.json").read_text())
