@@ -916,6 +916,16 @@
     "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\attempt_notes.json",
     "sha256": "6ae2190b10963faae19c8e52a9c3b43ff659f72a41c18cb267d7677a1a5f3c45"
   },
+  "scaling_common_evaluation_plans": {
+    "flexible": {
+      "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_common_model_comparison_20260921\\flexible\\plan.json",
+      "sha256": "ef0af0a9ed425b231034352a87327148519bcb2029fbdb776536f6658717febe"
+    },
+    "neutral": {
+      "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_common_model_comparison_20260921\\neutral\\plan.json",
+      "sha256": "cbb59838cf0a5bcb3c8e65b8a0dc34bb9eec01db51d9675a7a8a65d377a531de"
+    }
+  },
   "scaling_common_model_plan": {
     "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_common_model_comparison_20260921\\refit_plan.json",
     "sha256": "a3eaf568c1ff37419a07166716c5e0f3e64649efadfbffb7550c517c61a7752b"
