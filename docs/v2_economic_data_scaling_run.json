@@ -1044,6 +1044,10 @@
     "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\parent_patience\\report.json",
     "sha256": "fdfbe820a7733972663f64771fdcb3a60868d907a072522a870fe4bc6f6cf96f"
   },
+  "scaling_patience_storage": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\storage\\patience_epochs.json",
+    "sha256": "aa6528fd2a434020bdd682dd77be6479983d344834fc88d3b2e04b75bac26227"
+  },
   "scaling_portfolio_decomposition": {
     "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\decomposition\\report.json",
     "sha256": "4f63ff22b0c6bde42af03cbd97df3cb2bb1cb90f12f3bcdc6ad1477ba8264ced"
