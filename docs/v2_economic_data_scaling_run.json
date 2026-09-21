@@ -945,8 +945,8 @@
     "sha256": "8c8a0cab4f35fe22672945e335ea9374b32fe4e4b46a123cf18accde075fcbbf"
   },
   "scaling_expanded_later_bounds_plan": {
-    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\evaluation\\later_source_replays\\bounds\\plan.json",
-    "sha256": "f27a389344eb1403dfee6a630de4bed0dd1fb3e10477aa25f5c8934538dcfd32"
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\evaluation\\later_source_replays\\bounds\\qualified_plan.json",
+    "sha256": "9d7e59c48ffd730f6e27905d236d5be5a7a6f915b3efcb51b921af312ea21dd3"
   },
   "scaling_expanded_later_source_account_parity": {
     "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\evaluation\\later_source_replays\\account_parity\\report.json",

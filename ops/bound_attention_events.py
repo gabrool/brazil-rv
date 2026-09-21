@@ -222,7 +222,7 @@ def execute(run, later=False):
                     legs = tuple(
                         replace(leg, disposal_session=event.effective_session)
                         if variant.get("disposal_at_effect")
-                        else replace(leg, disposal_session=leg.delivery_session)
+                        else replace(leg, disposal_session=None)
                         if variant.get("disposal_at_custody")
                         else replace(
                             leg,
