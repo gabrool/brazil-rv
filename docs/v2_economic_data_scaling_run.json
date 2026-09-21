@@ -1215,6 +1215,10 @@
     "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\capacity_depth_engineering\\qualification.json",
     "sha256": "b415dd43ed9618d216bd9beba07001f441013c776c638904181896f06c689cc7"
   },
+  "stage_d_depth_evaluation": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\capacity_depth\\evaluation_progress.json",
+    "sha256": "d972ecdc74e7db4d6d21ac1ed98ce1706d90aaa0be99df643e16a4ffbea49dfd"
+  },
   "stage_d_depth_evaluation_plan": {
     "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\capacity_depth\\evaluation_plan.json",
     "sha256": "358737ef1f4238960bd5fb9242c5baf86d4528f50f7548c2855173888cac3265"
