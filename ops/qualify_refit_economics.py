@@ -197,7 +197,7 @@ def main():
     for event in source["source_actions_represented_once"]:
         t, n = local(event["date"]), names.index(event["isin"])
         expected["action_has_action"][t, n] = False
-        expected["action_successor_index"][t, n] = -1
+        expected["action_successor_index"][t, n] = n
     for event in terms["identity_actions"]:
         t, n = local(event["effective_date"]), names.index(event["predecessor_isin"])
         for key, value in (

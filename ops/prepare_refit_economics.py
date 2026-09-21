@@ -375,7 +375,7 @@ def main():
             )
             assert successor[t, n] == names.index(leg["successor_isin"])
             has[t, n] = False
-            successor[t, n] = -1
+            successor[t, n] = n
             cleared.append(
                 dict(
                     date=event["effective_date"],

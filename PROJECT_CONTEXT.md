@@ -26,6 +26,8 @@ Accounting/source-only replay shallow-copies frozen OLD PolicyData and replaces 
 
 Fresh matched forecasts use the separately qualified new portfolio cache (stage_c_refit_economics and stage_c_refit_economics_qualification), with original allocation-risk formulas on admitted dated histories. It is never supplied to old fits. The frozen stage_c_data_replay_plan binds96 seed/ensemble/capital books and original neutral calibration. Reuse completed groups as the fits become available. The unused July18 2016 loader prelude and July19 prior-CDI feature remain explicitly outside every actual evaluation window; each actual window has corrected current/prior coverage.
 
+The current portfolio-cache binding includes the two-cell cleared-action index correction recorded by stage_c_refit_action_identity. JSL/SIMPAR and TIM conversion distributions remain unchanged; their cleared ordinary-action indices must identify themselves, never use−1. Separate qualified plan files preserve the original plans/cache and completed F2 books. Static PolicyData, model-store coordinates and all fits remain unchanged. Reuse prior cache/risk/source proofs and the four actual account-schema checks; do not rebuild them.
+
 ## Information, identity and targets
 
 Decision time is15:45 America/Sao_Paulo. Daily market state ends at t-1; publications enter at their admitted availability; completed intraday bars exclude the entry bar. Use the dated B3 schedule. Source completeness, observation, activity, membership, feature validity and label validity are distinct. Do not invent/interpolate OHLC, mark stale prices observed, or use stale exact-horizon endpoints.
