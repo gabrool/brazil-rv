@@ -42,6 +42,7 @@ def main():
     parser.add_argument("--settlement-index", action="store_true")
     parser.add_argument("--b3-sula", action="store_true")
     parser.add_argument("--expanded-attention", action="store_true")
+    parser.add_argument("--expanded-year", type=int, choices=(2019, 2021), default=2019)
     args = parser.parse_args()
     started = perf_counter()
     run = json.loads((PROJECT / "docs/v2_economic_data_scaling_run.json").read_text())
@@ -49,7 +50,11 @@ def main():
         Path(run["scaling_expanded_evaluation_plan"]["path"]).parent
         if args.expanded_attention
         else Path(run["stage_c_root"])
-    ) / "event_sources"
+    ) / (
+        "event_sources_2021"
+        if args.expanded_attention and args.expanded_year == 2021
+        else "event_sources"
+    )
     root.mkdir(exist_ok=True)
     if args.b3_sula:
         path = root / "b3_189_2022.pdf"
@@ -77,10 +82,24 @@ def main():
         return
     scope = {2022: ("UNIDAS",), 2023: ("REDE D",)} if args.supplement else SCOPES
     if args.expanded_attention:
-        scope = {
-            year: ("FIBRIA", "SUZANO", "GUARARAPES", "QGEP", "ENAUTA")
-            for year in (2018, 2019)
-        }
+        scope = (
+            {
+                2021: (
+                    "SMILES",
+                    "GPC PARTIC",
+                    "DEXXOS",
+                    "LINX",
+                    "COSAN LOG",
+                    "RUMO LOG",
+                    "COSAN S.A.",
+                )
+            }
+            if args.expanded_year == 2021
+            else {
+                year: ("FIBRIA", "SUZANO", "GUARARAPES", "QGEP", "ENAUTA")
+                for year in (2018, 2019)
+            }
+        )
     label = "supplement" if args.supplement else "issuer"
     if args.settlement_index:
         scope = {2022: ("22691", "24821")}
@@ -102,7 +121,7 @@ def main():
                 scopes=scope,
                 rad_manifest=prior["rad_manifest"],
                 purpose=(
-                    "Resolve only FIBR/GUAR PN/QGEP transitions actually held in expanded F3 books. Freeze sources/account effects separately; keep current fits/store immutable. Existing issuer/year RAD groups only, no source census or model-data propagation."
+                    "Resolve only transitions actually held in the added evaluation period (FIBR/GUAR PN/QGEP in2019; SMLS/GPCP/LINX/RLOG in2021). Freeze sources/account effects separately; keep current fits/store immutable. Existing issuer/year RAD groups only, no source census or model-data propagation."
                     if args.expanded_attention
                     else "Resolve nine actually exposed transition leads together; reuse all previously admitted events and sources. INEP one-day gap is a separate quote disposition, not an assumed action."
                 ),

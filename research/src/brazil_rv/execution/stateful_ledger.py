@@ -3345,8 +3345,15 @@ def simulate_stateful_ledger(
             abs(hedge_unconstrained_target_notional - hedge_target_notional) > 1e-12
         )
         hedge_notional_before = hedge_shares * hedge_mark if hedge_shares else 0.0
+        hedge_change = hedge_target_notional - hedge_notional_before
+        # A weight/notional round trip must not create a new minimum-fee loan.
+        # Relative arithmetic tolerance preserves tiny genuine positions at zero.
+        if abs(hedge_change) <= 8 * np.finfo(np.float64).eps * max(
+            abs(hedge_target_notional), abs(hedge_notional_before)
+        ):
+            hedge_change = 0.0
         rebalance_required = config.beta_hedge and (
-            abs(hedge_target_notional - hedge_notional_before)
+            abs(hedge_change)
             > (
                 0.0
                 if portfolio_policy is not None
@@ -3359,7 +3366,7 @@ def simulate_stateful_ledger(
         )
         hedge_order = None
         if rebalance_required and np.isfinite(hedge_mark):
-            change = hedge_target_notional - hedge_notional_before
+            change = hedge_change
             if change != 0.0:
                 hedge_order = submit_order(
                     day,

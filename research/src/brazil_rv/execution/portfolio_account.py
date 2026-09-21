@@ -716,7 +716,18 @@ class PortfolioAccount:
         )
         increase = torch.where(increase > 1e-10, increase, 0.0)
         entry_notional = target.sign() * increase * start_nav
-        hedge_trade_notional = (target[-1] - before[-1]) * start_nav
+        hedge_change = target[-1] - before[-1]
+        # Suppress only arithmetic-equivalent no-trade intents, without an
+        # absolute floor that would erase genuine tiny openings or full covers.
+        hedge_change = torch.where(
+            hedge_change.abs()
+            > 8
+            * torch.finfo(torch.float64).eps
+            * torch.maximum(target[-1].abs(), before[-1].abs()),
+            hedge_change,
+            0.0,
+        )
+        hedge_trade_notional = hedge_change * start_nav
         for event in loan_cash_settlements:
             if event.prohibit_new_borrow and event.effective_session <= day:
                 entry_notional = entry_notional.clone()

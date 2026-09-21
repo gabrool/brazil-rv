@@ -126,6 +126,26 @@ chosen winner. Further changes require their own explicit controlled contrast.
 
 ## Attempts, recovery and storage
 
+The actual F3 source-book identical-intention check found an additional concrete
+accounting defect, before the newly introduced cash revision was reached. On
+January8 2019 a roundoff hedge trade of aboutR4.66e-10 created another R10 minimum
+loan fee in the independent account. The first four NAV comparisons differed
+only by normal floating-point error. A bounded five-day charge capture attributes
+the discrepancy to the hedge root, rather than the corporate event. Initial
+parity failure, first-divergence diagnostic and charge capture remain exact saved
+recipes and outputs. A later opposite-direction spot guard is still to be
+diagnosed; it has not been relaxed.
+
+The correction plan was frozen before corrected outcomes. Both accounts suppress
+only hedge changes within eight Float64 epsilons of their target/current scale;
+there is no absolute currency/quantity floor. Six targeted no-trade, genuine tiny
+opening/partial/reversal/terminal and gradient cases pass, as do37 affected account
+and loan-notice cases. Twelve separate F3 corrected books and their actual
+identical-intention qualification are pending. The unfinished eight-fold baseline
+uses a preserved pre-correction source snapshot, and GPU fits keep their isolated
+training runtime. This defect is not yet a demonstrated explanation for the wider
+model's reversal.
+
 The expanded 2019 period exposed held Fibria, Guararapes PN and QGEP transitions.
 Ten selected issuer originals and fifteen readable pages supply the dated terms;
 this is bounded source recovery, not a repeated source census. Fibria cash was

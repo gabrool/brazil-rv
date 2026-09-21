@@ -40,6 +40,18 @@ dependencies. Do not describe the expanded comparison as globally source-correct
 Reuse its twelve source replays and independent account/entitlement proofs;
 resolve `scaling_expanded_source_qualification`/`scaling_expanded_event_qualification`.
 
+An actual F3 identical-intention check exposed a hedge roundoff defect: an
+unchanged weight became a sub-nanoreal trade and opened another R10-minimum loan.
+Resolve `scaling_hedge_roundoff_plan`; both accounts now suppress only relative
+Float64-equivalent hedge changes, preserving real tiny positions and liquidation.
+Six new cases and37 affected cases pass; actual corrected-book parity/economic
+attribution remain pending. Do not treat the small first observed fee as the
+explanation for the multi-bps reversal. The unfinished eight-period BASELINE
+evaluation must import the preserved `hedge_roundoff/baseline_runtime` source
+snapshot, keeping all baseline books on their original account implementation.
+The active GPU training worktree is unchanged; no model-store or fit correction
+follows from this account-only defect.
+
 Complete the user-authorized [economic/data/capacity registration](research/preregistrations/v2_economic_data_scaling.md). Foundation is complete and sealed; never repeat it. Resolve [the run pointer](docs/v2_economic_data_scaling_run.json) and [progress](docs/v2_economic_data_scaling_progress.md) for evidence.
 
 The user disabled the one-minute heartbeat on September20 and requested continuous implementation without routine checkpoint pauses. The automation is paused; research remains active. Do not re-enable it or create another recurring monitor. Inspect actual process command lines before launches; never duplicate workers. Report meaningful results or blockers.

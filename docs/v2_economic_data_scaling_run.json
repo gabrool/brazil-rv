@@ -924,9 +924,17 @@
     "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\evaluation\\plan.json",
     "sha256": "daedbe333f2534e03589ce70d20d42e5b04ea5a5c7a7f515b4f534bee6ae6474"
   },
+  "scaling_expanded_event_bounds": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\evaluation\\source_replays\\bounds\\replays.json",
+    "sha256": "822c6f56424cf1a91eca55ad5e69f4f7c126ccb33121ffa9e2104d2629a7f0a2"
+  },
   "scaling_expanded_event_bounds_plan": {
     "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\evaluation\\source_replays\\bounds\\plan.json",
     "sha256": "8e5b72a72351f155755326a886cf5c759b4db02055e55a583da121fb5941d473"
+  },
+  "scaling_expanded_event_bounds_qualification": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\evaluation\\source_replays\\bounds\\qualification\\manifest.json",
+    "sha256": "37527104ddabd523131d42a2059c57cb3d14221050f98b4ece75ab09fd34dd01"
   },
   "scaling_expanded_event_qualification": {
     "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\expanded_folds\\evaluation\\source_replays\\event_qualification\\report.json",
@@ -959,6 +967,10 @@
   "scaling_forecast_verification": {
     "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\forecast_verification\\report.json",
     "sha256": "6b5f3b22059578753aa5ea998dd96c3c2a5dd0c0c0092bc5bfe31badb00e03d6"
+  },
+  "scaling_hedge_roundoff_plan": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\hedge_roundoff\\plan.json",
+    "sha256": "56426254e61fff2b5ef26c5a316e4379674c247994afe3f3b2611d3ec2a3d51a"
   },
   "scaling_input_contracts": {
     "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\input_contracts.json",
