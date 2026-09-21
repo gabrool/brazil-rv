@@ -1109,13 +1109,17 @@
     "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_economic_matched_20260920\\refit_economics\\action_identity\\plan_resolution.json",
     "sha256": "431edc505053d47a7f353cf077685a15413ade3a38e48ddcea1f07e6a8e71c5a"
   },
+  "stage_c_refit_compile_resolution": {
+    "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_economic_matched_20260920\\data_refits\\c6_compile\\resolution.json",
+    "sha256": "a30d10b0eb65af558ec06b07911510b0b38c3095deb0127249391579e8e0d9e5"
+  },
   "stage_c_refit_debit_plan": {
     "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\matched_refit_debit_bounds\\qualified_plan.json",
     "sha256": "914923d5289a1d88f972beeb07e353d3aad5f55426513d0371e1aa3ffcfbdba0"
   },
   "stage_c_refit_debit_qualification": {
     "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\matched_refit_debit_bounds\\qualification\\manifest.json",
-    "sha256": "39c5ff578b20cec384dc33675194124ba10c865e139b226eb091521a28eaff71"
+    "sha256": "d49d2de9473667d28e5da47ce1d80b6f485291e810dddb187a7a53a4aeb6a3bb"
   },
   "stage_c_refit_economics": {
     "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_economic_matched_20260920\\refit_economics\\action_identity\\manifest.json",
