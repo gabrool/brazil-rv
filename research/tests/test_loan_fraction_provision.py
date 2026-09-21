@@ -4,6 +4,7 @@ import numpy as np
 import pytest
 import torch
 
+from brazil_rv.execution.loan_contracts import LoanContracts
 from brazil_rv.execution.portfolio_account import PortfolioAccount, tensor
 from brazil_rv.execution.portfolio_policy import PortfolioTarget
 from brazil_rv.execution.share_distributions import (
@@ -14,6 +15,68 @@ from brazil_rv.execution.share_distributions import (
 from test_portfolio_account import compare
 from test_portfolio_ledger import replay
 from test_v2_stateful_ledger import _config
+
+
+@pytest.mark.parametrize("return_day", [2, 3])
+def test_fraction_excludes_physically_due_returns_without_early_cash_or_rent_end(
+    return_day,
+):
+    quantity = tensor([100.4, 0]).requires_grad_()
+    loans = LoanContracts(2, fee_multiplier=0)
+    loans.open(quantity, [10, 20], [0.04, 0.04], 0, "2024-01-02")
+    loans.accrue(1, "2024-01-03")
+    loans.request_return([20.2, 0], return_day, request_day=1)
+    auction = FractionAuction(5, 21, 6, True)
+    if return_day > 2:
+        with pytest.raises(ValueError, match="settled returns"):
+            loans.provision_fractions(0, 0.5, 2, auction)
+        return
+    before_principal = loans.principal.clone()
+    before_rent = loans.rent_due.clone()
+    fraction = loans.provision_fractions(0, 0.5, 2, auction)
+    assert fraction.item() == pytest.approx(0.1, abs=1e-13)
+    torch.testing.assert_close(loans.principal, before_principal, atol=0, rtol=0)
+    torch.testing.assert_close(loans.rent_due, before_rent, atol=0, rtol=0)
+    assert loans.quantity[loans.return_day == 2].item() == pytest.approx(20.2)
+    fraction.backward(retain_graph=True)
+    assert quantity.grad[0].item() == pytest.approx(0.5)
+    loans.deliver(0, 1, 0.5, 1, final=True)
+    loans.accrue(2, "2024-01-04")
+    paid, _ = loans.pay(2)
+    assert paid.sum().item() == pytest.approx(202 * (1.04 ** (2 / 252) - 1), abs=1e-12)
+    assert loans.active_quantity.tolist() == pytest.approx([0, 40])
+    assert loans.outstanding_principal.tolist() == pytest.approx([0, 802])
+
+
+def test_fully_due_return_has_no_fraction_but_retains_close_charge():
+    loans = LoanContracts(2, fee_multiplier=0)
+    loans.open([100.4, 0], [10, 20], [0.04, 0.04], 0, "2024-01-02")
+    loans.accrue(1, "2024-01-03")
+    loans.request_return([100.4, 0], 2, request_day=1)
+    assert loans.provision_fractions(0, 0.5, 2, FractionAuction(5, 21, 6, True)) == 0
+    assert loans.quantity.sum().item() == pytest.approx(100.4)
+    loans.deliver(0, 1, 0.5, 1, final=True)
+    loans.accrue(2, "2024-01-04")
+    paid, _ = loans.pay(2)
+    assert paid.sum().item() == pytest.approx(1004 * (1.04 ** (2 / 252) - 1), abs=1e-12)
+    assert loans.quantity.numel() == 0
+
+
+def test_cover_settling_on_effect_day_provisions_only_remaining_short_in_both_accounts():
+    close = np.array([[100, 300]] * 3 + [[np.nan, 300]] * 5)
+    targets = np.array([[-0.4, 0], [-0.2, 0], [-0.2, 0]] + [[0, 0]] * 5)
+    terms = replace(event(3), effective_session=3, available_session=3)
+    config = _config(initial_capital_brl=10000)
+    compare(close, targets, share_distributions=(terms,), config=config)
+    book = replay(
+        close,
+        lambda s: PortfolioTarget(targets[s.day]),
+        share_distributions=(terms,),
+        config=config,
+    )
+    assert book.signed_shares[3, 0] == pytest.approx(-0.66 / 0.333)
+    assert sum(f.quantity for f in book.fills if f.security_index == 1) == pytest.approx(6)
+    assert book.nav[-1] == pytest.approx(12000 - 6 * 300 - 0.66 * 310, abs=1e-9)
 
 
 def event(delivery=3, *, cash=310, carry_zero=False):

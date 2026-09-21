@@ -914,9 +914,10 @@ class LoanContracts:
     def provision_fractions(self, name, ratio, day, auction):
         """Truncate each remaining original contract, preserving its principal.
 
-        Dommo's last spot settlement precedes conversion. Pending returns or
-        already split roots require their own custody/rounding terms, not net
-        position rounding. Returned fractional units are a separate signed
+        Physically due returns retain their original records until close rent
+        accrual/payment, but no longer enter the unreturned quantity's rounding.
+        Future returns or already split unreturned roots require their own
+        custody/rounding terms, not net position rounding. Fractional units are a signed
         auction obligation in the share/cash book, not tradable loan quantity.
 
         A sub-one-share contract has no deliverable quantity. Primary research
@@ -925,14 +926,14 @@ class LoanContracts:
         Neither convention is claimed as an observed B3 invoice for that case.
         """
         ids = np.flatnonzero(self.name == name)
-        if not len(ids):
-            return _tensor(0.0)
-        if np.any(self.return_day[ids] >= 0) or len(np.unique(self.root[ids])) != len(
-            ids
-        ):
+        future_returns = np.any(self.return_day[ids] > day)
+        ids = ids[self.return_day[ids] < 0]
+        if future_returns or len(np.unique(self.root[ids])) != len(ids):
             raise ValueError(
                 "loan fractions require settled returns and unsplit original contracts"
             )
+        if not len(ids):
+            return _tensor(0.0)
         converted = self.quantity[ids] * ratio
         whole = converted.floor()
         fraction = (converted - whole).sum()
