@@ -1217,7 +1217,7 @@
   },
   "stage_d_depth_evaluation": {
     "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\capacity_depth\\evaluation_progress.json",
-    "sha256": "f549478fc2aa4579a60312cceede706dec2206ba15d3dea8f5bd05c847646533"
+    "sha256": "e6dfd15fd2208cebbbdb1a9970c0581e9a5278fb7aae992ec7cae20b27c0b595"
   },
   "stage_d_depth_evaluation_plan": {
     "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\capacity_depth\\evaluation_plan.json",
