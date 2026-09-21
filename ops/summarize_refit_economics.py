@@ -24,6 +24,7 @@ def fit_readouts(progress):
         root = Path(source["path"]).parent
         history = bound_json(binding(root / "history.json"))
         diagnostic = root / "diagnostics.json"
+        detail = bound_json(binding(diagnostic)) if diagnostic.exists() else {}
         rows.append(
             dict(
                 key=rec["key"],
@@ -32,6 +33,18 @@ def fit_readouts(progress):
                 epochs=manifest["epochs_completed"],
                 selected_epoch=manifest["selected_epoch"],
                 stop_reason=manifest.get("stop_reason"),
+                selection_ic=manifest.get("selection_ic"),
+                ema_selected_epoch=manifest.get("ema_selected_epoch"),
+                ema_selection_ic=manifest.get("ema_selection_ic"),
+                selected_clean_fit_ic=detail.get("selected_clean_fit", {}).get(
+                    "mean_ic"
+                ),
+                terminal_clean_fit_ic=detail.get("terminal_clean_fit", {}).get(
+                    "mean_ic"
+                ),
+                training_loss_start=history[0]["training_loss"],
+                training_loss_end=history[-1]["training_loss"],
+                loss_scale_retries=sum(x.get("loss_scale_retries", 0) for x in history),
                 peak_cuda_bytes=manifest.get("peak_cuda_bytes"),
                 complete_fit_seconds=rec["seconds"],
                 median_epoch_after_first_seconds=float(
