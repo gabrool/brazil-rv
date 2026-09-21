@@ -1,6 +1,7 @@
 """Reproduce saved attention forecasts eagerly on each checkpoint's own store."""
 
 from functools import partial
+import argparse
 import gc
 import json
 from pathlib import Path
@@ -28,16 +29,25 @@ from scope_compiled_score_failure import contrast
 PROJECT = Path(__file__).resolve().parents[1]
 
 
-def main():
+def main(matched_stopping=False):
     torch.set_num_threads(1)
     pointer = PROJECT / "docs/v2_economic_data_scaling_run.json"
     run = json.loads(pointer.read_text())
     investigation = bound_json(run["scaling_investigation"])
-    original = bound_json(investigation["old_plan"])
-    roots = {
-        "original": Path(original["foundation_root"]),
-        "corrected": Path(run["stage_c_refit_root"]),
-    }
+    if matched_stopping:
+        current = bound_json(run["scaling_matched_stopping_plan"])
+        investigation = dict(
+            arms=list(current["arms"]),
+            screen_folds=current["folds"],
+            seeds=current["seeds"],
+        )
+        roots = {"matched": Path(current["root"])}
+    else:
+        original = bound_json(investigation["old_plan"])
+        roots = {
+            "original": Path(original["foundation_root"]),
+            "corrected": Path(run["stage_c_refit_root"]),
+        }
     stores = {
         version: Path(bound_json(binding(root / "frozen_design.json"))["store"]["root"])
         for version, root in roots.items()
@@ -46,12 +56,17 @@ def main():
         Path(run["stage_d_width_original_plan"]["path"]).parent
         / "scoring_failure/architecture_scope/report.json"
     )
-    previous = bound_json(binding(previous_path))
-    out = Path(run["scaling_investigation"]["path"]).parent / "forecast_verification"
+    previous = {} if matched_stopping else bound_json(binding(previous_path))
+    out = (
+        Path(current["root"]) / "forecast_verification"
+        if matched_stopping
+        else Path(run["scaling_investigation"]["path"]).parent / "forecast_verification"
+    )
     out.mkdir(exist_ok=True)
     plan_path = out / "plan.json"
     if not plan_path.exists():
         cases = []
+        seen = {}
         for version, root in roots.items():
             for arm in investigation["arms"]:
                 for fold in investigation["screen_folds"]:
@@ -70,8 +85,10 @@ def main():
                                 seed=seed,
                                 fit=binding(fit / "run_manifest.json"),
                                 reused=reused,
+                                reuse_case=seen.get(str(fit.resolve())),
                             )
                         )
+                        seen[str(fit.resolve())] = f"{version}_{arm}_{fold}_{seed}"
         write_json_atomic(
             plan_path,
             dict(
@@ -80,11 +97,15 @@ def main():
                     k: dict(root=str(v), manifest=binding(v / "manifest.json"))
                     for k, v in stores.items()
                 },
-                prior=binding(previous_path),
+                prior=None if matched_stopping else binding(previous_path),
                 rtol=0.02,
                 atol=0.002,
                 driver=binding(Path(__file__)),
-                scope="All 48 original/corrected TE_full/TE_wide F checkpoints and original evaluation dates, own original conditioning/store, full population/full60. Reuse two already passed corrected F10/11 complete eager exports; 46 new eager exports. No optimizer, fit, changed score, new selection or held-out data. Preserve original tolerance and every failure; this tests inference reproducibility, not every historical training kernel.",
+                scope=(
+                    "All new matched-stopping child checkpoints and every saved evaluation date, own accepted store/conditioning/full933/full60. Exact junction aliases reuse their identical checkpoint's eager proof; counts overlap. No old checkpoint verification is repeated. Original rtol.02/atol.002 and all failures remain. No weights/scores/selector change; inference agreement does not prove every training kernel."
+                    if matched_stopping
+                    else "All 48 original/corrected TE_full/TE_wide F checkpoints and original evaluation dates, own original conditioning/store, full population/full60. Reuse two already passed corrected F10/11 complete eager exports; 46 new eager exports. No optimizer, fit, changed score, new selection or held-out data. Preserve original tolerance and every failure; this tests inference reproducibility, not every historical training kernel."
+                ),
             ),
         )
     plan = bound_json(binding(plan_path))
@@ -103,7 +124,17 @@ def main():
             continue
         manifest = bound_json(case["fit"])
         fit = Path(case["fit"]["path"]).parent
-        if case["reused"]:
+        if case.get("reuse_case"):
+            reused_ref = binding(out / case["reuse_case"] / "report.json")
+            saved_result = bound_json(reused_ref)
+            assert saved_result["case"]["fit"]["sha256"] == case["fit"]["sha256"]
+            result = dict(
+                case=case,
+                reused=reused_ref,
+                comparison=saved_result["comparison"],
+                seconds=0,
+            )
+        elif case["reused"]:
             result = dict(
                 case=case,
                 reused=plan["prior"],
@@ -221,9 +252,16 @@ def main():
         ),
     )
     write_json_atomic(out / "report.json", report)
-    run["scaling_forecast_verification"] = binding(out / "report.json")
+    run = json.loads(pointer.read_text())
+    run[
+        "scaling_matched_stopping_forecast_verification"
+        if matched_stopping
+        else "scaling_forecast_verification"
+    ] = binding(out / "report.json")
     write_json_atomic(pointer, run)
 
 
 if __name__ == "__main__":
-    main()
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--matched-stopping", action="store_true")
+    main(parser.parse_args().matched_stopping)
