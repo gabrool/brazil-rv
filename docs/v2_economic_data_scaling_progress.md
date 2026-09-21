@@ -2402,3 +2402,10 @@ the demonstrated successful prefix. Exact code/stdout/qualified recipes remain;
 prefix counts are reconstructed and labelled, not a claimed saved phase receipt.
 Epoch staging/verification115.20383s and cache-stream/resume4.27691s; initial total
 wall time is unknown. No source, fit, forecast, account or data audit was repeated.
+
+Added-period recovery `scaling_inputs_10623e7.zip` is verified, SHA
+0bf7b65909afe77322050a30087c37e698e8e0f1076132a55d6e951d9e94cd72,
+463,396,848bytes. All1,478logical/1,394unique members restore/hash-check, with84
+aliases. All64changed arrays reconstruct2,097,413,892cells to exact new-store
+byte hashes;42unchanged arrays retain the prior verified store dependency.
+Archive15.81s/recovery19.72s. Sources/accepted full arrays/oldfits are not duplicated.

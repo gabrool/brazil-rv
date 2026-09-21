@@ -24,6 +24,17 @@ development reserves unless a later explicit decision authorizes using them;
 do not call disjoint periods continuous or use 2025/2026 consumers. Reuse passed
 controls and source evidence. No recurring heartbeat or new subagents.
 
+Matched stopping execution, frozen before new outcomes: run six patience20
+parent trajectories (two attention widths, three original seeds). Apply the
+unchanged patience5 selector only to each trajectory's prefix through its first
+five-stale stopping point; retain that exact saved epoch. Patience affects only
+the loop termination condition, with the same60-epoch LR schedule, updates,
+sampler and RNG. Label the twelve parent selections as views of six trajectories,
+not twelve independent fits. If both rules choose the same epoch, their identical
+child seed/fold job is executed once and explicitly reused. Otherwise both child
+fits run. Preserve actual executed patience20 metadata on every parent checkpoint;
+no fake continuation, overwritten old fit or outcome-based seed selection.
+
 User amendment, September 21: before further capacity fits, investigate why wider
 attention's corrected data/refit result reverses its old-forecast advantage.
 Follow `docs/v2_SCALING_INVESTIGATION.md` and the hash-bound investigation plan.
