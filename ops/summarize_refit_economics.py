@@ -30,6 +30,11 @@ def sensitivity_results(run, plan, out, primary_metrics):
             False,
         ),
         ("stage_c_refit_debit_plan", "stage_c_refit_debit_qualification", True),
+        (
+            "stage_c_refit_fraction_precision_plan",
+            "stage_c_refit_fraction_precision_qualification",
+            False,
+        ),
     ):
         specification = bound_json(run[plan_key])
         root = Path(run[plan_key]["path"]).parent

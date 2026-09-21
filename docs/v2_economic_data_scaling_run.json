@@ -1129,9 +1129,17 @@
     "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_economic_matched_20260920\\refit_economics\\action_identity\\qualification.json",
     "sha256": "828aa13c72bc141186ea839db8b0db836f54287bf1d0e52c2c438ea9604b4fdb"
   },
+  "stage_c_refit_fraction_precision_arithmetic": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\matched_refit_fraction_precision\\precision_arithmetic.json",
+    "sha256": "b77e570097a0e566072a626c22b4ca48d8131a3c51c50dad0f384cfff97940b1"
+  },
   "stage_c_refit_fraction_precision_plan": {
     "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\matched_refit_fraction_precision\\plan.json",
     "sha256": "b68e8dedfcbcec8d1b69138011b4c73e796931320f7b356cd242d30dab46b5c6"
+  },
+  "stage_c_refit_fraction_precision_qualification": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\matched_refit_fraction_precision\\qualification\\manifest.json",
+    "sha256": "27cf6dbce44a179996d42ad618a6bd0e4c530cc95b4e4d16e700654eb5f4f701"
   },
   "stage_c_refit_interruption": {
     "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_economic_matched_20260920\\refit_interruption.json",
