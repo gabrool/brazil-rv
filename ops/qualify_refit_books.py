@@ -1,7 +1,8 @@
 """Saved fresh-fit account arithmetic and actual unresolved-exposure inventory."""
 
 from collections import defaultdict
-from decimal import Decimal
+from decimal import Decimal, ROUND_DOWN, ROUND_HALF_UP
+import argparse
 import json
 from pathlib import Path
 from time import perf_counter
@@ -15,12 +16,18 @@ from brazil_rv.v2.data_repair import binding, bound_json
 PROJECT = Path(__file__).resolve().parents[1]
 
 
-def main():
+def main(sensitivities=False):
     tick = perf_counter()
     pointer = PROJECT / "docs/v2_economic_data_scaling_run.json"
     run = json.loads(pointer.read_text())
-    plan = bound_json(run["stage_c_data_replay_plan"])
-    root = Path(run["stage_c_data_replay_plan"]["path"]).parent
+    reference = (
+        run["stage_c_refit_sensitivity_plan"]
+        if sensitivities
+        else run["stage_c_data_replay_plan"]
+    )
+    outer = bound_json(reference)
+    plan = bound_json(outer["primary"]) if sensitivities else outer
+    root = Path(reference["path"]).parent
     replays = bound_json(binding(root / "replays.json"))
     out = root / "qualification"
     out.mkdir(exist_ok=True)
@@ -124,9 +131,9 @@ def main():
                 ) * (1 if fill["side"] == "buy" else -1)
         counts["fills"] = len(fills)
         pending = []
-        assert cfg["spot_invoice_convention"] == "unrounded"
         for day, date in enumerate(days):
             groups = defaultdict(set)
+            amounts = defaultdict(lambda: Decimal(0))
             total, flow, cost = Decimal(0), Decimal(0), Decimal(0)
             for fill in by_day[day]:
                 amount, charge = (
@@ -137,6 +144,7 @@ def main():
                 cost += charge
                 flow += amount * (1 if fill["side"] == "sell" else -1) - charge
                 groups[fill["security_index"]].add(fill["side"])
+                amounts[fill["security_index"]] += amount
             assert all(len(sides) == 1 for sides in groups.values()), (
                 rec["key"],
                 date,
@@ -145,7 +153,8 @@ def main():
             trading = tariffs[date]["trading_bps"]
             if trading is None:
                 trading = cfg["unrecovered_spot_trading_bps"]
-            assert cfg["spot_execution_phase"] == "regular"
+            if cfg["spot_execution_phase"] == "auction":
+                trading = 0.7
             rates = [
                 trading,
                 2.75 if date < "2021-02-02" else 2.5,
@@ -156,14 +165,37 @@ def main():
                 0,
                 *[float(total * Decimal(str(rate)) / 10000) for rate in rates],
             ]
+            adjustment = np.zeros(2)
+            if cfg["spot_invoice_convention"] == "security_day_6dp_cent":
+                for category, rate in enumerate(rates[:2]):
+                    charge = sum(
+                        (
+                            (
+                                amount.quantize(
+                                    Decimal(".000001"), rounding=ROUND_HALF_UP
+                                )
+                                * Decimal(str(rate))
+                                / 10000
+                            ).quantize(Decimal(".000001"), rounding=ROUND_HALF_UP)
+                            for amount in amounts.values()
+                        ),
+                        Decimal(0),
+                    ).quantize(Decimal(".01"), rounding=ROUND_DOWN)
+                    adjustment[category] = float(charge) - expected[category + 1]
+                    expected[category + 1] = float(charge)
             check("decimal_spot_components", expected, a["execution_charges"][day])
             check(
-                "unrounded_invoice_adjustment",
-                np.zeros(2),
+                "invoice_adjustment",
+                adjustment,
                 a["spot_invoice_adjustment"][day],
             )
-            check("fill_charges", float(cost), sum(expected))
-            pending.append((day + (3 if date < "2019-05-27" else 2), flow))
+            check("fill_charges", float(cost) + adjustment.sum(), sum(expected))
+            pending.append(
+                (
+                    day + (3 if date < "2019-05-27" else 2),
+                    flow - Decimal(str(float(adjustment.sum()))),
+                )
+            )
             pending = [(d, v) for d, v in pending if d > day]
             check(
                 "spot_cash_queue",
@@ -225,6 +257,27 @@ def main():
         exposure_path = target.with_suffix(".exposures.json")
         write_json_atomic(exposure_path, exposure)
         payments = bound_json(rec["loan_cash_payments"])
+        contrast = None
+        if sensitivities:
+            baseline = bound_json(rec["baseline"]["book"])
+            assert baseline["state_dates"] == days
+            for field in ("forecast_sources", "mapping", "member", "policy_inputs"):
+                assert baseline["provenance"][field] == book["provenance"][field]
+            with np.load(
+                Path(rec["baseline"]["book"]["path"]).parent / "account.npz"
+            ) as z:
+                difference = (a["nav"] - z["nav"]) / cfg["initial_capital_brl"] * 1e4
+            contrast = dict(
+                final_path_bps=float(difference[-1]),
+                max_abs_path_bps=float(np.max(np.abs(difference))),
+                mean_net_cdi_delta_bps_day=float(
+                    np.mean(
+                        np.asarray(daily["net_excess_bps"])
+                        - baseline["daily"]["net_excess_bps"]
+                    )
+                ),
+                baseline=rec["baseline"]["book"],
+            )
         result = dict(
             passed=True,
             key=rec["key"],
@@ -239,24 +292,33 @@ def main():
             prior_debit_sessions=int((free < 0).sum()),
             maximum_overdue_principal=float(np.max(a["loan_overdue_principal"])),
             economics_unresolved=rec["economics_unresolved"],
+            contrast=contrast,
             seconds=perf_counter() - started,
             limits="Saved independent NAV/funding/spot-cash/fee and unit-identity checks; original loan/corporate mechanics reused. Unquoted holdings are evidence for exposure review, not observed quotes or proof of a new corporate event. No new forecasts or account replay ran in qualification.",
         )
         write_json_atomic(target, result)
         records.append(binding(target))
     summary = dict(
-        status="complete" if len(records) == plan["planned_books"] else "partial",
-        planned=plan["planned_books"],
+        status="complete"
+        if replays["status"] == "complete" and len(records) == len(replays["completed"])
+        else "partial",
+        planned=len(replays["completed"]) if sensitivities else plan["planned_books"],
         qualified=len(records),
         reports=records,
-        plan=run["stage_c_data_replay_plan"],
+        plan=reference,
         seconds=perf_counter() - tick,
     )
     write_json_atomic(out / "manifest.json", summary)
-    run["stage_c_data_replay_qualification"] = binding(out / "manifest.json")
+    run[
+        "stage_c_refit_sensitivity_qualification"
+        if sensitivities
+        else "stage_c_data_replay_qualification"
+    ] = binding(out / "manifest.json")
     write_json_atomic(pointer, run)
     print(json.dumps({k: v for k, v in summary.items() if k != "reports"}), flush=True)
 
 
 if __name__ == "__main__":
-    main()
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--sensitivities", action="store_true")
+    main(parser.parse_args().sensitivities)

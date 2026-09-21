@@ -1118,6 +1118,10 @@
     "sha256": "3a303991b50f1af4a0012676c676145fe83e354d50f9d3d76d16d7ba80bfb4b2"
   },
   "stage_c_refit_root": "C:\\quant-data\\b3\\processed\\model_runs\\v2_economic_matched_20260920\\data_refits",
+  "stage_c_refit_sensitivity_plan": {
+    "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\matched_refit_sensitivities\\plan.json",
+    "sha256": "fcd8aff1c239f438e185cee8b590040809209bce054aaec856af792821a8d3e5"
+  },
   "stage_c_replays": {
     "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_economic_matched_20260920\\replays.json",
     "sha256": "962597c8b3e9f209876a561e13790d478be462f1c8fe76ad831e865e00162586"
