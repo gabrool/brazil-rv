@@ -1,4 +1,4 @@
-"""Freeze the registered second temporal layer after width disposition."""
+"""Freeze registered depth or matched LSTM after the preceding capacity screen."""
 
 import argparse
 from copy import deepcopy
@@ -20,11 +20,13 @@ import run_capacity_width
 PROJECT = Path(__file__).resolve().parents[1]
 
 
-def freeze(run):
-    admission = bound_json(run["stage_d_width_admission"])
+def freeze(run, wave):
+    previous = "width" if wave == "depth" else "depth"
+    prefix = f"stage_d_{wave}"
+    admission = bound_json(run[f"stage_d_{previous}_admission"])
     assert admission["technical_comparisons_valid"]
-    engineering = bound_json(run["stage_d_depth_engineering"])
-    assert engineering["status"] == "implementation_qualified_not_depth_experiment"
+    engineering = bound_json(run[prefix + "_engineering"])
+    assert engineering["status"] == f"implementation_qualified_not_{wave}_experiment"
     model_source = Path(inspect.getfile(CharacteristicModel))
     for name, record in engineering["runtime"].items():
         assert sha256_file(model_source.with_name(name)) == record["sha256"]
@@ -36,18 +38,28 @@ def freeze(run):
         )
     )
     cells, counts, controls, recipes, reference_results = {}, {}, {}, {}, {}
-    for candidate, architecture in (("TE_depth2", "attention"), ("GRU_depth2", "gru")):
+    candidates = (
+        (("TE_depth2", "attention"), ("GRU_depth2", "gru"))
+        if wave == "depth"
+        else (("LSTM_matched", "gru"),)
+    )
+    for candidate, architecture in candidates:
         retained = admission["retained"][architecture]
         parent_plan = bound_json(retained["plan"])
         reference = retained["arm"]
         old_cell = parent_plan["cells"][reference]
         old_config = configuration(old_cell, store["feature_names"])
-        assert old_config.temporal_encoder == architecture
+        assert old_config.temporal_encoder in (
+            (architecture,) if wave == "depth" else ("gru", "gru_depth2")
+        )
         cell = deepcopy(old_cell)
         cell["cell"] = candidate
-        cell["model"] = dict(
-            cell.get("model", {}), temporal_encoder=architecture + "_depth2"
+        encoder = (
+            architecture + "_depth2"
+            if wave == "depth"
+            else old_config.temporal_encoder.replace("gru", "lstm")
         )
+        cell["model"] = dict(cell.get("model", {}), temporal_encoder=encoder)
         config = configuration(cell, store["feature_names"])
         assert {
             k for k, value in asdict(config).items() if value != asdict(old_config)[k]
@@ -94,13 +106,13 @@ def freeze(run):
                     == original["store"]["manifest_sha256"]
                 )
                 controls[f"{reference}/{fold}/{seed}"] = manifest
-    root = Path(run["root"]) / "capacity_depth"
+    root = Path(run["root"]) / f"capacity_{wave}"
     root.mkdir(exist_ok=False)
     plan = dict(
-        status="frozen_before_depth_outcomes",
+        status=f"frozen_before_{wave}_outcomes",
         stage="D",
-        admission=run["stage_d_width_admission"],
-        engineering=run["stage_d_depth_engineering"],
+        admission=run[f"stage_d_{previous}_admission"],
+        engineering=run[prefix + "_engineering"],
         store=original["store"],
         cells=cells,
         parameters=counts,
@@ -112,7 +124,7 @@ def freeze(run):
         f_recipes=recipes,
         maximum_epochs=original["maximum_epochs"],
         ema_half_life_epochs=original["attention_gru_ema_half_life_epochs"],
-        planned_fits=30,
+        planned_fits=len(cells) * len(original["seeds"]) * (1 + len(original["folds"])),
         driver=binding(Path(run_capacity_width.__file__)),
         freezer=binding(Path(__file__)),
         runtime=dict(
@@ -128,25 +140,31 @@ def freeze(run):
                 "configuration": binding(Path(inspect.getfile(configuration))),
             },
         ),
-        contrast="Exactly one second temporal block for attention and one second recurrent GRU layer, at widths retained by the prior economic screen. Position encoding once, unchanged pooling/early peers/FiLM/heads/final context/trunk. GRU has no added interlayer dropout. Fresh compatible P parents and original seeds/folds/learning budgets/optimizer/selector; saved single-layer controls reused.",
+        contrast=(
+            "Exactly one second temporal block for attention and one second recurrent GRU layer, at widths retained by the prior economic screen. Position encoding once; GRU has no added interlayer dropout."
+            if wave == "depth"
+            else "Exactly one LSTM-versus-GRU cell at the retained GRU width and layer count. Only the recurrent cell changes, with its additional gate parameters recorded by module. No extra interlayer dropout. Compare complete fit runtimes and memory explicitly; this is not a parameter-matched GRU width contrast."
+        )
+        + " Unchanged pooling/early peers/FiLM/heads/final context/trunk. Fresh compatible P parents and original seeds/folds/learning budgets/optimizer/selector; saved controls reused.",
         gate="R10m equal-four-fold net-CDI delta >=.25bps/day, >=2/3 positive seeds and >=3/4 positive folds; no unexplained BRL/CDI Sharpe decline or worse drawdown. IC diagnostic. At most one candidate per architecture proceeds to ten-fold confirmation under the registered family-adjusted uncertainty rule; width and depth are not independent additional replication slots.",
-        next="LSTM versus retained GRU is authorized after recurrent diagnostics with explicit parameter/runtime differences. Further peer/context/general capacity requires those diagnostics and economic evidence; no automatic grid or extra seeds.",
+        next="Further peer/context/general capacity requires module/fit diagnostics and economic evidence; no automatic grid or extra seeds. At most one final candidate per architecture receives registered ten-fold confirmation.",
     )
     write_json_atomic(root / "plan.json", plan)
     write_json_atomic(root / "frozen_design.json", dict(store=original["store"]))
-    run["stage_d_depth_plan"] = binding(root / "plan.json")
+    run[prefix + "_plan"] = binding(root / "plan.json")
     write_json_atomic(PROJECT / "docs/v2_economic_data_scaling_run.json", run)
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--freeze", action="store_true")
+    parser.add_argument("--wave", choices=("depth", "lstm"), required=True)
     args = parser.parse_args()
     run = json.loads((PROJECT / "docs/v2_economic_data_scaling_run.json").read_text())
     if args.freeze:
-        freeze(run)
+        freeze(run, args.wave)
     else:
         # Reuse the exact frozen fit loop; only its explicit plan binding changes.
         run_capacity_width.execute(
-            dict(run, stage_d_width_plan=run["stage_d_depth_plan"])
+            dict(run, stage_d_width_plan=run[f"stage_d_{args.wave}_plan"])
         )
