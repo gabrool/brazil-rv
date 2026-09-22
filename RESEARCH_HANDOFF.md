@@ -1,952 +1,425 @@
-# Brazil-RV research handoff
-
-Last verified: 2026-08-18.
-
-This is the current-session handoff for a new researcher or LLM. Read
-`AGENTS.md` and `PROJECT_CONTEXT.md` first, then use executable code, immutable
-feature/run manifests, and canonical pointers as the final authority. Some older
-Markdown in Git history describes systems that were deliberately deleted.
-
-## Executive state
-
-- The accepted incumbent family is the peer-free, full causal time-of-day (TOD)
-  normalized, width-64 causal TCN trained uniformly with soft Spearman and
-  SAM-AdamW. It has no cross-equity attention.
-- The best exact validation score verified in this session is **0.041972** for
-  seed 11. The project-level incumbent discussed at the start of the session was
-  approximately 0.0415. Nothing reached 0.05 or 0.06.
-- The gap-weighted pairwise hybrid objective was tested and rejected at seed 11:
-  IC **0.037294**, delta **-0.004678** from the matched soft-Spearman control.
-- Residual-state cross-equity attention on top of that hybrid parent was also
-  rejected at seed 11: IC **0.034091**, delta **-0.003204** from its parent.
-- No held-out test observations were loaded. Every campaign and report records
-  `test_accessed=false`.
-- The original 21-run campaign was deliberately curtailed after weak early
-  evidence. It did **not** complete 21 runs.
-- Implementation work through commit `a91815d08c282a2f1018c9e22a7db3731f104c55`
-  was tested and used for the final two-run campaign. Later documentation commits
-  do not change those reported runs.
-
-## Accepted incumbent architecture
-
-The model accepts one date/decision sample containing a fixed 158-slot
-point-in-time equity axis plus named context instruments.
-
-```text
-Each instrument's causal 5-minute patches (69 x 130)
-                         |
-        shared width-64 causal temporal encoder
-     kernel 3, dilations 1/2/4/8/16/32, 6 blocks
-        LayerNorm + SwiGLU + residual in each block
-                         |
-       final temporal state + projected 32-D slow state
-                         |
-              64-D state per instrument
-
-Equity state ---------------------------------------+
-15 fixed-slot context states -----------------------+--> gated fusion --> 3 scores
-masked equity mean and dispersion ------------------+
-```
-
-Important details:
-
-- Five one-minute rows form each patch, so the patch input width is
-  `5 * 26 = 130`.
-- The nominal temporal receptive field is 127 patches, larger than the 69-patch
-  input. The encoder already covers the complete history window.
-- TCN weights are shared across equities and contexts, but each instrument is
-  encoded independently. The TCN itself does not learn stock-to-stock mixing.
-- The readout is the final causal state. A linear slow-state projection is added
-  before state normalization.
-- Context-plus-pooled fusion concatenates the named context states, masked equity
-  mean, and masked equity dispersion; a gated residual MLP conditions each equity
-  state on that shared vector.
-- The accepted no-attention model has 277,379 trainable parameters and produces
-  scores for 30-, 60-, and 120-minute horizons.
-
-The context screen is fixed rather than an experiment switch:
-
-- Active local contexts: `WDO$`, `DI1F27`, `DI1F28`, `DI1F29`, `DI1F31`, and
-  `DI1$N`.
-- `WIN$` is masked and equity `beta_to_WIN` is zeroed.
-- Active global contexts: `ZT.v.0` and `ZN.v.0`.
-- `ES.v.0`, `NQ.v.0`, `CL.v.0`, `HG.v.0`, `6E.v.0`, and `6M.v.0` are present in
-  the store but masked by the accepted model policy.
-
-## Features, normalization, targets, and splits
-
-The current peer-free full-TOD store built and audited on the GH200 is:
-
-```text
-/lambda/nfs/brazil-rv-east3/quant-data/b3/processed/features/
-  m1_features_pit_causal_tod_20260818T151728490951Z
-```
-
-Identity:
-
-- Contract: `M1_FEATURES_PIT_CAUSAL_TOD`
-- Metadata SHA-256:
-  `c90103b0f99e0017dc1303284a1ab61eca99106094227f5823ba718756d28a6b`
-- 1,248 dates, 1,228 eligible dates, and 67,540 date/decision samples.
-- No human-prior or peer arrays exist in the schema.
-
-The Windows workspace's local canonical pointer may still identify the old V4
-store. The promoted full-TOD pointer was written on the persistent Lambda NFS
-filesystem. Resolve and verify the pointer in the environment where an experiment
-will run; do not silently use the local V4 pointer with current code.
-
-Equity normalization is causal full TOD normalization:
-
-- 30-minute bins.
-- The profile is estimated from unclipped legacy-normalized equity close moves.
-- Twenty-session-equivalent shrinkage prior centered on relative variance one.
-- Relative-variance bounds `[0.25, 4.0]`.
-- Each training date emits its profile before updating it.
-- The profile freezes after 2024-06-28 for validation, embargo, and test dates.
-- Only equities receive the TOD overlay.
-
-Other series are normalized according to their semantics:
-
-- Price-like equities and WDO use log moves divided by causal volatility.
-- Fixed DI quote changes are converted to basis points and divided by causal
-  rate-change volatility; valid prior rate level and exact expiry distance live
-  only in applicable slow fields.
-- `DI1$N` is session-local and does not create an absolute level, overnight chain,
-  or fabricated selected maturity.
-- Global futures use log returns, completed-Globex-session causal volatility,
-  causal robust volume state, and roll/mapping-change masks.
-- Volume surprises use trailing robust median/MAD state. Missing bars are never
-  interpolated; masks carry availability.
-
-For equity `i` and horizon `H`, the continuous precursor to the rank target is:
-
-```text
-z_i = (log(exit_close / entry_open) - contemporaneous CS median)
-      / (causal equity sigma_i * sqrt(H))
-```
-
-The stored learning target is the centered cross-sectional midrank of `z_i`,
-independently by date, decision, and horizon. Model history ends strictly before
-decision time, the entry bar is excluded, and labels cannot cross the permitted
-session boundary.
-
-Splits:
-
-| Split | Dates | Date count | Samples |
-|---|---|---:|---:|
-| Train | 2021-08-16 through 2024-06-28 | 716 | 39,380 |
-| Embargo 1 | between train and validation | 5 | 275 |
-| Validation | 2024-07-08 through 2025-06-30 | 244 | 13,420 |
-| Embargo 2 | between validation and test | 4 | 220 |
-| Held-out test | 2025-07-07 through 2026-07-17 | 259 | 14,245 |
-
-The primary metric is mean daily cross-sectional Spearman IC: average decisions
-within each date/horizon, then average validation dates and the three horizons
-equally.
-
-## Training contract for the incumbent
-
-- Objective: soft Spearman, temperature 0.50.
-- Recency: uniform over all 716 training sessions.
-- Seeds used for matched campaigns: 11, 29, and 47.
-- Optimizer: SAM-AdamW, SAM rho 0.125, learning rate `3e-4`, AdamW betas
-  `(0.9, 0.95)`, epsilon `1e-8`, weight decay 0.01.
-- Effective batch: 512, composed from two ordered 256-sample loader batches.
-- Date-stratified sampling.
-- Maximum 20 epochs, early-stop patience 3, minimum IC improvement `1e-4`.
-- PyTorch Inductor compilation uses default mode, full graphs, and static shapes;
-  validation is eager.
-
-## What was implemented and removed in this session
-
-The cleanup reduced the session diff by roughly 28,700 deleted lines. It removed:
-
-- Human-prior acquisition, classifications, static peer construction, peer arrays,
-  peer loader/model paths, and related audits/tests.
-- Old attribution/probe, conflict-OOF, feature-variant, normalization-overlay,
-  horizon/multiscale, and stage-validation machinery.
-- Transformer and MLP model families, alternate TCN configurations, routing modes,
-  readout variants, single-horizon branches, rank Huber, and other completed
-  experiment switches.
-- V-numbered normalization implementations and the old 21-run driver after the
-  campaign direction changed.
-
-The remaining core preserves point-in-time membership, security/source identity,
-entry-bar exclusion, session-safe labels, causal/frozen fitted state, raw-source
-immutability, feature-store identity, atomic run artifacts, and test isolation.
-
-Portability fixes made during remote execution include workspace-path resolution
-between Windows and Linux/NFS, repository identity resolution from the source root,
-and support for security slots that are inactive through the development period
-when building the temporary target-scale sidecar.
-
-## Experiment chronology and actual run count
-
-### Original PIT-clean campaign
-
-The planned campaign had 21 run specifications: three legacy controls, three
-full-TOD uniform controls, twelve recency runs, and three attention runs.
-
-What actually happened before the campaign was curtailed:
-
-- Three clean legacy controls were reused from the persistent campaign at
-  `pit_clean_core_campaign_858b372`; they were not retrained in this session.
-- Three peer-free full-TOD uniform controls, seeds 11/29/47, completed under
-  `pit_clean_core_campaign_4067962`.
-- At the last recorded original-campaign checkpoint, scientific progress was 6/21
-  when reused controls were included, but only three new runs had completed.
-- The first `exp_504` recency attempt was stopped while incomplete after weak early
-  results. All remaining recency specifications were skipped. It must not be
-  counted as a completed result.
-- A first non-residual uniform-TOD attention attempt showed declining/stagnant
-  validation behavior while training loss fell. The requested three-seed attention
-  sweep was not completed and is not promotable evidence.
-
-The expensive feature construction was legitimate but much slower than estimated:
-it made a two-pass 146-source full-TOD store, then audited it. That work was shared
-preprocessing, not repeated baseline training.
-
-The exact full-TOD seed-11 soft-Spearman result used in all later comparisons was:
-
-| Metric | Value |
-|---|---:|
-| Primary IC | **0.0419722656** |
-| 30-minute IC | 0.0460368119 |
-| 60-minute IC | 0.0409836943 |
-| 120-minute IC | 0.0388962908 |
-| Best epoch / epochs completed | 12 / 15 |
-| Runtime | 661.3 seconds |
-
-The other two uniform-control manifests remain under the persistent source
-campaign. Their exact values were not copied into this Git checkout, so do not
-invent them; read their immutable run manifests after mounting the NFS store.
-
-### Hybrid loss experiment
-
-The motivation was that soft Spearman treats near-ties and large target separations
-similarly. The tested loss was:
-
-```text
-L = L_soft_spearman + 0.25 * L_gap_pairwise
-pair_weight(i,j) = min(abs(z_i - z_j), 1.0)
-```
-
-The pairwise logistic temperature was 0.50. The exact continuous `z` values were
-reconstructed from immutable raw-return/median arrays and exact causal equity
-sigmas in a development-only sidecar. The sidecar ended at validation end and had
-SHA-256 `46031721f696c1d55c1d9285caacaedb2177051fa670f4a4c3028a455b9c7245`.
-
-Interpretation: no new inference feature is required for this objective. The gap
-only changes gradient weights. The model can benefit only when existing causal
-inputs predict the large separation; the loss cannot manufacture absent signal.
-
-### Residual-state attention experiment
-
-The candidate was designed after the first attention attempt appeared to overfit:
-
-- Take final 64-D equity states after slow-state addition.
-- Pre-normalize them and subtract the active cross-sectional mean.
-- Apply one four-head, bias-free self-attention layer to those residualized states.
-- Mask inactive equities as keys/values and zero their outputs.
-- Add the result residually to the original, non-residualized equity state.
-- Preserve the original fixed context-plus-pooled fusion afterward.
-- Zero-initialize the attention output projection so epoch-zero behavior exactly
-  matches its no-attention parent.
-- Add no ticker, security, sector, positional, or classification embeddings and no
-  separate feed-forward block.
-
-This is a coherent permutation-equivariant equity mixer. The common component is
-not discarded: it stays on the residual path and enters pooled/context fusion.
-
-### Final two-run campaign results
-
-Campaign:
-
-```text
-/lambda/nfs/brazil-rv-east3/quant-data/b3/processed/model_runs/
-  hybrid_loss_residual_attention_a91815d
-```
-
-| Arm, seed 11 | Best epoch | Epochs | Primary IC | IC 30 / 60 / 120 | Delta from parent |
-|---|---:|---:|---:|---:|---:|
-| Existing soft-Spearman full-TOD control | 12 | 15 | **0.041972** | .046037 / .040984 / .038896 | - |
-| Hybrid base | 13 | 16 | 0.037294 | .043617 / .036109 / .032158 | **-0.004678** |
-| Hybrid + residual attention | 8 | 11 | 0.034091 | .039608 / .032327 / .030338 | **-0.003204** |
-
-The hybrid base took 745.4 seconds. Attention took 489.3 seconds. The systemd
-service completed successfully with zero restarts. The campaign report records
-`test_accessed=false`.
-
-Decision: do not run seeds 29/47 for these exact candidates. The losses are large
-enough on the screen seed that neither deserves promotion. Retain the full-TOD
-soft-Spearman no-attention family as incumbent.
-
-## Conceptual conclusions from the session
-
-### Role of the TCN
-
-The TCN is a shared causal temporal encoder, not inherently a denoiser or a
-cross-asset model. Locality, dilation, causality, residual learning, and sharing
-weights across instruments are its sample-efficiency biases. Denoising is learned
-only if it helps the objective. Stock-to-stock interaction begins in cross-sectional
-features, pooled fusion, or an explicit post-encoder mixer.
-
-### RevIN
-
-Whole-input RevIN is not a natural fit. RevIN assumes a forecasting output that can
-be returned to the same physical units after per-instance normalization. Brazil-RV
-outputs dimensionless cross-sectional scores and mixes semantically different
-channels: returns, volume surprises, ranks, masks, calendars, rate levels, and slow
-state. A single window mean/variance would erase useful regime information and mix
-structural zeros into statistics. A future ablation could normalize only masked
-price-move channels, but that would not be ordinary RevIN and is not currently a
-top-priority experiment.
-
-### Why macro instruments were not put in equity attention
-
-Equities are an exchangeable set; DI tenors, WDO, ZT, and ZN are named and
-heterogeneous. Their identity and maturity matter. They already condition every
-equity through fixed-slot nonlinear fusion. If context processing is revisited,
-use a tenor-aware DI curve encoder or equity-query/context-key cross-attention,
-not undifferentiated self-attention over equity and macro tokens.
-
-## Highest-value next research order
-
-1. **Learned low-capacity set pooling.** Apply a small shared transform to equity
-   states, masked-mean the result, and feed that learned market summary back to
-   each equity. This is an O(N), lower-variance extension of the existing fixed
-   mean/dispersion pool.
-2. **Common/idiosyncratic auxiliary decomposition.** Keep the actual rank target,
-   but add a causally defined factor/common and residual auxiliary objective. Do
-   not reproduce a large paper architecture blindly; control beta/factor estimation
-   error and preserve both components for the final raw-return ordering.
-3. **Low-rank factor mixer.** Learn a small number of pooled latent factors and
-   per-equity loadings instead of another full N-by-N attention matrix.
-4. **Causal ModernTCN-lite screen.** Match inputs, loss, fusion, optimizer, width,
-   and approximate parameter count. Use left-only padding. This is medium value
-   because the incumbent already has a receptive field larger than the input.
-5. **Causal ConvTimeNet channel-independent screen** only after the above. Ensure
-   deformable patch offsets can never sample future positions. Do not begin with
-   the channel-dependent version across equities.
-
-Use the accepted soft-Spearman incumbent as the parent for new experiments, not
-the rejected hybrid objective. Start with one matched seed; promote to seeds
-11/29/47 only after a meaningful improvement.
-
-## Current HEAD status
-
-The current source tree is the restored peer-free soft-Spearman parent plus the
-internal-fold trajectory measurement layer. Historical hybrid and attention
-results above remain authoritative records, not executable compatibility paths.
-
-- `modeling.train` runs a fixed 20-epoch soft-Spearman SAM trajectory and records
-  raw, EMA, weight-average, and prediction-average candidates.
-- Rejected hybrid loss, continuous-target sidecar, residual attention, recency
-  weighting, and their campaign driver have been deleted from current code.
-- The rejected Patience-centered checkpoint-average evaluator is likewise absent;
-  its recorded commit and immutable artifact preserve exact reproduction.
-- Exact historical reproduction still uses the recorded commit
-  `4067962f6bb6748a530814d10e20dfc865a385c7`, immutable store identity, and run
-  manifest.
-- The official validation split is reserved for sparse stage-winner checks; the
-  held-out test remains accessible only through the standalone frozen-rule evaluator.
-
-## Completed restoration and trajectory screen (2026-08-19)
-
-The peer-free incumbent was retrained from historical commit
-`4067962f6bb6748a530814d10e20dfc865a385c7` before the new recipe was used. The
-matched reproduction is stored at:
-
-    /lambda/nfs/brazil-rv-east3/quant-data/b3/processed/model_runs/parent_reproduction_4067962_e22dd67_20260819T131142Z
-
-| Seed | Immutable IC | Reproduced IC | Delta | Best / stopped epoch |
-|---:|---:|---:|---:|---:|
-| 11 | 0.041972266 | 0.041977574 | +0.000005309 | 12 / 15 |
-| 29 | 0.040481999 | 0.040475500 | -0.000006499 | 14 / 17 |
-| 47 | 0.038463105 | 0.038464003 | +0.000000898 | 7 / 10 |
-
-All best and stopped epochs matched. Every run used soft Spearman, uniform dates,
-the full causal-TOD store hash
-`c90103b0f99e0017dc1303284a1ab61eca99106094227f5823ba718756d28a6b`, and
-recorded `test_accessed=false`.
-
-The fixed-trajectory discovery campaign from commit
-`e22dd671305f30069ff2da4aafc50c1eb521cb51` is stored at:
-
-    /lambda/nfs/brazil-rv-east3/quant-data/b3/processed/model_runs/trajectory_discovery_e22dd67_20260819T134332Z
-
-It contains six completed runs, 120 epoch checkpoints, and 126 prediction files.
-Fold A fit 512 dates through 2023-08-31 and selected on the next 102 dates through
-2024-01-31. Fold B fit 614 dates through 2024-01-31 and selected on the final 102
-training dates through 2024-06-28. These remain screening folds because the stored
-causal TOD profile adapted inside the historical training dates.
-
-| Rule | Fold A ensemble IC | Fold B ensemble IC | Mean |
-|---|---:|---:|---:|
-| Final raw | 0.043416 | 0.049602 | 0.046509 |
-| Final EMA-0.98 | 0.043522 | 0.049681 | 0.046601 |
-| Final EMA-0.99 | 0.043826 | 0.049905 | 0.046866 |
-| **Final EMA-0.995** | **0.045309** | **0.050625** | **0.047967** |
-| Last-3 weight average | 0.043438 | 0.049902 | 0.046670 |
-| Last-5 weight average | 0.043628 | 0.050146 | 0.046887 |
-| Tail-3 prediction average | 0.043458 | 0.049932 | 0.046695 |
-| Tail-5 prediction average | 0.043661 | 0.050187 | 0.046924 |
-| Patience-3 raw (same-window, selection-biased) | 0.049576 | 0.054145 | 0.051860 |
-| Retrospective best raw (diagnostic) | 0.049382 | 0.054145 | 0.051763 |
-
-The same-window Patience result above is not a deployed-value estimate: each seed's
-checkpoint was selected and reported on the same 102-date window.
-
-The corrective artifact is:
-
-    /lambda/nfs/brazil-rv-east3/quant-data/b3/processed/model_runs/trajectory_crossfit_3054228_20260819T161200Z
-
-It selected on odd dates and reported on even dates, then reversed the roles. Raw
-Patience scored `0.048416`/`0.050673`, mean `0.049545`, versus final EMA-0.995 mean
-`0.047967`. EMA-0.995 Patience scored `0.048518`; last-10 and last-7 raw weight
-averaging scored `0.048060` and `0.047352`. The raw weight-average sequence was
-strictly monotone across last-3/5/7/10 (`0.046670`, `0.046887`, `0.047352`,
-`0.048060`) and had not saturated at the longest tested tail. The outer rule
-replay chose raw Patience in three of four directions and EMA Patience once, with
-mean out-of-half IC
-`0.048897`. Raw Patience-3 is frozen: minimum improvement `0.0001`, patience three,
-maximum 20 epochs, restore best raw checkpoint. Its Fold-B paired advantage over
-final EMA-0.995 was effectively zero and all paired block intervals included zero,
-so this is a numerical freeze rather than established dominance.
-
-The fold contrast reflects different post-peak declines: Fold A final raw fell
-about `0.0050` below cross-fitted Patience, while Fold B final raw was only about
-`0.0011` lower. Both folds placed the coherent benefit at 120 minutes and were
-slightly negative at 30 minutes. With two folds this cannot be attributed to
-regime distance versus fit-window length, so checkpoint selection was frozen
-rather than probed further.
-
-One predeclared no-retraining refinement then averaged five raw checkpoints around
-each parity-selected Patience peak. It scored `0.046655`/`0.050385`, mean
-`0.048520`, versus raw Patience mean `0.049545`; centered-minus-raw-Patience was
-`-0.001761` on Fold A and `-0.000288` on Fold B and was negative in all four
-out-of-half directions. The centered rule was rejected and no window sweep was
-run. Official validation and test were not accessed. Historical reproduction is:
-
-    evaluator commit 381dcb7491b26f1e34d4ecdef75d0e5e291b5441
-    /lambda/nfs/brazil-rv-east3/quant-data/b3/processed/model_runs/trajectory_centered_crossfit_381dcb7_20260819T170100Z
-
-The evaluator was removed from current HEAD under the deletion-first rule. Raw
-Patience-3 remains the frozen trajectory rule, and the checkpoint-rule line is
-closed.
-
-The strict paired analyzer compared the selected rule with final raw. Fold-A and
-fold-B deltas were `+0.001892` and `+0.001024`. Moving-block 95% intervals were
-`[-0.000126, 0.003693]` / `[-0.000016, 0.003627]` at block lengths 5/10 for fold A
-and `[-0.000087, 0.001816]` / `[-0.000078, 0.001568]` for fold B. Horizon deltas
-were positive at 30/60/120 minutes: `+0.000719/+0.001487/+0.003471` in fold A and
-`+0.000659/+0.000888/+0.001525` in fold B. Time-of-day deltas were mixed: 8 of 55
-were negative in fold A (range `-0.001888` to `+0.006399`) and 17 of 55 in fold B
-(range `-0.001263` to `+0.003981`).
-
-EMA-0.995 seed-prediction correlations ranged 0.909-0.914 in fold A and
-0.928-0.932 in fold B. Uniform rank ensembling gained `+0.001048` and `+0.000981`
-versus the mean member, respectively; no ensemble weights were learned. Official
-validation was not accessed by this campaign, and the held-out test remains sealed.
-
-## Code map
-
-- `research/src/brazil_rv/preprocessing/build.py`: self-contained full-TOD store.
-- `research/src/brazil_rv/preprocessing/intraday_normalization.py`: causal TOD
-  profile and equity dynamic correction.
-- `research/src/brazil_rv/modeling/data.py`: sidecar-free loader, masking, patches,
-  and the two expanding internal screening folds.
-- `research/src/brazil_rv/modeling/layers.py`: causal residual TCN block.
-- `research/src/brazil_rv/modeling/model.py`: peer-free shared TCN and fixed
-  context-plus-pooled fusion.
-- `research/src/brazil_rv/modeling/engine.py`: compiled soft-Spearman/SAM training
-  and eager validation.
-- `research/src/brazil_rv/modeling/trajectory.py`: EMA, tail averaging, checkpoint,
-  frozen raw-Patience, and frozen-rule helpers.
-- `research/src/brazil_rv/modeling/train.py`: one fixed 20-epoch trajectory with
-  raw and EMA artifacts at every epoch.
-- `research/src/brazil_rv/modeling/analyze.py`: strict alignment, uniform rank
-  ensembles, paired bootstraps, guardrails, and fixed-rule baseline selection.
-- `research/src/brazil_rv/modeling/crossfit.py`: bidirectional odd/even checkpoint
-  and rule selection plus immutable last-7/last-10 prediction extensions.
-- `research/src/brazil_rv/modeling/run_discovery_campaign.py`: exact two-fold,
-  three-seed internal screen; it cannot access official validation or test.
-- `research/src/brazil_rv/modeling/evaluate.py`: standalone validation/test
-  evaluation for official runs carrying an internally frozen rule.
-
-## Operational handoff
-
-The 2026-08-19 parent reproduction and trajectory screen used Lambda instance
-`de1f90e39e204d1aa10f6a00677ad0f4` at `192.222.59.14`. After the NFS artifacts
-and lockbox flags passed audit, termination was accepted and a subsequent provider
-query no longer listed the instance. Persistent results remain on the
-`brazil-rv-east3` NFS filesystem. The older final two-run campaign used instance
-`1408116f8e794a4baa1962d512e80d6c`; its host state is historical and must not be
-inferred from this record.
-
-Do not evaluate the held-out test split, overwrite raw data, mutate immutable
-feature stores, or update a canonical pointer until the corresponding audit passes.
-
-## Completed Phase A representation campaign (2026-08-20)
-
-Campaign commit `732b1b0e7dd870d9ea210c7b2eb750a624f12fb7` tested six
-zero-start residual candidates on the two internal folds. Each candidate completed
-both folds, seeds 11/29/47, and 20 epochs: 120 checkpoints per candidate and 720
-total. Primary reporting used separately replayed odd/even cross-fitted raw
-Patience-3 for candidate and parent; final EMA-0.995 was the free secondary
-readout. Prediction ensembles were uniform rank averages and learned no weights.
-
-| Candidate | Patience Fold A / Fold B / mean delta | EMA-0.995 Fold A / Fold B / mean delta |
+# Brazil-RV: local coding-model handoff
+
+Verified **2026-09-21 22:42:57 America/Sao_Paulo** (2026-09-22 01:42:57 UTC).
+This is a dated snapshot, not a launcher. Refresh processes, progress files and
+Git state before acting. **Work is already running; do not start duplicate jobs.**
+
+This replaces the obsolete August TCN/cloud handoff, preserved in Git at
+`b5e937613da41afe762710b340b07fdd9e03c70e:RESEARCH_HANDOFF.md`. Its old cloud
+commands, data, architecture and validation boundaries do not apply now.
+
+## 1. Where we are and what comes next
+
+This is offline Brazilian equity relative-value research, using permanent
+security identities, causal historical inputs and economic portfolio evaluation.
+It is not a production trading system. The immediate goal is to investigate why
+wider attention lost its advantage after the data/refit changes, compare models
+fairly on common inputs/accounts/periods, then pursue justified improvements.
+
+The user authorized four steps:
+
+1. **Complete:** propagate the specifically evidenced added-period repairs
+   (GUAR/QGEP actions, QGEP/GPC/Wiz histories and distribution targets) into a
+   separately accepted complete store. Earlier stores remain immutable.
+2. **Running:** attention widths 64/96 × parent stopping patience 5/20, seeds 11/29/47,
+   eight fixed development periods. Six patience20 parent trajectories supply
+   twelve labelled selections. Each patience5 view sees only its five-stale
+   prefix. Identical selected parents permit exact child reuse. There are at most
+   96 children and 102 logical jobs including parents, not necessarily 102 fits.
+3. **Frozen and queued:** 54 fresh C6/GRU parent/child fits on the same store and
+   periods, then common neutral 5% and flexible 45% net-exposure comparisons, with
+   beta cap 5% fixed. The existing continuation launches this after attention
+   verification. Preserve each model's original distinct recipe.
+4. **Not started under this continuation:** choose bounded architecture contrasts
+   from the common evidence, including the authorized LSTM investigation where
+   justified. The continuation stops for this review; it does not launch an
+   unlimited capacity grid.
+
+Foundation, bounded Stage A accounting admission, the previous accepted data
+stores, four-period Stage C comparisons, and registered width/depth screens are
+already complete/disposed. **Do not restart them.** Historical heartbeat messages
+saying “Stage A incomplete / C and D unstarted” are superseded.
+
+### Current best: keep comparison scopes separate
+
+There is **no established global winner on one common corrected continuous
+comparison**. These are different evidence sets, not one leaderboard:
+
+| Evidence set | Result | Meaning |
 |---|---|---|
-| Decision time | -.000017 / -.000002 / -.000010 | -.000180 / -.000088 / -.000134 |
-| Temporal stats | +.000098 / -.000307 / -.000104 | +.001688 / -.001669 / +.000009 |
-| Multi-depth stats | +.000532 / -.000827 / -.000148 | +.001408 / -.003358 / -.000975 |
-| Cross-sectional max/min | -.000498 / +.000101 / -.000198 | +.001691 / -.000146 / +.000772 |
-| Learned set pool | -.000009 / -.000003 / -.000006 | +.000002 / +.000009 / +.000005 |
-| Conditional bucket means | -.000363 / -.000035 / -.000199 | +.001752 / -.000902 / +.000425 |
-
-All six primary means were non-positive. The two significant-looking Fold-A EMA
-effects for max/min and conditional buckets reversed on Fold B. Horizon and TOD
-guardrails were mixed, and no candidate warranted official-validation access.
-Reject all six standalone candidates; raw Patience-3 remains the parent.
-
-The completed campaign is stored at:
-
-    /lambda/nfs/brazil-rv-east3/quant-data/b3/processed/model_runs/phase_a_732b1b0_20260819T180348Z
-
-The manifest is `status=completed`, references the causal feature-store hash
-`c90103b0f99e0017dc1303284a1ab61eca99106094227f5823ba718756d28a6b`, and records
-`official_validation_accessed=false` and `test_accessed=false`.
-
-Deletion-first cleanup removed the six candidate implementations, generic variant
-plumbing, `modeling.phase_a`, and candidate tests from current HEAD. The experiment
-commit and immutable artifact preserve exact reproduction. The strict analyzer's
-observation-level comparison entry point was retained because it is generally
-useful for future cross-fitted campaigns.
-
-The Phase A instance was `df8326b7265845bf8285546d9018ed86` in `us-east-3`.
-After results and repository state were safely recorded, termination was accepted;
-a subsequent provider query reported the exact instance ID absent. Persistent
-campaign results remain on the `brazil-rv-east3` NFS filesystem.
-
-Final verification passed Ruff and full Python syntax compilation. Before the
-building reset, commit `732b1b0` passed all 192 research tests and compiled BF16
-real-store smoke checks for all six candidates on the GH200. The post-reset local
-full-suite rerun did not collect tests because Windows Application Control blocked
-`torch.dll` with `WinError 4551`, including from a fresh isolated `uv` environment.
-This is an environment-policy failure, not a test assertion. As a compensating
-check, every deletion-first model/training/test file byte-matched the previously
-tested parent and the retained analyzer byte-matched commit `732b1b0`. Re-run
-`uv run --project research pytest` after the Windows policy is cleared; do not
-represent the post-reset attempt as a passing suite.
-
-## Phase A autopsy, diversity ensemble, and decision-time closure (2026-08-20)
-
-A checkpoint autopsy showed that the near-zero decision-time and learned-set
-scores were not dead-adapter artifacts. Across Fold A/Fold B and seeds 11/29/47,
-the historical decision-time projection ended at L2 `0.319-0.355`; the learned-set
-final projection ended at `0.490-1.107`, and both learned-set `phi` layers moved.
-Candidate/parent prediction Spearman remained `0.999134-0.999440` for decision
-time and `0.999626-0.999890` for learned set. Learned set had already used
-standard `phi` initialization, zero-only final projection, and the incumbent
-nonlinear shared fusion. Both paths were active but contributed almost no new
-cross-sectional ordering.
-
-Saved predictions then supported two no-training diversity ensembles:
-
-| Uniform rank ensemble | Patience Fold A / Fold B / mean delta | EMA Fold A / Fold B / mean delta |
-|---|---|---|
-| Parent-3 + multi-depth-3 | +.001237 / +.000284 / +.000761 | +.002562 / +.000739 / +.001651 |
-| Parent-3 + multi-depth-3 + temporal-3 | +.000942 / +.000230 / +.000586 | +.002398 / +.000135 / +.001266 |
-
-Every direction was positive, but every fold-level block interval included zero.
-Adding temporal members diluted the six-member pool. Retain parent+multi-depth as
-the sole Phase A diversity candidate for sparse official-validation confirmation;
-do not learn weights, do not add temporal members, and do not treat it as proven
-until that confirmation. Raw Patience-3 on the parent remains the base for new
-representation experiments. The immutable reanalysis is:
-
-    /lambda/nfs/brazil-rv-east3/quant-data/b3/processed/model_runs/phase_a_autopsy_d237998_20260820T111500Z
-
-The remaining decision-time routing objection received one corrected rerun. The
-candidate used a standard-initialized `2 -> 16 -> 16` GELU decision embedding and
-a zero-only `16 -> 128` projection into shared mean/dispersion context before the
-existing nonlinear fusion. Adapter construction preserved the parent's RNG state;
-exact parent weights and predictions matched at epoch zero. A 10-step rank-loss
-test confirmed both the projection and upstream embedding changed. The exact
-experiment commit passed all 188 research tests on the GH200.
-
-| Readout | Fold A delta | Fold B delta | Mean |
-|---|---:|---:|---:|
-| Cross-fitted raw Patience-3 | -0.000001432 | -0.000008622 | -0.000005027 |
-| Final EMA-0.995 | -0.000000824 | -0.000000765 | -0.000000795 |
-
-All bootstrap intervals included zero; horizon/TOD deltas were at noise scale.
-The final projection reached L2 `0.299-0.992` and both embedding layers moved in
-every run. Decision time is therefore an active, route-corrected null and the line
-is closed without official-validation access. The campaign contains six completed
-20-epoch trajectories and 120 checkpoints:
-
-    implementation 9828f7219efbda1cb3d9aef89217423bd7e65feb
-    provenance fix b8d955a71a0c6a20be0861d4a6bfd2330d1da65b
-    /lambda/nfs/brazil-rv-east3/quant-data/b3/processed/model_runs/decision_time_fusion_b8d955a_20260820T113924Z
-
-Its manifest is `status=completed`, records the exact final commit, and has
-`official_validation_accessed=false` and `test_accessed=false`. Deletion-first
-cleanup removed the rejected adapter, variant plumbing, driver, and specific
-tests; exact reproduction uses the commits and immutable artifact. The generic
-analyzer now supports candidate and parent ensembles with different member counts
-without weakening strict alignment or uniform-rank requirements.
-
-The paid instance for these follow-ups was
-`d09de0143ed64f2f929f117e1b68727d` in `us-east-3`. Lambda accepted termination,
-the instance entered `terminating`, and a subsequent provider inventory query
-confirmed that the exact ID was absent. Persistent experiment artifacts remain
-on the attached NFS volume.
-
-## Completed Phase B target decomposition and adaptation (2026-08-20)
-
-Phase B is complete and produced no recipe change. The three-seed parent with
-Raw Patience-3 remains canonical; official validation is closed again and the
-held-out test is untouched.
-
-### Auxiliary-target audit
-
-Commits `a04d63e`/`15471e8` built an immutable sidecar from causal
-pre-neutralization `beta_to_WIN`, exact decision-open-to-label-close WIN returns,
-explicit observed endpoint masks, and no stale prices. Residual returns were
-`r_i - beta_i r_WIN`, then median-centered, normalized by the existing causal
-volatility scale and horizon, and cross-sectionally midranked. Sign was relative
-to the cross-sectional median; magnitude was absolute normalized return.
-
-Across the 716 training dates, beta coverage was 0.998564-0.998567, exact WIN
-endpoint coverage was 0.999948-0.999974, residual/main rank correlation was
-0.959743-0.960993, and mean absolute rank shift was 0.093272-0.094033. Mutation
-tests passed for future invariance, exact-exit sensitivity, endpoint masking, and
-beta emit-before-update. Audit hash:
-
-    a2f1ef5cbc6fd3c293d6da8e2ded6f873bc9183fe3ba353a8a6d3d55766fb6c5
-
-Sidecar:
-
-    /lambda/nfs/brazil-rv-east3/quant-data/b3/processed/auxiliary_targets/phase_b_aux_15471e8_20260820T141500Z
-
-### Main auxiliary campaign
-
-Commit `6b7b121` ran residual-rank, sign, magnitude, and combined supervision on
-Fold A/Fold B, seeds 11/29/47, fixed 20-epoch SAM trajectories: 24 trajectories
-and 480 checkpoints. The main target/head stayed canonical. Single auxiliary
-losses had weight 0.5; combined used the equal mean of all three with the same
-fixed total weight. Raw odd/even cross-fitted Patience-3 was primary and final
-EMA-0.995 was the free secondary readout.
-
-| Candidate | Primary Fold A / Fold B / mean | EMA Fold A / Fold B / mean |
-|---|---|---|
-| Residual rank | +.000418 / -.001669 / -.000625 | +.001439 / +.000988 / +.001214 |
-| Sign | -.000936 / -.000028 / -.000482 | -.000143 / +.000201 / +.000029 |
-| Magnitude | -.003143 / -.002054 / -.002599 | -.003219 / +.000101 / -.001559 |
-| Combined | -.000641 / -.000061 / -.000351 | +.001055 / +.001382 / +.001218 |
-
-No primary candidate improved both folds. Residual Fold B and magnitude Fold A
-had block-5/10 intervals excluding zero on the negative side. The EMA residual
-and combined effects were secondary-only and did not override the primary rule.
-No candidate improved the parent+Phase-A stack on both folds; the conditional
-common-component head was skipped because residual rank did not win.
-
-Campaign:
-
-    /lambda/nfs/brazil-rv-east3/quant-data/b3/processed/model_runs/phase_b_6b7b121_20260820T145500Z
-
-### Recency fine-tuning
-
-Because no auxiliary qualified, recency started from the parent. Each fold/seed
-and odd/even direction used the latest 120 fit dates, learning rate `3e-5`, and
-one three-epoch trajectory. This produced 36 checkpoints and honestly compared
-epochs 1/2/3 plus fixed 50/50 full-history/fine-tuned rank ensembles out of half.
-The nominal best was the epoch-3 50/50 ensemble: Fold A `-0.000930`, Fold B
-`+0.001843`, mean `+0.000457`. Fold A's block-10 interval was wholly negative
-while Fold B's was wholly positive. The both-fold guardrail selected
-`full_history`; no recency state was retained.
-
-### Sparse official confirmation
-
-After Phase B, the sole stage finalist remained Phase-A parent-3 plus
-multi-depth-3. Three full-history multi-depth trajectories were run from commit
-`732b1b0` with the frozen Raw Patience-3 rule, then the validation-only analyzer
-from `e33a122` compared their uniform six-member rank pool with the matched
-parent-3 reproduction.
-
-| Recipe | Official validation IC |
-|---|---:|
-| Parent-3 | 0.041639843 |
-| Parent-3 + multi-depth-3 | 0.040495819 |
-| Delta | -0.001144024 |
-
-Block-5 95% was `[-0.002990, +0.000614]`; block-10 was
-`[-0.003185, +0.000623]`. All 30/60/120-minute deltas were negative. Reject the
-six-member recipe; diversity did not compensate for weaker multi-depth members.
-Do not evaluate this rejected stage on held-out test.
-
-Official artifacts:
-
-    /lambda/nfs/brazil-rv-east3/quant-data/b3/processed/model_runs/phase_a_official_732b1b0_20260820T201500Z
-
-The sidecar, discovery campaign, recency manifest, official runs, and confirmation
-all preserve exact results. Deletion-first cleanup restored canonical source and
-tests byte-for-byte to pre-Phase-B commit `2c4897c`; rejected auxiliary, recency,
-and one-use confirmation code is reproduced through commits `a04d63e`,
-`15471e8`, `6b7b121`, and `e33a122`, not compatibility branches. The main Linux
-suite passed 191/191 on the exact Phase B implementation; local Windows passed
-190 with only the policy-blocked compile test deselected.
-
-The paid Phase B instance was `5e9201fcd5b6436cbdd3be9fe9ee4524` in
-`us-east-3`. Termination was requested only after results, cleanup, the 209-test
-suite, commit `23efd41`, and its GitHub push completed. Lambda first returned
-`terminating`; the subsequent provider inventory contained zero matches for the
-exact instance ID. Persistent sidecar, campaign, recency, and official-confirmation
-artifacts remain on the `brazil-rv-east3` NFS filesystem.
-
-
-## Completed post-Phase-B gated screens and Phase C (2026-08-21)
-
-The attached next-stage plan is complete. It produced no accepted recipe change:
-the canonical model remains the three-seed parent with Raw Patience-3, official
-validation is closed again, and the held-out test is untouched.
-
-Commits `c0d0598`, `3b60ac9`, and `921dd3a` preserve the exact diagnostic,
-sidecar, Phase C, and sparse-confirmation implementations. The corrected immutable
-sidecar is:
-
-    /lambda/nfs/brazil-rv-east3/quant-data/b3/processed/auxiliary_targets/next_stage_3b60ac9_20260820T233000Z
-
-D1 found quarterly parent ICs of `0.040053`, `0.045006`, `0.045948`, and
-`0.035552` from Q3-2024 through Q2-2025. H1-2025 minus H2-2024 was `-0.001779`,
-with block-5/10 intervals `[-0.021437, +0.018751]` and
-`[-0.022423, +0.018695]`; the fitted slope was slightly positive. There is no
-statistically useful official-year staleness signal.
-
-D2's stronger WIN+WDO+ready-DI-level residual passed the audit gate at residual/main
-rank correlation `0.861604`. The one authorized candidate was null under primary
-Raw Patience-3 (`+0.000286 / -0.000452` on Folds A/B), although its fixed EMA
-secondary was positive on both folds. R1's no-training Patience plus final-EMA
-rank blend was also rejected (`-0.000123 / +0.001292`).
-
-The Phase C discovery campaign ran exactly the gated sequence below. Every
-candidate used folds A/B, seeds 11/29/47, fixed 20-epoch SAM trajectories,
-cross-fitted Raw Patience-3 primary, final EMA-0.995 secondary, and paired
-block-5/10 inference. It completed 36 trajectories and 720 raw checkpoints with
-no official-validation or test access.
-
-| Candidate | Primary Fold A / Fold B / mean | EMA Fold A / Fold B / mean | Decision |
-|---|---|---|---|
-| Stronger residual auxiliary | +.000286 / -.000452 / -.000083 | +.001731 / +.001879 / +.001805 | Null primary; Stage 3 diversity member by prior gate |
-| Compressed global risk | -.000029 / +.000001 / -.000014 | -.000090 / +.000148 / +.000029 | Reject |
-| Factor mixer K=4 | -.000095 / -.003950 / -.002022 | -.000072 / -.000545 / -.000308 | Reject; skip K=8/set-pool extensions |
-| DI tilt exposure | -.000005 / +.000002 / -.000001 | -.000032 / -.000025 / -.000028 | Reject; live-path autopsy passed |
-| Width 96, 2x weight decay | +.000751 / -.002182 / -.000716 | -.009056 / -.007347 / -.008201 | Reject |
-| Competitive feature gate | +.000024 / -.000134 / -.000055 | +.000283 / +.000274 / +.000279 | Reject primary; live-path autopsy passed |
-
-Campaign:
-
-    /lambda/nfs/brazil-rv-east3/quant-data/b3/processed/model_runs/next_stage_3b60ac9_20260820T233000Z/phase_c
-
-Stage 3 therefore stacked only parent-3 plus three full-history stronger-residual
-members, with the composition frozen before the one official read. The six-member
-uniform rank ensemble scored `0.042142944` versus parent-3 `0.041639843`, a
-`+0.000503100` point estimate. Block-5 was `[-0.000390, +0.001351]`; block-10
-was `[-0.000437, +0.001336]`. All horizon deltas were positive, but the stack
-cleared neither interval. It was rejected, and the manifest records
-`held_out_test_read_justified=false` and `test_accessed=false`.
-
-Official artifact:
-
-    /lambda/nfs/brazil-rv-east3/quant-data/b3/processed/model_runs/next_stage_official_921dd3a_20260821T085500Z
-
-The practical research conclusion is that the current causal feature set is
-plateaued near the established recent-regime IC. The next high-value investment
-belongs in new data and deployment adaptivity rather than another architecture
-rewiring of the same inputs.
-
-Deletion-first cleanup restored `research/src` and `research/tests` byte-for-byte
-to accepted pre-experiment commit `a91c068`. Rejected diagnostic, sidecar,
-variant, campaign, and confirmation code remains reproducible through commits
-`c0d0598`, `3b60ac9`, and `921dd3a` plus the immutable artifacts, not through
-compatibility code on current HEAD. The cleaned suite passed 185 research tests
-and 24 collector invariants (209 total), and Ruff passed.
-
-The paid next-stage instance was `c6e81d007b354af98eaeec598902543c` in
-`us-east-3`. Lambda accepted termination after cleanup commit `09c0d12` was
-pushed, then two provider inventory checks confirmed zero matches for the exact
-ID. Persistent sidecar, discovery, and official-confirmation artifacts remain on
-`brazil-rv-east3` NFS.
-
-## Final EMA residual-stack reanalysis (2026-08-21)
-
-The replicated positive EMA-0.995 secondary readouts triggered one final
-zero-training, predeclared comparison. On each discovery fold, the candidate kept
-the same three cross-fitted parent Patience members and changed only the three
-residual members from cross-fitted Raw Patience-3 to fixed final EMA-0.995. The
-gate required at least `+0.001` candidate-minus-comparator IC on each fold before
-any additional official access.
-
-Fold A gained `+0.000352` (`0.049103` versus `0.048751`) and failed the gate;
-its 120-minute delta was `-0.001288` and both block intervals crossed zero. Fold B
-gained `+0.002300` (`0.053006` versus `0.050706`) with both intervals wholly
-positive. The mean gain was `+0.001326`, but mean performance could not override
-the both-fold contract.
-
-No official-validation or held-out-test artifact was opened. The immutable result
-is:
-
-    /lambda/nfs/brazil-rv-east3/quant-data/b3/processed/model_runs/ema_residual_stack_84ae363_20260821T114900Z
-
-This closes the model-side program: EMA is genuinely helpful for the residual
-stack in one discovery period, but the effect did not replicate strongly enough
-under the same guardrail used throughout the program.
-
-Deletion-first cleanup removed the one-use analyzer and tests. Reproduction uses
-commit `84ae363` and the immutable artifact; current canonical source/tests match
-pre-experiment commit `68c6301` exactly and pass the 209-test suite plus Ruff.
-
-The paid analysis instance `3985e78591e349549f7c99971c86fa9e` was terminated
-after cleanup commit `7a6590e` reached GitHub. Two provider inventory checks
-confirmed the exact ID was absent; the immutable NFS artifact persists.
-
-## Designated challenger and cleanup state (2026-08-21)
-
-The EMA-member stack is retained as a standing challenger, not as the canonical
-recipe. It is the uniform rank average of three honest odd/even cross-fitted
-parent Raw-Patience members and three Experiment-18 stronger-residual members at
-fixed final EMA-0.995, seeds 11/29/47. The residual target is the audited
-WIN+WDO+ready-DI-level residual rank; auxiliary soft-Spearman weight is 0.5 and all
-other hyperparameters are frozen to the `3b60ac9` manifests.
-
-Future fold screens use
-`modeling.designated_challenger.compare_discovery_screen`. It emits candidate
-deltas against both canonical parent and challenger, but its machine-readable
-selection contract keeps retention keyed only to the canonical parent and forbids "beats either" selection. The challenger receives an official comparison only as
-part of the next official read independently justified for a future stage winner.
-Its saved official final-EMA payloads remain reserved; the test lockbox is sealed.
-
-Lambda storage was compacted from 148.513 GiB to 18.815 GiB by deleting 5,928
-exactly enumerated objects (129.699 GiB). Raw/interim data, the canonical causal-TOD
-store, all parent epoch predictions needed for cross-fit Patience, and the exact
-discovery/official challenger payloads were verified after deletion. Closed
-campaigns retain lightweight manifests, metrics, and analyses; deleted training
-intermediates require rerunning their recorded commits. The immutable cleanup
-manifest and exact delete list are at:
-
-    /lambda/nfs/brazil-rv-east3/quant-data/b3/processed/model_runs/_retention/storage_cleanup_20260821
-
-No paid Lambda instance was active. Provider byte accounting lagged immediately
-after deletion, but the complete object listing measured 20,202,855,773 bytes.
-
-## Experiment 43 official-read closure (2026-08-24)
-
-The frozen official read compared canonical parent-3 Raw Patience-3 against the
-stored six-member residual challenger and the Experiment-41 store-v2 mask
-retrained on all 716 training dates. Canonical scored `0.041639843`; challenger
-scored `0.042093822` (`+0.000453978`), and store-v2 scored `0.043235373`
-(`+0.001595530`). Their paired block-10 95% intervals versus canonical were
-`[-0.000684798,+0.001534552]` and
-`[-0.000294105,+0.003434960]`. Neither lower bound exceeded zero, so neither arm
-was promoted. Canonical remains deployed and the conditional seven-seed
-expansion was not run.
-
-The immutable result root is:
-
-    /lambda/nfs/brazil-rv-east3/quant-data/b3/processed/model_runs/official_read_c04ea91_20260824T140900Z
-
-It retains all 63 official prediction archives, both full analyses, the frozen
-decision, deployed recipe, validation-access ledger, and exact source/output
-hash inventories. A reviewed post-decision cleanup removed only the 60
-non-deployed store-v2 checkpoints. This was validation-access event 3; the
-held-out test remains sealed and every manifest records `test_accessed=false`.
-
-Result commit `880a66e` reached GitHub before exact paid GH200 instance
-`c2da7efd0ab645178a847aad8fdf12c8` was terminated. Two consecutive provider
-inventory reads confirmed it absent and the account at zero active instances.
-
-## Experiment 45 consolidation-read closure (2026-08-25)
-
-Official-validation access event 4 completed the deployment decision that
-Experiments 43 and 44 had earned. Fresh store-v2 seeds 11/29/47 scored
-`0.043239945`, reproducing the retained Experiment-43 comparator
-(`0.043235373`) within `+0.000004572` and passing the informational sanity
-band. The exact ten-seed expansion scored `0.043718770`, a
-`+0.000478826` gain over fresh three, and passed the frozen deployment rule.
-
-The blind `e2_plus_archive` consensus realized all frozen members and scored
-`0.043916831`, but its paired block-10 95% interval versus the comparator was
-`[-0.000853732, +0.002373780]`. The superiority gate therefore failed. Arm 2
-was not promoted, no hybrid was evaluated, and the deployed measured recipe is
-the uniform tie-aware rank ensemble of store-v2 Raw Patience-3 seeds
-`11/29/47/61/79/97/113/131/149/167`.
-
-The immutable result root is:
-
-    /lambda/nfs/brazil-rv-east3/quant-data/b3/processed/model_runs/consolidation_read_e2eb713_20260825T105134Z
-
-All 18 trajectories, 298 prediction archives, 18 references, paired analyses,
-seed-correlation/gain diagnostics, promotion decision, deployed recipe, and
-event-4 access ledger are retained. The deployed recipe records and preserves
-20 selected/final checkpoints / 90,194,220 bytes. A completion audit rehashed
-730 manifest-bound outputs / 32,334,740,807 bytes and passed at SHA-256
-`52239ea7db0b0051cfdb8c25bb17ff1c64a89560f0a41ff6226dfd928ac618e7`.
-Every access artifact records `test_accessed=false`; the held-out test remains
-sealed.
-
-The two 30-minute specialists required a score-neutral finalization repair:
-their untrained 60/120-minute metric fields were encoded as JSON `null` from
-already-saved predictions after strict JSON rejected NaN. No official source
-was reopened and no frozen score, gate, member, or weight changed. The repair
-audit SHA-256 is
-`28f64727d2d6bb949fe3a0d0bd5b461ec14f9b0c51db7393c5ca7c7bfe864ce4`.
-
-After result commit `d09da27` reached GitHub, a reviewed cleanup removed only
-the 84 checkpoint files / 370,484,520 bytes belonging to the eight
-non-deployed jobs. It retained every prediction/reference/analysis and all 200
-checkpoints / 901,942,200 bytes belonging to the ten deployed measured jobs,
-including the 20 required selected/final checkpoints. Plan and passing
-postcheck SHA-256 values are
-`f7ec92ed63c837b28539c75e48890ee77ec378dcba42de65db6fb0aef06ee19b`
-and `22e44bde683993387e60f7347bc16ea437fc8e426fb8f792be3e693eec0bf37a`.
-
-The user explicitly requested that paid GH200 instance
-`d0ebcd5f7dbb44dc99370080df7b47cc` stay active for the immediately following
-experiment, overriding the registration's normal terminate-on-closure step.
-
-## Experiment 46 cross-equity closure (2026-08-25)
-
-The fixed monthly peer graph, N0 rotation, eight-field F2 screen, and
-conditional nine-trajectory F3 screen completed without opening official
-validation or the held-out test. N0 did not support neutralization and did not
-trigger T-peer. F2 selected four fields: peer-relative 60-minute and
-prior-session returns, peer-mean 60-minute return, and peer-dispersion
-60-minute return.
-
-F3 failed both registered paths. Standalone Fold C/A/B deltas were
-`+0.000054345/+0.000347304/-0.000881236`, mean `-0.000159862`; pooled block-5
-and block-10 95% intervals both included zero. Parent-plus-candidate mean was
-`-0.000007868`. No official-read arm was registered and deployment remains the
-Experiment-45 measured ten-seed store-v2 ensemble. The nine candidate final
-EMA-0.995 members are retained only as eligible inputs to a future frozen
-ensemble-pool registration.
-
-The result root is:
-
-    /lambda/nfs/brazil-rv-east3/quant-data/b3/processed/model_runs/cross_equity_46_affea34_20260825T170000Z
-
-All 552 pre-cleanup artifacts / 9,806,864,144 bytes were hashed and audited;
-the completion audit passed at
-`2f82faef622882768af07aeec9e3e750b195c5f49c5929f9344f5da52ab2b74b`.
-The reviewed post-result cleanup removed 156 redundant checkpoints /
-705,303,300 bytes and retained all 180 prediction archives plus the 24 exact
-epoch-20/whole-fold/cross-fit-selected checkpoints. Its postcheck passed at
-`68ab557488c49895821c62a38045581c5daa4d696b579e64848e30dc42a97427`.
-Operational repair `f565933` resumed analysis from the nine immutable
-completed trajectories after decoupling the store-v2 retention parent from an
-obsolete challenger-embedded parent check; it changed no score or rule.
-
-Paid GH200 instance `d0ebcd5f7dbb44dc99370080df7b47cc` must remain active for
-the user's next experiment. Do not terminate it at this closure.
+| Historical C6, flexible 45% net cap, 1,738 continuous sessions | 6.70751 bps/day above CDI; zero-rate Sharpe 1.88147 | Historical reference; corrected continuous counterpart is unrun |
+| Eight-period attention baseline plus separate account/source overlays, neutral 5% net cap | Attention 64: 3.01618 vs attention 96: 1.92001 bps/day above CDI | Working return baseline; independent period accounts, not one continuous account |
+| Earlier corrected four-period capacity screen | Two-layer GRU: 1.79771 bps/day above CDI | Positive mean, only 1/3 seeds and 2/4 periods improved; not adopted |
+
+The earlier attention 128/GRU 96 width screens and depth candidates did not pass
+their registered gates. The original compiler-corrupted GRU96 results are excluded;
+qualified replacement results exist. These findings do not prove scaling cannot
+work. No new capacity model has been adopted.
+
+Earlier parent stopping is a demonstrated **partial mechanism** for the attention
+reversal: the seed29/F10 patience probe improved seed/ensemble net return by
+7.04780/2.36412 bps/day, but remained negative above CDI. That outcome-informed
+diagnostic is not an adopted general stopping rule. A real tiny hedge-trade/minimum
+fee defect was fixed, but its measured effects were too small to explain the main
+reversal. The current matched stopping experiment is the broader test.
+
+Training already uses the full permitted chronological past. Four evaluation
+periods never meant training on only four short windows. Current evaluation folds:
+**F2/F3/F6/F7/F10/F11/F13/F14**. Reserve **F1/F4/F5/F8/F9/F12** from new corrected
+comparisons unless a subsequent explicit decision changes this boundary. They
+were used historically: do not call them untouched tests. **No 2025/2026 consumer
+reads.** Never splice disjoint periods into a supposedly continuous account.
+A fully corrected 1,738-session reference would require currently reserved periods.
+
+## 2. What is running
+
+At the snapshot: **26 completed logical jobs / 24 actual fits**, including all six
+parents. Last completed: `TE_wide_p20/F/F3/29`; active: `TE_full_p5/F/F3/47`.
+The continuation reported four complete three-seed forecast groups. Refresh these
+numbers from disk; they are not a persistent completion claim.
+
+| Job | Pinned checkout and commit | Actual Python PID at snapshot |
+|---|---|---:|
+| GPU attention | `C:/Brazil-RV/.worktrees/attention-stopping-resume`, `b49b19ff81c1119698379e739d29d4390f2b3a71` | 17812 |
+| Finite evaluation/next-stage continuation | `C:/Brazil-RV/.worktrees/scaling-evaluation`, `fdd354a9e5cf4a32e042b5a2aca3e18a87493f21` | 24568 |
+
+GPU entry point: `ops/run_matched_stopping.py` in its pinned checkout.
+Continuation entry point:
+`C:/quant-data/b3/processed/model_runs/v2_attention_stopping_20260921/continue_comparison.py`.
+
+Windows uv launches an environment-Python wrapper and the actual interpreter.
+Three related OS processes can represent **one job**. Inspect full command lines
+and parent IDs; never kill or restart based on a stale PID or log alone.
+
+The continuation evaluates completed attention groups on CPU, waits for the GPU
+worker to exit, eagerly verifies every distinct new attention checkpoint on its
+own evaluation dates, qualifies books, and summarizes results. It then runs the
+54 C6/GRU fits sequentially and evaluates neutral/flexible policies. It stops on
+errors or at `comparisons_saved_pending_exposure_review_and_capacity_decision`.
+
+It is **one finite offline job**, not a recurring automation. The user disabled
+the one-minute heartbeat. Do not recreate it, repeatedly restart chats, or pause
+for routine permission questions. Inspect healthy workers briefly and use time
+for necessary independent work. Notify meaningful findings, failures or decisions.
+
+The initial attention driver stopped because JSON sorting put the `p20` alias
+before its `p5` source fit. `ordered_arms()` now orders reference/patience explicitly;
+four tests passed. All six parents and two completed children were reused. Resolve
+`scaling_matched_stopping_resume` for exact failure/resume evidence. No learning
+rule or model equation changed. The active log is **training_resume.log**, not
+the original failed training.log.
+
+### Safe status commands (read-only)
+
+```powershell
+$repo = 'C:/Brazil-RV/quant/b3-quant'
+Set-Location $repo
+$run = Get-Content -LiteralPath "$repo/docs/v2_economic_data_scaling_run.json" -Raw | ConvertFrom-Json
+$plan = Get-Content -LiteralPath $run.scaling_matched_stopping_plan.path -Raw | ConvertFrom-Json
+$attentionRoot = $plan.root
+Get-CimInstance Win32_Process |
+    Where-Object { $_.Name -match '^(python|uv)\.exe$' } |
+    Select-Object ProcessId,ParentProcessId,Name,CommandLine
+nvidia-smi --query-gpu=name,memory.total,memory.used,utilization.gpu --format=csv
+$progress = Get-Content -LiteralPath "$attentionRoot/refits.json" -Raw | ConvertFrom-Json
+$progress | Select-Object status,actual_fits,logical_jobs
+$progress.completed.Count
+$progress.completed | Select-Object -Last 2
+Get-Content -LiteralPath "$attentionRoot/training_resume.log" -Tail 8
+Get-Content -LiteralPath "$attentionRoot/continuation_progress.json"
+Get-Content -LiteralPath "$attentionRoot/continuation.log" -Tail 8
+```
+
+## 3. Relevant locations and authority
+
+Repository-relative paths below are under **C:/Brazil-RV/quant/b3-quant**.
+Its physical location is **C:/quant/b3-quant**: these are the same repository,
+not copies. `C:/Brazil-RV/quant-data` points to `C:/quant-data`, and
+`C:/Brazil-RV/Trading` points to `C:/Trading`.
+
+| Path | Purpose |
+|---|---|
+| `C:/Brazil-RV/AGENTS.md` | Workspace engineering/data/leakage rules |
+| `PROJECT_CONTEXT.md` | Canonical startup contract; read before material changes |
+| `research/preregistrations/v2_economic_data_scaling.md` | Authorized experiments and gates; reread after each stage/GPU wave |
+| `docs/v2_economic_data_scaling_run.json` | Canonical path/hash index; resolve plans/inputs from here |
+| `docs/v2_economic_data_scaling_progress.md` | Current decision summary and historical evidence |
+| `docs/v2_SCALING_INVESTIGATION.md`, `docs/v2_ATTENTION_REVERSAL_DIAGNOSTICS.md` | Investigation scope/findings |
+| `docs/v2_PERFORMANCE_COMPARABILITY.md`, `docs/v2_CAPACITY_RESULTS.md` | Comparable metrics and previous capacity outcomes |
+| `docs/v2_scaling_data_inputs.json`, `docs/v2_scaling_store_contract.json` | Current store acceptance and checkpoint compatibility |
+| `docs/v2_SCALING_DATA_REPAIRS.md` | Completed added-period data repairs |
+| `docs/v2_CORPORATE_ACCOUNT.md`, `docs/v2_ECONOMIC_ACCOUNT_ACCEPTANCE.md` | Account hypotheses and bounded admission |
+| `docs/v2_COMPILED_SCORE_FAILURE.md` | Compiler correction and qualified scope |
+| `docs/v2_STORAGE_CLEANUP.md`, `docs/v2_strong_cleanup.json` | Cleanup/recovery catalog |
+| `research/pyproject.toml`, `research/uv.lock`, `research/.venv` | Research environment, separate from collector tooling |
+| `ops/` | Existing frozen-plan drivers, audits and summaries |
+| `research/src/brazil_rv/v2/` | Models, training, data consumers and evaluation |
+| `research/src/brazil_rv/execution/` | Accounts, allocation, loans, settlement and custody |
+| `C:/quant-data/b3/interim/ti` | Active short-path compiler cache; preserve during jobs |
+| `C:/quant-data/b3/raw/`, canonical source archives, `C:/Trading/` | Immutable sources/broker installation; do not modify |
+
+Current resolved inputs/outputs, for orientation; resolve pointers before use:
+
+- Fresh-fit store: **C:/quant-data/b3/processed/v2_scaling_store_20260921**.
+  Manifest SHA256
+  `e0dfad778e09ffac81a6212dbb99a22555f7dbb6ff0020c5400b7025f8862efd`.
+  Both `scaling_data_inputs` and `economic_refit_inputs` now select its acceptance.
+  Earlier matched/composed/Natura/foundation stores remain immutable.
+- Attention root: **C:/quant-data/b3/processed/model_runs/v2_attention_stopping_20260921**.
+  Contains plan.json, refits.json, parents/, fits/, evaluation/, refit_economics/,
+  ordering_resume/, training/continuation logs and the finite continuation script.
+- Common-model root: **C:/quant-data/b3/processed/model_runs/v2_common_model_comparison_20260921**.
+  Contains refit_plan.json, neutral/plan.json and flexible/plan.json. Fits and
+  training.log will appear as the queued stage runs.
+- Evidence/recovery root: **D:/quant-data/b3/processed/model_runs/v2_economic_data_scaling_20260919**.
+  The investigation lives under scaling_investigation/. Many canonical dependencies
+  are on D:, not merely in the C: junction. Do not scan all quant-data recursively.
+
+Relevant keys in the main run pointer:
+
+```text
+scaling_data_inputs                 scaling_input_recovery
+scaling_matched_stopping_plan       scaling_matched_stopping_resume
+scaling_matched_stopping_evaluation_plan
+scaling_continuation_plan           scaling_refit_economics
+scaling_common_model_plan           scaling_common_evaluation_plans
+economic_account                   stage_d_compiler_acceptance
+scaling_expanded_results            scaling_strong_cleanup
+```
+
+Qualification/result pointers appear when their stages finish. Do not substitute
+an old experiment's report for a missing new result. Use
+`brazil_rv.v2.data_repair.bound_json` for hash-bound JSON and
+`binding`/`artifacts.write_json_atomic` for new bindings. Preserve frozen plans;
+register justified amendments separately, never edit a hash to silence a mismatch.
+Current pointers, accepted contracts and live status supersede old narrative queues.
+
+## 4. The “merge to GitHub” rule
+
+**Completed work must reach GitHub main. A local change, local commit, branch or
+unmerged PR alone is not completed delivery.** Routine integration is already
+authorized; do not repeatedly ask permission to carry it through.
+
+1. Implement the smallest correct change and run appropriate targeted checks.
+   Freeze experiments before outcomes. Preserve failed/skipped attempts honestly.
+2. Archive/hash recoverable new evidence on D:, verify recovery, and update
+   accepted pointers/reports. Keep large datasets/checkpoints out of Git; do not
+   duplicate immutable inputs into every recovery package.
+3. Commit reviewed files. If work was on a branch/worktree, integrate into main
+   and resolve conflicts without losing another job's/user's changes. A normal
+   documentation change may be committed directly on main.
+4. Push main to **https://github.com/gabrool/brazil-rv.git**.
+5. Verify local HEAD, origin/main and the GitHub API SHA agree; inspect worktree
+   status. If publication fails, retain work and report the failure. Do not claim
+   it is merged or use force-push to conceal a mismatch.
+
+```powershell
+Set-Location 'C:/Brazil-RV/quant/b3-quant'
+git diff --check
+git status --short
+# Stage only reviewed task files, then commit/integrate as appropriate.
+git push origin main
+$localCommit = git rev-parse HEAD
+$originCommit = git rev-parse origin/main
+$githubCommit = gh api repos/gabrool/brazil-rv/commits/main --jq .sha
+if ($localCommit -ne $originCommit -or $localCommit -ne $githubCommit) {
+    throw 'Local/origin/GitHub main do not match'
+}
+git status --short
+```
+
+Starting main for this handoff was
+`b5e937613da41afe762710b340b07fdd9e03c70e`, verified on GitHub. This document is a
+subsequent documentation change; resolve HEAD for new work rather than pinning
+everything to that starting SHA.
+
+Financial fits require a **clean, commit-bound runtime checkout**. Keep running
+and queued numerical checkouts pinned. Do not edit, pull, merge, reformat or
+upgrade dependencies underneath them. Main can advance independently. Their
+older frozen commits are intentional. Never bypass the clean-worktree guard.
+Exact-byte bindings also matter: CRLF/LF conversion has caused source-hash
+mismatches. Restore frozen bytes only after proving normalized source identity
+and retaining that evidence; do not weaken provenance checks.
+
+## 5. Running efficiently on the RTX 2060
+
+Verified installed stack: **RTX 2060, 6,144 MiB VRAM; Python 3.12.13;
+PyTorch 2.6.0+cu126; triton-windows 3.2.0.post21**. Use
+`C:/Brazil-RV/quant/b3-quant/research/.venv` through uv. Windows pins differ from
+the old Linux/GH200 environment. Do not install globally or casually upgrade this
+working compiler stack. Routine commands use `--no-sync`; rebuild/sync from the
+existing lock only when needed and no affected job is running.
+
+The current code already implements the important optimizations:
+
+- **One persistent GPU worker, sequential fits.** Reuse process/cache/immutable
+  inputs, with model, optimizer, RNG and compiler state reset at fit boundaries
+  by the existing driver. Never compete for 6GB VRAM with a second fit or manual
+  GPU verification while the continuation owns the queue.
+- **FP16 autocast on Turing; FP32 parameters, moments and losses.**
+  `round7_training.autocast_dtype` intentionally selects FP16 here. Do not force
+  BF16 because an API reports emulated support. Keep gradient scaling, unscaling
+  before SAM perturbation/clipping, and exact same-batch/RNG overflow retries.
+  Skipping an update changes the registered learning contract.
+- **Inductor default mode on Turing.** `train.compile_forward()` maps expensive
+  max-autotune requests to default on this GPU. Keep compiled forward/backward
+  and losses, the dynamic date dimension, stable stage-wide name padding and
+  dynamic CUDA-graph safeguards. Do not force capture on sparse dynamic paths.
+- **Preserve the qualified ATen LayerNorm forward/backward fallback.** A fused
+  GRU96 residual-normalization kernel demonstrably read uninitialized temporary
+  memory. The correction is in compile_forward(), not an optional speed tweak.
+  Finite scores/high GPU utilization do not prove correct forecasts; retain the
+  registered eager/saved-score checks for new runs.
+- **Exact compact session/security caching.** DateTensorCache stores histories
+  once and gathers causally instead of materializing all overlapping 60-session
+  windows. Balanced batches visit every fit date once per epoch, with at most
+  16 dates per batch. Compact identity-aware padding retains every eligible name;
+  it does not authorize security subsampling or truncated history.
+- **Single-thread CPU math:** OMP/OpenBLAS/MKL=1 and torch.set_num_threads(1).
+  The existing CPU account continuation can overlap GPU training.
+- **Short cache path:** C:/quant-data/b3/interim/ti. Default Windows temp paths
+  produced an unwritable 264-character Triton artifact; the qualified short path
+  fixed it. Do not clear the active cache mid-run.
+- **Measure cold and warm time separately.** Use manifests, preparation/cache
+  bytes, epoch logs and peak CUDA memory. Recent attention steady epochs are
+  roughly 4–6 seconds in observed jobs; initialization, compilation, selection,
+  export and verification add time. This is not another graph/fold's fit ETA.
+
+Never gain speed by dropping names, shortening history, shrinking the 60-epoch
+maximum/LR schedule, changing seeds/losses or reducing validation. Such changes
+require separate frozen contrasts. Reuse passed source/consumer/account proofs;
+do not repeat large matrices merely to create a new checkpoint.
+
+Current attention P recipe: LR 1e-4, SAM rho 0.125, executed patience 20 with
+patience 5 prefix views. F: ASAM rho 0.2, eta 0.01, patience 5. Both retain max/schedule 60,
+minimum improvement 1e-4 and transferred LR multiplier 0.3. EMA half-life 1 is
+separately recorded; raw checkpoint selection and earlier ties remain. The C6
+slow parent has its own original stopping/selection cadence; do not replace it
+with the attention recipe. Read the frozen plans for full recipe details.
+
+### Recovery-only launch example: do not run while the worker exists
+
+First inspect processes and the failing/incomplete fit. Preserve logs/artifacts.
+Completed manifests are reused; an incomplete fit can resume only from a matching
+resume.pt with optimizer/scaler/RNG state. The trainer rejects incomplete output
+without resumable state. Never delete that evidence or bypass the guard.
+
+```powershell
+$repo = 'C:/Brazil-RV/quant/b3-quant'
+$checkout = 'C:/Brazil-RV/.worktrees/attention-stopping-resume'
+$run = Get-Content -LiteralPath "$repo/docs/v2_economic_data_scaling_run.json" -Raw | ConvertFrom-Json
+$plan = Get-Content -LiteralPath $run.scaling_matched_stopping_plan.path -Raw | ConvertFrom-Json
+$busy = @(Get-CimInstance Win32_Process | Where-Object {
+    $_.Name -match '^(python|uv)\.exe$' -and
+    $_.CommandLine -match 'run_matched_stopping\.py|compare_common_models\.py|run_economic_refits\.py|brazil_rv\.v2\.train\b'
+})
+if ($busy.Count) { throw 'Training already exists; inspect it instead of duplicating it' }
+Set-Location $checkout
+git status --short
+# Verify expected commit and frozen driver/runtime hashes before continuing.
+$env:PYTHONPATH = "$checkout/research/src;$checkout/ops"
+$env:PYTHONUTF8 = '1'
+$env:OMP_NUM_THREADS = '1'
+$env:OPENBLAS_NUM_THREADS = '1'
+$env:MKL_NUM_THREADS = '1'
+$env:TORCHINDUCTOR_CACHE_DIR = 'C:/quant-data/b3/interim/ti'
+$stamp = Get-Date -Format 'yyyyMMdd_HHmmss'
+uv run --project "$repo/research" --no-sync python -u ops/run_matched_stopping.py `
+    *> "$($plan.root)/training_recovery_$stamp.log"
+```
+
+Explicit PYTHONPATH is essential: the shared environment's editable package
+otherwise resolves main instead of necessarily the pinned checkout. Check imported
+module paths when isolating a runtime. The current resume driver SHA256 is
+`627aa5e2fcd9f3793f32d1774597165d986a97abf84dd012ec09f96c30a951ef`.
+Do not invoke --freeze again for an already frozen experiment.
+
+The finite continuation has a different checkout and must remain unique. If it
+stops, inspect continuation_progress.json and its log before resuming. Its entry
+point is continue_comparison.py under the attention root, with PYTHONPATH pointing
+to scaling-evaluation/research/src and scaling-evaluation/ops. It launches
+ops/compare_common_models.py itself; do not independently launch that queued job.
+Replay scripts can default to older plans: use explicit current bindings.
+
+## 6. Assumptions, safeguards and remaining limits
+
+- Account: ordinary domestic corporate CNPJ, R$10m primary, R$1m/R$5m checks.
+  100% historical CDI on eligible settled short proceeds, zero execution brokerage
+  and CDI-plus-zero debit spread are favorable **negotiated research hypotheses,
+  not obtained quotes**. Do not impose retail loan-turnover penalties, fund
+  discounts or an invented required zero-interest admission case.
+- Separate dated B3 spot/loan/custody charges, rent/intermediation, brokerage,
+  shortfall, free/proceeds income and actual settled debit financing. Never add
+  B3 to the old bundled4bp or double-charge invoice adjustments. Preserve
+  settlement, prior-close funding, loan cohorts and pending obligations.
+- Independent source/arithmetic/causality checks support the bounded contracts;
+  they do not prove every historical datum or broker term. Linx's held2021
+  BDR/cash valuation and some delivery/fraction/lender terms remain explicit.
+  Apply frozen bounds when actual books are exposed; zero-exposure controls are
+  not quantitative bounds on held positions.
+- Old models/forecasts keep their old model coordinates. Account-only replays
+  shallow-copy frozen PolicyData and change admitted inputs explicitly; never
+  regenerate static coordinates. New stores require fresh training conditioning
+  and compatible new P parents. Equal schema shape is not checkpoint compatibility.
+- Preserve all 933 permanent identities, 3,717 accepted dates, 2009 warmup/full 60-session
+  history. Tickers are dated attributes. Keep effect/knowledge/custody/payment
+  separate. A spot rename is not a loan alias or permission to pool acquired
+  companies' filings/history.
+- No invented OHLC, quotes, fills, locates or exact endpoints; no forward-filled
+  “observed” bars, entry-bar features, future-fitted scalers or current constituents
+  used historically. Unit-uncertain denominators stay unsupported until sourced
+  evidence resolves them. Do not relax thresholds to obtain better results.
+- Freeze contrasts before outcomes. Preserve failed/skipped attempts and separate
+  source/account/data/refit attribution. Report net-above-CDI, labelled currency-
+  consistent Sharpes, drawdown, seeds/periods, paired 20/40/60-session uncertainty
+  (40 primary), turnover and holding information. Validation gains alone do not
+  rule out selection bias or implementation errors; investigate concrete causes.
+- **No Lambda/cloud compute, deployment, live/forward capture, new subagents,
+  automatic extra seeds or unregistered broad grids.** At most two new candidate
+  cells per registered capacity wave. Reread registration before it.
+
+## 7. Implementation map, storage and delivery discipline
+
+All entries below are repository-relative; read actual call sites before editing.
+
+| File(s) | Responsibility |
+|---|---|
+| `ops/run_matched_stopping.py`, `ops/test_matched_stopping.py` | Current attention execution, prefix selection/reuse and ordering tests |
+| `ops/compare_common_models.py`, `ops/run_economic_refits.py` | C6/GRU plan and shared fit driver |
+| `ops/verify_attention_forecasts.py` | Own-store eager forecast verification |
+| `ops/replay_data_refits.py`, `ops/qualify_refit_books.py`, `ops/summarize_scaling_comparison.py` | Explicit-plan books, saved arithmetic and comparisons |
+| `research/src/brazil_rv/v2/round7_training.py`, `research/src/brazil_rv/v2/train.py` | Recipes/caches/SAM/resume and compiler/sampling/splits |
+| `research/src/brazil_rv/v2/characteristic_model.py`, `research/src/brazil_rv/v2/temporal_pathway.py`, `research/src/brazil_rv/v2/model.py` | Attention/GRU and C6 graphs |
+| `research/src/brazil_rv/v2/data.py`, `research/src/brazil_rv/v2/store.py`, `research/src/brazil_rv/v2/round7_preprocessing.py` | Causal consumers, virtual targets, training-only conditioning |
+| `research/src/brazil_rv/execution/portfolio_account.py`, `research/src/brazil_rv/execution/stateful_ledger.py`, `research/src/brazil_rv/execution/portfolio_policy.py` | Actual account/allocation paths; supporting loan/custody modules are alongside |
+
+Use uv run --project research --no-sync for targeted pytest/Ruff commands from
+main, with PYTHONPATH set to the intended source/ops. Protect important invariants
+instead of maximizing test count. Keep code lean; avoid new frameworks,
+dependencies, compatibility shims or repeated upstream checks. Evolve canonical
+implementations and use Git for history. PROJECT_CONTEXT is for durable contracts
+and accepted decisions, not a per-action changelog.
+
+The user authorizes aggressive cleanup of stale files. The last pass reclaimed
+**70.55 GB** (10.21 GB deleted, 60.33 GB losslessly compressed), including 52 inactive
+checkouts. Only main and the two active checkouts remain. Historical paths in old
+reports can therefore be absent; recreate from recorded commits only when needed.
+Compressed evidence keeps its decoded hashes/paths, with extra read/decompression
+cost for cold artifacts.
+
+Resolve scaling_strong_cleanup for exact catalogs. Metadata recovery:
+`D:/quant-data/b3/processed/model_runs/v2_economic_data_scaling_20260919/scaling_investigation/storage/strong_cleanup_20260921.zip`,
+SHA256 `61329d534452bc509f1297724b88cf9e872f9148ddbacd6691c15ba4adb031f8`.
+Selected weights and forecasts remain online. Retired intermediate objective
+weights/optimizer states restore from the prior verified full tar, not that small
+metadata ZIP. Do not delete active caches/current parents/unique evidence/raw
+archives/accepted stores. Resolve exact intended Windows roots before recursive
+deletion, and avoid following junctions into protected locations.
+
+**Next:** refresh the two jobs and let healthy work continue. Investigate actual
+failures while reusing completed fits. Review attention verification and matched
+comparisons, then the queued C6/GRU/policy results. Check actual exposure limits
+and all seeds/periods before choosing a capacity contrast. Deliver recoverable
+evidence, a clear statement of the best comparable model and remaining uncertainty,
+and verified GitHub-main integration. One audit, cleanup or model wave does not
+complete the whole research program.
