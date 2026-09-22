@@ -3,9 +3,14 @@
 The round-7 trainer selects the raw checkpoint with the best mean common-population
 D3/D5/D10 IC on a 55-session selection window whose D10 labels end ten sessions
 early, so at most 45 defined days decide a fit. These helpers quantify how well that
-statistic can distinguish neighbouring epochs, and implement the trailing-window
-smoothed selection score used by ``TrainingRecipe.selection_smoothing``. Nothing
-here reads evaluation labels; every input is a saved fit/selection history.
+statistic can distinguish neighbouring epochs, and define post-hoc selection
+*views* over an executed trajectory: alternative rules applied to the saved
+per-epoch selection scores, binding already saved epoch checkpoints. Views change
+no gradient, schedule, sampler or RNG, so they are labelled selections of one
+executed fit, never independent fits (the convention of the matched stopping
+experiment). The trainer itself is untouched so that the inference-provenance
+guard keeps accepting every existing checkpoint. Nothing here reads evaluation
+labels; every input is a saved fit/selection history.
 """
 
 from __future__ import annotations
@@ -66,6 +71,134 @@ def _daily(record):
         [np.nan if v is None else float(v) for v in record["selection"]["daily_ic"]],
         dtype=np.float64,
     )
+
+
+def _scores(history):
+    if not history:
+        raise ValueError("history is empty")
+    epochs = [int(r["epoch"]) for r in history]
+    if epochs != list(range(1, len(epochs) + 1)):
+        raise ValueError("history epochs must be consecutive from one")
+    return epochs, [float(r["selection"]["mean_ic"]) for r in history]
+
+
+def raw_prefix_view(history, *, patience, minimum_improvement):
+    """The original selector applied only to the prefix through its stopping point.
+
+    This is the matched stopping experiment's ``stopped_selection`` rule: a raw
+    improvement resets the stale count, ``patience`` stale epochs end the view,
+    and later epochs are never inspected.
+    """
+    epochs, scores = _scores(history)
+    best, selected, stale, considered = float("-inf"), None, 0, 0
+    for epoch, value in zip(epochs, scores, strict=True):
+        if stale >= patience:
+            break
+        if value > best + minimum_improvement:
+            best, selected, stale = value, epoch, 0
+        else:
+            stale += 1
+        considered = epoch
+    if selected is None:
+        raise ValueError("no epoch improved on the initial score")
+    return {
+        "rule": "raw",
+        "patience": int(patience),
+        "minimum_improvement": float(minimum_improvement),
+        "selected_epoch": int(selected),
+        "selection_score": float(best),
+        "epochs_considered": int(considered),
+        "stop_reason": "patience" if stale >= patience else "trajectory_end",
+    }
+
+
+def smoothed_view(history, *, window, patience=None, minimum_improvement=0.0):
+    """Trailing-window mean selection score; the best window's centre epoch is chosen.
+
+    With ``patience`` the smoothed score also decides stopping, so the view sees
+    only its own prefix. Without it the whole executed trajectory is scanned, and
+    the view is truncated wherever the executed stopping rule ended the fit.
+    """
+    epochs, scores = _scores(history)
+    smoothed, centres = smoothed_selection(scores, window)
+    best, selected, stale, considered = float("-inf"), None, 0, 0
+    for index, (score, centre) in enumerate(zip(smoothed, centres, strict=True)):
+        if patience is not None and stale >= patience:
+            break
+        if score > best + minimum_improvement:
+            best, selected, stale = float(score), epochs[int(centre)], 0
+        else:
+            stale += 1
+        considered = epochs[index]
+    if selected is None:
+        raise ValueError("no epoch improved on the initial score")
+    return {
+        "rule": f"smoothed{int(window)}",
+        "window": int(window),
+        "patience": None if patience is None else int(patience),
+        "minimum_improvement": float(minimum_improvement),
+        "selected_epoch": int(selected),
+        "selection_score": float(best),
+        "epochs_considered": int(considered),
+        "stop_reason": (
+            "patience"
+            if patience is not None and stale >= patience
+            else "trajectory_end"
+        ),
+    }
+
+
+def raw_selected_epoch(history):
+    """The epoch the trainer selected: the last record flagged as an improvement."""
+    epochs, scores = _scores(history)
+    flagged = [int(r["epoch"]) for r in history if r.get("selected")]
+    if flagged:
+        return flagged[-1]
+    return epochs[int(np.argmax(scores))]
+
+
+def epoch_views(history, rules=("raw", "centre3", "top3", "around3")):
+    """Epoch sets whose forecasts a post-hoc rule would rank-average.
+
+    ``raw`` is the trainer's own selection; ``centreK`` the centre epoch of the
+    best trailing-``K`` window; ``topK`` the ``K`` best raw epochs (earlier ties
+    first); ``aroundK`` the ``K`` epochs centred on the raw selection, clipped to
+    the executed trajectory. Every epoch named here has a saved checkpoint.
+    """
+    epochs, scores = _scores(history)
+    raw = raw_selected_epoch(history)
+    views = {}
+    for rule in rules:
+        if rule == "raw":
+            chosen, detail = [raw], {"selection_score": scores[raw - 1]}
+        elif rule.startswith("centre"):
+            window = int(rule[len("centre") :])
+            view = smoothed_view(history, window=window)
+            chosen, detail = [view["selected_epoch"]], view
+        elif rule.startswith("top"):
+            count = int(rule[len("top") :])
+            order = sorted(range(len(epochs)), key=lambda i: (-scores[i], i))
+            chosen = sorted(epochs[i] for i in order[:count])
+            detail = {"scores": [scores[e - 1] for e in chosen]}
+        elif rule.startswith("around"):
+            count = int(rule[len("around") :])
+            half = (count - 1) // 2
+            chosen = [
+                e
+                for e in range(raw - half, raw - half + count)
+                if 1 <= e <= len(epochs)
+            ]
+            detail = {"scores": [scores[e - 1] for e in chosen]}
+        else:
+            raise ValueError(f"unknown post-hoc selection rule: {rule}")
+        views[rule] = {
+            "rule": rule,
+            "epochs": [int(e) for e in chosen],
+            "raw_selected_epoch": int(raw),
+            "trajectory_epochs": len(epochs),
+            **detail,
+        }
+    return views
 
 
 def selection_noise_summary(history, *, smoothing=3, lags=10):

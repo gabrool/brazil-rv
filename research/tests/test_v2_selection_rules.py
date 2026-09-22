@@ -5,10 +5,69 @@ import pytest
 
 from brazil_rv.v2.selection_rules import (
     audit_histories,
+    epoch_views,
     newey_west_mean_se,
+    raw_prefix_view,
+    raw_selected_epoch,
     selection_noise_summary,
     smoothed_selection,
+    smoothed_view,
 )
+
+
+def _trajectory(scores, patience=None, minimum_improvement=1e-4):
+    """Records as the trainer writes them, with its own improvement flags."""
+    records, best = [], -np.inf
+    for epoch, score in enumerate(scores, start=1):
+        improved = score > best + minimum_improvement
+        if improved:
+            best = score
+        records.append(
+            {
+                "epoch": epoch,
+                "selection": {"mean_ic": score, "daily_ic": [score] * 45},
+                "selected": improved,
+            }
+        )
+    return records
+
+
+def test_raw_prefix_view_reproduces_the_matched_stopping_selector():
+    history = _trajectory([0.01, 0.05, 0.02, 0.03, 0.04, 0.045, 0.049, 0.10, 0.0])
+    five = raw_prefix_view(history, patience=5, minimum_improvement=1e-4)
+    assert five["selected_epoch"] == 2 and five["epochs_considered"] == 7
+    assert five["stop_reason"] == "patience"
+    twenty = raw_prefix_view(history, patience=20, minimum_improvement=1e-4)
+    assert twenty["selected_epoch"] == 8 and twenty["stop_reason"] == "trajectory_end"
+    assert raw_selected_epoch(history) == 8
+
+
+def test_smoothed_view_selects_the_centre_of_the_best_window():
+    history = _trajectory([0.01, 0.05, 0.02, 0.03, 0.10, 0.00, 0.00, 0.00])
+    view = smoothed_view(history, window=3)
+    assert view["selected_epoch"] == 4 and view["stop_reason"] == "trajectory_end"
+    assert view["selection_score"] == pytest.approx(np.mean([0.02, 0.03, 0.10]))
+    prefix = smoothed_view(history, window=3, patience=2)
+    # Smoothed scores: .01,.03,.0267,.0333,.05,... the .0267 dip costs one stale
+    # epoch, epoch 4 recovers, epoch 5 improves, then two stale epochs stop it.
+    assert prefix["selected_epoch"] == 4 and prefix["epochs_considered"] == 7
+    assert prefix["stop_reason"] == "patience"
+    with pytest.raises(ValueError):
+        smoothed_view([{"epoch": 2, "selection": {"mean_ic": 0.1}}], window=3)
+
+
+def test_epoch_views_name_only_saved_epochs():
+    history = _trajectory([0.01, 0.05, 0.02, 0.03, 0.10, 0.00, 0.00, 0.00])
+    views = epoch_views(history)
+    assert views["raw"]["epochs"] == [5]
+    assert views["centre3"]["epochs"] == [4]
+    assert views["top3"]["epochs"] == [2, 4, 5]
+    assert views["around3"]["epochs"] == [4, 5, 6]
+    early = epoch_views(_trajectory([0.10, 0.0, 0.0]), rules=("around3", "top5"))
+    assert early["around3"]["epochs"] == [1, 2]
+    assert early["top5"]["epochs"] == [1, 2, 3]
+    with pytest.raises(ValueError):
+        epoch_views(history, rules=("median3",))
 
 
 def test_window_one_is_raw_selection_and_centres_are_middle_epochs():

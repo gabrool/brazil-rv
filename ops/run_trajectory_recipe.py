@@ -1,283 +1,236 @@
-"""Trajectory-recipe wave: same cells, same data, only the stopping/selection rule.
+"""Short fully annealed F schedule from existing parents; selection unchanged.
 
-Contrast registered by ``docs/v2_SHARPE_TWO_PLAN.md`` (R1). Every cell keeps its
-Stage C architecture, inputs, optimizer, loss, selector population and store. The
-only changes are the checkpoint trajectory:
+Under the matched stopping recipe an F child runs a 60-epoch cosine schedule with
+patience 5, so the raw selection lands on a near-peak-learning-rate iterate at
+epochs three to six. This one-factor wave keeps everything else and changes only
+the child's schedule: ``schedule_epochs = epochs = --f-epochs`` (default 8) with
+patience equal to that budget, so the trajectory anneals fully and the selector
+compares low-learning-rate iterates. Parents are the existing patience-20
+attention selection views, or the common-model C6/GRU parents once trained; no
+new P fit is run. Learning rate, SAM, transferred-parameter multiplier, loss,
+selector population, store and fold boundaries are inherited unchanged.
 
-* P stage: patience 5 -> ``--p-patience`` (default 20) and trailing-window
-  smoothed selection (``--smoothing``, default 3) instead of the raw best epoch.
-* F stage: the 60-epoch cosine schedule with patience 5 is replaced by a short
-  fully annealed schedule (``schedule_epochs = epochs = --f-epochs``, default 8),
-  patience equal to the epoch budget (no early stop) and the same smoothed
-  selection, so the selected child is a low-learning-rate iterate near the centre
-  of the best trailing window rather than a near-peak-LR draw.
+    uv run --project research --no-sync python ops/run_trajectory_recipe.py \
+        --freeze --cell TE_full
+    uv run --project research --no-sync python ops/run_trajectory_recipe.py
 
-Freeze once, then execute (resumable, one fit at a time on the RTX 2060):
-
-    uv run --project research python ops/run_trajectory_recipe.py --freeze \
-        --cell TE_full --cell C6 --seed 11 --seed 29 --seed 47 --all-folds
-    uv run --project research python ops/run_trajectory_recipe.py
-
-Fits land under ``<run root>/trajectory_recipe/fits/<cell>/...`` with the same
-layout as the Stage C refits, so the existing replay and account tooling can
-score them paired against the Stage C controls fold by fold and seed by seed.
-Nothing here reads evaluation labels or held-out consumers.
+At most two cells per wave. Children land under ``<attention root>/f_schedule/
+fits/<cell>_f8/<fold>_seed_<seed>`` and are evaluated with
+``ops/replay_forecast_variants.py`` (arm ``<cell>_f8``), whose post-hoc views
+(centre3/top3/around3) also apply to these shorter trajectories. Execution
+refuses to start while another fit queue is incomplete on the 6 GB GPU.
 """
 
 import argparse
 import gc
-import inspect
 import json
 from pathlib import Path
+import shutil
 from time import perf_counter
 
 import torch
 
 from brazil_rv.v2.artifacts import sha256_file, write_json_atomic
-from brazil_rv.v2.characteristic_model import CharacteristicModel
 from brazil_rv.v2.data_repair import binding, bound_json
 from brazil_rv.v2.research_rounds import _git_identity
-from brazil_rv.v2.round7 import configuration
 from brazil_rv.v2.round7_training import TrainingRecipe, train
-from brazil_rv.v2.splits import _SELECTION_WINDOWS
-from brazil_rv.v2.train import compile_forward
+from extend_matched_stopping_views import gpu_is_free, runtime_files
 
 PROJECT = Path(__file__).resolve().parents[1]
 POINTER = PROJECT / "docs/v2_economic_data_scaling_run.json"
-PLAN_KEY = "trajectory_recipe_plan"
+PLAN_KEY = "scaling_f_schedule_plan"
 
 
-def trajectory_recipes(p_recipe, f_recipe, *, p_patience, f_epochs, smoothing):
-    """Derive the P and F trajectory recipes from the Stage C recipes.
+def short_schedule_recipe(f_recipe, f_epochs):
+    """Only the schedule length and the patience change; every other field is kept."""
+    child = {**f_recipe, "schedule_epochs": int(f_epochs), "patience": int(f_epochs)}
+    TrainingRecipe(**child)
+    return child
 
-    Only stopping and selection fields change; learning rate, SAM radius,
-    adaptivity and the transferred-parameter multiplier are inherited unchanged.
-    ``f_epochs=None`` keeps the source F schedule and patience (the fallback arm)
-    and adds only the smoothed selection.
-    """
-    parent = {
-        **p_recipe,
-        "patience": int(p_patience),
-        "selection_smoothing": int(smoothing),
-    }
-    child = {**f_recipe, "selection_smoothing": int(smoothing)}
-    if f_epochs is not None:
-        child["schedule_epochs"] = int(f_epochs)
-        child["patience"] = int(f_epochs)
-    for recipe in (parent, child):
-        TrainingRecipe(**recipe)  # every key must be a real recipe field
-    return parent, child
+
+def parents_for(run, stopping, cell):
+    """Hash-bound parent checkpoints per seed for one cell; None while untrained."""
+    root = Path(stopping["root"])
+    parents = {}
+    for seed in stopping["seeds"]:
+        if cell in stopping["cells"]:
+            views = bound_json(
+                binding(
+                    root / "parents" / cell / f"P_seed_{seed}" / "stopping_views.json"
+                )
+            )["views"]
+            parents[str(seed)] = dict(views["20"]["checkpoint"], view="p20")
+        else:
+            common = bound_json(run["scaling_common_model_plan"])
+            path = (
+                Path(common["root"]) / "fits" / cell / f"P_seed_{seed}" / "selected.pt"
+            )
+            if not path.exists():
+                return None
+            parents[str(seed)] = dict(binding(path), view="selected")
+    return parents
 
 
 def freeze(run, args):
-    source = bound_json(run["stage_c_refit_plan"])
-    cells = args.cell or sorted(source["cells"])
-    unknown = set(cells) - set(source["cells"])
-    if unknown:
-        raise SystemExit(f"cells not in the Stage C plan: {sorted(unknown)}")
-    seeds = args.seed or list(source["seeds"])
-    folds = list(_SELECTION_WINDOWS) if args.all_folds else list(source["folds"])
-    f_epochs = None if args.keep_f_schedule else int(args.f_epochs)
-    p_recipe, f_recipes = None, {}
-    for cell in cells:
-        parent, child = trajectory_recipes(
-            source["p_recipe"],
-            source["f_recipes"][cell],
-            p_patience=args.p_patience,
-            f_epochs=f_epochs,
-            smoothing=args.smoothing,
-        )
-        p_recipe, f_recipes[cell] = parent, child
-    f_budget = source["maximum_epochs"] if f_epochs is None else f_epochs
-    f_contrast = (
-        "F schedule and patience unchanged, smoothed selection only"
-        if f_epochs is None
-        else (
-            f"F 60-epoch cosine/patience "
-            f"{next(iter(source['f_recipes'].values()))['patience']} -> fully "
-            f"annealed {f_epochs}-epoch schedule, no early stop, same smoothed "
-            "selection"
-        )
+    stopping_ref = run["scaling_matched_stopping_plan"]
+    stopping = bound_json(stopping_ref)
+    common = (
+        bound_json(run["scaling_common_model_plan"])
+        if "scaling_common_model_plan" in run
+        else {"cells": {}, "f_recipes": {}}
     )
-    controls = {}
-    for cell in cells:
-        for seed in source["seeds"]:
-            for fold in source["folds"]:
-                path = (
-                    Path(run["stage_c_refit_root"])
-                    / "fits"
-                    / cell
-                    / f"{fold}_seed_{seed}"
-                    / "run_manifest.json"
-                )
-                if path.exists():
-                    controls[f"{cell}/{fold}/{seed}"] = binding(path)
-    root = Path(run["root"]) / "trajectory_recipe"
+    cells = {**common["cells"], **stopping["cells"]}
+    f_recipes = {**common["f_recipes"], **stopping["f_recipes"]}
+    chosen = args.cell
+    if not chosen or len(chosen) > 2 or set(chosen) - set(cells):
+        raise SystemExit(f"choose one or two cells from {sorted(cells)}")
+    parents = {}
+    for cell in chosen:
+        found = parents_for(run, stopping, cell)
+        if found is None:
+            raise SystemExit(f"{cell} parents are not trained yet")
+        parents[cell] = found
+    root = Path(stopping["root"]) / "f_schedule"
     root.mkdir(exist_ok=False)
+    arms = {f"{cell}_f{args.f_epochs}": {"reference": cell} for cell in chosen}
     plan = {
-        "status": "frozen_before_trajectory_outcomes",
-        "source": run["stage_c_refit_plan"],
-        "store": source["store"],
-        "cells": {cell: source["cells"][cell] for cell in cells},
-        "controls": controls,
-        "seeds": seeds,
-        "folds": folds,
-        "p_recipe": p_recipe,
-        "f_recipes": f_recipes,
-        "maximum_epochs": source["maximum_epochs"],
-        "f_epochs": int(f_budget),
-        "ema_half_life_epochs": source.get("attention_gru_ema_half_life_epochs"),
-        "planned_fits": len(cells) * len(seeds) * (1 + len(folds)),
-        "driver": binding(Path(__file__)),
+        "status": "frozen_before_short_schedule_outcomes",
+        "root": str(root),
+        "source": stopping_ref,
+        "common_source": run.get("scaling_common_model_plan"),
+        "store": stopping["store"],
+        "cells": {cell: cells[cell] for cell in chosen},
+        "arms": arms,
+        "parents": parents,
+        "seeds": stopping["seeds"],
+        "folds": stopping["folds"],
+        "f_epochs": int(args.f_epochs),
+        "f_recipes": {
+            cell: short_schedule_recipe(f_recipes[cell], args.f_epochs)
+            for cell in chosen
+        },
+        "source_f_recipes": {cell: f_recipes[cell] for cell in chosen},
+        "ema_half_life_epochs": stopping["ema_half_life_epochs"],
+        "planned_fits": len(chosen) * len(stopping["seeds"]) * len(stopping["folds"]),
         "runtime": {
             "git": _git_identity(),
-            "files": {
-                "training": binding(Path(inspect.getfile(train))),
-                "model": binding(Path(inspect.getfile(CharacteristicModel))),
-                "configuration": binding(Path(inspect.getfile(configuration))),
-                "compiler": binding(Path(inspect.getfile(compile_forward))),
-            },
+            "files": {k: binding(v) for k, v in runtime_files().items()},
         },
+        "driver": binding(Path(__file__)),
+        "registration": binding(
+            PROJECT / "research/preregistrations/v2_posthoc_selection_and_ensembles.md"
+        ),
         "contrast": (
-            "One-factor trajectory contrast against the Stage C fits: identical cells, "
-            "store, optimizer, loss and selector population; P patience "
-            f"{source['p_recipe']['patience']}->{args.p_patience} with trailing-"
-            f"{args.smoothing} smoothed centre-epoch selection; {f_contrast}."
+            f"Child schedule only: 60-epoch cosine with patience 5 -> fully annealed "
+            f"{args.f_epochs}-epoch schedule with patience {args.f_epochs}. Same "
+            "parents (patience-20 attention views or trained common-model parents), "
+            "learning rate, SAM, transferred multiplier, loss, selector, store, seeds "
+            "and eight periods. Raw earlier-tie selection is unchanged; post-hoc "
+            "views are evaluated separately."
         ),
         "gate": (
-            "Primary: paired per-fold, per-seed common-population evaluation IC delta "
-            "versus the Stage C control over all executed folds, Newey-West lag 10 "
-            "on the pooled daily differences; adopt only if the lower 95% bound "
-            "exceeds zero and at least 2/3 of seeds and 2/3 of folds are positive. "
-            "Economics (R$10m neutral and flexible-net books) are reported for the "
-            "retained recipe only, never used to pick it. No per-fold or per-seed "
-            "recipe choice."
+            "Paired fold deltas of each short-schedule arm against its reference arm's "
+            "existing books on the same policy (block 40 primary): retain only with "
+            "the 95 percent lower bound above zero and a majority of seeds and folds "
+            "positive. No per-fold or per-seed schedule choice."
         ),
     }
     write_json_atomic(root / "plan.json", plan)
+    write_json_atomic(root / "frozen_design.json", {"store": stopping["store"]})
     run[PLAN_KEY] = binding(root / "plan.json")
     write_json_atomic(POINTER, run)
     print(
         json.dumps(
-            {"frozen": str(root / "plan.json"), "planned_fits": plan["planned_fits"]}
-        )
+            {"plan": run[PLAN_KEY], "arms": list(arms), "fits": plan["planned_fits"]}
+        ),
+        flush=True,
     )
 
 
-def execute(run, arms=None):
-    torch.set_num_threads(1)
+def execute(run, force=False):
     reference = run[PLAN_KEY]
     plan = bound_json(reference)
-    assert plan["driver"]["sha256"] == sha256_file(Path(__file__))
-    imported = {
-        "training": Path(inspect.getfile(train)),
-        "model": Path(inspect.getfile(CharacteristicModel)),
-        "configuration": Path(inspect.getfile(configuration)),
-        "compiler": Path(inspect.getfile(compile_forward)),
-    }
-    for name, record in plan["runtime"]["files"].items():
-        assert sha256_file(imported[name]) == record["sha256"], name
-    selected_arms = set(arms or plan["cells"])
-    assert selected_arms <= set(plan["cells"])
-    root = Path(reference["path"]).parent
-    store = Path(plan["store"]["root"])
+    assert sha256_file(Path(__file__)) == plan["driver"]["sha256"]
+    for key, path in runtime_files().items():
+        assert sha256_file(path) == plan["runtime"]["files"][key]["sha256"], key
+    gpu_is_free(run, force)
+    store, root = Path(plan["store"]["root"]), Path(plan["root"])
     assert sha256_file(store / "manifest.json") == plan["store"]["manifest_sha256"]
+    torch.set_num_threads(1)
     progress = root / "refits.json"
     completed = (
         json.loads(progress.read_text())["completed"] if progress.exists() else []
     )
     done = {r["key"] for r in completed}
-    jobs = [
-        ("P", "pretrain_internal", seed, arm)
-        for seed in plan["seeds"]
-        for arm in plan["cells"]
-    ]
-    jobs += [
-        ("F", fold, seed, arm)
-        for fold in plan["folds"]
-        for seed in plan["seeds"]
-        for arm in plan["cells"]
-    ]
-    for stage, fold, seed, arm in jobs:
-        if arm not in selected_arms:
-            continue
-        key = f"{arm}/{stage}/{fold}/{seed}"
-        if key in done:
-            bound_json(next(r["manifest"] for r in completed if r["key"] == key))
-            continue
-        output = (
-            root
-            / "fits"
-            / arm
-            / (f"P_seed_{seed}" if stage == "P" else f"{fold}_seed_{seed}")
-        )
-        parent = root / "fits" / arm / f"P_seed_{seed}" / "selected.pt"
-        tick = perf_counter()
-        print(
-            json.dumps(
-                {"starting": key, "completed": len(completed), "planned": len(jobs)}
-            ),
-            flush=True,
-        )
-        torch._dynamo.reset()
-        if torch.cuda.is_available():
-            torch.cuda.reset_peak_memory_stats()
-        train(
-            store,
-            output,
-            cell=plan["cells"][arm],
-            stage=stage,
-            fold=fold,
-            seed=seed,
-            epochs=plan["maximum_epochs"] if stage == "P" else plan["f_epochs"],
-            recipe=TrainingRecipe(
-                **(plan["p_recipe"] if stage == "P" else plan["f_recipes"][arm])
-            ),
-            parent=parent if stage == "F" else None,
-            parent_sha256=sha256_file(parent) if stage == "F" else None,
-            compiled=True,
-            export_scores=stage == "F",
-            ema_half_life_epochs=plan["ema_half_life_epochs"] if stage == "F" else None,
-        )
-        completed.append(
-            {
-                "key": key,
-                "manifest": binding(output / "run_manifest.json"),
-                "seconds": perf_counter() - tick,
-            }
-        )
-        done.add(key)
-        write_json_atomic(
-            progress,
-            {
-                "status": "complete" if len(completed) == len(jobs) else "running",
-                "plan": reference,
-                "completed": completed,
-                "planned": len(jobs),
-            },
-        )
-        gc.collect()
-        if torch.cuda.is_available():
-            torch.cuda.empty_cache()
+    for fold in plan["folds"]:
+        for seed in plan["seeds"]:
+            for arm, spec in plan["arms"].items():
+                key = f"{arm}/F/{fold}/{seed}"
+                if key in done:
+                    continue
+                cell = spec["reference"]
+                parent = plan["parents"][cell][str(seed)]
+                output = root / "fits" / arm / f"{fold}_seed_{seed}"
+                tick = perf_counter()
+                if not (output / "run_manifest.json").exists():
+                    if shutil.disk_usage(root).free < 2_000_000_000:
+                        raise RuntimeError("less than 2 GB free before fit")
+                    print(
+                        json.dumps({"starting": key, "completed": len(completed)}),
+                        flush=True,
+                    )
+                    torch._dynamo.reset()
+                    if torch.cuda.is_available():
+                        torch.cuda.reset_peak_memory_stats()
+                    train(
+                        store,
+                        output,
+                        cell=plan["cells"][cell],
+                        stage="F",
+                        fold=fold,
+                        seed=seed,
+                        epochs=plan["f_epochs"],
+                        recipe=TrainingRecipe(**plan["f_recipes"][cell]),
+                        parent=Path(parent["path"]),
+                        parent_sha256=parent["sha256"],
+                        compiled=True,
+                        export_scores=True,
+                        ema_half_life_epochs=plan["ema_half_life_epochs"],
+                    )
+                    gc.collect()
+                    if torch.cuda.is_available():
+                        torch.cuda.empty_cache()
+                manifest = bound_json(binding(output / "run_manifest.json"))
+                assert manifest["status"] == "completed"
+                completed.append(
+                    {
+                        "key": key,
+                        "manifest": binding(output / "run_manifest.json"),
+                        "parent": parent,
+                        "seconds": perf_counter() - tick,
+                    }
+                )
+                done.add(key)
+                write_json_atomic(
+                    progress,
+                    {
+                        "status": "complete"
+                        if len(completed) == plan["planned_fits"]
+                        else "running",
+                        "plan": reference,
+                        "completed": completed,
+                        "planned": plan["planned_fits"],
+                    },
+                )
+                print(json.dumps(completed[-1]), flush=True)
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--freeze", action="store_true")
-    parser.add_argument("--cell", action="append", help="Stage C cell name; repeatable")
-    parser.add_argument("--seed", type=int, action="append", help="seed; repeatable")
-    parser.add_argument(
-        "--all-folds", action="store_true", help="every development fold"
-    )
-    parser.add_argument("--p-patience", type=int, default=20)
+    parser.add_argument("--cell", action="append", help="one or two cells")
     parser.add_argument("--f-epochs", type=int, default=8)
-    parser.add_argument(
-        "--keep-f-schedule",
-        action="store_true",
-        help="fallback arm: keep the F schedule and patience, add smoothing only",
-    )
-    parser.add_argument("--smoothing", type=int, default=3)
-    parser.add_argument("--arm", action="append", help="execute only these cells")
+    parser.add_argument("--force", action="store_true", help="skip the busy-GPU guard")
     args = parser.parse_args()
     run = json.loads(POINTER.read_text())
-    freeze(run, args) if args.freeze else execute(run, args.arm)
+    freeze(run, args) if args.freeze else execute(run, args.force)
