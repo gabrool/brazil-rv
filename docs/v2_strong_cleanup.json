@@ -1,0 +1,42 @@
+{
+  "attempts": "Initial LZX pass was stopped solely to speed remaining compression. Its 776 verified files were reused. One in-flight compact child completed and its decoded bytes matched the pre-existing SHA256 sidecar. Remaining files used XPRESS16K, with before/after decoded hashes. A read-only optional psutil environment query failed because psutil was absent; no dependency was installed. Exact cleanup recipes/logs and switch record are archived; inline read-only checks are not claimed as standalone retained shell files.",
+  "compressed_files": 10250,
+  "compression_bytes": 60334519491,
+  "deleted_files": 44770,
+  "deletion_bytes": 10211681189,
+  "measurement": "Windows GetCompressedFileSizeW file allocation accounting; disposable uncompressed cache uses exact file lengths. Volume-free-space changes also include concurrent training writes.",
+  "preserved": "Raw sources and accepted stores untouched; selected weights, forecasts and evidence retained. Two active checkouts and active compiler cache preserved. Historical checkout commits all belong to main ancestry and retain explicit archive refs. Archive-only epochs and optimizer states restore from the prior verified complete objective tar.",
+  "receipts": {
+    "compression_summary.json": {
+      "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_attention_stopping_20260921\\storage\\strong_cleanup\\compression_summary.json",
+      "sha256": "6215c11996d621212340bf12be8e3a7399b37f91fb1c3143fd4150aaa8a3a3be"
+    },
+    "objective_retirement.json": {
+      "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_attention_stopping_20260921\\storage\\strong_cleanup\\objective_retirement.json",
+      "sha256": "6e29db01af566acebf59ed6d93049881d58e12586065bfc22452982d4d9009ec"
+    },
+    "retained_artifacts.json": {
+      "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_attention_stopping_20260921\\storage\\strong_cleanup\\retained_artifacts.json",
+      "sha256": "fbf44e633143f0e7350375fb9093d1d1c95ac020834cfd4bd9c2eb5e242359df"
+    },
+    "stale_cache.json": {
+      "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_attention_stopping_20260921\\storage\\strong_cleanup\\stale_cache.json",
+      "sha256": "8e206fc748fd627de949fccb589d1eff105477404cc27e28bb36afb15f67787d"
+    },
+    "worktree_retirement.json": {
+      "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_attention_stopping_20260921\\storage\\strong_cleanup\\worktree_retirement.json",
+      "sha256": "9c5ccd924be33d22e5f1a7f9cd8cfabc462c1133b5f5a6e68a8c3f7da0835d96"
+    }
+  },
+  "reclaimed_bytes": 70546200680,
+  "recovery": {
+    "archive": {
+      "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\storage\\strong_cleanup_20260921.zip",
+      "sha256": "61329d534452bc509f1297724b88cf9e872f9148ddbacd6691c15ba4adb031f8"
+    },
+    "bytes": 1281728,
+    "verified_members": 40
+  },
+  "retired_checkouts": 52,
+  "status": "complete"
+}

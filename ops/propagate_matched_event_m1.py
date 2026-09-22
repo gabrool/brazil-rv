@@ -18,12 +18,20 @@ from propagate_surviving_m1 import grid_for, minute, same
 PROJECT = Path(__file__).resolve().parents[1]
 
 
-def main():
+def main(scaling=False):
     tick = perf_counter()
     pointer = PROJECT / "docs/v2_economic_data_scaling_run.json"
     run = json.loads(pointer.read_text())
-    admission = bound_json(run["stage_c_event_data_admission"])
-    events = bound_json(admission["plan"])["events"]
+    admission_key = (
+        "scaling_data_identity" if scaling else "stage_c_event_data_admission"
+    )
+    daily_key = (
+        "scaling_data_daily_qualification"
+        if scaling
+        else "stage_c_event_daily_qualification"
+    )
+    admission = bound_json(run[admission_key])
+    events = bound_json(admission["plan"])["history" if scaling else "events"]
     root = Path(admission["parent"]["root"])
     m = bound_json(
         dict(
@@ -31,7 +39,11 @@ def main():
             sha256=admission["parent"]["manifest_sha256"],
         )
     )
-    out = Path(admission["plan"]["path"]).parent / "m1"
+    out = (
+        Path(bound_json(run["scaling_data_workspace"])["root"])
+        if scaling
+        else Path(admission["plan"]["path"]).parent
+    ) / "m1"
     out.mkdir(exist_ok=False)
     (out / "executed.py").write_bytes(Path(__file__).read_bytes())
     dates, isins = (
@@ -49,12 +61,13 @@ def main():
         for e in events
         if assignments.filter(pl.col("isin") == e["isin"]).is_empty()
     ]
-    assert len(missing) == 4 and "BRRRRPACNOR5" not in missing
+    if not scaling:
+        assert len(missing) == 4 and "BRRRRPACNOR5" not in missing
     schedule_record = binding(root / m["tables"]["b3_session_schedule"]["path"])
     schedule = {
         s.trade_date: s for s in load_session_schedule(Path(schedule_record["path"]))
     }
-    q = bound_json(run["stage_c_event_daily_qualification"])
+    q = bound_json(run[daily_key])
     old_sigma = np.load(root / "target_scale_sigma.npy", mmap_mode="r")
     sigma = old_sigma.copy()
     with np.load(q["deltas"]["path"]) as z:
@@ -69,15 +82,19 @@ def main():
         out / "plan.json",
         dict(
             parent=admission["parent"],
-            admission=run["stage_c_event_data_admission"],
-            daily=run["stage_c_event_daily_qualification"],
+            admission=run[admission_key],
+            daily=run[daily_key],
             assignments=assignment_record,
             schedule=schedule_record,
             missing_predecessor_assignments=missing,
             registration=binding(
                 PROJECT / "research/preregistrations/v2_economic_data_scaling.md"
             ),
-            contrast="Native return/range use final prior-close sigma on existing assigned M1 dates. Only RRRP has a predecessor stream: BRAV also inherits21prior original sessions for unchanged20-session same-clock volume/16-observation support. Public prebirth arrays remain empty; other native channels and masks remain exact. Four absent predecessor streams stay absent. Selected normalized rows are saved for scalar reuse; no held-out market reads or full source census.",
+            contrast=(
+                "Native return/range use final prior-close sigma only on existing assigned dates through2024. New successors have no accepted M1 stream; WIZS predecessor observations do not authorize a WIZC stream. Other native channels/support/history stay exact. Reuse scalar inputs where needed; no held-out reads or raw census."
+                if scaling
+                else "Native return/range use final prior-close sigma on existing assigned M1 dates. Only RRRP has a predecessor stream: BRAV also inherits21prior original sessions for unchanged20-session same-clock volume/16-observation support. Public prebirth arrays remain empty; other native channels and masks remain exact. Four absent predecessor streams stay absent. Selected normalized rows are saved for scalar reuse; no held-out market reads or full source census."
+            ),
             verification="Old-coordinate native controls; independent printed-block return/range and16-of20 volume arithmetic. Entry-bar mutations and final combined full60 consumer proof follow. No accepted store/oldfit changes.",
         ),
     )
@@ -320,7 +337,9 @@ def main():
     )
     write_json_atomic(out / "manifest.json", report)
     run = json.loads(pointer.read_text())
-    run["stage_c_event_m1"] = binding(out / "manifest.json")
+    run["scaling_data_m1" if scaling else "stage_c_event_m1"] = binding(
+        out / "manifest.json"
+    )
     write_json_atomic(pointer, run)
     print(json.dumps(report), flush=True)
 

@@ -17,11 +17,17 @@ from brazil_rv.v2.portfolio_training import windows
 PROJECT = Path(__file__).resolve().parents[1]
 
 
-def main():
+def main(scaling=False):
     tick = perf_counter()
     pointer = PROJECT / "docs/v2_economic_data_scaling_run.json"
     run = json.loads(pointer.read_text())
-    source = bound_json(run["stage_c_refit_economics"])
+    source_key = "scaling_refit_economics" if scaling else "stage_c_refit_economics"
+    output_key = (
+        "scaling_refit_economics_qualification"
+        if scaling
+        else "stage_c_refit_economics_qualification"
+    )
+    source = bound_json(run[source_key])
     plan = bound_json(source["plan"])
     root = Path(source["store"]["root"])
     manifest = bound_json(
@@ -86,7 +92,7 @@ def main():
     edges = sorted(links, key=lambda r: r["effective_index"], reverse=True)
     first, stop = plan["decision_rows"]
     fallbacks = 0
-    for t in range(first, stop):
+    for t in range(plan.get("risk_recompute_start", first), stop):
         past = np.arange(t, max(first - 1, t - 21), -1)
         route = np.broadcast_to(np.arange(len(names)), (len(past), len(names))).copy()
         for edge in edges:
@@ -116,7 +122,17 @@ def main():
     # The cached hedge closes are already qualified against the original source.
     hedge = inputs.bova11_close
     history_records = []
+    new_successors = (
+        {
+            names.index(e["successor_isin"])
+            for e in bound_json(run["scaling_data_plan"])["history"]
+        }
+        if scaling
+        else {e["successor_index"] for e in links}
+    )
     for edge in links:
+        if edge["successor_index"] not in new_successors:
+            continue
         for offset in (0, 20, 60):
             t, name = edge["effective_index"] + offset, edge["successor_index"]
             if not indices[0] + 61 <= t <= indices[-1]:
@@ -209,7 +225,7 @@ def main():
         ):
             expected[key][t, n] = value
         expected["action_session_resolved"][t:, n] = True
-    assert len(inputs.share_distributions) == len(terms["share_distributions"]) == 18
+    assert len(inputs.share_distributions) == len(terms["share_distributions"])
     for event, actual in zip(
         terms["share_distributions"], inputs.share_distributions, strict=True
     ):
@@ -226,6 +242,10 @@ def main():
             and actual.available_session == local(event["available_date"])
         )
         assert actual.cash_per_prior_share == event["cash_per_prior_share"]
+        assert actual.cash_values == tuple(
+            (local(v["available_date"]), v["cash_per_prior_share"])
+            for v in event.get("cash_values", [])
+        )
         for leg, loaded in zip(event["legs"], actual.legs, strict=True):
             assert loaded.successor_index == names.index(leg["successor_isin"])
             assert loaded.shares_per_prior_share == leg["shares_per_prior_share"]
@@ -307,7 +327,12 @@ def main():
         )
     design = bound_json(run["stage_c_plan"])
     fold_records = []
-    for fold in design["folds"]:
+    folds = (
+        bound_json(run["scaling_matched_stopping_plan"])["folds"]
+        if scaling
+        else design["folds"]
+    )
+    for fold in folds:
         rows = windows(Path(design["prior_root"]), data, fold)["evaluation"]
         a, b = int(rows[0]), int(rows[-1]) + 1
         assert covered[a:b].all() and np.isfinite(cdi[indices[a:b] - 1]).all()
@@ -330,7 +355,7 @@ def main():
         )
     result = dict(
         passed=True,
-        inputs=run["stage_c_refit_economics"],
+        inputs=run[source_key],
         counts=dict(counts),
         backward_fallback_cells=sum(
             counts[k] for k in counts if k == "independent_20_session_fallback"
@@ -346,7 +371,7 @@ def main():
         seconds=perf_counter() - tick,
     )
     write_json_atomic(out / "report.json", result)
-    run["stage_c_refit_economics_qualification"] = binding(out / "report.json")
+    run[output_key] = binding(out / "report.json")
     write_json_atomic(pointer, run)
     print(json.dumps(result), flush=True)
 

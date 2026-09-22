@@ -16,12 +16,17 @@ from brazil_rv.v2.data_repair import binding, bound_json
 PROJECT = Path(__file__).resolve().parents[1]
 
 
-def main():
+def main(scaling=False):
     tick = perf_counter()
     run = json.loads((PROJECT / "docs/v2_economic_data_scaling_run.json").read_text())
-    a = bound_json(run["surviving_rename_admission"])
+    admission_key = "scaling_data_identity" if scaling else "surviving_rename_admission"
+    a = bound_json(run[admission_key])
     root = Path(a["parent"]["root"])
-    work = Path(a["plan"]["path"]).parent
+    work = (
+        Path(bound_json(run["scaling_data_workspace"])["root"])
+        if scaling
+        else Path(a["plan"]["path"]).parent
+    )
     out = work / "unit_history"
     out.mkdir(exist_ok=False)
     (out / "executed.py").write_bytes(Path(__file__).read_bytes())
@@ -30,7 +35,11 @@ def main():
         np.load(root / "date_index.npy"),
         np.load(root / "isin_index.npy").tolist(),
     )
-    links = pl.read_parquet(a["history_mapping"]["path"]).to_dicts()
+    links = pl.read_parquet(
+        work / "issuers/financial_history_links.parquet"
+        if scaling
+        else a["history_mapping"]["path"]
+    ).to_dicts()
     by_successor = {r["successor_index"]: r for r in links}
     parent = bound_json(run["lending_feature_propagation"])
     float_inputs = bound_json(parent["source_receipts"]["prior_float_inputs"])
@@ -44,6 +53,8 @@ def main():
         for n in bound_json(binding(work / "issuers/manifest.json"))["affected_isins"]
     ]
     for kind, base in bases.items():
+        if scaling and kind == "lending":
+            continue
         observed = np.load(base / "observed.npy", mmap_mode="r")
         dist = np.load(base / "distribution_number.npy", mmap_mode="r")
         splits = np.load(base / "detected_split_mask.npy", mmap_mode="r")
@@ -109,8 +120,12 @@ def main():
     }
     floats = pl.read_parquet(work / "lending/selected_floats.parquet").to_dicts()
     records = []
-    for row in pl.read_parquet(work / "lending/denominator_losses.parquet").iter_rows(
-        named=True
+    for row in (
+        []
+        if scaling
+        else pl.read_parquet(work / "lending/denominator_losses.parquet").iter_rows(
+            named=True
+        )
     ):
         current, isin = row["date"], row["isin"]
         idrow, loan = identity[current, isin], balances[current, isin]
@@ -159,7 +174,13 @@ def main():
             )
         )
     im = bound_json(binding(work / "issuers/manifest.json"))
-    family = bound_json(im["source_family"])
+    family = bound_json(
+        json.loads((PROJECT / "docs/v2_data_inputs.json").read_text())[
+            "financial_family"
+        ]
+        if scaling
+        else im["source_family"]
+    )
     source_root = Path(bound_json(family["original_family"])["source_root"])
     codes = {
         d["cvm_code"] for d in identity.values() if d["isin"] in im["affected_isins"]
@@ -169,8 +190,18 @@ def main():
         for r in cvm.rad_rows(source_root)
         if r["cvm_code"] in codes and r["group"] == "structured" and r["id"]
     }
-    docs = []
-    for source in im["source_caches"]:
+    docs = (
+        [
+            d
+            for d in pickle.loads(
+                (work / "issuers/selected_documents.pkl").read_bytes()
+            )
+            if d.get("shares")
+        ]
+        if scaling
+        else []
+    )
+    for source in [] if scaling else im["source_caches"]:
         selected, _ = pickle.loads(Path(source["path"]).read_bytes())
         docs.extend(
             d
@@ -232,7 +263,7 @@ def main():
         inputs={
             "issuer": binding(work / "issuers/manifest.json"),
             "lending": binding(work / "lending/manifest.json"),
-            "admission": run["surviving_rename_admission"],
+            "admission": run[admission_key],
         },
         records=binding(out / "records.json"),
         lending_rows=sum(r["family"] == "lending" for r in records),
@@ -247,6 +278,11 @@ def main():
         limits="Existing DISMES/split/ambiguity rows are uncertainty barriers, not proof of a share split or wrong printed capital/float. No source-rate/quantity mutation or scope censoring; every newly lost live valuation/utilization is enumerated. Date selection/arithmetic independently reconstructed; audited original extraction/publication evidence reused.",
     )
     write_json_atomic(out / "manifest.json", summary)
+    if scaling:
+        summary["reused_lending_qualification"] = run["scaling_data_unit_history"]
+        from repair_scaling_inputs import record
+
+        record(run, "scaling_data_financial_units", out / "manifest.json", summary)
     print(json.dumps(summary), flush=True)
 
 

@@ -266,15 +266,22 @@ def main(mode):
     print(json.dumps(result), flush=True)
 
 
-def assemble(run, admission, root, m, out, dates, isins, pointer, tick):
+def assemble(run, admission, root, m, out, dates, isins, pointer, tick, scaling=False):
+    prefix = "scaling_data_" if scaling else "stage_c_event_"
     plan = bound_json(binding(out / "plan.json"))
-    targets = bound_json(run["stage_c_event_targets"])
-    for key in (
-        "stage_c_event_targets_qualification",
-        "stage_c_event_minute_qualification",
-        "stage_c_event_auxiliary_arithmetic",
-        "stage_c_event_sidecars",
-    ):
+    evidence_keys = [
+        prefix + k
+        for k in (
+            "targets_qualification",
+            "minute_qualification",
+            "auxiliary_arithmetic",
+            "sidecars",
+        )
+    ]
+    if scaling:
+        evidence_keys.extend(prefix + k for k in ("financial_units", "unit_history"))
+    targets = bound_json(run[prefix + "targets"])
+    for key in evidence_keys:
         bound_json(run[key])
     (
         out / ("executed_assembly_" + binding(Path(__file__))["sha256"][:12] + ".py")
@@ -282,11 +289,14 @@ def assemble(run, admission, root, m, out, dates, isins, pointer, tick):
     records = [*plan["layers"], targets["action_deltas"], targets["deltas"]]
     patches = read_layers(records)
     destination = (
-        Path(run["stage_c_root"]).parent.parent / "v2_economic_matched_store_20260920"
+        root.parent / "v2_scaling_store_20260921"
+        if scaling
+        else Path(run["stage_c_root"]).parent.parent
+        / "v2_economic_matched_store_20260920"
     )
     assert not destination.exists()
     tables = {k: root / r["path"] for k, r in m["tables"].items()}
-    issuer = bound_json(run["stage_c_event_issuers"])
+    issuer = bound_json(run[prefix + "issuers"])
     tables.update(
         isin_succession_links=Path(admission["links"]["path"]),
         slow_history_links=Path(admission["history_mapping"]["path"]),
@@ -318,16 +328,24 @@ def assemble(run, admission, root, m, out, dates, isins, pointer, tick):
     )
     cutoffs = next_session_decision_cutoffs(sessions, following_decision_at=following)
     prior_roles = pl.read_parquet(tables["corporate_action_alignment_roles"])
-    prior_roles = prior_roles.filter(
-        ~(
-            (pl.col("isin") == "BRJSLGACNOR2")
-            & (pl.col("event_date").cast(pl.String) == "2020-11-11")
+    new_roles = _action_alignment_role_table(new_terms, dates, cutoffs)
+    if scaling:
+        prior_roles = prior_roles.join(
+            new_roles.select("isin", "event_date").unique(),
+            on=["isin", "event_date"],
+            how="anti",
         )
-    )
+    else:
+        prior_roles = prior_roles.filter(
+            ~(
+                (pl.col("isin") == "BRJSLGACNOR2")
+                & (pl.col("event_date").cast(pl.String) == "2020-11-11")
+            )
+        )
     tables["corporate_action_alignment_roles"] = pl.concat(
-        [prior_roles, _action_alignment_role_table(new_terms, dates, cutoffs)]
+        [prior_roles, new_roles]
     ).sort("event_date", "isin")
-    context = bound_json(run["stage_c_event_context"])
+    context = bound_json(run[prefix + "context"])
     common = pl.read_parquet(context["artifacts"]["common_rows"]["path"])
     tables["common_state_diagnostics"] = pl.concat(
         [
@@ -337,9 +355,9 @@ def assemble(run, admission, root, m, out, dates, isins, pointer, tick):
             common,
         ]
     ).sort("trade_date")
-    tables["matched_corporate_source_entry_barriers"] = pl.DataFrame(
-        json.loads((out / "entry_barriers.json").read_text())
-    )
+    tables[
+        ("scaling" if scaling else "matched") + "_corporate_source_entry_barriers"
+    ] = pl.DataFrame(json.loads((out / "entry_barriers.json").read_text()))
     active = np.load(root / "active.npy").copy()
     for ix, v in patches["active"]:
         active[tuple(ix.T)] = v
@@ -351,32 +369,34 @@ def assemble(run, admission, root, m, out, dates, isins, pointer, tick):
         output=str(destination),
         plan=binding(out / "plan.json"),
         layers=records,
-        evidence={
-            k: run[k]
-            for k in (
-                "stage_c_event_targets_qualification",
-                "stage_c_event_minute_qualification",
-                "stage_c_event_auxiliary_arithmetic",
-                "stage_c_event_sidecars",
-            )
-        },
-        account_terms=run["stage_c_event_candidate_terms"],
+        evidence={k: run[k] for k in evidence_keys},
+        account_terms=targets["account_terms"]
+        if scaling
+        else run["stage_c_event_candidate_terms"],
         refit="New training-only conditioning and compatible newly fitted P/F weights. Preserve original graphs/folds/seeds/full933/full60/learning budget/optimizer/selector. Optional to-close loss inactive. Old accounting forecasts keep OLDPolicyData.",
         episodes="Historical public old-JSL values are preserved. The backward history walk may only traverse decreasing event times; new logistics-JSL history cannot enter old holding/SIMPAR histories. Market continuity never pools distinct legal issuer filings or loan-source aliases.",
-        storage="Independent full NPY files, lossless NTFS while writing and LZX read-only compression after each array is finalized. Exact decoded bytes are verified by the manifest and independent composition. No raw/parent/old-fit changes or hardlinks. Prior ordinary-NTFS assembly exhausted space and its unsealed staging was automatically removed; saved numerical layers reused.",
+        storage="Independent full NPY files, lossless NTFS while writing and LZX read-only compression after each array is finalized. Exact decoded bytes are verified by the manifest and independent composition. No raw/parent/old-fit changes or hardlinks; saved numerical layers reused.",
     )
-    contract_path = PROJECT / "docs/v2_matched_store_contract.json"
+    contract_path = PROJECT / (
+        "docs/v2_scaling_store_contract.json"
+        if scaling
+        else "docs/v2_matched_store_contract.json"
+    )
     write_json_atomic(contract_path, contract)
     metadata = copy.deepcopy(m["metadata"])
-    metadata["matched_source_data_contract"] = dict(
+    metadata[
+        "scaling_input_contract" if scaling else "matched_source_data_contract"
+    ] = dict(
         contract=binding(contract_path),
         parent=admission["parent"],
         refit_required=True,
         inherited_diagnostics="Earlier counts remain historical receipts; composition evidence and current arrays supersede them.",
     )
-    metadata["isin_succession_link_count"] = 10
+    metadata["isin_succession_link_count"] = pl.read_parquet(
+        tables["isin_succession_links"]
+    ).height
     effects = {key: sum(len(ix) for ix, _ in values) for key, values in patches.items()}
-    tables["matched_array_changes"] = pl.DataFrame(
+    tables[("scaling" if scaling else "matched") + "_array_changes"] = pl.DataFrame(
         [dict(array=k, changed_cells=v) for k, v in effects.items()]
     )
     with StoreStaging(destination, dates=dates, isins=isins) as stage:
@@ -427,7 +447,7 @@ def assemble(run, admission, root, m, out, dates, isins, pointer, tick):
     )
     write_json_atomic(out / "manifest.json", result)
     run = json.loads(pointer.read_text())
-    run["stage_c_event_store_assembly"] = binding(out / "manifest.json")
+    run[prefix + "store_assembly"] = binding(out / "manifest.json")
     write_json_atomic(pointer, run)
     print(json.dumps(result), flush=True)
 

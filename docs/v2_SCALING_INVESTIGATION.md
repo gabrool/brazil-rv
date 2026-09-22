@@ -58,5 +58,5 @@ partial mechanism from a controlled single-seed experiment. The small hedge
 roundoff defect is corrected but cannot explain the observed reversal. There is
 no complete single-cause explanation or generally adopted new stopping rule.
 Known added-period source/data dependencies remain separately identified. A
-matched parent-stopping contrast across both widths is the next justified
-training investigation, still unstarted; LSTM remains deferred.
+matched parent-stopping contrast across both widths is now running on the separately
+accepted added-period data contract; LSTM remains deferred.

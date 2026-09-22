@@ -1,3 +1,5 @@
+from dataclasses import replace
+
 import numpy as np
 
 from brazil_rv.execution.share_distributions import (
@@ -76,6 +78,46 @@ def test_basket_targets_keep_both_legs_cash_and_later_actions():
         minimum_rank_names=1,
     )
     assert not missing.shareholder_valid[0, 0, 0]
+
+
+def test_basket_cash_revisions_use_endpoint_knowledge_and_original_units():
+    close = np.full((7, 2), 10.0)
+    q = np.ones_like(close)
+    q[1, 0] = 2  # Two original shares are entitled to the later distribution.
+    q[3, 1] = 3  # A successor split must not multiply the original cash claim.
+    event = ShareDistribution(
+        0,
+        2,
+        0,
+        (ShareDelivery(1, 1, 4),),
+        "fixture",
+        5,
+        6,
+        cash_values=((3, 7), (5, 6)),
+    )
+
+    def outcomes(term):
+        return build_economic_multi_day_targets(
+            close,
+            np.ones_like(close, bool),
+            np.ones_like(close, bool),
+            np.full_like(close, 0.02),
+            _actions(q),
+            share_distributions=(term,),
+            horizons=(2, 3, 4, 5, 6),
+            minimum_rank_names=1,
+        )
+
+    result = outcomes(event)
+    # Cash stays unremunerated before and after payment and is never reinvested.
+    np.testing.assert_allclose(result.terminal_wealth[0, 0], [3, 7.4, 7.4, 7.2, 7.2])
+    mutated = outcomes(replace(event, cash_values=((3, 7), (5, 100))))
+    np.testing.assert_array_equal(
+        result.terminal_wealth[0, 0, :3], mutated.terminal_wealth[0, 0, :3]
+    )
+    np.testing.assert_array_equal(
+        result.price_simple_return, mutated.price_simple_return
+    )
 
 
 def test_basket_targets_ignore_delivery_timing_and_future_mutations():

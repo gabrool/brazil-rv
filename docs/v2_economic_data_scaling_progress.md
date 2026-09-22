@@ -4,7 +4,7 @@
 
 The bounded accounting/data admission, four-period matched refits, width/depth
 screens and eight-period attention investigation are complete. No new capacity
-candidate is adopted. LSTM and matched broader parent-stopping experiments have
+candidate is adopted. Matched broader parent-stopping is now running; LSTM has
 not started. The heartbeat remains paused.
 
 There is no established overall winner on one common, fully corrected continuous
@@ -21,12 +21,12 @@ an unconfirmed candidate, not an adopted winner. These rows are not one leaderbo
 Source-backed corrections and independent numerical/causality checks support the
 implemented contracts; they do not prove every historical datum or broker term.
 Primary 100%-CDI proceeds, zero brokerage and CDI-plus-zero debit spread are favorable
-negotiated hypotheses, not quotes. Remaining newly evidenced model-data dependencies
-are GUAR/QGEP actions, GPC/Wiz histories and RLOG/Smiles targets. Linx's 2021 BDR/cash
+negotiated hypotheses, not quotes. Newly evidenced GUAR/QGEP actions, QGEP/GPC/Wiz
+histories and four gross distribution targets now qualify in the complete
+`scaling_data_inputs` contract. Linx's 2021 BDR/cash
 valuation and unknown fraction terms remain explicit account limitations.
 
-Next priorities are bounded propagation of these known data dependencies, then
-matched parent-stopping across both attention widths and the fixed seeds/periods.
+The current experiment is matched parent-stopping across both attention widths and fixed seeds/periods.
 The single-seed patience result remains diagnostic. Further comparisons should
 put C6/GRU and neutral/flexible policies on common dates and accounting before
 declaring a global best model or resuming conditional architecture expansion.
@@ -36,6 +36,105 @@ See [the current investigation](v2_ATTENTION_REVERSAL_DIAGNOSTICS.md),
 [performance comparability](v2_PERFORMANCE_COMPARABILITY.md).
 
 ## Detailed investigation and historical milestones
+
+### Matched stopping execution
+
+The stronger filesystem cleanup is documented in
+[storage cleanup](v2_STORAGE_CLEANUP.md), with per-file retirement/compression and
+recovery receipts under `scaling_strong_cleanup`. Historical code checkouts now
+restore from retained Git commits; current training/evaluation checkouts remain.
+Selected models, forecasts, immutable sources and accepted stores are preserved.
+
+The initial driver stopped after all six parents and two full-attention children:
+JSON key sorting put the wider patience20 alias before its patience5 source job.
+This was an execution-order defect, not a failed numerical fit. The resumed driver
+explicitly orders each reference's patience5 job before patience20 reuse; four
+targeted tests pass, including the serialized-plan order. Resolve
+`scaling_matched_stopping_resume` for exact original stdout/code and the qualified
+driver. The eight completed fits are reused. Training resumed in the clean
+attention-stopping-resume checkout at b49b19f; the finite evaluation/common-model
+continuation remains active. No model equation, source data or learning rule changed.
+
+Step3's `scaling_common_model_plan` is frozen for54 fresh C6/GRU parent/child
+fits on the same accepted store and eight periods; it has not launched while
+attention occupies the GPU. Original distinct model recipes remain explicit.
+The common policy comparison keeps both attention stopping arms, reuses their
+neutral books and changes only the optimizer/ledger net cap from5% to45%, with
+beta5% fixed. Original calibration is reused, not fitted to new outcomes.
+The1738-session historical C6 reference remains separately labelled: its full
+corrected counterpart would consume the six currently protected development
+reserve periods, so it is deferred under the current evaluation boundary.
+`scaling_continuation_plan` now binds one finite offline continuation in the clean
+scaling-evaluation checkout fdd354a. It waits for complete attention three-seed
+forecast groups, evaluates those on CPU, and waits for the active GPU worker to
+exit before verifying every distinct new attention checkpoint eagerly on its full
+evaluation dates. Exact checkpoint aliases reuse that proof. Only after passing
+inference/account checks does it run the frozen C6/GRU jobs and common policy
+books. Any failure stops the sequence for investigation. It has no recurring
+automation or chat wakeup; capacity choices remain a subsequent evidence review.
+
+The first wider seed selects the same parent epoch under both stopping rules.
+Exact forecast/mask identity, common dates/capital/member and the same calibration
+now permit explicit book reuse within this one frozen evaluation plan. Reused
+books retain original provenance, bind the second arm's forecast sources and reuse
+the saved arithmetic proof with zero new cell counts. One added identity test
+checks that even a one-ULP forecast change, support change or policy/date/capital
+change prevents reuse; all three stopping/reuse tests pass. No model equation,
+account convention or numerical outcome is changed by this execution optimization.
+
+`scaling_matched_refit_epoch_retirement` removes713 more archived intermediate
+epochs from60 completed old refits, freeing2,817,417,216allocated bytes. The5GB
+recovery ZIP and every selected member were restored/hash-checked before deletion;
+canonical C paths include documented D junction targets. Selected/EMA checkpoints,
+forecasts, histories and the active stopping experiment remain. This attempt passed
+first invocation in33.12s. Together with the preceding cleanup,9,154 redundant
+files free20,818,420,623allocated bytes, plus1,459,560,256bytes of lossless compression.
+
+`scaling_matched_stopping_plan` freezes six executed patience20 trajectories and
+twelve labelled patience5/20 selection views. All original seeds11/29/47 and
+attention64/96 are retained. The exact five-stale prefix rule cannot inspect later
+epochs; two targeted selector tests pass. Schedule/max60, child recipes and
+preprocessing/transfer checks remain unchanged. At most96child fits run across
+the same eight periods; exactly identical parent selections permit explicit child
+reuse. The isolated training checkout is df644ec. Two checkout files required
+line-ending-only restoration to the frozen bytes; normalized Git content is exact
+and the checkout was clean before the first fit. No running code is modified.
+
+`scaling_refit_economics` composes the new accepted store and22 previously qualified
+distribution terms for later book evaluation. The first701 allocation-risk rows
+reuse the parent; only the changed tail is recomputed. Independent backward
+fallback checks cover1,322,994cells and all eight actual ledger windows cover
+993sessions. Cash revisions, one-time source actions, strict prior loan references,
+corrected CDI and all source-known clocks qualify. Preparation55.17s and saved
+qualification2.73s; no account book was replayed in this preparation.
+
+Additional cleanup removes301 archived intermediate checkpoints from the excluded
+GRU96 compiler-failed wave, freeing1,813,348,352allocated bytes. Selected/EMA/resume
+files and histories remain, including the interrupted F10 fit. Another3,592 direct
+archived recovery-extract copies free4,575,303bytes. Two initial cleanup inventory
+attempts stopped before any deletion on an unfamiliar receipt status / absent
+completed-fit manifest; their exact code/stdout remain, and the qualified resumes
+retain unrecognized files and preserve interrupted-fit evidence. No model or
+numerical replay failed in these cleanup attempts.
+
+### Added-period complete data contract
+
+[The new repair report](v2_SCALING_DATA_REPAIRS.md) binds 180 restored eligible
+name/dates, unchanged raw observations and 1,032 added gross/neutral outcomes.
+The actual neutral target changes260,946 values over1,446dates, with no losses.
+All106arrays/3717sessions/933names/full60 are preserved. Complete composition and
+275 actual dataset/collator samples pass3,245,645,048 comparisons, plus new causal
+boundaries and old-parent rejection. Live losses remain2,980 peer-field cells
+under the unchanged three-other-peer rule and39financial/135lending cells under
+independently enumerated unit-uncertainty barriers. New prebirth observations,
+loan aliases and acquired-issuer histories are not invented. No new fit result.
+These numerical counts are not independent observations; raw, typed and sample
+counts overlap. Assembly146.31s/consumer107.98s are CPU audit runtimes.
+
+Storage cleanup freed16,183,079,752allocated bytes from4,548 archived intermediate
+foundation/decision checkpoints, plus1,459,560,256bytes through lossless compression.
+Selected models, forecasts and unique evidence remain. Receipts resolve through
+`scaling_historical_epoch_retirement` and `scaling_completed_artifact_compression`.
 
 September 21 user-directed investigation now takes priority over the unstarted
 LSTM fits. See [the frozen scope](v2_SCALING_INVESTIGATION.md) and
@@ -2383,3 +2482,10 @@ the demonstrated successful prefix. Exact code/stdout/qualified recipes remain;
 prefix counts are reconstructed and labelled, not a claimed saved phase receipt.
 Epoch staging/verification115.20383s and cache-stream/resume4.27691s; initial total
 wall time is unknown. No source, fit, forecast, account or data audit was repeated.
+
+Added-period recovery `scaling_inputs_10623e7.zip` is verified, SHA
+0bf7b65909afe77322050a30087c37e698e8e0f1076132a55d6e951d9e94cd72,
+463,396,848bytes. All1,478logical/1,394unique members restore/hash-check, with84
+aliases. All64changed arrays reconstruct2,097,413,892cells to exact new-store
+byte hashes;42unchanged arrays retain the prior verified store dependency.
+Archive15.81s/recovery19.72s. Sources/accepted full arrays/oldfits are not duplicated.

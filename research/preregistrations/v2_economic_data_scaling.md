@@ -8,6 +8,33 @@ Reread this document after each stage. Progress and evidence belong in
 
 ## Fixed boundaries and priorities
 
+User continuation, September 21: execute the four-step sequence summarized in
+the current progress document. First propagate the specifically evidenced added-
+period model-data repairs into a separately accepted complete store. Then compare
+parent patience 5 versus 20 across attention widths 64/96 and the fixed seeds
+11/29/47 on the eight already designated evaluation periods. Preserve the
+60-epoch maximum and schedule, child stopping, optimizer, target, history and
+checkpoint selector; freeze the executable plan before any new fit outcome.
+Treat the earlier seed29/F10 probe as diagnostic, never as an adopted best seed.
+Next compare C6/GRU and neutral/flexible exposure on common dates and accounting,
+with a separately identified continuous counterpart where compatible forecasts
+exist. Finally resume bounded architecture experiments from the resulting
+baseline, including the previously authorized LSTM contrast. Preserve the six
+development reserves unless a later explicit decision authorizes using them;
+do not call disjoint periods continuous or use 2025/2026 consumers. Reuse passed
+controls and source evidence. No recurring heartbeat or new subagents.
+
+Matched stopping execution, frozen before new outcomes: run six patience20
+parent trajectories (two attention widths, three original seeds). Apply the
+unchanged patience5 selector only to each trajectory's prefix through its first
+five-stale stopping point; retain that exact saved epoch. Patience affects only
+the loop termination condition, with the same60-epoch LR schedule, updates,
+sampler and RNG. Label the twelve parent selections as views of six trajectories,
+not twelve independent fits. If both rules choose the same epoch, their identical
+child seed/fold job is executed once and explicitly reused. Otherwise both child
+fits run. Preserve actual executed patience20 metadata on every parent checkpoint;
+no fake continuation, overwritten old fit or outcome-based seed selection.
+
 User amendment, September 21: before further capacity fits, investigate why wider
 attention's corrected data/refit result reverses its old-forecast advantage.
 Follow `docs/v2_SCALING_INVESTIGATION.md` and the hash-bound investigation plan.

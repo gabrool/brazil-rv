@@ -2,6 +2,7 @@
 
 import argparse
 from dataclasses import asdict
+import hashlib
 import json
 from pathlib import Path
 import pickle
@@ -10,6 +11,7 @@ from time import perf_counter
 import numpy as np
 import torch
 
+from brazil_rv.execution.allocation import AllocationConfig
 from brazil_rv.execution.custody_fees import CustodyAssessment
 from brazil_rv.execution.portfolio_policy import CalibratedPolicy, exact_replay
 from brazil_rv.execution.spot_costs import MonthlySpotTariff
@@ -110,6 +112,22 @@ def holding_spells(result, names):
     )
 
 
+def forecast_identity(panel, valid, fold, capital, member, mapping_key):
+    """Exact input identity for repeated logical arms within one frozen plan."""
+    return dict(
+        fold=fold,
+        capital=capital,
+        member=member,
+        mapping_key=mapping_key,
+        panel_sha256=hashlib.sha256(np.ascontiguousarray(panel).tobytes()).hexdigest(),
+        valid_sha256=hashlib.sha256(np.ascontiguousarray(valid).tobytes()).hexdigest(),
+        panel_shape=list(panel.shape),
+        panel_dtype=str(panel.dtype),
+        valid_shape=list(valid.shape),
+        valid_dtype=str(valid.dtype),
+    )
+
+
 def execute(run):
     torch.set_num_threads(1)
     code = _git_identity()
@@ -124,6 +142,10 @@ def execute(run):
     prior = Path(plan["prior_root"])
     account = bound_json(plan["economic_account"])
     values = account["primary_config"].copy()
+    allocation = AllocationConfig(**plan.get("allocation", {}))
+    if "allocation" in plan:
+        values["planned_absolute_net_cap"] = allocation.net_cap
+        values["planned_absolute_beta_cap"] = allocation.beta_cap
     values["monthly_spot_tariffs"] = tuple(
         MonthlySpotTariff(**x) for x in values["monthly_spot_tariffs"]
     )
@@ -162,8 +184,9 @@ def execute(run):
             }
             if keys <= done:
                 continue
+            arm_root = Path(plan.get("fit_roots", {}).get(arm, plan["fit_root"]))
             fits = [
-                Path(plan["fit_root"]) / "fits" / arm / f"{fold}_seed_{seed}"
+                arm_root / "fits" / arm / f"{fold}_seed_{seed}"
                 for seed in plan["seeds"]
             ]
             if not all(
@@ -174,10 +197,10 @@ def execute(run):
             ):
                 pending.append(dict(arm=arm, fold=fold))
                 continue
-            panels, valid, sources = new_panel(
-                Path(plan["fit_root"]), data, arm, fold, rows, "raw"
-            )
-            mapping = calibration(mappings["arms"]["C6" if arm == "C6" else "TE_all"])
+            panels, valid, sources = new_panel(arm_root, data, arm, fold, rows, "raw")
+            mapping_key = "C6" if arm == "C6" else "TE_all"
+            mapping = calibration(mappings["arms"][mapping_key])
+            mapping_ref = binding(mapping_path)
             for capital in plan["capitals"]:
                 for member in (
                     [*map(str, plan["seeds"]), "ensemble"]
@@ -191,6 +214,48 @@ def execute(run):
                         )
                         continue
                     tick = perf_counter()
+                    identity = (
+                        forecast_identity(
+                            panels[member], valid, fold, capital, member, mapping_key
+                        )
+                        if plan.get("reuse_identical_forecasts", False)
+                        else None
+                    )
+                    reused = next(
+                        (
+                            r
+                            for r in completed
+                            if identity is not None
+                            and r.get("exact_input_identity") == identity
+                            and r.get("mapping") == mapping_ref
+                        ),
+                        None,
+                    )
+                    if reused is not None:
+                        # Account, inputs, dates, policy and mapping are fixed by
+                        # this plan; forecasts and validity are byte-identical.
+                        assert bound_json(reused["book"])["provenance"]["plan"] == ref
+                        completed.append(
+                            dict(
+                                reused,
+                                key=key,
+                                reused_from_key=reused["key"],
+                                logical_forecast_sources=sources,
+                                seconds=0,
+                            )
+                        )
+                        done.add(key)
+                        write_json_atomic(
+                            progress,
+                            dict(
+                                status="running",
+                                plan=ref,
+                                completed=completed,
+                                planned=plan["planned_books"],
+                            ),
+                        )
+                        print(json.dumps(completed[-1]), flush=True)
+                        continue
                     target = out / "books" / key
                     assert not target.exists(), (
                         "Preserve partial output and resume its exact boundary explicitly"
@@ -209,11 +274,17 @@ def execute(run):
                         policy_inputs=plan["inputs"],
                         mapping=binding(mapping_path),
                         forecast_sources=sources,
+                        allocation=asdict(allocation),
                         member=member,
                         heldout_accessed=False,
                     )
                     result, targets, previous = exact_replay(
-                        view, CalibratedPolicy(mapping), start, stop, config=config
+                        view,
+                        CalibratedPolicy(mapping),
+                        start,
+                        stop,
+                        config=config,
+                        allocation=allocation,
                     )
                     book = save_book(
                         target,
@@ -263,6 +334,8 @@ def execute(run):
                             seconds=perf_counter() - tick,
                             economics_unresolved=bool(result.economics_unresolved),
                             net_excess_bps=book["summary"]["mean"]["net_excess_bps"],
+                            exact_input_identity=identity,
+                            mapping=mapping_ref,
                         )
                     )
                     done.add(key)

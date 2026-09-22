@@ -16,11 +16,14 @@ from verify_surviving_market_inputs import independent
 PROJECT = Path(__file__).resolve().parents[1]
 
 
-def main():
+def main(scaling=False):
     tick = perf_counter()
     pointer = PROJECT / "docs/v2_economic_data_scaling_run.json"
     run = json.loads(pointer.read_text())
-    admission = bound_json(run["stage_c_event_data_admission"])
+    admission_key = (
+        "scaling_data_identity" if scaling else "stage_c_event_data_admission"
+    )
+    admission = bound_json(run[admission_key])
     root = Path(admission["parent"]["root"])
     manifest = bound_json(
         dict(
@@ -28,7 +31,11 @@ def main():
             sha256=admission["parent"]["manifest_sha256"],
         )
     )
-    out = Path(admission["plan"]["path"]).parent / "sidecars"
+    out = (
+        Path(bound_json(run["scaling_data_workspace"])["root"])
+        if scaling
+        else Path(admission["plan"]["path"]).parent
+    ) / "sidecars"
     out.mkdir(exist_ok=True)
     assert not (out / "manifest.json").exists()
     (out / ("executed_" + binding(Path(__file__))["sha256"][:12] + ".py")).write_bytes(
@@ -42,13 +49,25 @@ def main():
     active = old_active.copy()
     with np.load(admission["deltas"]["path"]) as z:
         active[tuple(z["active__indices"].T)] = z["active__values"]
-    first = int(np.searchsorted(dates, np.datetime64("2020-09-18")))
+    first = int(
+        np.searchsorted(
+            dates,
+            np.datetime64(
+                min(
+                    e["effective_date"]
+                    for e in bound_json(admission["plan"])["history"]
+                )
+                if scaling
+                else np.datetime64("2020-09-18")
+            ),
+        )
+    )
     issuer, lending, auxiliary = [
-        bound_json(run["stage_c_event_" + k])
+        bound_json(run[("scaling_data_" if scaling else "stage_c_event_") + k])
         for k in ("issuers", "lending", "auxiliaries")
     ]
     pi, plend, pa = [
-        bound_json(run["surviving_rename_" + k])
+        bound_json(run[("stage_c_event_" if scaling else "surviving_rename_") + k])
         for k in ("issuers", "lending", "auxiliaries")
     ]
     families = {
@@ -74,7 +93,7 @@ def main():
             out / "plan.json",
             dict(
                 parent=admission["parent"],
-                admission=run["stage_c_event_data_admission"],
+                admission=run[admission_key],
                 families=families,
                 contrast="Final typed alignment of saved seven-family tables, exact existing-coordinate controls and independent original feature transforms. No source/reducer or prior sector/market/consumer repetition. Keep every live loss and unchanged support. One complete-store consumer qualification follows.",
             ),
@@ -222,7 +241,9 @@ def main():
     )
     write_json_atomic(out / "manifest.json", report)
     run = json.loads(pointer.read_text())
-    run["stage_c_event_sidecars"] = binding(out / "manifest.json")
+    run["scaling_data_sidecars" if scaling else "stage_c_event_sidecars"] = binding(
+        out / "manifest.json"
+    )
     write_json_atomic(pointer, run)
 
 

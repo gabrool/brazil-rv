@@ -24,10 +24,16 @@ from propagate_remaining_auxiliaries import exact_nullable, odd_family, replace
 PROJECT = Path(__file__).resolve().parents[1]
 
 
-def main():
+def main(scaling=False):
     tick = perf_counter()
     run = json.loads((PROJECT / "docs/v2_economic_data_scaling_run.json").read_text())
-    admission = bound_json(run["stage_c_event_data_admission"])
+    admission_key = (
+        "scaling_data_identity" if scaling else "stage_c_event_data_admission"
+    )
+    prior_key = (
+        "stage_c_event_auxiliaries" if scaling else "surviving_rename_auxiliaries"
+    )
+    admission = bound_json(run[admission_key])
     parent = Path(admission["parent"]["root"])
     manifest = bound_json(
         dict(
@@ -35,7 +41,7 @@ def main():
             sha256=admission["parent"]["manifest_sha256"],
         )
     )
-    prior = bound_json(run["surviving_rename_auxiliaries"])
+    prior = bound_json(run[prior_key])
     families = source_families(manifest)
     dates, isins = (
         np.load(parent / "date_index.npy"),
@@ -44,19 +50,23 @@ def main():
     sessions = dates.astype(object).tolist()
     old_links = pl.read_parquet(parent / "slow_history_links.parquet").to_dicts()
     links = pl.read_parquet(admission["history_mapping"]["path"]).to_dicts()
-    events = bound_json(admission["plan"])["events"]
+    events = bound_json(admission["plan"])["history" if scaling else "events"]
     new_pairs = {(e["isin"], e["successor_isin"]) for e in events}
     new_links = [
         x
         for x in links
         if (isins[x["predecessor_index"]], isins[x["successor_index"]]) in new_pairs
     ]
-    for link in links:
+    for link in [*links, *(old_links if scaling else [])]:
         if isins[link["predecessor_index"]] == "BRJSLGACNOR2":
             link["source_reopens_index"] = sessions.index(date(2020, 11, 11))
     links.sort(key=lambda x: x["effective_index"])
     new_links.sort(key=lambda x: x["effective_index"])
-    out = Path(admission["plan"]["path"]).parent / "auxiliaries"
+    out = (
+        Path(bound_json(run["scaling_data_workspace"])["root"])
+        if scaling
+        else Path(admission["plan"]["path"]).parent
+    ) / "auxiliaries"
     out.mkdir(exist_ok=False)
     (out / "executed.py").write_bytes(Path(__file__).read_bytes())
     (out / "executed_index.py").write_bytes(
@@ -66,9 +76,9 @@ def main():
         out / "plan.json",
         dict(
             parent=admission["parent"],
-            admission=run["stage_c_event_data_admission"],
-            prior=run["surviving_rename_auxiliaries"],
-            contrast="Five admitted market episodes: bounded22-prior/22-following activity/options and six-prior oddlot source; unchanged support/clocks. Index uses BOTH dated composition identities, originalADV20 and JSL source reopening by snapshot date; no option-series/loan alias or source census. Reuse accepted source normalizations and parent families; final combined typed/consumer verification follows.",
+            admission=run[admission_key],
+            prior=run[prior_key],
+            contrast=f"{len(events)} admitted histories: bounded22-prior/22-following activity/options and six-prior oddlot source; unchanged support/clocks. Index uses BOTH dated composition identities, originalADV20 and JSL source reopening by snapshot date; no option-series/loan alias or source census. Reuse accepted source normalizations and parent families; final combined typed/consumer verification follows.",
             verification="Save source subsets and control/corrected outputs once; exact old-family controls, future-source deletion prefixes, independent arithmetic and actual new-family consumers before full-store admission.",
             registration=binding(
                 PROJECT / "research/preregistrations/v2_economic_data_scaling.md"
@@ -243,12 +253,19 @@ def main():
 
     im = bound_json(families["rebalance"]["source_manifest"])
     snapshots = bound_json(im["snapshots"])
+    portfolio_start = (
+        date(min(sessions[x["effective_index"]].year for x in new_links) - 1, 1, 1)
+        if scaling
+        else date(2020, 4, 1)
+    )
     portfolios = selected(
-        snapshots["output"], pl.col("disclosure_date") >= date(2020, 4, 1)
+        snapshots["output"], pl.col("disclosure_date") >= portfolio_start
     )
     portfolios.write_parquet(out / "index_portfolios.parquet")
     index_cash = selected(
-        cash_rec, pl.col("source_trade_date") >= date(2020, 1, 1)
+        cash_rec,
+        pl.col("source_trade_date")
+        >= (portfolio_start if scaling else date(2020, 1, 1)),
     ).select("source_trade_date", "isin", "ticker")
     index_cash.write_parquet(out / "index_tickers.parquet")
     base = Path(im["base_store"]["path"]).parent
@@ -330,7 +347,7 @@ def main():
         status="qualified_auxiliary_reducers_pending_consumer",
         plan=binding(out / "plan.json"),
         parent=admission["parent"],
-        prior=run["surviving_rename_auxiliaries"],
+        prior=run[prior_key],
         scopes=scopes,
         index_control_cells=count,
         index_reports=index_reports,
@@ -343,7 +360,9 @@ def main():
     write_json_atomic(out / "manifest.json", report)
     pointer = PROJECT / "docs/v2_economic_data_scaling_run.json"
     run = json.loads(pointer.read_text())
-    run["stage_c_event_auxiliaries"] = binding(out / "manifest.json")
+    run["scaling_data_auxiliaries" if scaling else "stage_c_event_auxiliaries"] = (
+        binding(out / "manifest.json")
+    )
     write_json_atomic(pointer, run)
     print(
         json.dumps(
