@@ -54,6 +54,13 @@ def runtime_files():
     )
 
 
+def ordered_arms(arms):
+    """Canonical JSON sorts p20 before p5; execute the reuse source first."""
+    return sorted(
+        arms.items(), key=lambda item: (item[1]["reference"], item[1]["patience"])
+    )
+
+
 def freeze(run):
     code = _git_identity()
     source = bound_json(run["stage_c_refit_plan"])
@@ -130,7 +137,12 @@ def freeze(run):
 def execute(run):
     reference = run["scaling_matched_stopping_plan"]
     plan = bound_json(reference)
-    assert sha256_file(Path(__file__)) == plan["driver"]["sha256"]
+    driver = plan["driver"]
+    if "scaling_matched_stopping_resume" in run:
+        resume = bound_json(run["scaling_matched_stopping_resume"])
+        assert resume["original_plan"] == reference
+        driver = resume["driver"]
+    assert sha256_file(Path(__file__)) == driver["sha256"]
     for key, path in runtime_files().items():
         assert sha256_file(path) == plan["runtime"]["files"][key]["sha256"], key
     store, root = Path(plan["store"]["root"]), Path(plan["root"])
@@ -244,7 +256,7 @@ def execute(run):
             )
     for fold in plan["folds"]:
         for seed in plan["seeds"]:
-            for arm, spec in plan["arms"].items():
+            for arm, spec in ordered_arms(plan["arms"]):
                 key = f"{arm}/F/{fold}/{seed}"
                 if key in done:
                     continue

@@ -1178,6 +1178,10 @@
     "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_attention_stopping_20260921\\plan.json",
     "sha256": "52cbf9539dae33aa217f4ad0db4bf2b32390b78feb1003d271e85115779a51d0"
   },
+  "scaling_matched_stopping_resume": {
+    "path": "C:\\quant-data\\b3\\processed\\model_runs\\v2_attention_stopping_20260921\\ordering_resume\\resume.json",
+    "sha256": "c6c26d91093e62ee8c30f03b0d82f774a8ea83a9409217909bf7ef0949e223a8"
+  },
   "scaling_parent_patience_evaluation_plan": {
     "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\parent_patience\\evaluation_plan.json",
     "sha256": "1b84ea1eaa28fb15eebdda9b66b7598c7535cf5ec9ce38212dfd141584c1c796"

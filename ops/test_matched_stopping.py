@@ -1,9 +1,11 @@
 """Protect the exact-prefix selector against future-history selection."""
 
+import json
+
 import numpy as np
 
 from replay_data_refits import forecast_identity
-from run_matched_stopping import stopped_selection
+from run_matched_stopping import ordered_arms, stopped_selection
 
 
 def test_future_epochs_cannot_change_early_stop():
@@ -45,3 +47,18 @@ def test_book_reuse_requires_same_forecasts_support_and_policy():
     assert forecast_identity(panel, valid, *args[:3], "C6") != original
     assert forecast_identity(panel, valid, "F3", *args[1:]) != original
     assert forecast_identity(panel, valid, args[0], 1000000, *args[2:]) != original
+
+
+def test_serialized_arm_order_runs_alias_source_before_reuse():
+    arms = {
+        f"{name}_p{p}": dict(reference=name, patience=p)
+        for name in ("TE_full", "TE_wide")
+        for p in (5, 20)
+    }
+    restored = json.loads(json.dumps(arms, sort_keys=True))
+    assert list(restored)[0] == "TE_full_p20"
+    seen = set()
+    for arm, spec in ordered_arms(restored):
+        if spec["patience"] == 20:
+            assert f"{spec['reference']}_p5" in seen
+        seen.add(arm)
