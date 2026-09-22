@@ -1230,6 +1230,10 @@
     "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\storage\\index.json",
     "sha256": "3248d018412e6f2eb71f4570240bf3f018bb70d2df273170ebe8c1c854bab811"
   },
+  "scaling_strong_cleanup": {
+    "path": "C:\\Brazil-RV\\quant\\b3-quant\\docs\\v2_strong_cleanup.json",
+    "sha256": "fd8da8e3145341c112b33d2ee1b8cfd0853ed76050bf5ad75520ebce5c380c05"
+  },
   "scaling_training_probe": {
     "path": "D:\\quant-data\\b3\\processed\\model_runs\\v2_economic_data_scaling_20260919\\scaling_investigation\\training_probe\\report.json",
     "sha256": "2066b5c40e440d8a724d14fc030ce241383c0f8389c53d0450f28553a3b81124"

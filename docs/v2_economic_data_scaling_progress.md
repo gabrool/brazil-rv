@@ -39,6 +39,22 @@ See [the current investigation](v2_ATTENTION_REVERSAL_DIAGNOSTICS.md),
 
 ### Matched stopping execution
 
+The stronger filesystem cleanup is documented in
+[storage cleanup](v2_STORAGE_CLEANUP.md), with per-file retirement/compression and
+recovery receipts under `scaling_strong_cleanup`. Historical code checkouts now
+restore from retained Git commits; current training/evaluation checkouts remain.
+Selected models, forecasts, immutable sources and accepted stores are preserved.
+
+The initial driver stopped after all six parents and two full-attention children:
+JSON key sorting put the wider patience20 alias before its patience5 source job.
+This was an execution-order defect, not a failed numerical fit. The resumed driver
+explicitly orders each reference's patience5 job before patience20 reuse; four
+targeted tests pass, including the serialized-plan order. Resolve
+`scaling_matched_stopping_resume` for exact original stdout/code and the qualified
+driver. The eight completed fits are reused. Training resumed in the clean
+attention-stopping-resume checkout at b49b19f; the finite evaluation/common-model
+continuation remains active. No model equation, source data or learning rule changed.
+
 Step3's `scaling_common_model_plan` is frozen for54 fresh C6/GRU parent/child
 fits on the same accepted store and eight periods; it has not launched while
 attention occupies the GPU. Original distinct model recipes remain explicit.

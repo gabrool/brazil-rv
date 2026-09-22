@@ -15,6 +15,10 @@ patience5 prefix selection; this is a labelled checkpoint selection view, not a
 second executed fit. Preserve schedule60, child recipes and earlier-tie selector.
 Verified redundant historical epoch files may be retired; selected checkpoints,
 forecasts, unique evidence and immutable sources remain online or recoverable.
+Resolve `scaling_strong_cleanup` and [storage cleanup](docs/v2_STORAGE_CLEANUP.md)
+before recreating a retired historical checkout or intermediate objective checkpoint.
+Only the current training/evaluation checkouts remain; historical commits are
+retained in Git and exact checkpoint copies remain in the verified recovery tar.
 The previous context is preserved byte-for-byte in [historical context](docs/PROJECT_CONTEXT_HISTORY.md), SHA b80c3539acaed9bfdde84a871b630d9d43fb7e9badcf8b54f0e315da14f76044.
 Its older pending queues, permissions and limitations are superseded where resolved below. Read historical sections only when relevant.
 
@@ -45,7 +49,7 @@ aboveCDI; separate source overlays3.01618/1.92001. Wide wins3/8; its paired40-da
 95% difference interval crosses zero[-2.69949,+.52282]. These are independent
 period accounts, not the original continuous flexible-net result. Parent stopping
 is a demonstrated partial cause, not a generally adopted rule or complete cause.
-Matched broader stopping remains the next justified training contrast, unstarted.
+Matched broader stopping is now running under `scaling_matched_stopping_plan`.
 `scaling_expanded_recovery` binds the verified main/epoch ZIPs and exact attempts.
 All334 new intermediate epoch copies and62 patience-probe copies now restore
 from their verified archives; selected/EMA weights, histories, forecasts and old
